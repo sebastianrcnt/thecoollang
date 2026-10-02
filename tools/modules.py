@@ -152,8 +152,9 @@ def tree_hash(root):
 
 
 class Graph:
-    def __init__(self, manifest, offline=False, frozen=False):
+    def __init__(self, manifest, offline=False, frozen=False, use_vendor=True):
         self.manifest = manifest
+        self.use_vendor = use_vendor
         self.offline = offline or os.environ.get('COOL_OFFLINE') == '1'
         self.frozen = frozen
         self.selected = {}
@@ -203,7 +204,7 @@ class Graph:
                 raise ValueError(f'replacement module path mismatch: {path}')
             return root
         vendor_index = self.manifest.root / 'vendor/cool.vendor.json'
-        if vendor_index.exists():
+        if self.use_vendor and vendor_index.exists():
             index = json.loads(vendor_index.read_text())
             root = self.manifest.root / 'vendor' / path if index.get(path) == version else self.manifest.root / 'vendor/.versions' / (path + '@' + version)
             if not root.is_dir():

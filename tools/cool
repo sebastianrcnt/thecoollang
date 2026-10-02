@@ -158,7 +158,8 @@ def module_command(args):
         path, version = args.value.rsplit('@', 1)
         validate_path(path); version_key(version)
         manifest.requires[path] = version
-    graph = Graph(manifest, getattr(args, 'offline', False), args.action == 'verify').resolve()
+    graph = Graph(manifest, getattr(args, 'offline', False), args.action == 'verify',
+                  use_vendor=args.action in ('verify', 'graph')).resolve()
     if args.action in ('get', 'tidy'):
         # MVS-selected minimum versions become explicit requirements.
         manifest.requires.update(graph.selected)

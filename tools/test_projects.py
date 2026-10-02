@@ -67,6 +67,12 @@ with tempfile.TemporaryDirectory(prefix='cool project ') as tmp:
         raise AssertionError('cache tampering was not detected')
     (shared2/'lib.cool').write_text('package lib; pub fn value() -> i64 { return 1; }')
     cli(project, 'mod', 'vendor', '--offline')
+    # Dependency updates regenerate stale vendor trees from the module cache.
+    cached_module('example.com/me/shared', 'v1.3.0')
+    manifest.requires['example.com/me/shared'] = 'v1.3.0'
+    manifest.write()
+    assert 'stale' in cli(project, 'mod', 'verify', '--offline', code=2).stderr
+    cli(project, 'mod', 'vendor', '--offline')
     (root/'cache/mod').rename(root/'saved-cache')
     Graph(manifest, offline=True, frozen=True).resolve()
     cli(project, 'mod', 'verify', '--offline')
