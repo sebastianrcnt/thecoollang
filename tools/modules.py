@@ -4,6 +4,7 @@ import base64
 from dataclasses import dataclass, field
 import hashlib
 import io
+import json
 import os
 from pathlib import Path
 import re
@@ -136,7 +137,10 @@ def find_root(start):
 def tree_hash(root):
     h = hashlib.sha256()
     for base, dirs, files in os.walk(root):
-        dirs[:] = sorted(d for d in dirs if d not in ('.git', 'build', 'vendor'))
+        for name in dirs:
+            if (Path(base) / name).is_symlink():
+                raise ValueError(f'symlink in module content: {Path(base) / name}')
+        dirs[:] = sorted(d for d in dirs if d != '.git')
         for name in sorted(files):
             path = Path(base) / name
             if path.is_symlink():
@@ -153,6 +157,7 @@ class Graph:
         self.offline = offline or os.environ.get('COOL_OFFLINE') == '1'
         self.frozen = frozen
         self.selected = {}
+        self.visited_roots = {}
         self.roots = {manifest.module: manifest.root}
         self.sums = {}
         self.pending_sums = {}
@@ -197,6 +202,14 @@ class Graph:
             if Manifest.read(root).module != path:
                 raise ValueError(f'replacement module path mismatch: {path}')
             return root
+        vendor_index = self.manifest.root / 'vendor/cool.vendor.json'
+        if vendor_index.exists():
+            index = json.loads(vendor_index.read_text())
+            root = self.manifest.root / 'vendor' / path if index.get(path) == version else self.manifest.root / 'vendor/.versions' / (path + '@' + version)
+            if not root.is_dir():
+                raise ValueError(f'vendor contents are stale for {path}@{version}; regenerate vendor')
+            self.verify_sum(path, version, tree_hash(root))
+            return root
         root = cache_home() / 'mod' / (path + '@' + version)
         if not root.exists():
             if self.offline:
@@ -208,7 +221,7 @@ class Graph:
             with tempfile.TemporaryDirectory(dir=root.parent, prefix='.fetch-') as tmp:
                 temp = Path(tmp)
                 subprocess.run(['git', '-c', 'core.hooksPath=/dev/null', 'clone', '--bare', '--quiet',
-                                'https://' + repository + '.git', str(temp / 'repo')], check=True)
+                                (('git@' + repository.split('/', 1)[0] + ':' + repository.split('/', 1)[1]) if os.environ.get('COOL_GIT_SSH') == '1' else 'https://' + repository) + '.git', str(temp / 'repo')], check=True)
                 archive = subprocess.check_output(['git', '-C', str(temp/'repo'), 'archive', '--format=tar', 'refs/tags/' + version])
                 unpack = temp / 'source'; unpack.mkdir()
                 with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
@@ -255,6 +268,7 @@ class Graph:
                 continue
             seen.add((path, version))
             root = self.source(path, version)
+            self.visited_roots[path, version] = root
             if path not in self.selected or version_key(version) > version_key(self.selected[path]):
                 self.selected[path] = version
                 self.roots[path] = root

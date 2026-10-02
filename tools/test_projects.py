@@ -65,5 +65,12 @@ with tempfile.TemporaryDirectory(prefix='cool project ') as tmp:
         assert 'checksum mismatch' in str(error)
     else:
         raise AssertionError('cache tampering was not detected')
+    (shared2/'lib.cool').write_text('package lib; pub fn value() -> i64 { return 1; }')
+    cli(project, 'mod', 'vendor', '--offline')
+    (root/'cache/mod').rename(root/'saved-cache')
+    Graph(manifest, offline=True, frozen=True).resolve()
+    cli(project, 'mod', 'verify', '--offline')
+    (project/'vendor/example.com/me/shared/lib.cool').write_text('tampered')
+    assert 'checksum mismatch' in cli(project, 'mod', 'verify', '--offline', code=2).stderr
     assert version_key('v1.0.0-alpha.2') < version_key('v1.0.0-alpha.10') < version_key('v1.0.0')
 print('projects: package graph, private symbols, cycles, cache invalidation, LLVM JIT, MVS, offline checksums PASS')

@@ -17,7 +17,8 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include "../../language/numeric.h"
+#include "../../language/memory.h"
+#include "../../language/ffi.h"
 
 #ifdef WARM_PROGRAM_HEADER
 #include WARM_PROGRAM_HEADER
@@ -454,6 +455,9 @@ static void register_host_symbols(Module *m) {
     HOST("NativeParseFloat", host_parse_float);
     HOST("NativeNumericCast", cool_numeric_cast);
     HOST("NativePrintFloat", host_print_float);
+    HOST("NativeForeignCall", cool_foreign_call);
+    HOST("NativeMemoryRead", cool_memory_read);
+    HOST("NativeMemoryWrite", cool_memory_write);
     HOST("AIWNIOS_SetJmp", AIWNIOS_SetJmp);
     HOST("AIWNIOS_LongJmp", AIWNIOS_LongJmp);
     HOST("ExtDft", host_ext_dft);

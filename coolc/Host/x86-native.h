@@ -71,6 +71,8 @@ static uintptr_t x86_host_import(const char *name, uintptr_t fn) {
         {"StrCpy",2}, {"StrICmp",2}, {"Caller",1}, {"IsCmdLineMode",0},
         {"StrPrintFunSeg",4}, {"PutS",1}, {"Print",0}, {"SwapI64",2}, {"Pow10",1},
         {"WriteProtectMemCpy",3}, {"NativeExit",1}, {"NativeErrPutS",1},
+        {"NativeForeignCall",6}, {"NativeParseFloat",2}, {"NativeNumericCast",4}, {"NativePrintFloat",1},
+        {"NativeMemoryRead",2}, {"NativeMemoryWrite",3},
         {"NativeArgCount",0}, {"NativeArg",1}, {"NativeGetChar",0},
         {"AIWNIOS_SetJmp",1}, {"AIWNIOS_LongJmp",1}, {"ExtDft",2}, {"ExtChg",2},
         {"FileNameAbs",2}, {"FileRead",3}, {"FileWrite",3}, {"NativeWrite",3},

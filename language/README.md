@@ -1,8 +1,8 @@
 # New-language compiler
 
 The lexer, parser, type checker, interpreter and LLVM emitter are written in
-bootstrap Cool (`*.cool`). `runtime.c` supplies only LLVM program IO and checked
-integer division/shift operations. No source-to-C compilation is used.
+bootstrap Cool (`*.cool`). `runtime.c` supplies LLVM program IO, numeric checks and raw memory services;
+`ffi.h` adapts scalar/pointer C calls through libffi. No source-to-C compilation is used.
 
 ```sh
 make language-test
@@ -13,7 +13,7 @@ clang -O2 build/modern.ll language/runtime.c -o build/modern
 
 Current scalar core: `fn`, `let`/`var`, explicit parameter/result types, `i64`,
 `i32`, `u8`, `bool`, `string`, explicit integer casts, forward calls, recursion,
-lexical scope, immutable bindings/parameters, `if`/`else`, `while`, `break`,
+lexical scope, immutable bindings/parameters, `if`/`else`, `while`, `for`, `break`,
 `continue`, short-circuit boolean expressions and captured-argument `defer`.
 Every local requires initialization. Non-void functions must return on every
 statically reachable path. Ordinary integer arithmetic wraps to its type width;
@@ -26,12 +26,12 @@ the process and does not promise cleanup.
 
 This is an implementation stage, not the full language: aggregate types, generic
 specialization, ownership checking and the complete runtime are still pending.
-The interpreter currently executes typed trees, not bytecode. The new frontend is
+The new frontend is
 written in existing Cool; new-syntax self-hosting is not yet achieved.
 
 ## Additional execution paths and projects
 
-`cool run` now uses typed register bytecode, compiled lazily per function.
+`cool run` uses adaptive bytecode/native execution, compiled lazily per function.
 `cool run --backend jit` compiles that bytecode to ARM64 native arithmetic and
 branches; checked operations and calls use shared runtime helpers. Functions
 with register files too large for baseline encodings fall back to bytecode.
@@ -45,8 +45,9 @@ files and cycle rejection. `cool.mod` supports semantic-version requirements and
 local replacement; the module graph uses MVS and records verified tree hashes in
 `cool.sum`. Local workspaces and offline/frozen resolution are supported.
 Direct fetching currently supports host/owner/repo Git repositories and tagged
-versions. Commit pseudo-versions, registry/proxy protocol, vendor and tidy commands
-are pending. `cool.sum` protects pinned content; no transparency service exists.
+versions. `mod tidy` records selected module versions; `mod vendor` includes the source
+graph and version manifests needed for offline MVS. Commit pseudo-versions and
+registry/proxy protocol are pending. `cool.sum` protects pinned content; no transparency service exists.
 
 `cool legacy ...` retains the original CLI for bootstrap-era source files.
 
@@ -81,3 +82,17 @@ relexes its output before writing, and is idempotence-tested. `cool test` discov
 jit` runs them under native JIT. `cool doc` prints public typed function signatures.
 Documentation comments, a full documentation site and language-server services
 remain outstanding.
+
+## Raw memory and C interoperability
+
+Typed `*T` pointers, `null`, `cast[*T](value)`, dereference and pointer indexing
+are implemented across all execution paths. Pointer arithmetic scales by element
+size. Raw loads/stores check null, but do not promise allocation bounds or lifetime
+safety. `std/mem` exposes alloc/free/copy. Unsafe operations require a lexical
+`unsafe { ... }` block, including casts and C calls.
+
+`extern "C" fn strlen(s: *u8) -> usize;` declares a C function. Interpreter and
+baseline JIT use a libffi host adapter; LLVM emits native C ABI calls with proper
+scalar conversions. Only scalar/pointer arguments and results are supported;
+variadic C functions, aggregate ABI and user-specified library linking are pending.
+The C symbols must be available to the selected execution engine.

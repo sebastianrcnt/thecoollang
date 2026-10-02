@@ -23,6 +23,9 @@ import I64 NativeGetChar();
 import I64 NativeParseFloat(U8 *text, I64 *ok);
 import I64 NativeNumericCast(I64 bits, I64 from, I64 to, I64 *ok);
 import U0 NativePrintFloat(I64 bits);
+import I64 NativeForeignCall(U8 *name, I64 result, I64 *types, I64 *values, I64 count, I64 *ok);
+import I64 NativeMemoryRead(I64 address, I64 type);
+import U0 NativeMemoryWrite(I64 address, I64 type, I64 value);
 union NumberBits { I64 bits; F64 real; };
 F64 AsFloat(I64 bits) { NumberBits n; n.bits = bits; return n.real; }
 I64 AsBits(F64 value) { NumberBits n; n.real = value; return n.bits; }
@@ -74,6 +77,8 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define T_U64 10
 #define T_F64 11
 #define T_F32 12
+#define T_NULL 13
+#define T_PTR 100
 #define K_ID 256
 #define K_INT 257
 #define K_STRING 258
@@ -124,10 +129,14 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_DEFER 15
 #define N_EXPR 16
 #define N_CAST 17
+#define N_LOAD 18
+#define N_STORE 19
+#define N_ADDRESS 20
+#define N_FOR 21
 class Node { I64 kind, type, value, op, slot; Token *token; U8 *name; Node *a, *b, *c, *next; };
 class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
 class Function {
-    U8 *name, *package; I64 result, argc, slots, begin, end, public;
+    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign;
     U8 *bytecode, *machine; I64 code_count, code_capacity, registers, calls;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
 };
@@ -135,7 +144,7 @@ class Function {
 Function *functions;
 I64 nfun;
 Local *locals;
-I64 depth, loop_depth, current_fun;
+I64 depth, loop_depth, current_fun, unsafe_depth;
 Node *NewNode(I64 kind, Token *t) { Node *n = CAlloc(sizeof(Node)); n->kind = kind; n->token = t; n->slot = -1; return n; }
 I64 FindFunIn(U8 *package, U8 *name) { I64 i; for (i = 0; i < nfun; i++) if (Eq(functions[i].package, package) && Eq(functions[i].name, name)) return i; return -1; }
 I64 FindFun(U8 *name) { return FindFunIn("__main", name); }
@@ -159,6 +168,7 @@ Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     res->slot = functions[current_fun].slots++; res->next = locals; locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
+Bool Pointer(I64 type) { return type >= T_PTR; }
 Bool Floating(I64 type) { return type == T_F64 || type == T_F32; }
 Bool Numeric(I64 type) { return Integer(type) || Floating(type); }
 Bool Unsigned(I64 type) { return type == T_U8 || type == T_U16 || type == T_U32 || type == T_U64; }
@@ -168,6 +178,7 @@ I64 Width(I64 type) {
     if (type == T_I32 || type == T_U32) return 32;
     return 64;
 }
+I64 ByteSize(I64 type) { if (type == T_VOID) return 0; if (type == T_BOOL) return 1; if (type == T_F32) return 4; if (type == T_F64 || Pointer(type)) return 8; return Width(type) / 8; }
 Bool Fits(I64 v, I64 type) {
     I64 width = Width(type);
     if (Unsigned(type)) { if (v < 0) return FALSE; if (width == 64) return TRUE; return v < (1 << width); }
@@ -177,6 +188,8 @@ Bool Fits(I64 v, I64 type) {
 U0 Coerce(Node *n, I64 type) {
     Node *child;
     if (n->type == type) return;
+    if (n->type == T_NULL && Pointer(type)) { n->type = type; return; }
+    if (Pointer(n->type) && type == T_PTR) { n->type = type; return; }
     if ((n->type == T_F32 && type == T_F64) || (n->kind == N_INT && Integer(n->type) && Floating(type) && -16777216 <= n->value <= 16777216)) {
         child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
         n->kind = N_CAST; n->a = child; n->type = type; return;

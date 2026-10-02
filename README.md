@@ -1,103 +1,91 @@
 # Cool
 
-Cool은 HolyC 계열의 네이티브 컴파일 언어입니다. 컴파일러·런타임·포매터를
-독립적으로 빌드하고 사용할 수 있습니다. CoolOS, Warm, VM이나 원본 coolcom 저장소는 필요하지 않습니다.
+C처럼 저수준 코드를 표현하되 읽기 쉬운 문법, 단순한 패키지 구조와 빠른 반복 실행을 목표로 하는 언어입니다. 원본 coolcom이나 OS 저장소 없이 빌드합니다.
+
+현재는 **언어 구현 진행 단계**입니다. 스칼라 타입, 함수, 패키지, 인터프리터·JIT·LLVM 실행 경로는 구현됐지만 구조체·배열·슬라이스·제네릭·소유권 검사는 아직 없습니다. 전체 목표와 실제 지원 범위를 구별해 기록합니다.
 
 ## 시작하기
 
-현재 지원 호스트는 **Apple Silicon macOS**입니다. Xcode Command Line Tools,
-Python 3.12 이상, GNU coreutils의 `gtimeout`이 필요합니다.
-전체 테스트의 x86-64 실행에는 Rosetta 2도 필요합니다.
+지원 호스트는 Apple Silicon macOS입니다. Xcode Command Line Tools, Python 3.12 이상, GNU coreutils의 `gtimeout`이 필요합니다. LLVM JIT 실행에는 LLVM의 `lli`, 기존 x86-64 회귀 검사에는 Rosetta 2가 필요합니다.
 
 ```sh
 cd ~/t5/coollang
 make -j4
 export PATH="$PWD/build:$PATH"
-cool run examples/hello.cool
-cool build examples/hello.cool -o build/hello
-./build/hello
+cool run examples/modern.cool
+cool build examples/modern.cool -o build/modern
+./build/modern
+cool repl
 ```
-
-`cool`은 어느 디렉터리에서나 실행할 수 있습니다. PATH 설정을 새 터미널에도
-적용하려면 셸 설정에 `export PATH="$HOME/t5/coollang/build:$PATH"`를 추가하세요.
-CLI는 저장소를 필요로 하지만, `cool build`로 만든 실행 파일은 소스·컴파일러·Python
-없이 호환되는 Apple Silicon Mac에서 실행할 수 있습니다.
 
 ```cool
-extern U0 Print(U8i *fmt, ...);
+package main;
+import "std/io";
 
-U0 Hello()
-{
-    Print("Hello, Cool!\n");
+fn square(n: i64) -> i64 {
+    return n * n;
 }
 
-Hello;
+fn main() {
+    for (var i = 0; i < 4; i = i + 1) {
+        io.println(square(i));
+    }
+}
 ```
 
-프로그램은 최상위 문장을 실행합니다. `main`을 자동으로 호출하지 않습니다.
-`U0`, `U8i`, `I64i`, `F64` 등은 기본 타입이며, 헤더 없는 소스에서 사용할 수 있습니다.
-`#include "file.coolh"`로 소스 기준 상대 경로의 헤더를 포함할 수 있습니다.
+지역 변수는 초기화해야 하며 `let`과 함수 인자는 변경할 수 없습니다. 암시적 축소 변환은 허용하지 않습니다. 포인터 역참조·산술·외부 C 호출은 `unsafe` 블록이 필요합니다. 메모리 안전 언어라고 보장하지 않습니다.
 
-## 명령
+## 실행과 개발
 
 ```sh
-cool run program.cool -- 'argument with spaces' --flag
+cool run program.cool                 # 바이트코드 실행, 자주 호출한 함수는 ARM64 JIT
+cool run --backend tree program.cool  # 참조 인터프리터
+cool run --backend jit program.cool   # ARM64 JIT
+cool run --backend llvm program.cool  # LLVM AOT 결과 캐시 후 실행
+cool run --backend llvm-jit program.cool
+cool emit-ir program.cool -o program.ll
 cool build program.cool -o app
-cool compile program.cool -o program.BIN
-cool run program.BIN
-cool vet program.cool
-cool fmt program.cool
+cool check .
 cool fmt --check src/
-cool fmt --diff src/
+cool test .
+cool doc .
 ```
 
-`build`는 ARM64 Mach-O 실행 파일을 만들고 `compile`은 로더가 필요한 BIN 모듈을 만듭니다.
-출력·입력 경로와 실행 중 작업 디렉터리는 호출한 디렉터리를 기준으로 합니다.
-프로그램 인자는 `--` 뒤에 전달하며 종료 코드는 그대로 전달됩니다.
-인자·종료 서비스는 `NativeArgCount`, `NativeArg`, `NativeExit`를 import해 사용합니다.
-`fmt --check`는 변경이 필요하면 1, 오류가 있으면 2로 종료합니다.
+C로 트랜스파일하지 않습니다. Cool로 작성된 프런트엔드가 타입 검사 후 트리·바이트코드·ARM64 기계어·LLVM IR을 생성합니다. C 코드는 OS·숫자·메모리·C ABI 어댑터입니다. Python은 빌드와 패키지 해석을 조율합니다.
 
-x86-64는 ARM 호스트에서 크로스 컴파일한 BIN을 별도 로더로 실행합니다.
+컴파일러 소스는 현재 기존 Cool 문법으로 작성돼 기존 셀프호스팅 컴파일러로 부트스트랩됩니다. **새 문법으로 자기 자신을 컴파일하는 단계는 아직 아닙니다.** REPL은 변수·함수와 컴파일 캐시를 유지하며 같은 시그니처의 함수 본문만 교체할 수 있습니다.
+
+`build`는 Clang으로 LLVM IR을 네이티브 실행 파일로 만듭니다. 생성물은 호환되는 Mac에서 소스·Python·Cool 컴파일러 없이 실행됩니다. 현재 새 언어 프로그램에 명령행 인자를 전달하는 기능은 미구현입니다.
+
+## 패키지
+
+디렉터리가 패키지입니다. `pub fn`만 외부에 공개하며 순환 import는 거부합니다. `cool.mod`와 `cool.sum`, MVS 버전 선택, 로컬 replace와 `cool.work`, 오프라인·동결 해석을 지원합니다.
 
 ```sh
-make build/coolc-x86_64
-cool compile --target x86_64 examples/hello.cool -o build/hello-x86.BIN
-build/coolc-x86_64 --run build/hello-x86.BIN
+cool mod init example.com/team/demo
+cool get example.com/team/library@v1.2.0
+cool mod tidy
+cool mod download
+cool mod verify
+cool mod graph
+cool mod vendor
+cool check --offline .
 ```
 
-## 구현과 지원 범위
+원격 소스는 `host/owner/repo` 형태의 Git 저장소와 버전 태그를 사용합니다. `COOL_GIT_SSH=1`로 SSH 전송을 선택할 수 있습니다. `cool.sum`은 Cool 자체 트리 해시 형식이며 Go의 체크섬 서비스와 호환되는 프로토콜은 아닙니다. 프록시·투명성 서비스·커밋 의사 버전은 미구현입니다.
 
-Cool 소스 → 자체 IR·최적화 → ARM64/x86-64 기계어 → BIN 모듈로 이어집니다.
-백엔드는 Aiwnios에서 이식·발전시킨 Cool 구현이며 LLVM을 사용하지 않습니다.
-C/어셈블리 호스트 로더가 BIN 재배치와 macOS 서비스 호출을 담당합니다.
-실행 파일 패키징과 로더 빌드에는 Clang을 사용합니다.
-
-ARM64는 컴파일러 자체 재컴파일을 지원합니다. x86-64는 BIN 실행·프로브를 지원하며,
-인라인 어셈블리, 컴파일러 자체 부트스트랩과 스레드 서비스에는 제한이 있습니다.
-Linux·Windows 호스트는 아직 지원하지 않습니다. 자세한 제한은 [x86 문서](coolc/Host/X86.md)에 있습니다.
-Cool은 포인터와 수동 메모리 관리를 제공하며 메모리 안전 언어는 아닙니다.
-
-- `coolc/`: 프런트엔드, 백엔드, 런타임, 호스트 로더, seed, 포매터와 테스트
-- `tools/cool`: 사용자 CLI와 독립 실행 파일 패키징
-- `tools/native/`: 컴파일러 준비·회귀 테스트·부트스트랩 검증
-- `examples/`: 실행 가능한 예제
-
-`coolc/Host/warm_*.h`와 패키징의 내부 `WARM_PROGRAM_HEADER` 이름은 공유 호스트
-서비스의 기존 이름입니다. Warm 컴파일러나 저장소를 요구하지 않습니다.
-
-## 검증
+## 부트스트랩과 검증
 
 ```sh
 make -j4 test
 make bootstrap-check
+cool legacy run examples/hello.cool
 ```
 
-`test`는 호스트 로더, ARM64/x86-64 코드생성·인라이닝, 진단·behavior,
-포매터와 CLI를 검증합니다. `bootstrap-check`는 seed → gen1 → gen2 → gen3을
-빌드하고 gen2와 gen3의 바이트 일치를 확인합니다. 체크인된 seed는 변경하지 않습니다.
-로그와 생성물은 `build/`에 저장됩니다.
+`cool legacy`는 기존 HolyC 계열 CLI입니다. 기존 문법 예제를 새 언어 예제로 혼동하지 마세요. `coolc/`에는 기존 컴파일러·네이티브 호스트·seed가, `language/`에는 새 언어 구현이 있습니다.
 
-[검증 기록](docs/verification.md) · [부트스트랩](coolc/NATIVE.md) · [추출 기준](SOURCE.md)
+회귀 검사는 기존 ARM64/x86-64 코드 생성, 새 언어 실행 경로 간 결과 일치, 패키지·캐시·체크섬, REPL 교체, 포매터·개발 도구를 확인합니다. `bootstrap-check`는 seed → gen1 → gen2 → gen3을 빌드해 gen2와 gen3의 바이트 일치를 검사합니다. 이 명령 자체는 체크인된 seed를 변경하지 않습니다.
 
-자체 코드는 MIT이며, 포함된 외부 코드는 원래 라이선스를 따릅니다.
-[LICENSE](LICENSE)와 [THIRD_PARTY.md](THIRD_PARTY.md)를 참고하세요.
+[전체 구현 목표](docs/language-plan.md) · [현재 지원 범위](language/README.md) · [추출 기준](SOURCE.md)
+
+자체 코드는 MIT이며 포함된 외부 코드는 원래 라이선스를 따릅니다. [LICENSE](LICENSE) · [THIRD_PARTY.md](THIRD_PARTY.md)

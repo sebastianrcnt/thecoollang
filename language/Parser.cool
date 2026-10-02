@@ -15,7 +15,7 @@ I64 TypeName(U8 *s) {
     if (Eq(s, "string")) return T_STRING;
     return -1;
 }
-I64 ParseType() { I64 t = TypeName(Ident()); if (t < 0) Error("unsupported or unknown type"); return t; }
+I64 ParseType() { I64 t; if (Take('*')) return T_PTR + ParseType(); t = TypeName(Ident()); if (t < 0) Error("unsupported or unknown type"); return t; }
 I64 Prec(I64 k) {
     if (k == K_OR) return 1;
     if (k == K_AND) return 2;
@@ -30,9 +30,26 @@ I64 Prec(I64 k) {
     return 0;
 }
 extern Node *Expr(I64 min);
-Node *Primary() {
+extern Node *Primary();
+Node *Atom() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
+    if (Is("null")) { pos++; n = NewNode(N_INT, t); n->type = T_NULL; return n; }
+    if (Is("cast") && tokens[pos+1].kind == '[') {
+        pos += 2; ty = ParseType(); Need(']', "expected ']' after cast type"); Need('(', "expected '(' after cast type");
+        n = NewNode(N_CAST, t); n->a = Expr(1); n->type = ty; Need(')', "expected ')' after cast operand");
+        if (Pointer(ty) || Pointer(n->a->type)) {
+            if (!unsafe_depth) ErrorAt(t, "pointer casts require unsafe");
+            if (!(Pointer(ty) || ty == T_U64 || ty == T_INT) || !(Pointer(n->a->type) || Integer(n->a->type) || n->a->type == T_NULL || n->a->type == T_STRING)) ErrorAt(t, "invalid pointer cast");
+        } else if (!Numeric(ty) || !Numeric(n->a->type)) ErrorAt(t, "invalid cast");
+        return n;
+    }
+    if (Take('*')) {
+        if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe");
+        n = NewNode(N_LOAD, t); n->a = Primary();
+        if (!Pointer(n->a->type) || n->a->type == T_PTR) ErrorAt(t, "dereference requires a typed pointer");
+        n->type = n->a->type - T_PTR; return n;
+    }
     if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; if (t->val < 0) n->type = T_U64; return n; }
     if (Take(K_FLOAT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_F64; return n; }
     if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = t->text; n->type = T_STRING; return n; }
@@ -64,12 +81,30 @@ Node *Primary() {
             if (count != 1 || n->a->type == T_VOID) ErrorAt(t, "print/println expects one scalar value");
             n->slot = -1; n->type = T_VOID; return n;
         }
+        if (qualified && Eq(package, "std/mem")) {
+            if (Eq(name, "alloc")) {
+                if (count != 1) ErrorAt(t, "mem.alloc requires a byte count");
+                Coerce(n->a, T_U64); n->slot = -3; n->type = T_PTR + T_U8; return n;
+            }
+            if (Eq(name, "free")) {
+                if (!unsafe_depth) ErrorAt(t, "manual free requires unsafe");
+                if (count != 1 || !Pointer(n->a->type)) ErrorAt(t, "mem.free requires a pointer");
+                n->slot = -4; n->type = T_VOID; return n;
+            }
+            if (Eq(name, "copy")) {
+                if (!unsafe_depth) ErrorAt(t, "raw memory copy requires unsafe");
+                if (count != 3 || !Pointer(n->a->type) || !Pointer(n->a->next->type)) ErrorAt(t, "mem.copy requires destination, source, byte count");
+                Coerce(n->a->next->next, T_U64); n->slot = -5; n->type = T_VOID; return n;
+            }
+            ErrorAt(t, "unknown std/mem function");
+        }
         if (!qualified && Eq(name, "assert")) {
             if (count != 1 || n->a->type != T_BOOL) ErrorAt(t, "assert expects one bool");
             n->slot = -2; n->type = T_VOID; return n;
         }
         id = FindFunIn(package, name);
         if (id < 0) ErrorAt(t, "unknown function");
+        if (functions[id].foreign && !unsafe_depth) ErrorAt(t, "foreign calls require unsafe");
         if (qualified && !functions[id].public) ErrorAt(t, "function is private to its package");
         if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
         arg = n->a;
@@ -80,6 +115,18 @@ Node *Primary() {
     if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
     n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; return n;
 }
+Node *Primary() {
+    Node *n = Atom(), *index, *address, *load; Token *t;
+    while (At()->kind == '[') {
+        t = At(); pos++;
+        if (!unsafe_depth) ErrorAt(t, "raw pointer indexing requires unsafe");
+        if (!Pointer(n->type) || n->type == T_PTR) ErrorAt(t, "indexing requires a typed pointer");
+        index = Expr(1); if (!Integer(index->type)) ErrorAt(t, "index must be an integer");
+        Need(']', "expected ']'"); address = NewNode(N_ADDRESS, t); address->a = n; address->b = index; address->type = n->type;
+        load = NewNode(N_LOAD, t); load->a = address; load->type = n->type - T_PTR; n = load;
+    }
+    return n;
+}
 Node *Expr(I64 min) {
     Node *a = Primary(), *n; Token *t; I64 p, op;
     while (Prec(At()->kind) >= min) {
@@ -89,6 +136,11 @@ Node *Expr(I64 min) {
             if (a->type != T_BOOL || n->b->type != T_BOOL) ErrorAt(t, "logical operators require bool operands");
             n->type = T_BOOL;
         } else {
+            if ((op == '+' || op == '-') && Pointer(a->type) && Integer(n->b->type)) {
+                if (!unsafe_depth) ErrorAt(t, "pointer arithmetic requires unsafe");
+                if (a->type == T_PTR) ErrorAt(t, "void pointer arithmetic is not defined");
+                n->kind = N_ADDRESS; n->type = a->type; a = n; goto expr_next;
+            }
             if (a->type != n->b->type) {
                 if (a->kind == N_INT) Coerce(a, n->b->type); else Coerce(n->b, a->type);
             }
@@ -105,6 +157,7 @@ Node *Expr(I64 min) {
         if (!Floating(a->type) && (op == '/' || op == '%') && n->b->kind == N_INT && !n->b->value) ErrorAt(t, "division by zero");
         if ((op == K_SHL || op == K_SHR) && n->b->kind == N_INT && (n->b->value < 0 || n->b->value >= Width(n->a->type))) ErrorAt(t, "shift count must be below operand width");
         a = n;
+expr_next:;
     }
     return a;
 }
@@ -119,8 +172,9 @@ Node *Block() {
     depth--; locals = saved; return n;
 }
 Node *Statement() {
-    Token *t = At(); Node *n; Local *l; U8 *name; I64 ty = -1; Bool mutable;
+    Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable;
     if (t->kind == '{') return Block();
+    if (Is("unsafe")) { pos++; unsafe_depth++; n = Block(); unsafe_depth--; return n; }
     if (Is("let") || Is("var")) {
         mutable = Is("var"); pos++; name = Ident(); if (Take(':')) ty = ParseType();
         Need('=', "variables must have an initializer");
@@ -135,6 +189,33 @@ Node *Statement() {
         if (At()->kind != ';') { n->a = Expr(1); Coerce(n->a, ty); }
         else if (ty != T_VOID) ErrorAt(t, "return value required");
         Need(';', "expected ';'"); return n;
+    }
+    if (Is("for")) {
+        pos++; Need('(', "expected '(' after for"); saved = locals; depth++;
+        block = NewNode(N_BLOCK, t); initial = NULL;
+        if (!Take(';')) {
+            initial = Statement();
+            if (initial->kind != N_BIND && initial->kind != N_ASSIGN && initial->kind != N_EXPR) ErrorAt(t, "invalid for initializer");
+        }
+        n = NewNode(N_FOR, t);
+        if (Take(';')) { n->a = NewNode(N_INT, t); n->a->type = T_BOOL; n->a->value = 1; }
+        else { n->a = Expr(1); Need(';', "expected ';' after for condition"); }
+        if (n->a->type != T_BOOL) ErrorAt(t, "for condition must be bool");
+        if (!Take(')')) {
+            post = NewNode(N_EXPR, At()); post->a = Expr(1);
+            if (Take('=')) {
+                if (post->a->kind == N_LOCAL) {
+                    l = FindLocal(post->a->name); if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
+                    post->kind = N_ASSIGN; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type);
+                } else if (post->a->kind == N_LOAD) {
+                    post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type);
+                } else ErrorAt(t, "invalid for update assignment");
+            }
+            n->c = post; Need(')', "expected ')' after for update");
+        }
+        loop_depth++; n->b = Block(); loop_depth--; depth--; locals = saved;
+        if (initial) { block->a = initial; initial->next = n; } else block->a = n;
+        return block;
     }
     if (Is("if") || Is("while")) {
         mutable = Is("while"); pos++; n = NewNode(N_IF, t); if (mutable) n->kind = N_WHILE;
@@ -163,7 +244,13 @@ Node *Statement() {
         n = NewNode(N_ASSIGN, t); n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type);
         Need(';', "expected ';'"); return n;
     }
-    n = NewNode(N_EXPR, t); n->a = Expr(1); Need(';', "expected ';'"); return n;
+    n = NewNode(N_EXPR, t); n->a = Expr(1);
+    if (Take('=')) {
+        if (n->a->kind != N_LOAD) ErrorAt(t, "invalid assignment target");
+        n->kind = N_STORE; n->type = n->a->type; n->a = n->a->a;
+        n->b = Expr(1); Coerce(n->b, n->type);
+    }
+    Need(';', "expected ';'"); return n;
 }
 Bool Returns(Node *n) {
     if (!n) return FALSE;
@@ -173,7 +260,7 @@ Bool Returns(Node *n) {
     return FALSE;
 }
 U0 ParseProgram() {
-    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, id, parsed[4096], count = 0; Bool public; Token *t;
+    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     while (At()->kind) {
         if (Is("package")) { pos++; Ident(); Need(';', "expected ';' after package"); }
@@ -187,6 +274,12 @@ U0 ParseProgram() {
             AddAlias(t, alias, path); pos++; Need(';', "expected ';' after import");
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
+            foreign = FALSE;
+            if (Is("extern")) {
+                foreign = TRUE; pos++;
+                if (At()->kind != K_STRING || !Eq(At()->text, "C")) Error("only extern C is supported");
+                pos++;
+            }
             if (!Is("fn")) Error("expected fn, package or import declaration");
             pos++; name = Ident();
             id = FindFunIn(At()->package, name); old = NULL;
@@ -201,7 +294,7 @@ U0 ParseProgram() {
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
             f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
-            f->name = name; f->package = At()->package; f->public = public; f->token = At();
+            f->foreign = foreign; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             Need('(', "expected '(' after function name");
             if (!Take(')')) {
                 do {
@@ -218,18 +311,32 @@ U0 ParseProgram() {
                 if (old->argc != f->argc || old->result != f->result) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
             }
+            if (foreign) {
+                if (Eq(name, "main") || (StrLen(name) >= 7 && name[0] == '_' && name[1] == '_' && name[2] == 'c' && name[3] == 'o' && name[4] == 'o' && name[5] == 'l' && name[6] == '_') || (StrLen(name) >= 5 && name[0] == 'c' && name[1] == 'o' && name[2] == 'o' && name[3] == 'l' && name[4] == '_')) Error("reserved C runtime symbol");
+                for (k = 0; k < nfun; k++) {
+                    if (k != id && functions[k].foreign && Eq(functions[k].name, name)) {
+                        if (functions[k].argc != f->argc || functions[k].result != f->result) Error("conflicting C function signature");
+                        for (j = 0; j < f->argc; j++) if (functions[k].arg_types[j] != f->arg_types[j]) Error("conflicting C function signature");
+                    }
+                }
+                if (f->result == T_STRING) Error("C ABI strings must use an explicit pointer");
+                for (j = 0; j < f->argc; j++) if (f->arg_types[j] == T_STRING) Error("C ABI strings must use an explicit pointer");
+                Need(';', "expected ';' after extern declaration"); f->body = NULL; goto declaration_next;
+            }
             f->begin = pos; Need('{', "expected function body"); braces = 1;
             while (braces) {
                 if (!At()->kind) Error("unterminated function body");
                 if (Take('{')) braces++; else if (Take('}')) braces--; else pos++;
             }
             f->end = pos;
+declaration_next:;
         }
     }
     for (i = 0; i < count; i++) {
-        current_fun = parsed[i]; f = &functions[current_fun]; pos = f->begin; locals = NULL; depth = 0;
+        current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
         for (j = 0; j < f->argc; j++) AddLocal(f->arg_names[j], f->arg_types[j], FALSE);
         f->body = Block();
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
+parsed_next:;
     }
 }

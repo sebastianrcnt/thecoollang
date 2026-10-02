@@ -55,6 +55,13 @@ bad('fn main() { let x: u8 = 1; io.println(x << 8); }', 'shift count')
 good('fn main() { let x = 1.5; let y: f64 = 2; io.println(x + y); io.println(x * y); io.println(-x); io.println(i32(3.9)); io.println(f64(u64(42))); io.println(f32(1.25) + f32(2.5)); io.println(1e-3 < 0.01); let nan = 0.0 / 0.0; io.println(nan != nan); }', '3.5\n3\n-1.5\n3\n42\n3.75\ntrue\ntrue\n')
 bad('fn main() { let x = 1.0 & 2.0; }', 'integer operands')
 bad('fn main() { let x = 1e; }', 'exponent digits')
+good('import "std/mem"; fn main() { unsafe { let p = cast[*i16](mem.alloc(4)); defer mem.free(p); p[0] = 42; let q = p + 1; *q = -2; io.println(p[0]); io.println(p[1]); io.println(p != null); let f = cast[*f32](mem.alloc(4)); defer mem.free(f); f[0] = f32(1.25); io.println(f[0]); } }', '42\n-2\ntrue\n1.25\n')
+bad('fn main() { let p: *i64 = null; io.println(*p); }', 'requires unsafe')
+bad('fn main() { unsafe { let p: *void = null; io.println(*p); } }', 'typed pointer')
+good('extern "C" fn strlen(s: *u8) -> usize; extern "C" fn abs(n: i32) -> i32; extern "C" fn sqrt(n: f64) -> f64; fn main() { unsafe { io.println(strlen(cast[*u8]("hello"))); io.println(abs(-7)); io.println(sqrt(9.0)); } }', '5\n7\n3\n')
+bad('extern "C" fn abs(n: i32) -> i32; fn main() { abs(-7); }', 'require unsafe')
+good('fn main() { var total = 0; for (var i = 0; i < 5; i = i + 1) { defer io.print(i); if (i == 1) { continue; } if (i == 4) { break; } total = total + i; } io.println(total); }', '012345\n')
+bad('fn main() { for (var i = 0; i < 1; i = i + 1) {} io.println(i); }', 'unknown variable')
 print('new language: parser/type checks + tree/bytecode/native-JIT differential cases PASS')
 
 # The same typed program must produce identical observable behavior under LLVM AOT.
@@ -65,7 +72,8 @@ with tempfile.TemporaryDirectory(prefix='cool-llvm-') as tmp:
         path.write_text(source)
         subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', 'llvm', path, ir], check=True, capture_output=True)
         for optimization in ('-O0', '-O2'):
-            subprocess.run(['clang', '-Wno-override-module', optimization, ir, ROOT/'language/runtime.c', '-o', exe], check=True, capture_output=True)
+            compilation = subprocess.run(['clang', '-Wno-override-module', optimization, ir, ROOT/'language/runtime.c', '-o', exe], capture_output=True, text=True)
+            assert compilation.returncode == 0, (index, optimization, compilation.stderr, ir.read_text())
             result = subprocess.run([exe], capture_output=True, text=True, timeout=10)
             assert (result.returncode, result.stdout, result.stderr) == (status, expected, ''), (index, optimization, result)
 print(f'LLVM AOT: {len(CASES)} interpreter differential cases at O0 and O2 PASS')

@@ -35,8 +35,11 @@ I64 EmitCall(Node *n, I64 *args) {
     if (n->slot == -1) {
         IR("  call void @cool_print(i64 "); Reg(args[0]); IR(", i64 "); RI(n->a->type); IR(", i64 "); RI(Eq(n->name, "println")); IR(")\n"); return Constant(0);
     }
+    if (n->slot == -3) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_alloc(i64 "); Reg(args[0]); IR(")\n"); return r; }
+    if (n->slot == -4) { IR("  call void @cool_free(i64 "); Reg(args[0]); IR(")\n"); return Constant(0); }
+    if (n->slot == -5) { IR("  call void @cool_copy(i64 "); Reg(args[0]); IR(", i64 "); Reg(args[1]); IR(", i64 "); Reg(args[2]); IR(")\n"); return Constant(0); }
     if (n->slot == -2) { IR("  call void @cool_assert(i64 "); Reg(args[0]); IR(")\n"); return Constant(0); }
-    r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @f"); RI(n->slot); IR("(");
+    r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @__cool_fn"); RI(n->slot); IR("(");
     for (i = 0; i < n->value; i++) { if (i) IR(", "); IR("i64 "); Reg(args[i]); }
     IR(")\n"); return r;
 }
@@ -55,6 +58,11 @@ I64 EmitExpr(Node *n) {
     if (n->kind == N_LOCAL) { r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return r; }
     if (n->kind == N_CALL) { args = EmitArgs(n); r = EmitCall(n, args); Free(args); return r; }
     a = EmitExpr(n->a);
+    if (n->kind == N_LOAD) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_load(i64 "); Reg(a); IR(", i64 "); RI(n->type); IR(")\n"); return r; }
+    if (n->kind == N_ADDRESS) {
+        b = EmitExpr(n->b); casted = Fresh(); IR("  "); Reg(casted); IR(" = mul i64 "); Reg(b); IR(", "); RI(ByteSize(n->type - T_PTR)); IR("\n");
+        r = Fresh(); IR("  "); Reg(r); if (n->op == '-') IR(" = sub i64 "); else IR(" = add i64 "); Reg(a); IR(", "); Reg(casted); IR("\n"); return r;
+    }
     if (n->kind == N_CAST) {
         if (!Floating(n->type) && !Floating(n->a->type)) return Truncate(a, n->type);
         r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_cast(i64 "); Reg(a); IR(", i64 "); RI(n->a->type); IR(", i64 "); RI(n->type); IR(")\n"); return r;
@@ -122,7 +130,7 @@ I64 EmitExpr(Node *n) {
     Reg(r); IR(" = zext i1 %b"); RI(r); IR(" to i64\n"); return r;
 }
 U0 EmitStmt(Node *n) {
-    Node *s; EScope *saved, *saved_loop; EDeferred *d; I64 r, yes, no, end, cond, saved_break, saved_continue; Bool left_done;
+    Node *s; EScope *saved, *saved_loop; EDeferred *d; I64 r, value, yes, no, end, cond, update, saved_break, saved_continue; Bool left_done;
     if (!n || terminated) return;
     switch (n->kind) {
         case N_BLOCK:
@@ -135,6 +143,8 @@ U0 EmitStmt(Node *n) {
             }
             if (!terminated) EmitCleanup(saved);
             scope = saved; break;
+        case N_STORE:
+            r = EmitExpr(n->a); value = EmitExpr(n->b); IR("  call void @cool_store(i64 "); Reg(r); IR(", i64 "); RI(n->type); IR(", i64 "); Reg(value); IR(")\n"); break;
         case N_BIND: case N_ASSIGN:
             r = EmitExpr(n->a); IR("  store i64 "); Reg(r); IR(", ptr %v"); RI(n->slot); IR("\n"); break;
         case N_EXPR: EmitExpr(n->a); break;
@@ -147,35 +157,46 @@ U0 EmitStmt(Node *n) {
             AtLabel(no); EmitStmt(n->c);
             if (left_done && terminated) break;
             if (!terminated) Jump(end); AtLabel(end); break;
-        case N_WHILE:
-            cond = Label(); yes = Label(); end = Label(); Jump(cond); AtLabel(cond);
+        case N_FOR: case N_WHILE:
+            cond = Label(); yes = Label(); end = Label(); update = Label(); Jump(cond); AtLabel(cond);
             r = EmitExpr(n->a); Branch(r, yes, end); AtLabel(yes);
             saved_break = loop_break; saved_continue = loop_continue; saved_loop = loop_scope;
-            loop_break = end; loop_continue = cond; loop_scope = scope; EmitStmt(n->b);
+            loop_break = end; loop_continue = cond; if (n->kind == N_FOR) loop_continue = update; loop_scope = scope; EmitStmt(n->b);
             loop_break = saved_break; loop_continue = saved_continue; loop_scope = saved_loop;
+            if (n->kind == N_FOR) { if (!terminated) Jump(update); AtLabel(update); EmitStmt(n->c); }
             if (!terminated) Jump(cond); AtLabel(end); break;
         case N_BREAK: EmitCleanup(loop_scope); Jump(loop_break); break;
         case N_CONTINUE: EmitCleanup(loop_scope); Jump(loop_continue); break;
     }
 }
+#include "ForeignLLVM.cool"
 U0 EmitLLVM(U8 *output) {
-    I64 i, j, main = FindFun("main"); Function *f; Text *all;
+    I64 i, j, k, main = FindFun("main"); Function *f; Text *all;
     if (main < 0) Error("no main function");
-    if (functions[main].argc || (functions[main].result != T_VOID && !Integer(functions[main].result))) ErrorAt(functions[main].token, "invalid main signature");
+    if (functions[main].argc || (functions[main].result != T_VOID && functions[main].result != T_I32 && functions[main].result != T_INT)) ErrorAt(functions[main].token, "invalid main signature");
     ir = TextNew(); globals = TextNew();
     IR("; Generated by the Cool-written frontend. No C transpilation.\n");
+    IR("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n");
     IR("declare i64 @cool_cast(i64, i64, i64)\n");
     IR("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n");
     for (i = 0; i < nfun; i++) {
+        f = &functions[i];
+        if (f->foreign) {
+            for (k = 0; k < i; k++) if (functions[k].foreign && Eq(functions[k].name, f->name)) goto foreign_already_declared;
+            ForeignDeclaration(f);
+        }
+foreign_already_declared:;
+    }
+    for (i = 0; i < nfun; i++) {
         f = &functions[i]; reg_id = 0; terminated = FALSE; scope = NULL;
-        IR("define i64 @f"); RI(i); IR("(");
+        IR("define i64 @__cool_fn"); RI(i); IR("(");
         for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR("i64 %a"); RI(j); }
         IR(") {\nentry:\n");
         for (j = 0; j < f->slots; j++) { IR("  %v"); RI(j); IR(" = alloca i64\n"); }
-        for (j = 0; j < f->argc; j++) { IR("  store i64 %a"); RI(j); IR(", ptr %v"); RI(j); IR("\n"); }
-        EmitStmt(f->body); if (!terminated) IR("  ret i64 0\n"); IR("}\n");
+        for (j = 0; !f->foreign && j < f->argc; j++) { IR("  store i64 %a"); RI(j); IR(", ptr %v"); RI(j); IR("\n"); }
+        if (f->foreign) { ForeignWrapper(f); terminated = TRUE; } else EmitStmt(f->body); if (!terminated) IR("  ret i64 0\n"); IR("}\n");
     }
-    IR("define i32 @main() {\nentry:\n  %exit = call i64 @f"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
+    IR("define i32 @main() {\nentry:\n  %exit = call i64 @__cool_fn"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
     all = TextNew(); if (globals->len) Append(all, globals->data); Append(all, ir->data);
     if (!FileWrite(output, all->data, all->len)) Error("failed to write LLVM IR");
 }

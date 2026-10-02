@@ -3,6 +3,7 @@
 import argparse
 import fcntl
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -12,7 +13,7 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from modules import Graph, Manifest, atomic_write, cache_home, find_root, validate_path, version_key
+from modules import Graph, Manifest, atomic_write, cache_home, find_root, validate_path, version_key, tree_hash as tree_hash_for_vendor
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -79,7 +80,7 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
         if len(declared) != 1:
             raise ValueError(f'mixed package declarations in {location}')
         for dependency in sorted(imports):
-            if dependency == 'std/io':
+            if dependency in ('std/io', 'std/mem'):
                 continue
             if graph is None:
                 raise ValueError(f'import {dependency} requires cool.mod')
@@ -97,7 +98,7 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
 
 def artifact(files, optimization):
     digest = hashlib.sha256(b'cool-artifact-v1\0' + optimization.encode())
-    for path in (ROOT/'build/language.BIN', ROOT/'language/runtime.c', ROOT/'language/numeric.h'):
+    for path in (ROOT/'build/language.BIN', ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h'):
         digest.update(path.read_bytes())
     digest.update(subprocess.check_output(['clang', '--version']))
     for package, path in files:
@@ -133,6 +134,24 @@ def module_command(args):
     if not root:
         raise ValueError('no cool.mod; run cool mod init <module-path>')
     manifest = Manifest.read(root)
+    if args.action == 'tidy':
+        ensure('build/language.BIN')
+        imports = set()
+        for base, dirs, files in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if d not in ('build', 'vendor') and not d.startswith('.') and not (Path(base)/d/'cool.mod').exists())
+            for name in files:
+                if name.endswith('.cool'):
+                    imports.update(metadata(Path(base)/name)[1])
+        direct = set()
+        for dependency in imports:
+            if dependency.startswith('std/') or dependency == manifest.module or dependency.startswith(manifest.module + '/'):
+                continue
+            candidates = [p for p in manifest.requires if dependency == p or dependency.startswith(p + '/')]
+            if candidates:
+                direct.add(max(candidates, key=len))
+            elif not any(dependency == p or dependency.startswith(p + '/') for p in manifest.replaces):
+                raise ValueError(f'missing requirement for {dependency}; use cool get')
+        manifest.requires = {p: v for p, v in manifest.requires.items() if p in direct}
     if args.action == 'get':
         if '@' not in args.value:
             raise ValueError('use module/path@vX.Y.Z')
@@ -140,12 +159,33 @@ def module_command(args):
         validate_path(path); version_key(version)
         manifest.requires[path] = version
     graph = Graph(manifest, getattr(args, 'offline', False), args.action == 'verify').resolve()
-    if args.action == 'get':
+    if args.action in ('get', 'tidy'):
         # MVS-selected minimum versions become explicit requirements.
         manifest.requires.update(graph.selected)
         manifest.write()
     if args.action != 'verify':
         graph.save_sums()
+    if args.action == 'vendor':
+        destination = root/'vendor'
+        with tempfile.TemporaryDirectory(dir=root, prefix='.cool-vendor-') as tmp:
+            staged = Path(tmp)/'vendor'; staged.mkdir()
+            for (path, version), source in graph.visited_roots.items():
+                if path in graph.local:
+                    raise ValueError('vendoring mutable local replacements is not supported; pin a version first')
+                tree = staged/path if graph.selected[path] == version else staged/'.versions'/(path+'@'+version); tree.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(source, tree, ignore=shutil.ignore_patterns('.git'))
+                if tree_hash_for_vendor(tree) != graph.pending_sums[path, version]:
+                    raise ValueError(f'module changed while vendoring: {path}')
+            (staged/'cool.vendor.json').write_text(json.dumps(graph.selected, sort_keys=True, indent=2) + '\n')
+            backup = Path(tmp)/'previous'
+            if destination.exists():
+                destination.rename(backup)
+            try:
+                staged.rename(destination)
+            except BaseException:
+                if backup.exists():
+                    backup.rename(destination)
+                raise
     for path, version in sorted(graph.selected.items()):
         print(f'{path} {version}')
 
@@ -173,7 +213,7 @@ def main():
     p = sub.add_parser('get'); p.add_argument('value'); p.add_argument('--offline', action='store_true'); p.set_defaults(action='get')
     p = sub.add_parser('mod'); ms = p.add_subparsers(dest='action', required=True)
     q = ms.add_parser('init'); q.add_argument('value')
-    for name in ('download', 'verify', 'graph'):
+    for name in ('download', 'verify', 'graph', 'tidy', 'vendor'):
         q = ms.add_parser(name); q.add_argument('--offline', action='store_true')
     raw = sys.argv[1:]
     forwarded = []
@@ -230,12 +270,14 @@ def main():
             front('jit-test-bundle' if args.backend == 'jit' else 'test-bundle', manifest)
         elif args.command == 'doc':
             names = {0: 'void', 1: 'i64', 2: 'bool', 3: 'string', 4: 'i32', 5: 'u8', 6: 'i8', 7: 'i16', 8: 'u16', 9: 'u32', 10: 'u64', 11: 'f64', 12: 'f32'}
+            def type_name(t):
+                return '*' + type_name(t - 100) if t >= 100 else names[t]
             for line in front('symbols', manifest, capture=True).stdout.splitlines():
                 package, name, public, result, params = line.split('\t')
                 if package != '__main' or public != '1':
                     continue
-                arguments = ', '.join(n + ': ' + names[int(t)] for n, t in (p.split(':') for p in params.split(',') if p))
-                print(f'pub fn {name}({arguments}) -> {names[int(result)]};')
+                arguments = ', '.join(n + ': ' + type_name(int(t)) for n, t in (p.split(':') for p in params.split(',') if p))
+                print(f'pub fn {name}({arguments}) -> {type_name(int(result))};')
         elif args.command == 'check':
             front('check-bundle', manifest)
         elif args.command == 'emit-ir':

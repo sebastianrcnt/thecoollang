@@ -1,0 +1,50 @@
+// Scalar/pointer C ABI lowering. Cool's internal i64 slots are not exposed as C ABI.
+U8 *CType(I64 type) {
+    if (Pointer(type)) return "ptr";
+    if (type == T_VOID) return "void";
+    if (type == T_F32) return "float";
+    if (type == T_F64) return "double";
+    if (type == T_BOOL) return "i1";
+    if (Width(type) == 8) return "i8";
+    if (Width(type) == 16) return "i16";
+    if (Width(type) == 32) return "i32";
+    return "i64";
+}
+U0 CAttribute(I64 type) {
+    if (type == T_BOOL || (Integer(type) && Width(type) < 32)) {
+        if (Unsigned(type) || type == T_BOOL) IR("zeroext "); else IR("signext ");
+    }
+}
+U0 ForeignDeclaration(Function *f) {
+    I64 j;
+    IR("declare "); CAttribute(f->result); IR(CType(f->result)); IR(" @"); IR(f->name); IR("(");
+    for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR(CType(f->arg_types[j])); IR(" "); CAttribute(f->arg_types[j]); }
+    IR(")\n");
+}
+U0 ForeignWrapper(Function *f) {
+    I64 j, type;
+    for (j = 0; j < f->argc; j++) {
+        type = f->arg_types[j]; IR("  %c"); RI(j); IR(" = ");
+        if (Pointer(type)) { IR("inttoptr i64 %a"); RI(j); IR(" to ptr\n"); }
+        else if (Floating(type)) {
+            IR("bitcast i64 %a"); RI(j); IR(" to double\n");
+            if (type == T_F32) { IR("  %s"); RI(j); IR(" = fptrunc double %c"); RI(j); IR(" to float\n"); }
+        } else if (type == T_BOOL || Width(type) < 64) { IR("trunc i64 %a"); RI(j); IR(" to "); IR(CType(type)); IR("\n"); }
+        else { IR("add i64 0, %a"); RI(j); IR("\n"); }
+    }
+    IR("  "); if (f->result) IR("%foreign = "); IR("call "); CAttribute(f->result); IR(CType(f->result)); IR(" @"); IR(f->name); IR("(");
+    for (j = 0; j < f->argc; j++) {
+        if (j) IR(", "); type = f->arg_types[j]; IR(CType(type)); IR(" "); CAttribute(type);
+        if (type == T_F32) IR("%s"); else IR("%c"); RI(j);
+    }
+    IR(")\n"); type = f->result;
+    if (!type) { IR("  ret i64 0\n"); return; }
+    if (Pointer(type)) IR("  %converted = ptrtoint ptr %foreign to i64\n");
+    else if (Floating(type)) {
+        if (type == T_F32) IR("  %double = fpext float %foreign to double\n  %converted = bitcast double %double to i64\n");
+        else IR("  %converted = bitcast double %foreign to i64\n");
+    } else if (type == T_BOOL || Width(type) < 64) {
+        IR("  %converted = "); if (Unsigned(type) || type == T_BOOL) IR("zext "); else IR("sext "); IR(CType(type)); IR(" %foreign to i64\n");
+    } else { IR("  ret i64 %foreign\n"); return; }
+    IR("  ret i64 %converted\n");
+}

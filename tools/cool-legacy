@@ -50,7 +50,7 @@ def standalone(binary, output, work):
     invoke(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
             '-fno-omit-frame-pointer', '-ffixed-x28',
             '-DWARM_PROGRAM_HEADER="' + str(header) + '"',
-            ROOT / 'coolc/Host/native.c', ROOT / 'coolc/Host/except.S', '-o', work / 'executable'])
+            ROOT / 'coolc/Host/native.c', ROOT / 'coolc/Host/except.S', '-lffi', '-o', work / 'executable'])
     with tempfile.NamedTemporaryFile(prefix='.' + output.name + '-', dir=output.parent, delete=False) as staged:
         staged_path = Path(staged.name)
         staged.write((work / 'executable').read_bytes())

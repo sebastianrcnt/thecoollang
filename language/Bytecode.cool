@@ -7,6 +7,9 @@
 #define BC_JUMP 7
 #define BC_JZERO 8
 #define BC_RETURN 9
+#define BC_ADDRESS 10
+#define BC_LOAD 11
+#define BC_STORE 12
 class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
 class BDefer { Node *call; I64 *args; BDefer *next; };
 class BScope { BDefer *calls; BScope *parent; };
@@ -46,6 +49,8 @@ I64 ByteExpr(Node *n) {
     }
     if (n->kind == N_CALL) { args = ByteArgs(n); r = Slot(); at = InstructionNew(BC_CALL, r, 0, 0, n); CodeAt(at)->args = args; return r; }
     a = ByteExpr(n->a); r = Slot();
+    if (n->kind == N_ADDRESS) { b = ByteExpr(n->b); InstructionNew(BC_ADDRESS, r, a, b, n); return r; }
+    if (n->kind == N_LOAD) { InstructionNew(BC_LOAD, r, a, 0, n); return r; }
     if (n->kind == N_CAST) { InstructionNew(BC_CAST, r, a, 0, n); return r; }
     if (n->kind == N_UNARY) { InstructionNew(BC_UNARY, r, a, 0, n); return r; }
     if (n->op == K_AND || n->op == K_OR) {
@@ -60,7 +65,7 @@ I64 ByteExpr(Node *n) {
     b = ByteExpr(n->b); InstructionNew(BC_BINARY, r, a, b, n); return r;
 }
 U0 ByteStmt(Node *n) {
-    Node *s; BScope *saved, *saved_loop; BDefer *d; I64 r, branch, end, start, saved_break, saved_continue, at; Bool left_done;
+    Node *s; BScope *saved, *saved_loop; BDefer *d; I64 r, branch, end, start, saved_break, saved_continue, update, at; Bool left_done;
     if (!n || bc_done) return;
     switch (n->kind) {
         case N_BLOCK:
@@ -72,6 +77,8 @@ U0 ByteStmt(Node *n) {
                 s = s->next;
             }
             if (!bc_done) ByteCleanup(saved); bc_scope = saved; break;
+        case N_STORE:
+            r = ByteExpr(n->a); at = ByteExpr(n->b); InstructionNew(BC_STORE, Slot(), r, at, n); break;
         case N_BIND: case N_ASSIGN: r = ByteExpr(n->a); InstructionNew(BC_COPY, n->slot, r); break;
         case N_EXPR: ByteExpr(n->a); break;
         case N_RETURN:
@@ -81,12 +88,14 @@ U0 ByteStmt(Node *n) {
             r = ByteExpr(n->a); branch = InstructionNew(BC_JZERO, 0, r); ByteStmt(n->b); left_done = bc_done;
             end = InstructionNew(BC_JUMP); CodeAt(branch)->target = bc_fun->code_count; bc_done = FALSE;
             ByteStmt(n->c); CodeAt(end)->target = bc_fun->code_count; bc_done = left_done && bc_done; break;
-        case N_WHILE:
+        case N_FOR: case N_WHILE:
             // Forward exit trampoline gives break a stable target before body compilation.
-            at = InstructionNew(BC_JUMP); end = InstructionNew(BC_JUMP); start = bc_fun->code_count; CodeAt(at)->target = start;
+            at = InstructionNew(BC_JUMP); end = InstructionNew(BC_JUMP); update = InstructionNew(BC_JUMP); start = bc_fun->code_count; CodeAt(at)->target = start;
             r = ByteExpr(n->a); branch = InstructionNew(BC_JZERO, 0, r); CodeAt(branch)->target = end;
             saved_break = bc_break; saved_continue = bc_continue; saved_loop = bc_loop_scope;
-            bc_break = end; bc_continue = start; bc_loop_scope = bc_scope; ByteStmt(n->b);
+            bc_break = end; bc_continue = start; if (n->kind == N_FOR) bc_continue = update; bc_loop_scope = bc_scope; ByteStmt(n->b);
+            CodeAt(update)->target = bc_fun->code_count;
+            if (n->kind == N_FOR) { bc_done = FALSE; ByteStmt(n->c); }
             if (!bc_done) { at = InstructionNew(BC_JUMP); CodeAt(at)->target = start; }
             bc_break = saved_break; bc_continue = saved_continue; bc_loop_scope = saved_loop;
             CodeAt(end)->target = bc_fun->code_count; bc_done = FALSE; break;
@@ -112,6 +121,12 @@ I64 Compute(Instruction *ins, I64 *values) {
         args = CAlloc((n->value + 1) * 8);
         for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];
         result = Invoke(n, args); Free(args); return result;
+    }
+    if (ins->op == BC_ADDRESS) { b *= ByteSize(n->type - T_PTR); if (n->op == '-') return a - b; return a + b; }
+    if (ins->op == BC_LOAD || ins->op == BC_STORE) {
+        if (!a) ErrorAt(n->token, "null pointer dereference");
+        if (ins->op == BC_LOAD) return NativeMemoryRead(a, n->type);
+        NativeMemoryWrite(a, n->type, b); return 0;
     }
     if (ins->op == BC_CAST) return ConvertNumber(a, n->a->type, n->type, n->token);
     op = n->op;

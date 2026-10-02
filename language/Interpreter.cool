@@ -55,7 +55,7 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
     return Normalize(result, n->type);
 }
 I64 Invoke(Node *n, I64 *args) {
-    Function *f; Frame *frame; Text *text; I64 i, result;
+    Function *f; Frame *frame; Text *text; I64 i, result, ok;
     if (n->slot == -1) {
         if (n->a->type == T_STRING) Out(args[0](U8 *));
         else if (Floating(n->a->type)) NativePrintFloat(args[0]);
@@ -63,7 +63,16 @@ I64 Invoke(Node *n, I64 *args) {
         else { text = TextNew(); if (Unsigned(n->a->type)) UnsignedNumber(text, args[0]); else Number(text, args[0]); Out(text->data); Free(text->data); Free(text); }
         if (Eq(n->name, "println")) Out("\n"); return 0;
     }
+    if (n->slot == -3) { if (args[0] < 0) ErrorAt(n->token, "allocation size exceeds host range"); return CAlloc(args[0]); }
+    if (n->slot == -4) { Free(args[0](U8 *)); return 0; }
+    if (n->slot == -5) { if (args[2] < 0) ErrorAt(n->token, "copy size exceeds host range"); MemCpy(args[0](U8 *), args[1](U8 *), args[2]); return 0; }
     if (n->slot == -2) { if (!args[0]) ErrorAt(n->token, "assertion failed"); return 0; }
+    f = &functions[n->slot];
+    if (f->foreign) {
+        result = NativeForeignCall(f->name, f->result, f->arg_types, args, f->argc, &ok);
+        if (!ok) ErrorAt(n->token, "could not resolve foreign function or unsupported C ABI");
+        return result;
+    }
     if (++call_depth > 1024) ErrorAt(n->token, "call depth limit exceeded");
     f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); if (execution_mode && !f->bytecode) CompileBytecode(f);
     frame->values = CAlloc((f->slots + f->registers + 1) * 8);
@@ -83,6 +92,10 @@ I64 Eval(Node *n, Frame *frame) {
     if (n->kind == N_STRING) return n->name;
     if (n->kind == N_LOCAL) return frame->values[n->slot];
     if (n->kind == N_CALL) { args = Arguments(n, frame); result = Invoke(n, args); Free(args); return result; }
+    if (n->kind == N_ADDRESS) {
+        a = Eval(n->a, frame); b = Eval(n->b, frame) * ByteSize(n->type - T_PTR); if (n->op == '-') return a - b; return a + b;
+    }
+    if (n->kind == N_LOAD) { a = Eval(n->a, frame); if (!a) ErrorAt(n->token, "null pointer dereference"); return NativeMemoryRead(a, n->type); }
     if (n->kind == N_CAST) return ConvertNumber(Eval(n->a, frame), n->a->type, n->type, n->token);
     a = Eval(n->a, frame); op = n->op;
     if (n->kind == N_UNARY) { if (Floating(n->type)) return AsBits(-AsFloat(a)); if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
@@ -92,7 +105,7 @@ I64 Eval(Node *n, Frame *frame) {
     return Arithmetic(n, a, b);
 }
 U0 Execute(Node *n, Frame *frame) {
-    Node *s; Deferred *deferred = NULL, *d;
+    Node *s; I64 address, value; Deferred *deferred = NULL, *d;
     if (!n) return;
     switch (n->kind) {
         case N_BLOCK:
@@ -105,16 +118,19 @@ U0 Execute(Node *n, Frame *frame) {
             }
             while (deferred) { d = deferred; Invoke(d->call, d->args); deferred = d->next; Free(d->args); Free(d); }
             break;
+        case N_STORE:
+            address = Eval(n->a, frame); value = Eval(n->b, frame); if (!address) ErrorAt(n->token, "null pointer dereference"); NativeMemoryWrite(address, n->type, value); break;
         case N_BIND: case N_ASSIGN: frame->values[n->slot] = Eval(n->a, frame); break;
         case N_EXPR: Eval(n->a, frame); break;
         case N_RETURN: if (n->a) frame->result = Eval(n->a, frame); frame->flow = 1; break;
         case N_IF: if (Eval(n->a, frame)) Execute(n->b, frame); else Execute(n->c, frame); break;
-        case N_WHILE:
+        case N_FOR: case N_WHILE:
             while (Eval(n->a, frame)) {
                 Execute(n->b, frame);
                 if (frame->flow == 1) break;
                 if (frame->flow == 2) { frame->flow = 0; break; }
                 frame->flow = 0;
+                if (n->kind == N_FOR) Execute(n->c, frame);
             }
             break;
         case N_BREAK: frame->flow = 2; break;

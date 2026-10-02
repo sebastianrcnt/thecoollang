@@ -34,7 +34,7 @@ U0 FormatFile(U8 *path, U8 *output) {
         else if (kind == ',') { Append(formatted, ","); FSpace(); }
         else if (kind == ':') { Append(formatted, ":"); FSpace(); }
         else if (kind == '(') {
-            if (prev == K_ID && (Eq(tokens[i-1].text, "if") || Eq(tokens[i-1].text, "while") || Eq(tokens[i-1].text, "return"))) FSpace();
+            if (prev == K_ID && (Eq(tokens[i-1].text, "for") || Eq(tokens[i-1].text, "if") || Eq(tokens[i-1].text, "while") || Eq(tokens[i-1].text, "return"))) FSpace();
             Append(formatted, "("); parens++;
         }
         else if (kind == ')') { Append(formatted, ")"); parens--; }

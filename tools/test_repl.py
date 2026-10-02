@@ -36,3 +36,9 @@ assert 'signature change requires a new session' in p.stderr
 assert 'incompatible types' in p.stderr
 assert 'unknown variable' in p.stderr
 print('REPL: persistent locals, adaptive JIT, changed-function-only compilation, live caller dispatch, error rollback PASS')
+
+source = '\n'.join(['unsafe { missing; }', 'let p: *i64 = null;', '*p', 'extern "C" fn abs(n: i32) -> i32;', 'unsafe { io.println(abs(-9)); }', ':quit', ''])
+p = subprocess.run([ROOT/'tools/cool', 'repl'], input=source, text=True, capture_output=True, timeout=20)
+assert p.returncode == 0 and p.stdout == '9\n', (p.stdout, p.stderr)
+assert 'requires unsafe' in p.stderr, p.stderr
+print('REPL: unsafe scope cannot escape a rejected submission; C declarations PASS')
