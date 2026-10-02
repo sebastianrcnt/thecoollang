@@ -79,6 +79,7 @@ cool check --offline .
 ```sh
 make -j4 test
 make bootstrap-check
+make benchmark
 cool legacy run examples/hello.cool
 ```
 

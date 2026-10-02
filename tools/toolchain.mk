@@ -56,3 +56,7 @@ test: repl-test
 developer-tools-test: build/language.BIN
 	python3 tools/test_developer_tools.py
 test: developer-tools-test
+
+.PHONY: benchmark
+benchmark: all
+	python3 tools/bench_language.py --output build/language-benchmark.json

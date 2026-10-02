@@ -102,3 +102,18 @@ f32 and narrow integers, so C output-pointer parameters work. Immutable bindings
 and parameters cannot yield mutable addresses. Local addresses must not escape
 their function lifetime; this is an unsafe obligation, not an ownership proof.
 REPL local storage is stable and capped at 65,536 registers.
+
+## Timing measurements
+
+`make benchmark` measures checking, each execution path, LLVM cold/cached builds
+and a persistent-session replacement workload. Setup is excluded; every reported
+measurement includes process startup. JSON samples go to
+`build/language-benchmark.json`; no hardware-dependent pass threshold is imposed.
+
+On the development Apple Silicon Mac, five-sample medians for summing integers
+from 0 through 9,999 were approximately 3.4 ms for direct frontend checking,
+3.0 ms for cold baseline JIT plus execution, and 88 ms for `cool run` including
+the Python driver. LLVM build medians were 128 ms cold and 99 ms cached; the built
+executable including startup took 2.7 ms. These are small-workload measurements,
+not large-project throughput or in-process incremental compilation latency.
+The driver overhead remains a performance task.
