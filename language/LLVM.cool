@@ -1,0 +1,153 @@
+// LLVM IR emission shares the typed nodes with the interpreter.
+class EDeferred { Node *call; I64 *args; EDeferred *next; };
+class EScope { EDeferred *calls; EScope *parent; };
+Text *ir, *globals;
+I64 reg_id, label_id, string_id, loop_break, loop_continue, active_label;
+EScope *scope, *loop_scope;
+Bool terminated;
+U0 IR(U8 *s) { Append(ir, s); }
+U0 RI(I64 n) { Number(ir, n); }
+U0 Reg(I64 r) { IR("%r"); RI(r); }
+I64 Fresh() { return ++reg_id; }
+I64 Label() { return ++label_id; }
+U0 AtLabel(I64 label) { active_label = label; IR("L"); RI(label); IR(":\n"); terminated = FALSE; }
+U0 Jump(I64 label) { IR("  br label %L"); RI(label); IR("\n"); terminated = TRUE; }
+I64 Constant(I64 value) { I64 r = Fresh(); IR("  "); Reg(r); IR(" = add i64 0, "); RI(value); IR("\n"); return r; }
+I64 Truth(I64 r) { I64 b = Fresh(); IR("  %b"); RI(b); IR(" = icmp ne i64 "); Reg(r); IR(", 0\n"); return b; }
+U0 Branch(I64 value, I64 yes, I64 no) {
+    I64 b = Truth(value); IR("  br i1 %b"); RI(b); IR(", label %L"); RI(yes); IR(", label %L"); RI(no); IR("\n"); terminated = TRUE;
+}
+I64 Truncate(I64 r, I64 type) {
+    I64 n, width;
+    if (type != T_U8 && type != T_I32) return r;
+    width = 32; if (type == T_U8) width = 8;
+    n = Fresh(); IR("  %t"); RI(n); IR(" = trunc i64 "); Reg(r); IR(" to i"); RI(width); IR("\n  "); Reg(n);
+    if (type == T_U8) IR(" = zext i"); else IR(" = sext i");
+    RI(width); IR(" %t"); RI(n); IR(" to i64\n"); return n;
+}
+extern I64 EmitExpr(Node *n);
+I64 *EmitArgs(Node *n) {
+    I64 *args = CAlloc((n->value + 1) * 8), i = 0; Node *a = n->a;
+    while (a) { args[i++] = EmitExpr(a); a = a->next; } return args;
+}
+I64 EmitCall(Node *n, I64 *args) {
+    I64 r, i;
+    if (n->slot == -1) {
+        IR("  call void @cool_print(i64 "); Reg(args[0]); IR(", i64 "); RI(n->a->type); IR(", i64 "); RI(Eq(n->name, "println")); IR(")\n"); return Constant(0);
+    }
+    if (n->slot == -2) { IR("  call void @cool_assert(i64 "); Reg(args[0]); IR(")\n"); return Constant(0); }
+    r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @f"); RI(n->slot); IR("(");
+    for (i = 0; i < n->value; i++) { if (i) IR(", "); IR("i64 "); Reg(args[i]); }
+    IR(")\n"); return r;
+}
+U0 EmitCleanup(EScope *until) {
+    EScope *s = scope; EDeferred *d;
+    while (s != until) { d = s->calls; while (d) { EmitCall(d->call, d->args); d = d->next; } s = s->parent; }
+}
+I64 EmitExpr(Node *n) {
+    I64 a, b, r, op, yes, no, end, id, i, ch, predecessor, *args; U8 *instruction = NULL, *hex = "0123456789ABCDEF";
+    if (n->kind == N_INT) return Constant(n->value);
+    if (n->kind == N_STRING) {
+        id = ++string_id; Append(globals, "@s"); Number(globals, id); Append(globals, " = private constant ["); Number(globals, StrLen(n->name) + 1); Append(globals, " x i8] c\"");
+        for (i = 0; n->name[i]; i++) { ch = n->name[i]; Char(globals, '\\'); Char(globals, hex[ch >> 4]); Char(globals, hex[ch & 15]); }
+        Append(globals, "\\00\"\n"); r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr @s"); RI(id); IR(" to i64\n"); return r;
+    }
+    if (n->kind == N_LOCAL) { r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return r; }
+    if (n->kind == N_CALL) { args = EmitArgs(n); r = EmitCall(n, args); Free(args); return r; }
+    a = EmitExpr(n->a);
+    if (n->kind == N_CAST) return Truncate(a, n->type);
+    op = n->op;
+    if (n->kind == N_UNARY) {
+        r = Fresh(); IR("  "); Reg(r);
+        if (op == '!') { IR(" = xor i64 "); Reg(a); IR(", 1\n"); }
+        else if (op == '~') { IR(" = xor i64 "); Reg(a); IR(", -1\n"); }
+        else { IR(" = sub i64 0, "); Reg(a); IR("\n"); }
+        return Truncate(r, n->type);
+    }
+    if (op == K_AND || op == K_OR) {
+        yes = Label(); no = Label(); end = Label();
+        if (op == K_AND) Branch(a, yes, no); else Branch(a, no, yes);
+        AtLabel(yes); b = EmitExpr(n->b); predecessor = active_label; Jump(end);
+        AtLabel(no); Jump(end); AtLabel(end); r = Fresh();
+        IR("  "); Reg(r); IR(" = phi i64 [ "); Reg(b); IR(", %L"); RI(predecessor);
+        IR(" ], [ "); RI(op == K_OR); IR(", %L"); RI(no); IR(" ]\n"); return r;
+    }
+    b = EmitExpr(n->b); r = Fresh();
+    if (op == '/' || op == '%' || op == K_SHL || op == K_SHR) {
+        IR("  "); Reg(r); IR(" = call i64 @");
+        if (op == '/' || op == '%') IR("cool_div"); else IR("cool_shift");
+        IR("(i64 "); Reg(a); IR(", i64 "); Reg(b); IR(", i64 "); RI(op == '%' || op == K_SHR); IR(")\n"); return Truncate(r, n->type);
+    }
+    switch (op) {
+        case '+': instruction = "add"; break; case '-': instruction = "sub"; break;
+        case '*': instruction = "mul"; break; case '&': instruction = "and"; break;
+        case '|': instruction = "or"; break; case '^': instruction = "xor"; break;
+    }
+    if (instruction) {
+        IR("  "); Reg(r); IR(" = "); IR(instruction); IR(" i64 "); Reg(a); IR(", "); Reg(b); IR("\n"); return Truncate(r, n->type);
+    }
+    switch (op) {
+        case K_EQ: instruction = "eq"; break; case K_NE: instruction = "ne"; break;
+        case '<': instruction = "slt"; break; case '>': instruction = "sgt"; break;
+        case K_LE: instruction = "sle"; break; case K_GE: instruction = "sge"; break;
+    }
+    IR("  %b"); RI(r); IR(" = icmp "); IR(instruction); IR(" i64 "); Reg(a); IR(", "); Reg(b); IR("\n  ");
+    Reg(r); IR(" = zext i1 %b"); RI(r); IR(" to i64\n"); return r;
+}
+U0 EmitStmt(Node *n) {
+    Node *s; EScope *saved, *saved_loop; EDeferred *d; I64 r, yes, no, end, cond, saved_break, saved_continue; Bool left_done;
+    if (!n || terminated) return;
+    switch (n->kind) {
+        case N_BLOCK:
+            saved = scope; scope = CAlloc(sizeof(EScope)); scope->parent = saved;
+            s = n->a;
+            while (s && !terminated) {
+                if (s->kind == N_DEFER) { d = CAlloc(sizeof(EDeferred)); d->call = s->a; d->args = EmitArgs(s->a); d->next = scope->calls; scope->calls = d; }
+                else EmitStmt(s);
+                s = s->next;
+            }
+            if (!terminated) EmitCleanup(saved);
+            scope = saved; break;
+        case N_BIND: case N_ASSIGN:
+            r = EmitExpr(n->a); IR("  store i64 "); Reg(r); IR(", ptr %v"); RI(n->slot); IR("\n"); break;
+        case N_EXPR: EmitExpr(n->a); break;
+        case N_RETURN:
+            r = Constant(0); if (n->a) r = EmitExpr(n->a);
+            EmitCleanup(NULL); IR("  ret i64 "); Reg(r); IR("\n"); terminated = TRUE; break;
+        case N_IF:
+            r = EmitExpr(n->a); yes = Label(); no = Label(); end = Label(); Branch(r, yes, no);
+            AtLabel(yes); EmitStmt(n->b); left_done = terminated; if (!terminated) Jump(end);
+            AtLabel(no); EmitStmt(n->c);
+            if (left_done && terminated) break;
+            if (!terminated) Jump(end); AtLabel(end); break;
+        case N_WHILE:
+            cond = Label(); yes = Label(); end = Label(); Jump(cond); AtLabel(cond);
+            r = EmitExpr(n->a); Branch(r, yes, end); AtLabel(yes);
+            saved_break = loop_break; saved_continue = loop_continue; saved_loop = loop_scope;
+            loop_break = end; loop_continue = cond; loop_scope = scope; EmitStmt(n->b);
+            loop_break = saved_break; loop_continue = saved_continue; loop_scope = saved_loop;
+            if (!terminated) Jump(cond); AtLabel(end); break;
+        case N_BREAK: EmitCleanup(loop_scope); Jump(loop_break); break;
+        case N_CONTINUE: EmitCleanup(loop_scope); Jump(loop_continue); break;
+    }
+}
+U0 EmitLLVM(U8 *output) {
+    I64 i, j, main = FindFun("main"); Function *f; Text *all;
+    if (main < 0) Error("no main function");
+    if (functions[main].argc || (functions[main].result != T_VOID && !Integer(functions[main].result))) ErrorAt(functions[main].token, "invalid main signature");
+    ir = TextNew(); globals = TextNew();
+    IR("; Generated by the Cool-written frontend. No C transpilation.\n");
+    IR("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64)\n");
+    for (i = 0; i < nfun; i++) {
+        f = &functions[i]; reg_id = 0; terminated = FALSE; scope = NULL;
+        IR("define i64 @f"); RI(i); IR("(");
+        for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR("i64 %a"); RI(j); }
+        IR(") {\nentry:\n");
+        for (j = 0; j < f->slots; j++) { IR("  %v"); RI(j); IR(" = alloca i64\n"); }
+        for (j = 0; j < f->argc; j++) { IR("  store i64 %a"); RI(j); IR(", ptr %v"); RI(j); IR("\n"); }
+        EmitStmt(f->body); if (!terminated) IR("  ret i64 0\n"); IR("}\n");
+    }
+    IR("define i32 @main() {\nentry:\n  %exit = call i64 @f"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
+    all = TextNew(); if (globals->len) Append(all, globals->data); Append(all, ir->data);
+    if (!FileWrite(output, all->data, all->len)) Error("failed to write LLVM IR");
+}

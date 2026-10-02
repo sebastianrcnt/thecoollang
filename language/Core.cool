@@ -1,0 +1,139 @@
+// The new-language compiler is written in bootstrap Cool, not Python or C.
+#define I64 I64i
+#define U64 U64i
+#define U8 U8i
+#define Bool I8i
+#define TRUE 1
+#define FALSE 0
+#define NULL 0
+import U8 *CAlloc(I64 size);
+import U8 *MAlloc(I64 size);
+import U0 Free(U8 *p);
+import U8 *MemCpy(U8 *to, U8 *from, I64 size);
+import I64 StrLen(U8 *s);
+import I64 StrCmp(U8 *a, U8 *b);
+import U8 *StrNew(U8 *s);
+import U8 *FileRead(U8 *path, I64 *size, U8 *attrs);
+import I64 FileWrite(U8 *path, U8 *data, I64 size);
+import I64 NativeWrite(I64 fd, U8 *data, I64 size);
+import U0 NativeExit(I64 code);
+import I64 NativeArgCount();
+import U8 *NativeArg(I64 index);
+import I64 NativeGetChar();
+
+class Text { U8 *data; I64 len, cap; };
+Text *TextNew() { return CAlloc(sizeof(Text)); }
+U0 Reserve(Text *t, I64 more) {
+    U8 *p;
+    I64 cap;
+    if (more < 0 || t->len > 0x3FFFFFFF - more) NativeExit(70);
+    if (t->len + more + 1 <= t->cap) return;
+    cap = t->cap * 2;
+    if (cap < t->len + more + 1) cap = t->len + more + 4096;
+    p = CAlloc(cap);
+    if (t->len) MemCpy(p, t->data, t->len);
+    Free(t->data); t->data = p; t->cap = cap;
+}
+U0 Char(Text *t, I64 ch) { Reserve(t, 1); t->data[t->len++] = ch; t->data[t->len] = 0; }
+U0 Append(Text *t, U8 *s) {
+    I64 n = StrLen(s);
+    Reserve(t, n); MemCpy(t->data + t->len, s, n); t->len += n; t->data[t->len] = 0;
+}
+U0 Number(Text *t, I64 n) {
+    U8 digits[32]; I64 i = 0; U64 v;
+    if (n < 0) { Char(t, '-'); v = -n; } else v = n;
+    do { digits[i++] = '0' + v % 10; v /= 10; } while (v);
+    while (i) Char(t, digits[--i]);
+}
+U0 Out(U8 *s) { NativeWrite(1, s, StrLen(s)); }
+U8 *Slice(U8 *s, I64 start, I64 end) {
+    U8 *p = CAlloc(end - start + 1); MemCpy(p, s + start, end - start); return p;
+}
+Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
+
+#define T_VOID 0
+#define T_INT 1
+#define T_BOOL 2
+#define T_STRING 3
+#define T_I32 4
+#define T_U8 5
+#define K_ID 256
+#define K_INT 257
+#define K_STRING 258
+#define K_EQ 259
+#define K_NE 260
+#define K_LE 261
+#define K_GE 262
+#define K_AND 263
+#define K_OR 264
+#define K_ARROW 265
+#define K_SHL 266
+#define K_SHR 267
+class Token { I64 kind, val, line, col; U8 *text, *file; };
+#define MAX_TOKENS 262144
+Token *tokens;
+I64 ntok, pos;
+Token *At() { return &tokens[pos]; }
+U0 ErrorAt(Token *t, U8 *message) {
+    Text *s = TextNew();
+    Append(s, t->file); Char(s, ':'); Number(s, t->line); Char(s, ':'); Number(s, t->col);
+    Append(s, ": error: "); Append(s, message); Char(s, '\n');
+    NativeWrite(2, s->data, s->len); NativeExit(2);
+}
+U0 Error(U8 *message) { ErrorAt(At(), message); }
+Bool Is(U8 *s) { return At()->kind == K_ID && Eq(At()->text, s); }
+Bool Take(I64 k) { if (At()->kind != k) return FALSE; pos++; return TRUE; }
+U0 Need(I64 k, U8 *msg) { if (!Take(k)) Error(msg); }
+U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
+
+#define N_INT 1
+#define N_STRING 2
+#define N_LOCAL 3
+#define N_CALL 4
+#define N_BINARY 5
+#define N_UNARY 6
+#define N_BIND 7
+#define N_ASSIGN 8
+#define N_RETURN 9
+#define N_IF 10
+#define N_WHILE 11
+#define N_BLOCK 12
+#define N_BREAK 13
+#define N_CONTINUE 14
+#define N_DEFER 15
+#define N_EXPR 16
+#define N_CAST 17
+class Node { I64 kind, type, value, op, slot; Token *token; U8 *name; Node *a, *b, *c, *next; };
+class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
+class Function {
+    U8 *name, *package; I64 result, argc, slots, begin, end, public;
+    U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
+};
+#define MAX_FUNCTIONS 4096
+Function *functions;
+I64 nfun;
+Local *locals;
+I64 depth, loop_depth, current_fun;
+Node *NewNode(I64 kind, Token *t) { Node *n = CAlloc(sizeof(Node)); n->kind = kind; n->token = t; n->slot = -1; return n; }
+I64 FindFun(U8 *name) { I64 i; for (i = 0; i < nfun; i++) if (Eq(functions[i].name, name)) return i; return -1; }
+Local *FindLocal(U8 *name) { Local *l = locals; while (l) { if (Eq(l->name, name)) return l; l = l->next; } return NULL; }
+Local *AddLocal(U8 *name, I64 type, Bool mutable) {
+    Local *l = locals, *res;
+    while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
+    res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth;
+    res->slot = functions[current_fun].slots++; res->next = locals; locals = res; return res;
+}
+Bool Integer(I64 type) { return type == T_INT || type == T_I32 || type == T_U8; }
+Bool Fits(I64 v, I64 type) { if (type == T_I32) return -2147483648 <= v <= 2147483647; if (type == T_U8) return 0 <= v <= 255; return type == T_INT; }
+U0 Coerce(Node *n, I64 type) {
+    Node *child;
+    if (n->type == type) return;
+    if (Integer(n->type) && Integer(type)) {
+        if (n->kind == N_INT && Fits(n->value, type)) { n->type = type; return; }
+        if (type == T_INT || (type == T_I32 && n->type == T_U8)) {
+            child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
+            n->kind = N_CAST; n->a = child; n->type = type; return;
+        }
+    }
+    ErrorAt(n->token, "incompatible types; use an explicit cast for narrowing conversions");
+}

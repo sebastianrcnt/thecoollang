@@ -1,0 +1,16 @@
+#include "Core.cool"
+#include "Lexer.cool"
+#include "Parser.cool"
+#include "Interpreter.cool"
+#include "LLVM.cool"
+U0 LanguageMain() {
+    U8 *source, *mode; I64 size;
+    if (NativeArgCount() < 3 || NativeArgCount() > 4) { Out("usage: language.BIN check|run|llvm source.cool [output.ll]\n"); NativeExit(2); }
+    mode = NativeArg(1); source = FileRead(NativeArg(2), &size, NULL);
+    if (!source) { Out("cannot read source\n"); NativeExit(2); }
+    LexSource(source, NativeArg(2)); ParseProgram();
+    if (Eq(mode, "run")) NativeExit(RunMain());
+    if (Eq(mode, "llvm")) { if (NativeArgCount() != 4) NativeExit(2); EmitLLVM(NativeArg(3)); return; }
+    if (!Eq(mode, "check")) { Out("unknown command\n"); NativeExit(2); }
+}
+LanguageMain;

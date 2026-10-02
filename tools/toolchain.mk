@@ -32,3 +32,10 @@ bootstrap-check: build/coolc
 	tools/native/bootstrap.sh
 clean:
 	rm -rf build
+
+LANGUAGE_SRC := $(wildcard language/*.cool)
+build/language.BIN: $(LANGUAGE_SRC) build/coolc coolc/seed/Compiler.BIN | build
+	COOLC_COMPILER_BIN="$(COOLC_SEED)" gtimeout 60 build/coolc language/Native.cool $@ > build/language-compile.log 2>&1 || { cat build/language-compile.log; exit 1; }
+.PHONY: language-test
+language-test: build/language.BIN
+	python3 tools/test_language.py

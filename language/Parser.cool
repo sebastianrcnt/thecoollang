@@ -1,0 +1,209 @@
+I64 TypeName(U8 *s) {
+    if (Eq(s, "void")) return T_VOID;
+    if (Eq(s, "i64")) return T_INT;
+    if (Eq(s, "i32")) return T_I32;
+    if (Eq(s, "u8")) return T_U8;
+    if (Eq(s, "bool")) return T_BOOL;
+    if (Eq(s, "string")) return T_STRING;
+    return -1;
+}
+I64 ParseType() { I64 t = TypeName(Ident()); if (t < 0) Error("unsupported or unknown type"); return t; }
+I64 Prec(I64 k) {
+    if (k == K_OR) return 1;
+    if (k == K_AND) return 2;
+    if (k == '|') return 3;
+    if (k == '^') return 4;
+    if (k == '&') return 5;
+    if (k == K_EQ || k == K_NE) return 6;
+    if (k == '<' || k == '>' || k == K_LE || k == K_GE) return 7;
+    if (k == K_SHL || k == K_SHR) return 8;
+    if (k == '+' || k == '-') return 9;
+    if (k == '*' || k == '/' || k == '%') return 10;
+    return 0;
+}
+extern Node *Expr(I64 min);
+Node *Primary() {
+    Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name;
+    if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; return n; }
+    if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = t->text; n->type = T_STRING; return n; }
+    if (Is("true") || Is("false")) { n = NewNode(N_INT, t); n->type = T_BOOL; n->value = Is("true"); pos++; return n; }
+    if (Take('(')) { n = Expr(1); Need(')', "expected ')'"); return n; }
+    if (t->kind == '-' || t->kind == '!' || t->kind == '~') {
+        k = t->kind; pos++; n = NewNode(N_UNARY, t); n->op = k; n->a = Primary(); n->type = n->a->type;
+        if (k == '!' && n->type != T_BOOL) ErrorAt(t, "logical negation requires bool");
+        if (k != '!' && !Integer(n->type)) ErrorAt(t, "integer operand required");
+        if (k == '-' && n->a->kind == N_INT) { n->kind = N_INT; n->value = -n->a->value; }
+        return n;
+    }
+    name = Ident();
+    if (Take('.')) {
+        if (!Eq(name, "io")) ErrorAt(t, "unknown imported package alias");
+        name = Ident();
+        if (!Eq(name, "println") && !Eq(name, "print")) ErrorAt(t, "unknown std/io function");
+    }
+    if (Take('(')) {
+        n = NewNode(N_CALL, t); n->name = name;
+        if (!Take(')')) {
+            do { arg = Expr(1); if (tail) tail->next = arg; else n->a = arg; tail = arg; count++; }
+            while (Take(','));
+            Need(')', "expected ')' after arguments");
+        }
+        n->value = count;
+        ty = TypeName(name);
+        if (ty >= 0) {
+            if (count != 1 || ty == T_VOID || ty == T_STRING || !Integer(n->a->type) || !Integer(ty)) ErrorAt(t, "cast expects one integer operand and an integer target");
+            n->kind = N_CAST; n->type = ty; return n;
+        }
+        if (Eq(name, "print") || Eq(name, "println")) {
+            if (count != 1 || n->a->type == T_VOID) ErrorAt(t, "print/println expects one scalar value");
+            n->slot = -1; n->type = T_VOID; return n;
+        }
+        if (Eq(name, "assert")) {
+            if (count != 1 || n->a->type != T_BOOL) ErrorAt(t, "assert expects one bool");
+            n->slot = -2; n->type = T_VOID; return n;
+        }
+        id = FindFun(name);
+        if (id < 0) ErrorAt(t, "unknown function");
+        if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
+        arg = n->a;
+        for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); arg = arg->next; }
+        n->slot = id; n->type = functions[id].result; return n;
+    }
+    l = FindLocal(name);
+    if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
+    n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; return n;
+}
+Node *Expr(I64 min) {
+    Node *a = Primary(), *n; Token *t; I64 p, op;
+    while (Prec(At()->kind) >= min) {
+        t = At(); op = t->kind; p = Prec(op); pos++;
+        n = NewNode(N_BINARY, t); n->op = op; n->a = a; n->b = Expr(p + 1);
+        if (op == K_AND || op == K_OR) {
+            if (a->type != T_BOOL || n->b->type != T_BOOL) ErrorAt(t, "logical operators require bool operands");
+            n->type = T_BOOL;
+        } else {
+            if (a->type != n->b->type) {
+                if (a->kind == N_INT) Coerce(a, n->b->type); else Coerce(n->b, a->type);
+            }
+            if (op == K_EQ || op == K_NE) {
+                if (a->type == T_VOID || a->type == T_STRING) ErrorAt(t, "equality requires integers or bool");
+                n->type = T_BOOL;
+            } else {
+                if (!Integer(a->type)) ErrorAt(t, "operator requires integer operands");
+                n->type = a->type;
+                if (op == '<' || op == '>' || op == K_LE || op == K_GE) n->type = T_BOOL;
+            }
+        }
+        if ((op == '/' || op == '%') && n->b->kind == N_INT && !n->b->value) ErrorAt(t, "division by zero");
+        if ((op == K_SHL || op == K_SHR) && n->b->kind == N_INT && (n->b->value < 0 || n->b->value >= 64)) ErrorAt(t, "shift count must be in 0..63");
+        a = n;
+    }
+    return a;
+}
+extern Node *Statement();
+Node *Block() {
+    Node *n = NewNode(N_BLOCK, At()), *tail = NULL, *s; Local *saved = locals;
+    Need('{', "expected '{'"); depth++;
+    while (!Take('}')) {
+        if (!At()->kind) Error("unterminated block");
+        s = Statement(); if (tail) tail->next = s; else n->a = s; tail = s;
+    }
+    depth--; locals = saved; return n;
+}
+Node *Statement() {
+    Token *t = At(); Node *n; Local *l; U8 *name; I64 ty = -1; Bool mutable;
+    if (t->kind == '{') return Block();
+    if (Is("let") || Is("var")) {
+        mutable = Is("var"); pos++; name = Ident(); if (Take(':')) ty = ParseType();
+        Need('=', "variables must have an initializer");
+        n = NewNode(N_BIND, t); n->a = Expr(1);
+        if (ty < 0) ty = n->a->type;
+        if (ty == T_VOID) ErrorAt(t, "cannot bind a void value");
+        Coerce(n->a, ty); l = AddLocal(name, ty, mutable); n->slot = l->slot; n->type = ty;
+        Need(';', "expected ';'"); return n;
+    }
+    if (Is("return")) {
+        pos++; n = NewNode(N_RETURN, t); ty = functions[current_fun].result;
+        if (At()->kind != ';') { n->a = Expr(1); Coerce(n->a, ty); }
+        else if (ty != T_VOID) ErrorAt(t, "return value required");
+        Need(';', "expected ';'"); return n;
+    }
+    if (Is("if") || Is("while")) {
+        mutable = Is("while"); pos++; n = NewNode(N_IF, t); if (mutable) n->kind = N_WHILE;
+        Need('(', "expected '(' before condition"); n->a = Expr(1); Need(')', "expected ')' after condition");
+        if (n->a->type != T_BOOL) ErrorAt(t, "condition must have type bool");
+        if (mutable) loop_depth++;
+        n->b = Block();
+        if (mutable) loop_depth--;
+        else if (Is("else")) { pos++; if (Is("if")) n->c = Statement(); else n->c = Block(); }
+        return n;
+    }
+    if (Is("break") || Is("continue")) {
+        if (!loop_depth) Error("loop control outside a loop");
+        n = NewNode(N_BREAK, t); if (Is("continue")) n->kind = N_CONTINUE;
+        pos++; Need(';', "expected ';'"); return n;
+    }
+    if (Is("defer")) {
+        pos++; n = NewNode(N_DEFER, t); n->a = Expr(1);
+        if (n->a->kind != N_CALL || n->a->type != T_VOID) ErrorAt(t, "defer requires a void function call");
+        Need(';', "expected ';'"); return n;
+    }
+    if (t->kind == K_ID && tokens[pos + 1].kind == '=') {
+        name = Ident(); pos++; l = FindLocal(name);
+        if (!l) ErrorAt(t, "unknown assignment target");
+        if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
+        n = NewNode(N_ASSIGN, t); n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type);
+        Need(';', "expected ';'"); return n;
+    }
+    n = NewNode(N_EXPR, t); n->a = Expr(1); Need(';', "expected ';'"); return n;
+}
+Bool Returns(Node *n) {
+    if (!n) return FALSE;
+    if (n->kind == N_RETURN) return TRUE;
+    if (n->kind == N_IF) return Returns(n->b) && Returns(n->c);
+    if (n->kind == N_BLOCK) { n = n->a; while (n) { if (Returns(n)) return TRUE; n = n->next; } }
+    return FALSE;
+}
+U0 ParseProgram() {
+    Function *f; U8 *package = "main", *name; I64 braces, i, j; Bool public;
+    functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
+    while (At()->kind) {
+        if (Is("package")) { pos++; package = Ident(); Need(';', "expected ';' after package"); }
+        else if (Is("import")) {
+            pos++;
+            if (At()->kind != K_STRING || !Eq(At()->text, "std/io")) Error("only std/io is available in this compiler stage");
+            pos++; Need(';', "expected ';' after import");
+        } else {
+            public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
+            if (!Is("fn")) Error("expected fn, package or import declaration");
+            pos++; name = Ident();
+            if (FindFun(name) >= 0) Error("duplicate function declaration");
+            if (nfun >= MAX_FUNCTIONS) Error("function limit exceeded");
+            f = &functions[nfun++]; f->name = name; f->package = package; f->public = public; f->token = At();
+            Need('(', "expected '(' after function name");
+            if (!Take(')')) {
+                do {
+                    if (f->argc >= 32) Error("function argument limit exceeded");
+                    f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter");
+                    f->arg_types[f->argc] = ParseType();
+                    if (!f->arg_types[f->argc]) Error("parameter cannot be void");
+                    f->argc++;
+                } while (Take(','));
+                Need(')', "expected ')'");
+            }
+            if (Take(K_ARROW)) f->result = ParseType();
+            f->begin = pos; Need('{', "expected function body"); braces = 1;
+            while (braces) {
+                if (!At()->kind) Error("unterminated function body");
+                if (Take('{')) braces++; else if (Take('}')) braces--; else pos++;
+            }
+            f->end = pos;
+        }
+    }
+    for (i = 0; i < nfun; i++) {
+        current_fun = i; f = &functions[i]; pos = f->begin; locals = NULL; depth = 0;
+        for (j = 0; j < f->argc; j++) AddLocal(f->arg_names[j], f->arg_types[j], FALSE);
+        f->body = Block();
+        if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
+    }
+}

@@ -1,0 +1,18 @@
+package main;
+import "std/io";
+
+fn fib(n: i64) -> i64 {
+    if (n < 2) { return n; }
+    return fib(n - 1) + fib(n - 2);
+}
+
+fn main() -> i32 {
+    defer io.println("done");
+    io.println("Hello, modern Cool!");
+    var i = 0;
+    while (i < 8) {
+        io.println(fib(i));
+        i = i + 1;
+    }
+    return 0;
+}

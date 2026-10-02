@@ -1,0 +1,86 @@
+class Frame { I64 *values, flow, result; };
+class Deferred { Node *call; I64 *args; Deferred *next; };
+I64 call_depth;
+extern I64 Eval(Node *n, Frame *frame);
+extern U0 Execute(Node *n, Frame *frame);
+I64 Normalize(I64 v, I64 type) { if (type == T_U8) return v & 255; if (type == T_I32) return (v << 32) >> 32; return v; }
+I64 Invoke(Node *n, I64 *args) {
+    Function *f; Frame *frame; Text *text; I64 i, result;
+    if (n->slot == -1) {
+        if (n->a->type == T_STRING) Out(args[0](U8 *));
+        else if (n->a->type == T_BOOL) { if (args[0]) Out("true"); else Out("false"); }
+        else { text = TextNew(); Number(text, args[0]); Out(text->data); Free(text->data); Free(text); }
+        if (Eq(n->name, "println")) Out("\n"); return 0;
+    }
+    if (n->slot == -2) { if (!args[0]) ErrorAt(n->token, "assertion failed"); return 0; }
+    if (++call_depth > 1024) ErrorAt(n->token, "call depth limit exceeded");
+    f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); frame->values = CAlloc((f->slots + 1) * 8);
+    for (i = 0; i < f->argc; i++) frame->values[i] = args[i];
+    Execute(f->body, frame); result = frame->result; Free(frame->values); Free(frame); call_depth--; return result;
+}
+I64 *Arguments(Node *n, Frame *frame) {
+    I64 i = 0, *args = CAlloc((n->value + 1) * 8); Node *a = n->a;
+    while (a) { args[i++] = Eval(a, frame); a = a->next; } return args;
+}
+I64 Eval(Node *n, Frame *frame) {
+    I64 a, b, op, result = 0, *args;
+    if (n->kind == N_INT) return n->value;
+    if (n->kind == N_STRING) return n->name;
+    if (n->kind == N_LOCAL) return frame->values[n->slot];
+    if (n->kind == N_CALL) { args = Arguments(n, frame); result = Invoke(n, args); Free(args); return result; }
+    if (n->kind == N_CAST) return Normalize(Eval(n->a, frame), n->type);
+    a = Eval(n->a, frame); op = n->op;
+    if (n->kind == N_UNARY) { if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
+    if (op == K_AND && !a) return 0;
+    if (op == K_OR && a) return 1;
+    b = Eval(n->b, frame);
+    if ((op == '/' || op == '%') && (!b || (a == (-0x7FFFFFFFFFFFFFFF - 1) && b == -1))) ErrorAt(n->token, "invalid integer division");
+    if ((op == K_SHL || op == K_SHR) && (b < 0 || b >= 64)) ErrorAt(n->token, "shift count outside 0..63");
+    switch (op) {
+        case '+': result = a + b; break; case '-': result = a - b; break;
+        case '*': result = a * b; break; case '/': result = a / b; break; case '%': result = a % b; break;
+        case '&': result = a & b; break; case '|': result = a | b; break; case '^': result = a ^ b; break;
+        case K_SHL: result = a << b; break; case K_SHR: result = a >> b; break;
+        case K_EQ: result = a == b; break; case K_NE: result = a != b; break;
+        case '<': result = a < b; break; case '>': result = a > b; break;
+        case K_LE: result = a <= b; break; case K_GE: result = a >= b; break;
+        case K_AND: result = a && b; break; case K_OR: result = a || b; break;
+    }
+    return Normalize(result, n->type);
+}
+U0 Execute(Node *n, Frame *frame) {
+    Node *s; Deferred *deferred = NULL, *d;
+    if (!n) return;
+    switch (n->kind) {
+        case N_BLOCK:
+            s = n->a;
+            while (s && !frame->flow) {
+                if (s->kind == N_DEFER) {
+                    d = CAlloc(sizeof(Deferred)); d->call = s->a; d->args = Arguments(s->a, frame); d->next = deferred; deferred = d;
+                } else Execute(s, frame);
+                s = s->next;
+            }
+            while (deferred) { d = deferred; Invoke(d->call, d->args); deferred = d->next; Free(d->args); Free(d); }
+            break;
+        case N_BIND: case N_ASSIGN: frame->values[n->slot] = Eval(n->a, frame); break;
+        case N_EXPR: Eval(n->a, frame); break;
+        case N_RETURN: if (n->a) frame->result = Eval(n->a, frame); frame->flow = 1; break;
+        case N_IF: if (Eval(n->a, frame)) Execute(n->b, frame); else Execute(n->c, frame); break;
+        case N_WHILE:
+            while (Eval(n->a, frame)) {
+                Execute(n->b, frame);
+                if (frame->flow == 1) break;
+                if (frame->flow == 2) { frame->flow = 0; break; }
+                frame->flow = 0;
+            }
+            break;
+        case N_BREAK: frame->flow = 2; break;
+        case N_CONTINUE: frame->flow = 3; break;
+    }
+}
+I64 RunMain() {
+    I64 id = FindFun("main"), args[1]; Node *call;
+    if (id < 0) Error("no main function");
+    if (functions[id].argc || (functions[id].result != T_VOID && functions[id].result != T_I32 && functions[id].result != T_INT)) ErrorAt(functions[id].token, "main must take no arguments and return void, i32 or i64");
+    call = NewNode(N_CALL, functions[id].token); call->slot = id; return Invoke(call, args);
+}
