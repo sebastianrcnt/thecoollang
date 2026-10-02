@@ -51,9 +51,10 @@ U0 ReplStep(Text *text) {
     bc_fun = f; f->registers = f->slots; bc_scope = NULL; bc_done = FALSE;
     ByteStmt(statement); register_id = Slot(); InstructionNew(BC_CONST, register_id); InstructionNew(BC_RETURN, 0, register_id);
     if (f->registers + 1 > repl_capacity) {
-        grown = CAlloc((f->registers + 64) * 8);
+        if (f->registers >= 65536) Error("session register limit exceeded");
+        grown = CAlloc(65536 * 8);
         for (i = 0; i < repl_capacity; i++) grown[i] = repl_values[i];
-        Free(repl_values); repl_values = grown; repl_capacity = f->registers + 64;
+        Free(repl_values); repl_values = grown; repl_capacity = 65536;
     }
     // The session's locals remain live; expression temporaries are regenerated.
     result = RunBytecode(f, repl_values); no_warn result;

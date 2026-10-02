@@ -10,6 +10,9 @@
 #define BC_ADDRESS 10
 #define BC_LOAD 11
 #define BC_STORE 12
+#define BC_LOCAL_READ 13
+#define BC_LOCAL_WRITE 14
+#define BC_LOCAL_ADDRESS 15
 class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
 class BDefer { Node *call; I64 *args; BDefer *next; };
 class BScope { BDefer *calls; BScope *parent; };
@@ -42,7 +45,8 @@ U0 ByteCleanup(BScope *until) {
 }
 I64 ByteExpr(Node *n) {
     I64 r, a, b, at, jump, end; I64 *args;
-    if (n->kind == N_LOCAL) { r = Slot(); InstructionNew(BC_COPY, r, n->slot); return r; }
+    if (n->kind == N_LOCAL) { r = Slot(); InstructionNew(BC_LOCAL_READ, r, n->slot, 0, n); return r; }
+    if (n->kind == N_LOCAL_ADDRESS) { r = Slot(); InstructionNew(BC_LOCAL_ADDRESS, r, n->slot, 0, n); return r; }
     if (n->kind == N_INT || n->kind == N_STRING) {
         r = Slot(); at = InstructionNew(BC_CONST, r); CodeAt(at)->value = n->value;
         if (n->kind == N_STRING) CodeAt(at)->value = n->name; return r;
@@ -79,7 +83,7 @@ U0 ByteStmt(Node *n) {
             if (!bc_done) ByteCleanup(saved); bc_scope = saved; break;
         case N_STORE:
             r = ByteExpr(n->a); at = ByteExpr(n->b); InstructionNew(BC_STORE, Slot(), r, at, n); break;
-        case N_BIND: case N_ASSIGN: r = ByteExpr(n->a); InstructionNew(BC_COPY, n->slot, r); break;
+        case N_BIND: case N_ASSIGN: r = ByteExpr(n->a); InstructionNew(BC_LOCAL_WRITE, n->slot, r, 0, n); break;
         case N_EXPR: ByteExpr(n->a); break;
         case N_RETURN:
             r = Slot(); InstructionNew(BC_CONST, r); if (n->a) r = ByteExpr(n->a);
@@ -117,6 +121,9 @@ I64 Compute(Instruction *ins, I64 *values) {
     I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, *args; Node *n = ins->node;
     if (ins->op == BC_CONST) return ins->value;
     if (ins->op == BC_COPY) return a;
+    if (ins->op == BC_LOCAL_READ) return NativeMemoryRead(&values[ins->a], n->type);
+    if (ins->op == BC_LOCAL_ADDRESS) return &values[ins->a];
+    if (ins->op == BC_LOCAL_WRITE) { NativeMemoryWrite(&result, n->type, a); return result; }
     if (ins->op == BC_CALL) {
         args = CAlloc((n->value + 1) * 8);
         for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];

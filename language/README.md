@@ -85,7 +85,7 @@ remain outstanding.
 
 ## Raw memory and C interoperability
 
-Typed `*T` pointers, `null`, `cast[*T](value)`, dereference and pointer indexing
+Typed `*T` pointers, `null`, `cast[*T](value)`, `&variable`, dereference and pointer indexing
 are implemented across all execution paths. Pointer arithmetic scales by element
 size. Raw loads/stores check null, but do not promise allocation bounds or lifetime
 safety. `std/mem` exposes alloc/free/copy. Unsafe operations require a lexical
@@ -96,3 +96,9 @@ baseline JIT use a libffi host adapter; LLVM emits native C ABI calls with prope
 scalar conversions. Only scalar/pointer arguments and results are supported;
 variadic C functions, aggregate ABI and user-specified library linking are pending.
 The C symbols must be available to the selected execution engine.
+
+Addresses of mutable locals use their native scalar representation, including
+f32 and narrow integers, so C output-pointer parameters work. Immutable bindings
+and parameters cannot yield mutable addresses. Local addresses must not escape
+their function lifetime; this is an unsafe obligation, not an ownership proof.
+REPL local storage is stable and capped at 65,536 registers.

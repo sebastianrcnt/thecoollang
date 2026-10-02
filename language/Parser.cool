@@ -44,6 +44,14 @@ Node *Atom() {
         } else if (!Numeric(ty) || !Numeric(n->a->type)) ErrorAt(t, "invalid cast");
         return n;
     }
+    if (Take('&')) {
+        if (!unsafe_depth) ErrorAt(t, "taking an address requires unsafe");
+        n = NewNode(N_LOCAL_ADDRESS, t); n->a = Primary();
+        if (n->a->kind != N_LOCAL) ErrorAt(t, "address operand must be a local variable");
+        l = FindLocal(n->a->name);
+        if (!l->mutable) ErrorAt(t, "cannot take a mutable address of let binding or parameter");
+        n->slot = l->slot; n->type = T_PTR + l->type; return n;
+    }
     if (Take('*')) {
         if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe");
         n = NewNode(N_LOAD, t); n->a = Primary();

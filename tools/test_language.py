@@ -62,6 +62,12 @@ good('extern "C" fn strlen(s: *u8) -> usize; extern "C" fn abs(n: i32) -> i32; e
 bad('extern "C" fn abs(n: i32) -> i32; fn main() { abs(-7); }', 'require unsafe')
 good('fn main() { var total = 0; for (var i = 0; i < 5; i = i + 1) { defer io.print(i); if (i == 1) { continue; } if (i == 4) { break; } total = total + i; } io.println(total); }', '012345\n')
 bad('fn main() { for (var i = 0; i < 1; i = i + 1) {} io.println(i); }', 'unknown variable')
+good('fn bump(p: *i16) { unsafe { *p = -2; } } fn main() { var small: i16 = 32767; var f: f32 = f32(1.5); unsafe { bump(&small); io.println(small); let p = &f; *p = f32(2.25); io.println(f); f = f32(3.5); io.println(*p); } }', '-2\n2.25\n3.5\n')
+good('extern "C" fn frexp(n: f64, exponent: *i32) -> f64; extern "C" fn modff(n: f32, integer: *f32) -> f32; fn main() { var exponent: i32 = 0; var integer: f32 = 0; unsafe { io.println(frexp(8.0, &exponent)); io.println(exponent); io.println(modff(f32(3.25), &integer)); io.println(integer); } }', '0.5\n4\n0.25\n3\n')
+good('fn identity(x: f32) -> f32 { return x; } fn main() { io.println(identity(f32(2.5))); var n: u8 = 255; unsafe { let p = &n; *p = 1; io.println(n); n = 2; io.println(*p); } }', '2.5\n1\n2\n')
+bad('fn main() { var x = 1; let p = &x; }', 'requires unsafe')
+bad('fn main() { let x = 1; unsafe { let p = &x; } }', 'mutable address')
+bad('fn f(x: i64) { unsafe { let p = &x; } } fn main() {}', 'mutable address')
 print('new language: parser/type checks + tree/bytecode/native-JIT differential cases PASS')
 
 # The same typed program must produce identical observable behavior under LLVM AOT.

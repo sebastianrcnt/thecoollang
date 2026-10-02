@@ -133,6 +133,7 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_STORE 19
 #define N_ADDRESS 20
 #define N_FOR 21
+#define N_LOCAL_ADDRESS 22
 class Node { I64 kind, type, value, op, slot; Token *token; U8 *name; Node *a, *b, *c, *next; };
 class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
 class Function {

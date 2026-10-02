@@ -25,6 +25,16 @@ I64 Truncate(I64 r, I64 type) {
     if (Unsigned(type)) IR(" = zext i"); else IR(" = sext i");
     RI(width); IR(" %t"); RI(n); IR(" to i64\n"); return n;
 }
+I64 LocalRead(I64 r, I64 type) {
+    I64 n;
+    if (type != T_F32) return Truncate(r, type);
+    n = Fresh(); IR("  %raw"); RI(n); IR(" = trunc i64 "); Reg(r); IR(" to i32\n  %single"); RI(n); IR(" = bitcast i32 %raw"); RI(n); IR(" to float\n  %double"); RI(n); IR(" = fpext float %single"); RI(n); IR(" to double\n  "); Reg(n); IR(" = bitcast double %double"); RI(n); IR(" to i64\n"); return n;
+}
+I64 LocalWrite(I64 r, I64 type) {
+    I64 n;
+    if (type != T_F32) return r;
+    n = Fresh(); IR("  %double"); RI(n); IR(" = bitcast i64 "); Reg(r); IR(" to double\n  %single"); RI(n); IR(" = fptrunc double %double"); RI(n); IR(" to float\n  %raw"); RI(n); IR(" = bitcast float %single"); RI(n); IR(" to i32\n  "); Reg(n); IR(" = zext i32 %raw"); RI(n); IR(" to i64\n"); return n;
+}
 extern I64 EmitExpr(Node *n);
 I64 *EmitArgs(Node *n) {
     I64 *args = CAlloc((n->value + 1) * 8), i = 0; Node *a = n->a;
@@ -55,7 +65,8 @@ I64 EmitExpr(Node *n) {
         for (i = 0; n->name[i]; i++) { ch = n->name[i]; Char(globals, '\\'); Char(globals, hex[ch >> 4]); Char(globals, hex[ch & 15]); }
         Append(globals, "\\00\"\n"); r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr @s"); RI(id); IR(" to i64\n"); return r;
     }
-    if (n->kind == N_LOCAL) { r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return r; }
+    if (n->kind == N_LOCAL) { r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return LocalRead(r, n->type); }
+    if (n->kind == N_LOCAL_ADDRESS) { r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr %v"); RI(n->slot); IR(" to i64\n"); return r; }
     if (n->kind == N_CALL) { args = EmitArgs(n); r = EmitCall(n, args); Free(args); return r; }
     a = EmitExpr(n->a);
     if (n->kind == N_LOAD) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_load(i64 "); Reg(a); IR(", i64 "); RI(n->type); IR(")\n"); return r; }
@@ -146,7 +157,7 @@ U0 EmitStmt(Node *n) {
         case N_STORE:
             r = EmitExpr(n->a); value = EmitExpr(n->b); IR("  call void @cool_store(i64 "); Reg(r); IR(", i64 "); RI(n->type); IR(", i64 "); Reg(value); IR(")\n"); break;
         case N_BIND: case N_ASSIGN:
-            r = EmitExpr(n->a); IR("  store i64 "); Reg(r); IR(", ptr %v"); RI(n->slot); IR("\n"); break;
+            r = LocalWrite(EmitExpr(n->a), n->type); IR("  store i64 "); Reg(r); IR(", ptr %v"); RI(n->slot); IR("\n"); break;
         case N_EXPR: EmitExpr(n->a); break;
         case N_RETURN:
             r = Constant(0); if (n->a) r = EmitExpr(n->a);
@@ -171,7 +182,7 @@ U0 EmitStmt(Node *n) {
 }
 #include "ForeignLLVM.cool"
 U0 EmitLLVM(U8 *output) {
-    I64 i, j, k, main = FindFun("main"); Function *f; Text *all;
+    I64 i, j, k, parameter, main = FindFun("main"); Function *f; Text *all;
     if (main < 0) Error("no main function");
     if (functions[main].argc || (functions[main].result != T_VOID && functions[main].result != T_I32 && functions[main].result != T_INT)) ErrorAt(functions[main].token, "invalid main signature");
     ir = TextNew(); globals = TextNew();
@@ -193,7 +204,7 @@ foreign_already_declared:;
         for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR("i64 %a"); RI(j); }
         IR(") {\nentry:\n");
         for (j = 0; j < f->slots; j++) { IR("  %v"); RI(j); IR(" = alloca i64\n"); }
-        for (j = 0; !f->foreign && j < f->argc; j++) { IR("  store i64 %a"); RI(j); IR(", ptr %v"); RI(j); IR("\n"); }
+        for (j = 0; !f->foreign && j < f->argc; j++) { parameter = Fresh(); IR("  "); Reg(parameter); IR(" = add i64 0, %a"); RI(j); IR("\n"); parameter = LocalWrite(parameter, f->arg_types[j]); IR("  store i64 "); Reg(parameter); IR(", ptr %v"); RI(j); IR("\n"); }
         if (f->foreign) { ForeignWrapper(f); terminated = TRUE; } else EmitStmt(f->body); if (!terminated) IR("  ret i64 0\n"); IR("}\n");
     }
     IR("define i32 @main() {\nentry:\n  %exit = call i64 @__cool_fn"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");

@@ -28,7 +28,7 @@ U0 CompileNative(Function *f) {
     for (i = 0; i < f->code_count; i++) {
         ins = &f->bytecode(Instruction *)[i]; offsets[i] = machine->len;
         if (ins->op == BC_CONST) { Immediate(0, ins->value); StoreReg(0, ins->dst); }
-        else if (ins->op == BC_COPY || (ins->op == BC_CAST && !Floating(ins->node->type) && !Floating(ins->node->a->type))) { LoadReg(0, ins->a); if (ins->op == BC_CAST) NormalizeReg(ins->node->type); StoreReg(0, ins->dst); }
+        else if (ins->op == BC_COPY || ((ins->op == BC_LOCAL_READ || ins->op == BC_LOCAL_WRITE) && ins->node->type != T_F32) || (ins->op == BC_CAST && !Floating(ins->node->type) && !Floating(ins->node->a->type))) { LoadReg(0, ins->a); if (ins->op == BC_CAST || ins->op == BC_LOCAL_READ) NormalizeReg(ins->node->type); StoreReg(0, ins->dst); }
         else if (ins->op == BC_RETURN) { LoadReg(0, ins->a); Word(0xA8C17BF3); Word(0xD65F03C0); }
         else if (ins->op == BC_JUMP || ins->op == BC_JZERO) {
             if (ins->op == BC_JZERO) LoadReg(0, ins->a);

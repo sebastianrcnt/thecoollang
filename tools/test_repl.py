@@ -42,3 +42,8 @@ p = subprocess.run([ROOT/'tools/cool', 'repl'], input=source, text=True, capture
 assert p.returncode == 0 and p.stdout == '9\n', (p.stdout, p.stderr)
 assert 'requires unsafe' in p.stderr, p.stderr
 print('REPL: unsafe scope cannot escape a rejected submission; C declarations PASS')
+
+source = 'var n: f32 = f32(1.25);\nvar p: *f32 = null;\nunsafe { p = &n; }\n' + ''.join(f'var x{i} = {i};\n' for i in range(100)) + 'unsafe { *p = f32(2.5); }\nn\n:quit\n'
+p = subprocess.run([ROOT/'tools/cool', 'repl'], input=source, text=True, capture_output=True, timeout=20)
+assert (p.returncode, p.stdout, p.stderr) == (0, '2.5\n', ''), p
+print('REPL: local addresses remain stable as the session grows PASS')
