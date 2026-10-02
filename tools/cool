@@ -1,150 +1,226 @@
 #!/usr/bin/env python3
-"""Build, run and format Cool programs on Apple silicon macOS."""
+"""Cool project driver. Parsing, typing, interpretation and emission run in Cool."""
 import argparse
 import fcntl
+import hashlib
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from modules import Graph, Manifest, atomic_write, cache_home, find_root, validate_path, version_key
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def ensure(*targets):
-    if os.environ.get('COOL_TOOLCHAIN_READY') == '1' and all((ROOT / t).exists() for t in targets):
-        return
-    if subprocess.run(['make', '-s', '-f', 'tools/toolchain.mk', '-q', *targets], cwd=ROOT, stdout=subprocess.DEVNULL).returncode == 0:
-        return
     (ROOT / 'build').mkdir(exist_ok=True)
     with (ROOT / 'build/.cool.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        subprocess.run(['make', '-s', '-f', 'tools/toolchain.mk', *targets], cwd=ROOT, check=True, stdout=sys.stderr)
+        subprocess.run(['make', '-s', '-C', ROOT, *targets], check=True, stdout=sys.stderr)
 
 
-def environment():
-    (ROOT / 'build/tmp').mkdir(parents=True, exist_ok=True)
-    return dict(os.environ, TMPDIR=str(ROOT / 'build/tmp'),
-                COOLC_COMPILER_BIN=str(ROOT / 'coolc/seed/Compiler.BIN'))
+def front(mode, source, *args, capture=False):
+    return subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', mode, source, *args],
+                          check=True, text=True, capture_output=capture)
 
 
-def invoke(args, **kwargs):
-    subprocess.run(list(map(str, args)), env=environment(), check=True, **kwargs)
+def metadata(path):
+    key = hashlib.sha256((ROOT/'build/language.BIN').read_bytes() + path.read_bytes()).hexdigest()
+    cache = cache_home() / 'scan' / key
+    if cache.exists():
+        lines = cache.read_text()
+    else:
+        lines = front('scan', path, capture=True).stdout
+        atomic_write(cache, lines.encode())
+    package, imports = None, []
+    for line in lines.splitlines():
+        kind, value = line.split('\t', 1)
+        if kind == 'package':
+            if package is not None:
+                raise ValueError(f'{path}: duplicate package declaration')
+            package = value
+        elif kind == 'import':
+            imports.append(value)
+    return package, imports
 
 
-def compiler(args):
-    ensure('build/warmc')
-    invoke([ROOT / 'build/warmc', *args])
+def bundle(entry, work, offline=False, frozen=False):
+    entry = Path(entry).resolve()
+    if not entry.exists():
+        raise ValueError(f'input does not exist: {entry}')
+    root = find_root(entry)
+    graph = Graph(Manifest.read(root), offline, frozen).resolve() if root else None
+    files, active, done = [], [], set()
+
+    def visit(package, location):
+        if package in active:
+            raise ValueError('import cycle: ' + ' -> '.join([*active, package]))
+        if package in done:
+            return
+        sources = [location] if location.is_file() else sorted(p for p in location.glob('*.cool') if not p.name.endswith('_test.cool'))
+        if not sources:
+            raise ValueError(f'no Cool files in package {package}: {location}')
+        active.append(package)
+        declared = set()
+        imports = set()
+        for source in sources:
+            name, dependencies = metadata(source)
+            if location.is_dir() and name is None:
+                raise ValueError(f'{source}: directory packages require a package declaration')
+            declared.add(name)
+            imports.update(dependencies)
+            if '\t' in str(source) or '\n' in str(source):
+                raise ValueError('source paths cannot contain tabs or newlines')
+        if len(declared) != 1:
+            raise ValueError(f'mixed package declarations in {location}')
+        for dependency in sorted(imports):
+            if dependency == 'std/io':
+                continue
+            if graph is None:
+                raise ValueError(f'import {dependency} requires cool.mod')
+            visit(dependency, graph.package(dependency))
+        files.extend((package, source) for source in sources)
+        active.pop(); done.add(package)
+
+    visit('__main', entry)
+    manifest = work / 'sources.list'
+    manifest.write_text(''.join(f'{package}\t{path}\n' for package, path in files))
+    if graph:
+        graph.save_sums()
+    return manifest, files
 
 
-def native(source, output, target='arm64'):
-    ensure('build/coolc')
-    p = subprocess.run([str(ROOT / 'build/coolc'), '--target', target, str(source), str(output)],
-                       env=environment(), capture_output=True)
-    if p.returncode or b'Errs:0 ' not in p.stdout:
-        sys.stdout.buffer.write(p.stdout)
-        sys.stderr.buffer.write(p.stderr)
-        raise subprocess.CalledProcessError(p.returncode or 1, p.args)
+def artifact(files, optimization):
+    digest = hashlib.sha256(b'cool-artifact-v1\0' + optimization.encode())
+    for path in (ROOT/'build/language.BIN', ROOT/'language/runtime.c'):
+        digest.update(path.read_bytes())
+    digest.update(subprocess.check_output(['clang', '--version']))
+    for package, path in files:
+        digest.update(package.encode() + b'\0' + str(path).encode() + b'\0' + path.read_bytes())
+    return cache_home() / 'build' / digest.hexdigest()
 
 
-def standalone(binary, output, work):
-    header = work / 'Program.h'
-    data = binary.read_bytes()
-    header.write_text('static const unsigned char warm_program[] = {\n' +
-                      ',\n'.join(','.join(str(b) for b in data[i:i+32]) for i in range(0, len(data), 32)) + '\n};\n')
-    invoke(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
-            '-fno-omit-frame-pointer', '-ffixed-x28',
-            '-DWARM_PROGRAM_HEADER="' + str(header) + '"',
-            ROOT / 'coolc/Host/native.c', ROOT / 'coolc/Host/except.S', '-o', work / 'executable'])
-    with tempfile.NamedTemporaryFile(prefix='.' + output.name + '-', dir=output.parent, delete=False) as staged:
-        staged_path = Path(staged.name)
-        staged.write((work / 'executable').read_bytes())
-    try:
-        staged_path.chmod(0o755)
-        staged_path.replace(output)
-    finally:
-        staged_path.unlink(missing_ok=True)
+def native(bundle_path, files, optimization):
+    target = artifact(files, optimization)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with (target.parent / (target.name + '.lock')).open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not target.exists():
+            with tempfile.TemporaryDirectory(dir=target.parent, prefix='.build-') as tmp:
+                tmp = Path(tmp)
+                front('llvm-bundle', bundle_path, tmp/'program.ll')
+                subprocess.run(['clang', '-Wno-override-module', optimization, tmp/'program.ll',
+                                ROOT/'build/language-runtime.o', '-o', tmp/'program'], check=True)
+                (tmp/'program').replace(target)
+    return target
 
+
+def module_command(args):
+    cwd = Path.cwd()
+    if args.action == 'init':
+        path = cwd/'cool.mod'
+        if path.exists():
+            raise ValueError('cool.mod already exists')
+        validate_path(args.value)
+        Manifest(cwd, args.value).write()
+        return
+    root = find_root(cwd)
+    if not root:
+        raise ValueError('no cool.mod; run cool mod init <module-path>')
+    manifest = Manifest.read(root)
+    if args.action == 'get':
+        if '@' not in args.value:
+            raise ValueError('use module/path@vX.Y.Z')
+        path, version = args.value.rsplit('@', 1)
+        validate_path(path); version_key(version)
+        manifest.requires[path] = version
+    graph = Graph(manifest, getattr(args, 'offline', False), args.action == 'verify').resolve()
+    if args.action == 'get':
+        # MVS-selected minimum versions become explicit requirements.
+        manifest.requires.update(graph.selected)
+        manifest.write()
+    if args.action != 'verify':
+        graph.save_sums()
+    for path, version in sorted(graph.selected.items()):
+        print(f'{path} {version}')
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'legacy':
+        os.execv(str(ROOT/'tools/cool-legacy'), [str(ROOT/'tools/cool-legacy'), *sys.argv[2:]])
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
-    for command in ('run', 'build'):
-        p = sub.add_parser(command)
-        p.add_argument('source', type=Path)
-        if command == 'build':
-            p.add_argument('-o', '--output', type=Path, default=Path('a.out'))
-    p = sub.add_parser('fmt')
-    p.add_argument('--check', action='store_true')
-    p.add_argument('--diff', action='store_true')
-    p.add_argument('paths', nargs='+', type=Path)
-    p = sub.add_parser('compile', help='emit a BIN module (arm64 or x86_64)')
-    p.add_argument('--target', choices=('arm64', 'x86_64'), default='arm64')
-    p.add_argument('source', type=Path)
-    p.add_argument('-o', '--output', required=True, type=Path)
-    p = sub.add_parser('vet', help='report compiler style diagnostics')
-    p.add_argument('source', type=Path)
+    for name in ('run', 'build', 'check', 'emit-ir'):
+        p = sub.add_parser(name)
+        p.add_argument('source', nargs='?', default='.')
+        p.add_argument('--offline', action='store_true')
+        p.add_argument('--frozen', action='store_true')
+        if name == 'run':
+            p.add_argument('--backend', choices=('interp', 'tree', 'jit', 'llvm', 'llvm-jit'), default='interp')
+        if name in ('build', 'emit-ir'):
+            p.add_argument('-o', '--output', default='a.out' if name == 'build' else 'program.ll')
+        if name in ('run', 'build'):
+            p.add_argument('--release', action='store_true')
+    p = sub.add_parser('get'); p.add_argument('value'); p.add_argument('--offline', action='store_true'); p.set_defaults(action='get')
+    p = sub.add_parser('mod'); ms = p.add_subparsers(dest='action', required=True)
+    q = ms.add_parser('init'); q.add_argument('value')
+    for name in ('download', 'verify', 'graph'):
+        q = ms.add_parser(name); q.add_argument('--offline', action='store_true')
     raw = sys.argv[1:]
     forwarded = []
     if '--' in raw:
-        at = raw.index('--')
-        raw, forwarded = raw[:at], raw[at + 1:]
+        at = raw.index('--'); raw, forwarded = raw[:at], raw[at+1:]
     args = parser.parse_args(raw)
-    if forwarded and args.command != 'run':
-        parser.error('program arguments are only accepted by run')
-    if args.command == 'fmt':
-        sources = []
-        for path in args.paths:
-            if not path.exists():
-                raise ValueError(f'input does not exist: {path}')
-            if path.is_dir():
-                for base, dirs, files in os.walk(path):
-                    dirs[:] = sorted(d for d in dirs if not d.startswith('.') and d not in ('build', 'vendor')
-                                     and not (Path(base) / d).is_symlink())
-                    sources.extend(Path(base, name).resolve() for name in sorted(files)
-                                   if Path(name).suffix in ('.cool', '.coolh', '.HC', '.HH'))
-            else:
-                sources.append(path.resolve())
-        if not sources:
-            raise ValueError('no Cool sources to format')
-        ensure('build/hcfmt.BIN')
-        invoke([ROOT / 'tools/hcfmt.sh', *(['--diff'] if args.diff else ['--check'] if args.check else []),
-                '--', *dict.fromkeys(sources)])
-        return
-    source = args.source.resolve()
-    if not source.is_file():
-        raise ValueError(f'input does not exist: {source}')
-    ensure('build/coolc')
-    if args.command == 'vet':
-        invoke([ROOT / 'build/coolc', '--vet', source])
-        return
-    if args.command in ('build', 'compile') and source == args.output.resolve():
-        raise ValueError('output must differ from the source')
-    if args.command == 'compile':
-        output = args.output.resolve()
-        with tempfile.TemporaryDirectory(prefix='.cool-', dir=output.parent) as tmp:
-            binary = Path(tmp) / 'program.BIN'
-            native(source, binary, args.target)
-            binary.replace(output)
-        return
-    if args.command == 'run' and source.suffix.upper() == '.BIN':
-        invoke([ROOT / 'build/coolc', '--run', source, *forwarded])
-        return
+    if forwarded:
+        parser.error('new-language program arguments are not implemented yet; no arguments were discarded')
+    if args.command in ('mod', 'get'):
+        module_command(args); return
+    ensure('build/language.BIN', 'build/language-runtime.o')
     with tempfile.TemporaryDirectory(prefix='cool-') as tmp:
         work = Path(tmp)
-        binary = work / 'program.BIN'
-        native(source, binary)
-        if args.command == 'run':
-            invoke([ROOT / 'build/coolc', '--run', binary, *forwarded])
+        manifest, files = bundle(args.source, work, args.offline, args.frozen)
+        if args.command == 'check':
+            front('check-bundle', manifest)
+        elif args.command == 'emit-ir':
+            output = Path(args.output).resolve()
+            if output in [p for _, p in files]:
+                raise ValueError('output would overwrite source')
+            front('llvm-bundle', manifest, work/'program.ll')
+            atomic_write(output, (work/'program.ll').read_bytes())
+        elif args.command == 'run' and args.backend in ('interp', 'tree', 'jit'):
+            mode = {'interp': 'bytecode-bundle', 'tree': 'run-bundle', 'jit': 'jit-bundle'}[args.backend]
+            front(mode, manifest)
+        elif args.command == 'run' and args.backend == 'llvm-jit':
+            lli = os.environ.get('COOL_LLI') or shutil.which('lli')
+            if not lli and Path('/opt/homebrew/opt/llvm/bin/lli').exists():
+                lli = '/opt/homebrew/opt/llvm/bin/lli'
+            if not lli:
+                raise ValueError('LLVM lli not found; set COOL_LLI')
+            ensure('build/language-runtime.dylib')
+            front('llvm-bundle', manifest, work/'program.ll')
+            subprocess.run([lli, '--dlopen=' + str(ROOT/'build/language-runtime.dylib'), work/'program.ll'], check=True)
         else:
-            standalone(binary, args.output.resolve(), work)
+            binary = native(manifest, files, '-O2' if args.release else '-O0')
+            if args.command == 'run':
+                subprocess.run([binary], check=True)
+            else:
+                output = Path(args.output).resolve()
+                if output in [p for _, p in files]:
+                    raise ValueError('output would overwrite source')
+                atomic_write(output, binary.read_bytes()); output.chmod(0o755)
 
 
 if __name__ == '__main__':
     try:
         main()
     except subprocess.CalledProcessError as error:
+        if error.stderr:
+            sys.stderr.write(error.stderr)
         raise SystemExit(error.returncode if error.returncode > 0 else 128 - error.returncode)
     except (OSError, ValueError) as error:
         print(f'cool: {error}', file=sys.stderr)

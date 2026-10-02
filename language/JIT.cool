@@ -1,0 +1,74 @@
+// Baseline ARM64 JIT. Arithmetic/branches emit native instructions directly;
+// calls and checked operations share the bytecode runtime helpers.
+import U8 *NativeJitAlloc(I64 size);
+import U0 NativeJitCommit(U8 *code, U8 *scratch, I64 size);
+Text *machine;
+U0 Word(I64 value) { I64 i; for (i = 0; i < 4; i++) Char(machine, (value >> (i * 8)) & 255); }
+U0 Immediate(I64 register_id, U64 value) {
+    I64 i; Word(0xD2800000 | ((value & 65535) << 5) | register_id);
+    for (i = 1; i < 4; i++) Word(0xF2800000 | (i << 21) | (((value >> (i * 16)) & 65535) << 5) | register_id);
+}
+U0 LoadReg(I64 register_id, I64 slot) { Word(0xF9400000 | (slot << 10) | (19 << 5) | register_id); }
+U0 StoreReg(I64 register_id, I64 slot) { Word(0xF9000000 | (slot << 10) | (19 << 5) | register_id); }
+U0 NormalizeReg(I64 type) { if (type == T_U8) Word(0x92401C00); if (type == T_I32) Word(0x93407C00); }
+U0 CompileNative(Function *f) {
+    I64 *offsets = CAlloc((f->code_count + 1) * 8), *patches = CAlloc((f->code_count + 1) * 8);
+    I64 i, op, encoded, cond, delta, at; Instruction *ins;
+    machine = TextNew();
+    Word(0xA9BF7BF3); // stp x19, x30, [sp, #-16]!
+    Word(0xAA0003F3); // mov x19, x0 (register array)
+    for (i = 0; i < f->code_count; i++) {
+        ins = &f->bytecode(Instruction *)[i]; offsets[i] = machine->len;
+        if (ins->op == BC_CONST) { Immediate(0, ins->value); StoreReg(0, ins->dst); }
+        else if (ins->op == BC_COPY || ins->op == BC_CAST) { LoadReg(0, ins->a); if (ins->op == BC_CAST) NormalizeReg(ins->node->type); StoreReg(0, ins->dst); }
+        else if (ins->op == BC_RETURN) { LoadReg(0, ins->a); Word(0xA8C17BF3); Word(0xD65F03C0); }
+        else if (ins->op == BC_JUMP || ins->op == BC_JZERO) {
+            if (ins->op == BC_JZERO) LoadReg(0, ins->a);
+            patches[i] = machine->len; Word(0);
+        } else {
+            encoded = 0; cond = -1;
+            if (ins->op == BC_BINARY) {
+                op = ins->node->op;
+                switch (op) {
+                    case '+': encoded = 0x8B010000; break; case '-': encoded = 0xCB010000; break;
+                    case '*': encoded = 0x9B017C00; break; case '&': encoded = 0x8A010000; break;
+                    case '|': encoded = 0xAA010000; break; case '^': encoded = 0xCA010000; break;
+                    case K_EQ: cond = 0; break; case K_NE: cond = 1; break;
+                    case '<': cond = 11; break; case '>': cond = 12; break;
+                    case K_LE: cond = 13; break; case K_GE: cond = 10; break;
+                }
+            }
+            if (encoded || cond >= 0) {
+                LoadReg(0, ins->a); LoadReg(1, ins->b);
+                if (encoded) Word(encoded); else { Word(0xEB01001F); Word(0x9A9F07E0 | ((cond ^ 1) << 12)); }
+                NormalizeReg(ins->node->type);
+            } else {
+                Immediate(0, ins); Word(0xAA1303E1); // mov x1, x19
+                Immediate(16, &Compute); Word(0xD63F0200); // blr x16
+            }
+            StoreReg(0, ins->dst);
+        }
+    }
+    for (i = 0; i < f->code_count; i++) {
+        ins = &f->bytecode(Instruction *)[i];
+        if (ins->op == BC_JUMP || ins->op == BC_JZERO) {
+            at = patches[i]; delta = (offsets[ins->target] - at) / 4;
+            if (ins->op == BC_JUMP) encoded = 0x14000000 | (delta & 0x3FFFFFF);
+            else {
+                if (delta < -262144 || delta >= 262144) ErrorAt(f->token, "JIT conditional branch exceeds range");
+                encoded = 0xB4000000 | ((delta & 0x7FFFF) << 5);
+            }
+            machine->data[at] = encoded; machine->data[at+1] = encoded >> 8;
+            machine->data[at+2] = encoded >> 16; machine->data[at+3] = encoded >> 24;
+        }
+    }
+    f->machine = NativeJitAlloc(machine->len); NativeJitCommit(f->machine, machine->data, machine->len);
+    Free(offsets); Free(patches); Free(machine->data); Free(machine);
+}
+I64 RunNative(Function *f, I64 *registers) {
+    I64 (*entry)(I64 *values);
+    // Large register files use the identical bytecode semantics instead of invalid encodings.
+    if (f->registers >= 4096) return RunBytecode(f, registers);
+    if (!f->machine) CompileNative(f);
+    entry = f->machine; return entry(registers);
+}

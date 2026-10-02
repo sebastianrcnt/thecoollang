@@ -1,6 +1,9 @@
 class Frame { I64 *values, flow, result; };
 class Deferred { Node *call; I64 *args; Deferred *next; };
-I64 call_depth;
+I64 call_depth, execution_mode;
+extern U0 CompileBytecode(Function *f);
+extern I64 RunBytecode(Function *f, I64 *registers);
+extern I64 RunNative(Function *f, I64 *registers);
 extern I64 Eval(Node *n, Frame *frame);
 extern U0 Execute(Node *n, Frame *frame);
 I64 Normalize(I64 v, I64 type) { if (type == T_U8) return v & 255; if (type == T_I32) return (v << 32) >> 32; return v; }
@@ -14,9 +17,12 @@ I64 Invoke(Node *n, I64 *args) {
     }
     if (n->slot == -2) { if (!args[0]) ErrorAt(n->token, "assertion failed"); return 0; }
     if (++call_depth > 1024) ErrorAt(n->token, "call depth limit exceeded");
-    f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); frame->values = CAlloc((f->slots + 1) * 8);
+    f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); if (execution_mode && !f->bytecode) CompileBytecode(f);
+    frame->values = CAlloc((f->slots + f->registers + 1) * 8);
     for (i = 0; i < f->argc; i++) frame->values[i] = args[i];
-    Execute(f->body, frame); result = frame->result; Free(frame->values); Free(frame); call_depth--; return result;
+    if (execution_mode == 2) result = RunNative(f, frame->values);
+    else if (execution_mode == 1) result = RunBytecode(f, frame->values);
+    else { Execute(f->body, frame); result = frame->result; } Free(frame->values); Free(frame); call_depth--; return result;
 }
 I64 *Arguments(Node *n, Frame *frame) {
     I64 i = 0, *args = CAlloc((n->value + 1) * 8); Node *a = n->a;

@@ -1,0 +1,140 @@
+#define BC_CONST 1
+#define BC_COPY 2
+#define BC_BINARY 3
+#define BC_UNARY 4
+#define BC_CAST 5
+#define BC_CALL 6
+#define BC_JUMP 7
+#define BC_JZERO 8
+#define BC_RETURN 9
+class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
+class BDefer { Node *call; I64 *args; BDefer *next; };
+class BScope { BDefer *calls; BScope *parent; };
+Function *bc_fun;
+BScope *bc_scope, *bc_loop_scope;
+I64 bc_break, bc_continue;
+Bool bc_done;
+I64 Slot() { return bc_fun->registers++; }
+Instruction *CodeAt(I64 index) { return &bc_fun->bytecode(Instruction *)[index]; }
+I64 InstructionNew(I64 op, I64 dst = 0, I64 a = 0, I64 b = 0, Node *node = NULL) {
+    I64 index = bc_fun->code_count++; Instruction *ins; U8 *grown;
+    if (bc_fun->code_count > bc_fun->code_capacity) {
+        bc_fun->code_capacity = (bc_fun->code_capacity + 32) * 2;
+        grown = CAlloc(bc_fun->code_capacity * sizeof(Instruction));
+        if (index) MemCpy(grown, bc_fun->bytecode, index * sizeof(Instruction));
+        Free(bc_fun->bytecode); bc_fun->bytecode = grown;
+    }
+    ins = CodeAt(index); ins->op = op; ins->dst = dst; ins->a = a; ins->b = b; ins->node = node; return index;
+}
+extern I64 ByteExpr(Node *n);
+I64 *ByteArgs(Node *n) { I64 *args = CAlloc((n->value + 1) * 8), i = 0; Node *a = n->a; while (a) { args[i++] = ByteExpr(a); a = a->next; } return args; }
+U0 ByteCleanup(BScope *until) {
+    BScope *s = bc_scope; BDefer *d; I64 at;
+    while (s != until) {
+        d = s->calls;
+        while (d) { at = InstructionNew(BC_CALL, Slot(), 0, 0, d->call); CodeAt(at)->args = d->args; d = d->next; }
+        s = s->parent;
+    }
+}
+I64 ByteExpr(Node *n) {
+    I64 r, a, b, at, jump, end; I64 *args;
+    if (n->kind == N_LOCAL) { r = Slot(); InstructionNew(BC_COPY, r, n->slot); return r; }
+    if (n->kind == N_INT || n->kind == N_STRING) {
+        r = Slot(); at = InstructionNew(BC_CONST, r); CodeAt(at)->value = n->value;
+        if (n->kind == N_STRING) CodeAt(at)->value = n->name; return r;
+    }
+    if (n->kind == N_CALL) { args = ByteArgs(n); r = Slot(); at = InstructionNew(BC_CALL, r, 0, 0, n); CodeAt(at)->args = args; return r; }
+    a = ByteExpr(n->a); r = Slot();
+    if (n->kind == N_CAST) { InstructionNew(BC_CAST, r, a, 0, n); return r; }
+    if (n->kind == N_UNARY) { InstructionNew(BC_UNARY, r, a, 0, n); return r; }
+    if (n->op == K_AND || n->op == K_OR) {
+        InstructionNew(BC_COPY, r, a);
+        jump = InstructionNew(BC_JZERO, 0, a);
+        if (n->op == K_OR) {
+            end = InstructionNew(BC_JUMP); CodeAt(jump)->target = bc_fun->code_count;
+            b = ByteExpr(n->b); InstructionNew(BC_COPY, r, b); CodeAt(end)->target = bc_fun->code_count;
+        } else { b = ByteExpr(n->b); InstructionNew(BC_COPY, r, b); CodeAt(jump)->target = bc_fun->code_count; }
+        return r;
+    }
+    b = ByteExpr(n->b); InstructionNew(BC_BINARY, r, a, b, n); return r;
+}
+U0 ByteStmt(Node *n) {
+    Node *s; BScope *saved, *saved_loop; BDefer *d; I64 r, branch, end, start, saved_break, saved_continue, at; Bool left_done;
+    if (!n || bc_done) return;
+    switch (n->kind) {
+        case N_BLOCK:
+            saved = bc_scope; bc_scope = CAlloc(sizeof(BScope)); bc_scope->parent = saved;
+            s = n->a;
+            while (s && !bc_done) {
+                if (s->kind == N_DEFER) { d = CAlloc(sizeof(BDefer)); d->call = s->a; d->args = ByteArgs(s->a); d->next = bc_scope->calls; bc_scope->calls = d; }
+                else ByteStmt(s);
+                s = s->next;
+            }
+            if (!bc_done) ByteCleanup(saved); bc_scope = saved; break;
+        case N_BIND: case N_ASSIGN: r = ByteExpr(n->a); InstructionNew(BC_COPY, n->slot, r); break;
+        case N_EXPR: ByteExpr(n->a); break;
+        case N_RETURN:
+            r = Slot(); InstructionNew(BC_CONST, r); if (n->a) r = ByteExpr(n->a);
+            ByteCleanup(NULL); InstructionNew(BC_RETURN, 0, r); bc_done = TRUE; break;
+        case N_IF:
+            r = ByteExpr(n->a); branch = InstructionNew(BC_JZERO, 0, r); ByteStmt(n->b); left_done = bc_done;
+            end = InstructionNew(BC_JUMP); CodeAt(branch)->target = bc_fun->code_count; bc_done = FALSE;
+            ByteStmt(n->c); CodeAt(end)->target = bc_fun->code_count; bc_done = left_done && bc_done; break;
+        case N_WHILE:
+            // Forward exit trampoline gives break a stable target before body compilation.
+            at = InstructionNew(BC_JUMP); end = InstructionNew(BC_JUMP); start = bc_fun->code_count; CodeAt(at)->target = start;
+            r = ByteExpr(n->a); branch = InstructionNew(BC_JZERO, 0, r); CodeAt(branch)->target = end;
+            saved_break = bc_break; saved_continue = bc_continue; saved_loop = bc_loop_scope;
+            bc_break = end; bc_continue = start; bc_loop_scope = bc_scope; ByteStmt(n->b);
+            if (!bc_done) { at = InstructionNew(BC_JUMP); CodeAt(at)->target = start; }
+            bc_break = saved_break; bc_continue = saved_continue; bc_loop_scope = saved_loop;
+            CodeAt(end)->target = bc_fun->code_count; bc_done = FALSE; break;
+        case N_BREAK: case N_CONTINUE:
+            ByteCleanup(bc_loop_scope); at = InstructionNew(BC_JUMP);
+            if (n->kind == N_BREAK) CodeAt(at)->target = bc_break; else CodeAt(at)->target = bc_continue;
+            bc_done = TRUE; break;
+    }
+}
+U0 CompileBytecode(Function *f) {
+    I64 zero;
+    bc_fun = f; f->registers = f->slots; bc_scope = NULL; bc_done = FALSE;
+    ByteStmt(f->body);
+    // Also supplies valid dead branch targets after terminal conditionals.
+    zero = Slot(); InstructionNew(BC_CONST, zero); InstructionNew(BC_RETURN, 0, zero);
+}
+I64 Compute(Instruction *ins, I64 *values) {
+    I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, *args; Node *n = ins->node;
+    if (ins->op == BC_CONST) return ins->value;
+    if (ins->op == BC_COPY) return a;
+    if (ins->op == BC_CALL) {
+        args = CAlloc((n->value + 1) * 8);
+        for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];
+        result = Invoke(n, args); Free(args); return result;
+    }
+    if (ins->op == BC_CAST) return Normalize(a, n->type);
+    op = n->op;
+    if (ins->op == BC_UNARY) { if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
+    if ((op == '/' || op == '%') && (!b || (a == (-0x7FFFFFFFFFFFFFFF - 1) && b == -1))) ErrorAt(n->token, "invalid integer division");
+    if ((op == K_SHL || op == K_SHR) && (b < 0 || b >= 64)) ErrorAt(n->token, "shift count outside 0..63");
+    switch (op) {
+        case '+': result = a + b; break; case '-': result = a - b; break;
+        case '*': result = a * b; break; case '/': result = a / b; break; case '%': result = a % b; break;
+        case '&': result = a & b; break; case '|': result = a | b; break; case '^': result = a ^ b; break;
+        case K_SHL: result = a << b; break; case K_SHR: result = a >> b; break;
+        case K_EQ: result = a == b; break; case K_NE: result = a != b; break;
+        case '<': result = a < b; break; case '>': result = a > b; break;
+        case K_LE: result = a <= b; break; case K_GE: result = a >= b; break;
+    }
+    return Normalize(result, n->type);
+}
+I64 RunBytecode(Function *f, I64 *values) {
+    I64 pc = 0; Instruction *ins;
+    while (pc < f->code_count) {
+        ins = &f->bytecode(Instruction *)[pc++];
+        if (ins->op == BC_RETURN) return values[ins->a];
+        if (ins->op == BC_JUMP) pc = ins->target;
+        else if (ins->op == BC_JZERO) { if (!values[ins->a]) pc = ins->target; }
+        else values[ins->dst] = Compute(ins, values);
+    }
+    return 0;
+}

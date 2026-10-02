@@ -14,9 +14,11 @@ def invoke(source, mode='run'):
                               text=True, capture_output=True, timeout=10)
 
 def good(source, output, status=0):
+    source = 'import "std/io";\n' + source
     CASES.append((source, output, status))
-    p = invoke(source)
-    assert (p.returncode, p.stdout, p.stderr) == (status, output, ''), (source, p.returncode, p.stdout, p.stderr)
+    for mode in ('run', 'bytecode', 'jit'):
+        p = invoke(source, mode)
+        assert (p.returncode, p.stdout, p.stderr) == (status, output, ''), (mode, source, p.returncode, p.stdout, p.stderr)
 
 def bad(source, diagnostic):
     p = invoke(source, 'check')
@@ -44,7 +46,10 @@ bad('fn main() {} fn main() {}', 'duplicate function')
 bad('fn main() { let x = missing; }', 'unknown variable')
 bad('fn main() { let x = "unfinished; }', 'unterminated string')
 bad('fn main() {} /*', 'unterminated comment')
-print('new language: 22 parser/type/interpreter cases PASS')
+good('fn main() { var x = 0; while (x < 10000) { if ((x > 3 && x < 7) || x == 9) { io.print(x); } x = x + 1; } io.println(true); }', '4569true\n')
+good('fn main() { var x: i32 = 2147483647; let y: i64 = x + 1; io.println(y); }', '-2147483648\n')
+good('fn main() { var a = 0; while (a < 3) { var b = 0; while (b < 3) { b = b + 1; if (b == 2) { break; } io.print(a); } a = a + 1; } }', '012')
+print('new language: parser/type checks + tree/bytecode/native-JIT differential cases PASS')
 
 # The same typed program must produce identical observable behavior under LLVM AOT.
 with tempfile.TemporaryDirectory(prefix='cool-llvm-') as tmp:

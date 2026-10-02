@@ -19,7 +19,7 @@ U0 LexSource(U8 *src, U8 *file) {
             i += 2; col += 2; goto lex_next;
         }
         if (ntok >= MAX_TOKENS - 2) NativeExit(70);
-        t = &tokens[ntok++]; t->file = file; t->line = line; t->col = col; start = i;
+        t = &tokens[ntok++]; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i;
         if (Alpha(ch)) {
             do { i++; col++; } while (Alpha(src[i]) || Digit(src[i]));
             t->kind = K_ID; t->text = Slice(src, start, i); goto lex_next;

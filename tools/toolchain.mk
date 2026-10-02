@@ -39,3 +39,12 @@ build/language.BIN: $(LANGUAGE_SRC) build/coolc coolc/seed/Compiler.BIN | build
 .PHONY: language-test
 language-test: build/language.BIN
 	python3 tools/test_language.py
+build/language-runtime.o: language/runtime.c | build
+	clang -std=c11 -Wall -Wextra -Werror -O2 -c $< -o $@
+build/language-runtime.dylib: language/runtime.c | build
+	clang -std=c11 -Wall -Wextra -Werror -O2 -dynamiclib $< -o $@
+all: build/language.BIN build/language-runtime.o
+.PHONY: project-test
+project-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_projects.py
+test: language-test project-test

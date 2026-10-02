@@ -28,3 +28,24 @@ This is an implementation stage, not the full language: aggregate types, generic
 specialization, ownership checking and the complete runtime are still pending.
 The interpreter currently executes typed trees, not bytecode. The new frontend is
 written in existing Cool; new-syntax self-hosting is not yet achieved.
+
+## Additional execution paths and projects
+
+`cool run` now uses typed register bytecode, compiled lazily per function.
+`cool run --backend jit` compiles that bytecode to ARM64 native arithmetic and
+branches; checked operations and calls use shared runtime helpers. Functions
+with register files too large for baseline encodings fall back to bytecode.
+`--backend tree` retains the tree evaluator for differential testing;
+`--backend llvm` runs a cached native executable, and `--backend llvm-jit` uses
+LLVM's lli with the runtime library (set COOL_LLI if it is not on PATH).
+
+The driver delegates source metadata discovery to the Cool lexer. Directory
+packages support aliases, public/private functions, forward declarations across
+files and cycle rejection. `cool.mod` supports semantic-version requirements and
+local replacement; the module graph uses MVS and records verified tree hashes in
+`cool.sum`. Local workspaces and offline/frozen resolution are supported.
+Direct fetching currently supports host/owner/repo Git repositories and tagged
+versions. Commit pseudo-versions, registry/proxy protocol, vendor and tidy commands
+are pending. `cool.sum` protects pinned content; no transparency service exists.
+
+`cool legacy ...` retains the original CLI for bootstrap-era source files.

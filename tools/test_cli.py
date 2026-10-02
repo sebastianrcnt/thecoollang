@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-COOL = ROOT / 'tools/cool'
+COOL = ROOT / 'tools/cool-legacy'
 
 
 def call(*args, code=0, **kwargs):

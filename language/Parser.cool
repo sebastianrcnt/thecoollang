@@ -23,7 +23,8 @@ I64 Prec(I64 k) {
 }
 extern Node *Expr(I64 min);
 Node *Primary() {
-    Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name;
+    Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name, *package; Bool qualified = FALSE;
+    package = t->package;
     if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; return n; }
     if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = t->text; n->type = T_STRING; return n; }
     if (Is("true") || Is("false")) { n = NewNode(N_INT, t); n->type = T_BOOL; n->value = Is("true"); pos++; return n; }
@@ -36,11 +37,7 @@ Node *Primary() {
         return n;
     }
     name = Ident();
-    if (Take('.')) {
-        if (!Eq(name, "io")) ErrorAt(t, "unknown imported package alias");
-        name = Ident();
-        if (!Eq(name, "println") && !Eq(name, "print")) ErrorAt(t, "unknown std/io function");
-    }
+    if (Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
     if (Take('(')) {
         n = NewNode(N_CALL, t); n->name = name;
         if (!Take(')')) {
@@ -49,21 +46,22 @@ Node *Primary() {
             Need(')', "expected ')' after arguments");
         }
         n->value = count;
-        ty = TypeName(name);
+        ty = -1; if (!qualified) ty = TypeName(name);
         if (ty >= 0) {
             if (count != 1 || ty == T_VOID || ty == T_STRING || !Integer(n->a->type) || !Integer(ty)) ErrorAt(t, "cast expects one integer operand and an integer target");
             n->kind = N_CAST; n->type = ty; return n;
         }
-        if (Eq(name, "print") || Eq(name, "println")) {
+        if (qualified && Eq(package, "std/io") && (Eq(name, "print") || Eq(name, "println"))) {
             if (count != 1 || n->a->type == T_VOID) ErrorAt(t, "print/println expects one scalar value");
             n->slot = -1; n->type = T_VOID; return n;
         }
-        if (Eq(name, "assert")) {
+        if (!qualified && Eq(name, "assert")) {
             if (count != 1 || n->a->type != T_BOOL) ErrorAt(t, "assert expects one bool");
             n->slot = -2; n->type = T_VOID; return n;
         }
-        id = FindFun(name);
+        id = FindFunIn(package, name);
         if (id < 0) ErrorAt(t, "unknown function");
+        if (qualified && !functions[id].public) ErrorAt(t, "function is private to its package");
         if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
         arg = n->a;
         for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); arg = arg->next; }
@@ -165,21 +163,25 @@ Bool Returns(Node *n) {
     return FALSE;
 }
 U0 ParseProgram() {
-    Function *f; U8 *package = "main", *name; I64 braces, i, j; Bool public;
+    Function *f; U8 *name, *alias, *path; I64 braces, i, j; Bool public; Token *t;
     functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     while (At()->kind) {
-        if (Is("package")) { pos++; package = Ident(); Need(';', "expected ';' after package"); }
+        if (Is("package")) { pos++; Ident(); Need(';', "expected ';' after package"); }
         else if (Is("import")) {
-            pos++;
-            if (At()->kind != K_STRING || !Eq(At()->text, "std/io")) Error("only std/io is available in this compiler stage");
-            pos++; Need(';', "expected ';' after import");
+            t = At(); pos++; alias = NULL;
+            if (At()->kind == K_ID) alias = Ident();
+            if (At()->kind != K_STRING) Error("expected import path string");
+            path = At()->text;
+            if (!alias) { alias = path; for (j = 0; path[j]; j++) if (path[j] == '/') alias = path + j + 1; }
+            if (!*alias) Error("empty import name");
+            AddAlias(t, alias, path); pos++; Need(';', "expected ';' after import");
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
             if (!Is("fn")) Error("expected fn, package or import declaration");
             pos++; name = Ident();
-            if (FindFun(name) >= 0) Error("duplicate function declaration");
+            if (FindFunIn(At()->package, name) >= 0) Error("duplicate function declaration");
             if (nfun >= MAX_FUNCTIONS) Error("function limit exceeded");
-            f = &functions[nfun++]; f->name = name; f->package = package; f->public = public; f->token = At();
+            f = &functions[nfun++]; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             Need('(', "expected '(' after function name");
             if (!Take(')')) {
                 do {
