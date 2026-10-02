@@ -20,8 +20,9 @@ I64 Invoke(Node *n, I64 *args) {
     f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); if (execution_mode && !f->bytecode) CompileBytecode(f);
     frame->values = CAlloc((f->slots + f->registers + 1) * 8);
     for (i = 0; i < f->argc; i++) frame->values[i] = args[i];
-    if (execution_mode == 2) result = RunNative(f, frame->values);
-    else if (execution_mode == 1) result = RunBytecode(f, frame->values);
+    f->calls++;
+    if (execution_mode == 2 || (execution_mode == 3 && f->calls >= 4)) result = RunNative(f, frame->values);
+    else if (execution_mode) result = RunBytecode(f, frame->values);
     else { Execute(f->body, frame); result = frame->result; } Free(frame->values); Free(frame); call_depth--; return result;
 }
 I64 *Arguments(Node *n, Frame *frame) {

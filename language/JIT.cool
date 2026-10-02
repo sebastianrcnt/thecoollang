@@ -3,6 +3,7 @@
 import U8 *NativeJitAlloc(I64 size);
 import U0 NativeJitCommit(U8 *code, U8 *scratch, I64 size);
 Text *machine;
+I64 jit_compilations;
 U0 Word(I64 value) { I64 i; for (i = 0; i < 4; i++) Char(machine, (value >> (i * 8)) & 255); }
 U0 Immediate(I64 register_id, U64 value) {
     I64 i; Word(0xD2800000 | ((value & 65535) << 5) | register_id);
@@ -14,6 +15,7 @@ U0 NormalizeReg(I64 type) { if (type == T_U8) Word(0x92401C00); if (type == T_I3
 U0 CompileNative(Function *f) {
     I64 *offsets = CAlloc((f->code_count + 1) * 8), *patches = CAlloc((f->code_count + 1) * 8);
     I64 i, op, encoded, cond, delta, at; Instruction *ins;
+    jit_compilations++;
     machine = TextNew();
     Word(0xA9BF7BF3); // stp x19, x30, [sp, #-16]!
     Word(0xAA0003F3); // mov x19, x0 (register array)

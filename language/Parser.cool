@@ -163,8 +163,8 @@ Bool Returns(Node *n) {
     return FALSE;
 }
 U0 ParseProgram() {
-    Function *f; U8 *name, *alias, *path; I64 braces, i, j; Bool public; Token *t;
-    functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
+    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, id, parsed[4096], count = 0; Bool public; Token *t;
+    if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     while (At()->kind) {
         if (Is("package")) { pos++; Ident(); Need(';', "expected ';' after package"); }
         else if (Is("import")) {
@@ -179,9 +179,19 @@ U0 ParseProgram() {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
             if (!Is("fn")) Error("expected fn, package or import declaration");
             pos++; name = Ident();
-            if (FindFunIn(At()->package, name) >= 0) Error("duplicate function declaration");
-            if (nfun >= MAX_FUNCTIONS) Error("function limit exceeded");
-            f = &functions[nfun++]; f->name = name; f->package = At()->package; f->public = public; f->token = At();
+            id = FindFunIn(At()->package, name); old = NULL;
+            if (id >= 0) {
+                if (!allow_redefinition) Error("duplicate function declaration");
+                for (j = 0; j < count; j++) if (parsed[j] == id) Error("duplicate declaration in submission");
+                old = CAlloc(sizeof(Function)); MemCpy(old, &functions[id], sizeof(Function));
+            } else {
+                if (nfun >= MAX_FUNCTIONS) Error("function limit exceeded");
+                id = nfun++;
+            }
+            parsed[count++] = id; f = &functions[id];
+            // Clear compilation products so only the changed function is recompiled.
+            f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
+            f->name = name; f->package = At()->package; f->public = public; f->token = At();
             Need('(', "expected '(' after function name");
             if (!Take(')')) {
                 do {
@@ -194,6 +204,10 @@ U0 ParseProgram() {
                 Need(')', "expected ')'");
             }
             if (Take(K_ARROW)) f->result = ParseType();
+            if (old) {
+                if (old->argc != f->argc || old->result != f->result) ErrorAt(f->token, "signature change requires a new session");
+                for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
+            }
             f->begin = pos; Need('{', "expected function body"); braces = 1;
             while (braces) {
                 if (!At()->kind) Error("unterminated function body");
@@ -202,8 +216,8 @@ U0 ParseProgram() {
             f->end = pos;
         }
     }
-    for (i = 0; i < nfun; i++) {
-        current_fun = i; f = &functions[i]; pos = f->begin; locals = NULL; depth = 0;
+    for (i = 0; i < count; i++) {
+        current_fun = parsed[i]; f = &functions[current_fun]; pos = f->begin; locals = NULL; depth = 0;
         for (j = 0; j < f->argc; j++) AddLocal(f->arg_names[j], f->arg_types[j], FALSE);
         f->body = Block();
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");

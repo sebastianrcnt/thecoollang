@@ -1,0 +1,89 @@
+// Persistent scalar session. Definitions retain stable IDs; compiled callers
+// dispatch through those IDs, so body replacement does not leave stale calls.
+I64 repl_context[24];
+Function *repl_snapshot;
+I64 repl_saved_nfun, repl_saved_ntok;
+Local *repl_locals;
+Alias *repl_aliases;
+I64 *repl_values;
+I64 repl_capacity;
+Text *Submission() {
+    Text *text = TextNew(); I64 ch, braces = 0, parens = 0; Bool quoted = FALSE, escaped = FALSE, line_comment = FALSE;
+    while ((ch = NativeGetChar()) >= 0) {
+        Char(text, ch);
+        if (line_comment) { if (ch == '\n') line_comment = FALSE; }
+        else if (quoted) { if (escaped) escaped = FALSE; else if (ch == '\\') escaped = TRUE; else if (ch == '"') quoted = FALSE; }
+        else {
+            if (ch == '"') quoted = TRUE;
+            if (ch == '/' && text->len > 1 && text->data[text->len-2] == '/') line_comment = TRUE;
+            if (ch == '{') braces++;
+            if (ch == '}') braces--;
+            if (ch == '(') parens++;
+            if (ch == ')') parens--;
+        }
+        if (ch == '\n' && braces <= 0 && parens <= 0 && !quoted) break;
+    }
+    if (!text->len && ch < 0) return NULL;
+    Reserve(text, 0); return text;
+}
+U0 ReplRestore() {
+    MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
+    nfun = repl_saved_nfun; ntok = repl_saved_ntok;
+    aliases = repl_aliases; locals = repl_locals; call_depth = 0;
+}
+U0 ReplStep(Text *text) {
+    I64 start = ntok, result, register_id, i; Node *statement, *call, *arg; Function *f; I64 *grown;
+    LexSource(text->data, "<repl>"); pos = start;
+    if (!At()->kind) return;
+    if (Is("fn") || Is("pub") || Is("import")) { ParseProgram(); return; }
+    current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0;
+    // Expression submissions may omit the trailing semicolon.
+    if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {
+        tokens[ntok] = tokens[ntok-1]; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
+    }
+    if (Is("return") || Is("defer")) Error("top-level return/defer requires an explicit function or block");
+    statement = Statement(); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
+    if (statement->kind == N_EXPR && statement->a->type != T_VOID) {
+        arg = statement->a; call = NewNode(N_CALL, arg->token); call->name = "println"; call->slot = -1; call->value = 1; call->type = T_VOID; call->a = arg;
+        statement->a = call;
+    }
+    f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = 0;
+    bc_fun = f; f->registers = f->slots; bc_scope = NULL; bc_done = FALSE;
+    ByteStmt(statement); register_id = Slot(); InstructionNew(BC_CONST, register_id); InstructionNew(BC_RETURN, 0, register_id);
+    if (f->registers + 1 > repl_capacity) {
+        grown = CAlloc((f->registers + 64) * 8);
+        for (i = 0; i < repl_capacity; i++) grown[i] = repl_values[i];
+        Free(repl_values); repl_values = grown; repl_capacity = f->registers + 64;
+    }
+    // The session's locals remain live; expression temporaries are regenerated.
+    result = RunBytecode(f, repl_values); no_warn result;
+    repl_locals = locals;
+}
+U0 Repl(Bool prompt) {
+    Text *text, *stats; I64 i, compiled;
+    functions = CAlloc(MAX_FUNCTIONS * sizeof(Function)); nfun = 1;
+    functions[0].name = "__session"; functions[0].package = "__main";
+    repl_snapshot = CAlloc(MAX_FUNCTIONS * sizeof(Function));
+    allow_redefinition = TRUE; lex_package = "__main"; execution_mode = 3;
+    // Standard IO is imported explicitly into the session's source scope.
+    LexSource("import \"std/io\";", "<repl>"); ParseProgram();
+    while (TRUE) {
+        if (prompt) Out("cool> ");
+        text = Submission(); if (!text) break;
+        if (Eq(text->data, ":quit\n") || Eq(text->data, ":quit")) break;
+        if (Eq(text->data, ":stats\n")) {
+            stats = TextNew(); compiled = 0;
+            for (i = 1; i < nfun; i++) if (functions[i].bytecode) compiled++;
+            Append(stats, "functions="); Number(stats, nfun - 1); Append(stats, " compiled="); Number(stats, compiled);
+            Append(stats, " bytecode_compilations="); Number(stats, bytecode_compilations);
+            Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); goto repl_next;
+        }
+        MemCpy(repl_snapshot, functions, MAX_FUNCTIONS * sizeof(Function));
+        repl_saved_nfun = nfun; repl_saved_ntok = ntok; repl_aliases = aliases;
+        if (AIWNIOS_SetJmp(repl_context)) ReplRestore();
+        else { recovery_context = repl_context; ReplStep(text); }
+        recovery_context = NULL;
+repl_next:
+        Free(text->data); Free(text);
+    }
+}

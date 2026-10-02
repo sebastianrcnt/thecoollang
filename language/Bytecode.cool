@@ -11,6 +11,7 @@ class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
 class BDefer { Node *call; I64 *args; BDefer *next; };
 class BScope { BDefer *calls; BScope *parent; };
 Function *bc_fun;
+I64 bytecode_compilations;
 BScope *bc_scope, *bc_loop_scope;
 I64 bc_break, bc_continue;
 Bool bc_done;
@@ -97,6 +98,7 @@ U0 ByteStmt(Node *n) {
 }
 U0 CompileBytecode(Function *f) {
     I64 zero;
+    bytecode_compilations++;
     bc_fun = f; f->registers = f->slots; bc_scope = NULL; bc_done = FALSE;
     ByteStmt(f->body);
     // Also supplies valid dead branch targets after terminal conditionals.

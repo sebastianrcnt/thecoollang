@@ -5,6 +5,7 @@
 #include "LLVM.cool"
 #include "Bytecode.cool"
 #include "JIT.cool"
+#include "Repl.cool"
 U0 ReadSource(U8 *file) {
     I64 size; U8 *src = FileRead(file, &size, NULL);
     if (!src) { Out("cannot read source\n"); NativeExit(2); }
@@ -24,11 +25,13 @@ U0 ReadBundle(U8 *file) {
 }
 U0 LanguageMain() {
     U8 *mode;
+    if (NativeArgCount() == 2 && (Eq(NativeArg(1), "repl") || Eq(NativeArg(1), "repl-quiet"))) { Repl(Eq(NativeArg(1), "repl")); return; }
     if (NativeArgCount() < 3 || NativeArgCount() > 4) { Out("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n"); NativeExit(2); }
     mode = NativeArg(1);
+    if (Eq(mode, "auto") || Eq(mode, "auto-bundle")) execution_mode = 3;
     if (Eq(mode, "bytecode") || Eq(mode, "bytecode-bundle")) execution_mode = 1;
     if (Eq(mode, "jit") || Eq(mode, "jit-bundle")) execution_mode = 2;
-    if (Eq(mode, "jit-bundle") || Eq(mode, "bytecode-bundle") || Eq(mode, "check-bundle") || Eq(mode, "run-bundle") || Eq(mode, "llvm-bundle")) ReadBundle(NativeArg(2));
+    if (Eq(mode, "auto-bundle") || Eq(mode, "jit-bundle") || Eq(mode, "bytecode-bundle") || Eq(mode, "check-bundle") || Eq(mode, "run-bundle") || Eq(mode, "llvm-bundle")) ReadBundle(NativeArg(2));
     else ReadSource(NativeArg(2));
     if (Eq(mode, "scan")) {
         I64 i, nesting = 0;

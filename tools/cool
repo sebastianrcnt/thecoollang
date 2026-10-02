@@ -161,11 +161,12 @@ def main():
         p.add_argument('--offline', action='store_true')
         p.add_argument('--frozen', action='store_true')
         if name == 'run':
-            p.add_argument('--backend', choices=('interp', 'tree', 'jit', 'llvm', 'llvm-jit'), default='interp')
+            p.add_argument('--backend', choices=('auto', 'interp', 'tree', 'jit', 'llvm', 'llvm-jit'), default='auto')
         if name in ('build', 'emit-ir'):
             p.add_argument('-o', '--output', default='a.out' if name == 'build' else 'program.ll')
         if name in ('run', 'build'):
             p.add_argument('--release', action='store_true')
+    sub.add_parser('repl')
     p = sub.add_parser('get'); p.add_argument('value'); p.add_argument('--offline', action='store_true'); p.set_defaults(action='get')
     p = sub.add_parser('mod'); ms = p.add_subparsers(dest='action', required=True)
     q = ms.add_parser('init'); q.add_argument('value')
@@ -180,7 +181,12 @@ def main():
         parser.error('new-language program arguments are not implemented yet; no arguments were discarded')
     if args.command in ('mod', 'get'):
         module_command(args); return
-    ensure('build/language.BIN', 'build/language-runtime.o')
+    ensure('build/language.BIN')
+    if args.command == 'repl':
+        subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', 'repl' if sys.stdin.isatty() else 'repl-quiet'], check=True)
+        return
+    if args.command == 'build' or (args.command == 'run' and args.backend == 'llvm'):
+        ensure('build/language-runtime.o')
     with tempfile.TemporaryDirectory(prefix='cool-') as tmp:
         work = Path(tmp)
         manifest, files = bundle(args.source, work, args.offline, args.frozen)
@@ -192,8 +198,8 @@ def main():
                 raise ValueError('output would overwrite source')
             front('llvm-bundle', manifest, work/'program.ll')
             atomic_write(output, (work/'program.ll').read_bytes())
-        elif args.command == 'run' and args.backend in ('interp', 'tree', 'jit'):
-            mode = {'interp': 'bytecode-bundle', 'tree': 'run-bundle', 'jit': 'jit-bundle'}[args.backend]
+        elif args.command == 'run' and args.backend in ('auto', 'interp', 'tree', 'jit'):
+            mode = {'auto': 'auto-bundle', 'interp': 'bytecode-bundle', 'tree': 'run-bundle', 'jit': 'jit-bundle'}[args.backend]
             front(mode, manifest)
         elif args.command == 'run' and args.backend == 'llvm-jit':
             lli = os.environ.get('COOL_LLI') or shutil.which('lli')

@@ -49,3 +49,18 @@ versions. Commit pseudo-versions, registry/proxy protocol, vendor and tidy comma
 are pending. `cool.sum` protects pinned content; no transparency service exists.
 
 `cool legacy ...` retains the original CLI for bootstrap-era source files.
+
+## Persistent session
+
+`cool repl` supports persistent scalar bindings, expressions, imports of std/io,
+function definitions and same-signature body replacement. `:stats` reports actual
+bytecode/native compilation counters; `:quit` exits. Functions start in bytecode
+and become baseline native code on the fourth call (`run --backend auto`, default).
+Call sites dispatch through stable function IDs, so a changed callee is replaced
+without recompiling callers. No inlining is done by this baseline tier.
+
+Invalid declarations roll back the symbol table and token cursor. Runtime side
+effects are not transactional. Signature changes require a new session. External
+package loading inside REPL, aggregate layout changes, concurrent redefinition,
+completion and source-history memory reclamation are not implemented yet. The
+session currently has explicit token/function/depth limits.

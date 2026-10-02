@@ -20,6 +20,10 @@ import U0 NativeExit(I64 code);
 import I64 NativeArgCount();
 import U8 *NativeArg(I64 index);
 import I64 NativeGetChar();
+import I64 AIWNIOS_SetJmp(I64 *context);
+import U0 AIWNIOS_LongJmp(I64 *context);
+I64 *recovery_context;
+Bool allow_redefinition;
 
 class Text { U8 *data; I64 len, cap; };
 Text *TextNew() { return CAlloc(sizeof(Text)); }
@@ -79,7 +83,9 @@ U0 ErrorAt(Token *t, U8 *message) {
     Text *s = TextNew();
     Append(s, t->file); Char(s, ':'); Number(s, t->line); Char(s, ':'); Number(s, t->col);
     Append(s, ": error: "); Append(s, message); Char(s, '\n');
-    NativeWrite(2, s->data, s->len); NativeExit(2);
+    NativeWrite(2, s->data, s->len);
+    if (recovery_context) AIWNIOS_LongJmp(recovery_context);
+    NativeExit(2);
 }
 U0 Error(U8 *message) { ErrorAt(At(), message); }
 Bool Is(U8 *s) { return At()->kind == K_ID && Eq(At()->text, s); }
@@ -108,7 +114,7 @@ class Node { I64 kind, type, value, op, slot; Token *token; U8 *name; Node *a, *
 class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
 class Function {
     U8 *name, *package; I64 result, argc, slots, begin, end, public;
-    U8 *bytecode, *machine; I64 code_count, code_capacity, registers;
+    U8 *bytecode, *machine; I64 code_count, code_capacity, registers, calls;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
 };
 #define MAX_FUNCTIONS 4096

@@ -48,3 +48,7 @@ all: build/language.BIN build/language-runtime.o
 project-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_projects.py
 test: language-test project-test
+.PHONY: repl-test
+repl-test: build/language.BIN
+	python3 tools/test_repl.py
+test: repl-test
