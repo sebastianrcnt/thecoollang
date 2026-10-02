@@ -16,7 +16,7 @@ static ffi_type *cool_ffi_type(int64_t type) {
         case 10: return &ffi_type_uint64;
         case 11: return &ffi_type_double;
         case 12: return &ffi_type_float;
-        default: return type >= 100 ? &ffi_type_pointer : NULL;
+        default: return type >= 100000 ? &ffi_type_pointer : NULL;
     }
 }
 static int64_t cool_foreign_call(const char *name, int64_t result_type, const int64_t *types,

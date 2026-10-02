@@ -54,3 +54,22 @@ void cool_store(int64_t address, int64_t type, int64_t value) {
     if (!address) fail("null pointer dereference");
     cool_memory_write(address, type, value);
 }
+
+void cool_zero(int64_t address, int64_t size) { memset((void *)(uintptr_t)address, 0, (size_t)size); }
+int64_t cool_length(int64_t source, int64_t count, int64_t slice) {
+    return slice ? ((const int64_t *)(uintptr_t)source)[1] : count;
+}
+int64_t cool_index(int64_t source, int64_t index, int64_t count, int64_t size, int64_t slice) {
+    count = cool_length(source, count, slice);
+    if (index < 0 || index >= count) fail("index out of bounds");
+    if (slice) source = ((const int64_t *)(uintptr_t)source)[0];
+    return (int64_t)((uint64_t)source + (uint64_t)index * (uint64_t)size);
+}
+void cool_slice(int64_t destination, int64_t source, int64_t low, int64_t high, int64_t count, int64_t size, int64_t slice) {
+    count = cool_length(source, count, slice);
+    if (low < 0 || high < low || high > count) fail("slice bounds out of range");
+    if (slice) source = ((const int64_t *)(uintptr_t)source)[0];
+    int64_t *result = (int64_t *)(uintptr_t)destination;
+    result[0] = (int64_t)((uint64_t)source + (uint64_t)low * (uint64_t)size);
+    result[1] = high-low;
+}

@@ -54,8 +54,30 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
     }
     return Normalize(result, n->type);
 }
-I64 Invoke(Node *n, I64 *args) {
-    Function *f; Frame *frame; Text *text; I64 i, result, ok;
+I64 ValueRead(I64 address, I64 type, I64 destination) {
+    if (!address) Error("null pointer dereference");
+    if (Aggregate(type)) { MemCpy(destination(U8 *), address(U8 *), ByteSize(type)); return destination; }
+    return NativeMemoryRead(address, type);
+}
+U0 ValueWrite(I64 address, I64 type, I64 value) {
+    if (!address) Error("null pointer dereference");
+    if (Aggregate(type)) MemCpy(address(U8 *), value(U8 *), ByteSize(type)); else NativeMemoryWrite(address, type, value);
+}
+I64 SequenceLength(Node *n, I64 source) { if (n->op == A_SLICE) return source(I64 *)[1]; return n->value; }
+I64 IndexAddress(Node *n, I64 source, I64 index) {
+    I64 length = SequenceLength(n, source);
+    if (index < 0 || index >= length) ErrorAt(n->token, "index out of bounds");
+    if (n->op == A_SLICE) source = source(I64 *)[0];
+    return source + index*ByteSize(n->type-T_PTR);
+}
+I64 MakeSlice(Node *n, I64 source, I64 low, I64 high, I64 destination) {
+    I64 length = SequenceLength(n, source);
+    if (low < 0 || high < low || high > length) ErrorAt(n->token, "slice bounds out of range");
+    if (n->op == A_SLICE) source = source(I64 *)[0];
+    destination(I64 *)[0] = source + low*ByteSize(Shape(n->type)->element); destination(I64 *)[1] = high-low; return destination;
+}
+I64 Invoke(Node *n, I64 *args, I64 destination = 0) {
+    Function *f; Frame *frame; Text *text; I64 i, offset = 0, result, ok;
     if (n->slot == -1) {
         if (n->a->type == T_STRING) Out(args[0](U8 *));
         else if (Floating(n->a->type)) NativePrintFloat(args[0]);
@@ -76,27 +98,35 @@ I64 Invoke(Node *n, I64 *args) {
     if (++call_depth > 1024) ErrorAt(n->token, "call depth limit exceeded");
     f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); if (execution_mode && !f->bytecode) CompileBytecode(f);
     frame->values = CAlloc((f->slots + f->registers + 1) * 8);
-    for (i = 0; i < f->argc; i++) NativeMemoryWrite(&frame->values[i], f->arg_types[i], args[i]);
+    for (i = 0; i < f->argc; i++) { ValueWrite(&frame->values[offset], f->arg_types[i], args[i]); offset += TypeSlots(f->arg_types[i]); }
     f->calls++;
     if (execution_mode == 2 || (execution_mode == 3 && f->calls >= 4)) result = RunNative(f, frame->values);
     else if (execution_mode) result = RunBytecode(f, frame->values);
-    else { Execute(f->body, frame); result = frame->result; } Free(frame->values); Free(frame); call_depth--; return result;
+    else { Execute(f->body, frame); result = frame->result; } if (Aggregate(f->result)) result = ValueRead(result, f->result, destination); Free(frame->values); Free(frame); call_depth--; return result;
 }
 I64 *Arguments(Node *n, Frame *frame) {
     I64 i = 0, *args = CAlloc((n->value + 1) * 8); Node *a = n->a;
     while (a) { args[i++] = Eval(a, frame); a = a->next; } return args;
 }
 I64 Eval(Node *n, Frame *frame) {
-    I64 a, b, op, result = 0, *args;
+    I64 a, b, op, result = 0, *args; Node *item;
     if (n->kind == N_INT) return n->value;
     if (n->kind == N_STRING) return n->name;
-    if (n->kind == N_LOCAL) return NativeMemoryRead(&frame->values[n->slot], n->type);
+    if (n->kind == N_LOCAL) return ValueRead(&frame->values[n->slot], n->type, &frame->values[n->storage]);
     if (n->kind == N_LOCAL_ADDRESS) return &frame->values[n->slot];
-    if (n->kind == N_CALL) { args = Arguments(n, frame); result = Invoke(n, args); Free(args); return result; }
+    if (n->kind == N_CALL) { args = Arguments(n, frame); result = Invoke(n, args, &frame->values[n->storage]); Free(args); return result; }
+    if (n->kind == N_AGG_LITERAL) {
+        result = &frame->values[n->storage]; MemSet(result(U8 *), 0, ByteSize(n->type));
+        for (item = n->a; item; item = item->next) ValueWrite(result+item->offset, item->type, Eval(item, frame)); return result;
+    }
+    if (n->kind == N_FIELD_ADDRESS) return Eval(n->a, frame) + n->value;
+    if (n->kind == N_INDEX_ADDRESS) { a = Eval(n->a, frame); b = Eval(n->b, frame); return IndexAddress(n, a, b); }
+    if (n->kind == N_SLICE) { a = Eval(n->a, frame); b = Eval(n->b, frame); result = SequenceLength(n, a); if (n->c) result = Eval(n->c, frame); return MakeSlice(n, a, b, result, &frame->values[n->storage]); }
+    if (n->kind == N_LENGTH) { a = Eval(n->a, frame); if (AggregateKind(n->a->type) == A_SLICE) return a(I64 *)[1]; return Shape(n->a->type)->count; }
     if (n->kind == N_ADDRESS) {
         a = Eval(n->a, frame); b = Eval(n->b, frame) * ByteSize(n->type - T_PTR); if (n->op == '-') return a - b; return a + b;
     }
-    if (n->kind == N_LOAD) { a = Eval(n->a, frame); if (!a) ErrorAt(n->token, "null pointer dereference"); return NativeMemoryRead(a, n->type); }
+    if (n->kind == N_LOAD) { a = Eval(n->a, frame); if (!a) ErrorAt(n->token, "null pointer dereference"); return ValueRead(a, n->type, &frame->values[n->storage]); }
     if (n->kind == N_CAST) return ConvertNumber(Eval(n->a, frame), n->a->type, n->type, n->token);
     a = Eval(n->a, frame); op = n->op;
     if (n->kind == N_UNARY) { if (Floating(n->type)) return AsBits(-AsFloat(a)); if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
@@ -120,8 +150,8 @@ U0 Execute(Node *n, Frame *frame) {
             while (deferred) { d = deferred; Invoke(d->call, d->args); deferred = d->next; Free(d->args); Free(d); }
             break;
         case N_STORE:
-            address = Eval(n->a, frame); value = Eval(n->b, frame); if (!address) ErrorAt(n->token, "null pointer dereference"); NativeMemoryWrite(address, n->type, value); break;
-        case N_BIND: case N_ASSIGN: NativeMemoryWrite(&frame->values[n->slot], n->type, Eval(n->a, frame)); break;
+            address = Eval(n->a, frame); value = Eval(n->b, frame); if (!address) ErrorAt(n->token, "null pointer dereference"); ValueWrite(address, n->type, value); break;
+        case N_BIND: case N_ASSIGN: ValueWrite(&frame->values[n->slot], n->type, Eval(n->a, frame)); break;
         case N_EXPR: Eval(n->a, frame); break;
         case N_RETURN: if (n->a) frame->result = Eval(n->a, frame); frame->flow = 1; break;
         case N_IF: if (Eval(n->a, frame)) Execute(n->b, frame); else Execute(n->c, frame); break;

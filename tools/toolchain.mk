@@ -60,3 +60,8 @@ test: developer-tools-test
 .PHONY: benchmark
 benchmark: all
 	python3 tools/bench_language.py --output build/language-benchmark.json
+
+.PHONY: aggregate-test
+aggregate-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_aggregates.py
+test: aggregate-test

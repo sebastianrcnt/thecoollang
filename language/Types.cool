@@ -1,0 +1,107 @@
+// Aggregate layouts and structural array/slice types. Pointer depth uses T_PTR.
+I64 FindType(U8 *package, U8 *name) {
+    I64 i; for (i = 0; i < naggregates; i++) if (aggregate_types[i].kind == A_STRUCT && Eq(aggregate_types[i].package, package) && Eq(aggregate_types[i].name, name)) return T_AGG + i;
+    return -1;
+}
+I64 NewType(I64 kind, Token *token) {
+    I64 type; if (naggregates == MAX_TYPES) ErrorAt(token, "type limit exceeded");
+    type = T_AGG + naggregates++; MemSet(&aggregate_types[type-T_AGG], 0, sizeof(AggregateType)); Shape(type)->kind = kind; Shape(type)->token = token; return type;
+}
+I64 SequenceType(I64 kind, I64 element, I64 count, Token *token) {
+    I64 i, type;
+    if (element == T_VOID || element == T_NULL) ErrorAt(token, "invalid element type");
+    if (count < 0 || count > 65536) ErrorAt(token, "array length outside 0..65536");
+    for (i = 0; i < naggregates; i++) if (aggregate_types[i].kind == kind && aggregate_types[i].element == element && aggregate_types[i].count == count) return T_AGG+i;
+    type = NewType(kind, token); Shape(type)->element = element; Shape(type)->count = count; return type;
+}
+I64 AlignSize(I64 size, I64 align) { return (size + align - 1) / align * align; }
+I64 Alignment(I64 type) { if (Aggregate(type)) { Layout(type); return Shape(type)->align; } return ByteSize(type); }
+extern I64 ParseType();
+U0 Layout(I64 type) {
+    AggregateType *a = Shape(type); Field *f, *tail = NULL, *other; I64 saved, field_type, align; U8 *name; Bool public;
+    if (a->state == 2) return;
+    if (a->state == 1) ErrorAt(a->token, "recursive aggregate requires a pointer");
+    a->state = 1; a->align = 1;
+    if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }
+    else if (a->kind == A_ARRAY) { a->size = ByteSize(a->element) * a->count; a->align = Alignment(a->element); }
+    else {
+        saved = pos; pos = a->begin; a->fields = NULL; a->count = 0;
+        while (pos < a->end) {
+            public = FALSE; if (Is("pub")) { pos++; public = TRUE; }
+            name = Ident(); Need(':', "expected ':' after field name"); field_type = ParseType();
+            if (!field_type) Error("field cannot be void");
+            Need(';', "expected ';' after field");
+            for (other = a->fields; other; other = other->next) if (Eq(other->name, name)) Error("duplicate field");
+            align = Alignment(field_type); a->size = AlignSize(a->size, align);
+            f = CAlloc(sizeof(Field)); f->name = name; f->type = field_type; f->offset = a->size; f->public = public;
+            if (tail) tail->next = f; else a->fields = f; tail = f;
+            a->size += ByteSize(field_type); if (align > a->align) a->align = align; a->count++;
+        }
+        a->size = AlignSize(a->size, a->align); pos = saved;
+    }
+    if (a->size > 524288) ErrorAt(a->token, "aggregate exceeds 512 KiB implementation limit");
+    a->state = 2;
+}
+Bool Borrowed(I64 type) {
+    Field *f;
+    if (!Aggregate(type)) return FALSE;
+    Layout(type);
+    if (Shape(type)->kind == A_SLICE) return TRUE;
+    if (Shape(type)->kind == A_ARRAY) return Borrowed(Shape(type)->element);
+    for (f = Shape(type)->fields; f; f = f->next) if (Borrowed(f->type)) return TRUE;
+    return FALSE;
+}
+U0 ValidateBorrowedElements(I64 type) {
+    Field *field;
+    if (!Aggregate(type)) return;
+    Layout(type);
+    if (Shape(type)->kind == A_SLICE) {
+        if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "slice elements cannot contain borrowed slices until lifetime analysis exists");
+    } else if (Shape(type)->kind == A_ARRAY) ValidateBorrowedElements(Shape(type)->element);
+    else for (field = Shape(type)->fields; field; field = field->next) ValidateBorrowedElements(field->type);
+}
+Field *FindField(I64 type, U8 *name, Token *token) {
+    Field *f; Layout(type);
+    for (f = Shape(type)->fields; f; f = f->next) if (Eq(f->name, name)) {
+        if (!f->public && !Eq(token->package, Shape(type)->package)) ErrorAt(token, "field is private to its package");
+        return f;
+    }
+    ErrorAt(token, "unknown field"); return NULL;
+}
+// Collect imports and nominal names before parsing signatures or layouts.
+extern I64 TypeName(U8 *name);
+U0 CollectTypes() {
+    I64 saved = pos, nesting = 0, type; Token *t; U8 *name, *alias, *path; Bool public; I64 j;
+    while (At()->kind) {
+        if (!nesting && Is("import")) {
+            t = At(); pos++; alias = NULL; if (At()->kind == K_ID) alias = Ident();
+            if (At()->kind != K_STRING) Error("expected import path string"); path = At()->text;
+            if (!alias) { alias = path; for (j = 0; path[j]; j++) if (path[j] == '/') alias = path+j+1; }
+            if (!*alias) Error("empty import name"); AddAlias(t, alias, path); pos++; Need(';', "expected ';' after import");
+        } else if (!nesting && (Is("struct") || (Is("pub") && tokens[pos+1].kind == K_ID && Eq(tokens[pos+1].text, "struct")))) {
+            public = FALSE; if (Is("pub")) { pos++; public = TRUE; }
+            t = At(); pos++; name = Ident(); if (TypeName(name) >= 0) ErrorAt(t, "struct name conflicts with a builtin type"); if (FindType(t->package, name) >= 0) ErrorAt(t, "duplicate struct or layout redefinition");
+            type = NewType(A_STRUCT, t); Shape(type)->name = name; Shape(type)->package = t->package; Shape(type)->public = public;
+            Need('{', "expected struct body"); Shape(type)->begin = pos;
+            while (At()->kind && At()->kind != '}') pos++;
+            Shape(type)->end = pos; Need('}', "unterminated struct"); Take(';');
+        } else { if (Take('{')) nesting++; else if (Take('}')) nesting--; else pos++; }
+    }
+    pos = saved;
+}
+U0 AppendType(Text *text, I64 type) {
+    U8 *name = NULL;
+    if (Pointer(type)) { Char(text, '*'); AppendType(text, type-T_PTR); return; }
+    if (Aggregate(type)) {
+        if (Shape(type)->kind == A_STRUCT) Append(text, Shape(type)->name);
+        else { Char(text, '['); if (Shape(type)->kind == A_ARRAY) Number(text, Shape(type)->count); Char(text, ']'); AppendType(text, Shape(type)->element); }
+        return;
+    }
+    switch (type) {
+        case T_VOID: name = "void"; break; case T_INT: name = "i64"; break; case T_BOOL: name = "bool"; break;
+        case T_STRING: name = "string"; break; case T_I32: name = "i32"; break; case T_U8: name = "u8"; break;
+        case T_I8: name = "i8"; break; case T_I16: name = "i16"; break; case T_U16: name = "u16"; break;
+        case T_U32: name = "u32"; break; case T_U64: name = "u64"; break; case T_F64: name = "f64"; break; case T_F32: name = "f32"; break;
+    }
+    if (!name) name = "<unknown>"; Append(text, name);
+}

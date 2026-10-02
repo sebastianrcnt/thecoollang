@@ -13,6 +13,12 @@
 #define BC_LOCAL_READ 13
 #define BC_LOCAL_WRITE 14
 #define BC_LOCAL_ADDRESS 15
+#define BC_AGG_INIT 16
+#define BC_AGG_FIELD 17
+#define BC_FIELD_ADDRESS 18
+#define BC_INDEX_ADDRESS 19
+#define BC_SLICE 20
+#define BC_LENGTH 21
 class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
 class BDefer { Node *call; I64 *args; BDefer *next; };
 class BScope { BDefer *calls; BScope *parent; };
@@ -44,7 +50,7 @@ U0 ByteCleanup(BScope *until) {
     }
 }
 I64 ByteExpr(Node *n) {
-    I64 r, a, b, at, jump, end; I64 *args;
+    I64 r, a, b, at, jump, end; I64 *args; Node *item;
     if (n->kind == N_LOCAL) { r = Slot(); InstructionNew(BC_LOCAL_READ, r, n->slot, 0, n); return r; }
     if (n->kind == N_LOCAL_ADDRESS) { r = Slot(); InstructionNew(BC_LOCAL_ADDRESS, r, n->slot, 0, n); return r; }
     if (n->kind == N_INT || n->kind == N_STRING) {
@@ -52,7 +58,15 @@ I64 ByteExpr(Node *n) {
         if (n->kind == N_STRING) CodeAt(at)->value = n->name; return r;
     }
     if (n->kind == N_CALL) { args = ByteArgs(n); r = Slot(); at = InstructionNew(BC_CALL, r, 0, 0, n); CodeAt(at)->args = args; return r; }
+    if (n->kind == N_AGG_LITERAL) {
+        r = Slot(); InstructionNew(BC_AGG_INIT, r, 0, 0, n);
+        for (item = n->a; item; item = item->next) { b = ByteExpr(item); InstructionNew(BC_AGG_FIELD, Slot(), r, b, item); } return r;
+    }
     a = ByteExpr(n->a); r = Slot();
+    if (n->kind == N_FIELD_ADDRESS) { InstructionNew(BC_FIELD_ADDRESS, r, a, 0, n); return r; }
+    if (n->kind == N_LENGTH) { InstructionNew(BC_LENGTH, r, a, 0, n); return r; }
+    if (n->kind == N_INDEX_ADDRESS) { b = ByteExpr(n->b); InstructionNew(BC_INDEX_ADDRESS, r, a, b, n); return r; }
+    if (n->kind == N_SLICE) { b = ByteExpr(n->b); end = 0; if (n->c) end = ByteExpr(n->c); at = InstructionNew(BC_SLICE, r, a, b, n); CodeAt(at)->target = end; return r; }
     if (n->kind == N_ADDRESS) { b = ByteExpr(n->b); InstructionNew(BC_ADDRESS, r, a, b, n); return r; }
     if (n->kind == N_LOAD) { InstructionNew(BC_LOAD, r, a, 0, n); return r; }
     if (n->kind == N_CAST) { InstructionNew(BC_CAST, r, a, 0, n); return r; }
@@ -121,19 +135,25 @@ I64 Compute(Instruction *ins, I64 *values) {
     I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, *args; Node *n = ins->node;
     if (ins->op == BC_CONST) return ins->value;
     if (ins->op == BC_COPY) return a;
-    if (ins->op == BC_LOCAL_READ) return NativeMemoryRead(&values[ins->a], n->type);
+    if (ins->op == BC_LOCAL_READ) return ValueRead(&values[ins->a], n->type, &values[n->storage]);
     if (ins->op == BC_LOCAL_ADDRESS) return &values[ins->a];
-    if (ins->op == BC_LOCAL_WRITE) { NativeMemoryWrite(&result, n->type, a); return result; }
+    if (ins->op == BC_LOCAL_WRITE) { if (Aggregate(n->type)) { ValueWrite(&values[n->slot], n->type, a); return values[n->slot]; } NativeMemoryWrite(&result, n->type, a); return result; }
+    if (ins->op == BC_AGG_INIT) { result = &values[n->storage]; MemSet(result(U8 *), 0, ByteSize(n->type)); return result; }
+    if (ins->op == BC_AGG_FIELD) { ValueWrite(a+n->offset, n->type, b); return 0; }
+    if (ins->op == BC_FIELD_ADDRESS) return a+n->value;
+    if (ins->op == BC_INDEX_ADDRESS) return IndexAddress(n, a, b);
+    if (ins->op == BC_SLICE) { result = SequenceLength(n, a); if (n->c) result = values[ins->target]; return MakeSlice(n, a, b, result, &values[n->storage]); }
+    if (ins->op == BC_LENGTH) { if (AggregateKind(n->a->type) == A_SLICE) return a(I64 *)[1]; return Shape(n->a->type)->count; }
     if (ins->op == BC_CALL) {
         args = CAlloc((n->value + 1) * 8);
         for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];
-        result = Invoke(n, args); Free(args); return result;
+        result = Invoke(n, args, &values[n->storage]); Free(args); return result;
     }
     if (ins->op == BC_ADDRESS) { b *= ByteSize(n->type - T_PTR); if (n->op == '-') return a - b; return a + b; }
     if (ins->op == BC_LOAD || ins->op == BC_STORE) {
         if (!a) ErrorAt(n->token, "null pointer dereference");
-        if (ins->op == BC_LOAD) return NativeMemoryRead(a, n->type);
-        NativeMemoryWrite(a, n->type, b); return 0;
+        if (ins->op == BC_LOAD) return ValueRead(a, n->type, &values[n->storage]);
+        ValueWrite(a, n->type, b); return 0;
     }
     if (ins->op == BC_CAST) return ConvertNumber(a, n->a->type, n->type, n->token);
     op = n->op;

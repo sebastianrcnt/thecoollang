@@ -2,11 +2,12 @@
 // dispatch through those IDs, so body replacement does not leave stale calls.
 I64 repl_context[24];
 Function *repl_snapshot;
-I64 repl_saved_nfun, repl_saved_ntok;
+I64 repl_saved_nfun, repl_saved_ntok, repl_saved_types;
 Local *repl_locals;
 Alias *repl_aliases;
 I64 *repl_values;
 I64 repl_capacity;
+Bool repl_executing;
 Text *Submission() {
     Text *text = TextNew(); I64 ch, braces = 0, parens = 0; Bool quoted = FALSE, escaped = FALSE, line_comment = FALSE;
     while ((ch = NativeGetChar()) >= 0) {
@@ -27,15 +28,18 @@ Text *Submission() {
     Reserve(text, 0); return text;
 }
 U0 ReplRestore() {
+    I64 retained_slots = functions[0].slots;
     MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
-    nfun = repl_saved_nfun; ntok = repl_saved_ntok;
+    if (repl_executing && retained_slots > functions[0].slots) functions[0].slots = retained_slots;
+    nfun = repl_saved_nfun; ntok = repl_saved_ntok; naggregates = repl_saved_types;
     aliases = repl_aliases; locals = repl_locals; call_depth = 0;
 }
 U0 ReplStep(Text *text) {
     I64 start = ntok, result, register_id, i; Node *statement, *call, *arg; Function *f; I64 *grown;
+    repl_executing = FALSE;
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
-    if (Is("fn") || Is("pub") || Is("import") || Is("extern")) { ParseProgram(); return; }
+    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("struct")) { ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {
@@ -43,7 +47,7 @@ U0 ReplStep(Text *text) {
     }
     if (Is("return") || Is("defer")) Error("top-level return/defer requires an explicit function or block");
     statement = Statement(); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
-    if (statement->kind == N_EXPR && statement->a->type != T_VOID) {
+    if (statement->kind == N_EXPR && statement->a->type != T_VOID && !Aggregate(statement->a->type)) {
         arg = statement->a; call = NewNode(N_CALL, arg->token); call->name = "println"; call->slot = -1; call->value = 1; call->type = T_VOID; call->a = arg;
         statement->a = call;
     }
@@ -57,7 +61,7 @@ U0 ReplStep(Text *text) {
         Free(repl_values); repl_values = grown; repl_capacity = 65536;
     }
     // The session's locals remain live; expression temporaries are regenerated.
-    result = RunBytecode(f, repl_values); no_warn result;
+    repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
     repl_locals = locals;
 }
 U0 Repl(Bool prompt) {
@@ -80,7 +84,7 @@ U0 Repl(Bool prompt) {
             Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); goto repl_next;
         }
         MemCpy(repl_snapshot, functions, MAX_FUNCTIONS * sizeof(Function));
-        repl_saved_nfun = nfun; repl_saved_ntok = ntok; repl_aliases = aliases;
+        repl_saved_types = naggregates; repl_saved_nfun = nfun; repl_saved_ntok = ntok; repl_aliases = aliases;
         if (AIWNIOS_SetJmp(repl_context)) ReplRestore();
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;

@@ -9,6 +9,7 @@
 import U8 *CAlloc(I64 size);
 import U8 *MAlloc(I64 size);
 import U0 Free(U8 *p);
+import U8 *MemSet(U8 *dst, I64 value, I64 size);
 import U8 *MemCpy(U8 *to, U8 *from, I64 size);
 import I64 StrLen(U8 *s);
 import I64 StrCmp(U8 *a, U8 *b);
@@ -78,7 +79,11 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define T_F64 11
 #define T_F32 12
 #define T_NULL 13
-#define T_PTR 100
+#define T_PTR 100000
+#define T_AGG 1000
+#define A_STRUCT 1
+#define A_ARRAY 2
+#define A_SLICE 3
 #define K_ID 256
 #define K_INT 257
 #define K_STRING 258
@@ -134,7 +139,12 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_ADDRESS 20
 #define N_FOR 21
 #define N_LOCAL_ADDRESS 22
-class Node { I64 kind, type, value, op, slot; Token *token; U8 *name; Node *a, *b, *c, *next; };
+#define N_AGG_LITERAL 23
+#define N_FIELD_ADDRESS 24
+#define N_INDEX_ADDRESS 25
+#define N_SLICE 26
+#define N_LENGTH 27
+class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next; };
 class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
 class Function {
     U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign;
@@ -162,14 +172,26 @@ U0 AddAlias(Token *t, U8 *name, U8 *path) {
     a = CAlloc(sizeof(Alias)); a->file = t->file; a->name = name; a->path = path; a->next = aliases; aliases = a;
 }
 Local *FindLocal(U8 *name) { Local *l = locals; while (l) { if (Eq(l->name, name)) return l; l = l->next; } return NULL; }
+extern I64 TypeSlots(I64 type);
 Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
     res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth;
-    res->slot = functions[current_fun].slots++; res->next = locals; locals = res; return res;
+    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
 Bool Pointer(I64 type) { return type >= T_PTR; }
+class Field { U8 *name; I64 type, offset, public; Field *next; };
+class AggregateType { U8 *name, *package; I64 kind, element, count, size, align, state, begin, end, public; Token *token; Field *fields; };
+#define MAX_TYPES 4096
+AggregateType aggregate_types[MAX_TYPES];
+I64 naggregates;
+Bool Aggregate(I64 type) { return T_AGG <= type < T_AGG + naggregates; }
+AggregateType *Shape(I64 type) { return &aggregate_types[type - T_AGG]; }
+extern U0 Layout(I64 type);
+I64 Storage(I64 type) { I64 slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); return slot; }
+I64 AggregateKind(I64 type) { if (!Aggregate(type)) return 0; return Shape(type)->kind; }
+
 Bool Floating(I64 type) { return type == T_F64 || type == T_F32; }
 Bool Numeric(I64 type) { return Integer(type) || Floating(type); }
 Bool Unsigned(I64 type) { return type == T_U8 || type == T_U16 || type == T_U32 || type == T_U64; }
@@ -179,7 +201,8 @@ I64 Width(I64 type) {
     if (type == T_I32 || type == T_U32) return 32;
     return 64;
 }
-I64 ByteSize(I64 type) { if (type == T_VOID) return 0; if (type == T_BOOL) return 1; if (type == T_F32) return 4; if (type == T_F64 || Pointer(type)) return 8; return Width(type) / 8; }
+I64 ByteSize(I64 type) { if (Aggregate(type)) { Layout(type); return Shape(type)->size; } if (type == T_VOID) return 0; if (type == T_BOOL) return 1; if (type == T_F32) return 4; if (type == T_F64 || Pointer(type)) return 8; return Width(type) / 8; }
+I64 TypeSlots(I64 type) { I64 size = ByteSize(type); if (!size) return 1; return (size + 7) / 8; }
 Bool Fits(I64 v, I64 type) {
     I64 width = Width(type);
     if (Unsigned(type)) { if (v < 0) return FALSE; if (width == 64) return TRUE; return v < (1 << width); }
@@ -190,7 +213,7 @@ U0 Coerce(Node *n, I64 type) {
     Node *child;
     if (n->type == type) return;
     if (n->type == T_NULL && Pointer(type)) { n->type = type; return; }
-    if (Pointer(n->type) && type == T_PTR) { n->type = type; return; }
+    if (Pointer(n->type) && type == T_PTR) { child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL; n->kind = N_CAST; n->a = child; n->type = type; return; }
     if ((n->type == T_F32 && type == T_F64) || (n->kind == N_INT && Integer(n->type) && Floating(type) && -16777216 <= n->value <= 16777216)) {
         child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
         n->kind = N_CAST; n->a = child; n->type = type; return;

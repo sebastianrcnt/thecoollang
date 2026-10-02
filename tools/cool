@@ -22,7 +22,12 @@ def ensure(*targets):
     (ROOT / 'build').mkdir(exist_ok=True)
     with (ROOT / 'build/.cool.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        subprocess.run(['make', '-s', '-C', ROOT, *targets], check=True, stdout=sys.stderr)
+        # This separately locked build cannot inherit make jobserver descriptors
+        # through Python's closed subprocess fds. Start an independent serial make.
+        env = dict(os.environ)
+        for key in ('MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
+            env.pop(key, None)
+        subprocess.run(['make', '-s', '-C', ROOT, *targets], check=True, stdout=sys.stderr, env=env)
 
 
 def front(mode, source, *args, capture=False):
@@ -272,8 +277,14 @@ def main():
         elif args.command == 'doc':
             names = {0: 'void', 1: 'i64', 2: 'bool', 3: 'string', 4: 'i32', 5: 'u8', 6: 'i8', 7: 'i16', 8: 'u16', 9: 'u32', 10: 'u64', 11: 'f64', 12: 'f32'}
             def type_name(t):
-                return '*' + type_name(t - 100) if t >= 100 else names[t]
+                return '*' + type_name(t - 100000) if t >= 100000 else names[t]
             for line in front('symbols', manifest, capture=True).stdout.splitlines():
+                if line.startswith('@type\t'):
+                    _, key, spelling = line.split('\t'); names[int(key)] = spelling; continue
+                if line.startswith('@struct\t'):
+                    _, package, signature = line.split('\t')
+                    if package == '__main': print(signature)
+                    continue
                 package, name, public, result, params = line.split('\t')
                 if package != '__main' or public != '1':
                     continue

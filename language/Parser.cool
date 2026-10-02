@@ -15,7 +15,21 @@ I64 TypeName(U8 *s) {
     if (Eq(s, "string")) return T_STRING;
     return -1;
 }
-I64 ParseType() { I64 t; if (Take('*')) return T_PTR + ParseType(); t = TypeName(Ident()); if (t < 0) Error("unsupported or unknown type"); return t; }
+I64 ParseType() {
+    I64 t, count, kind; Token *token = At(); U8 *name, *package = token->package;
+    if (Take('*')) { t = ParseType(); if (t >= 100*T_PTR) Error("pointer nesting limit exceeded"); return T_PTR+t; }
+    if (Take('[')) {
+        kind = A_ARRAY; count = 0;
+        if (Take(']')) kind = A_SLICE;
+        else { count = At()->val; Need(K_INT, "array length must be an integer literal"); Need(']', "expected ']'"); }
+        return SequenceType(kind, ParseType(), count, token);
+    }
+    name = Ident(); t = TypeName(name); if (t >= 0) return t;
+    if (Take('.')) { package = ResolveAlias(token, name); name = Ident(); }
+    t = FindType(package, name); if (t < 0) ErrorAt(token, "unsupported or unknown type");
+    if (!Eq(package, token->package) && !Shape(t)->public) ErrorAt(token, "type is private to its package");
+    return t;
+}
 I64 Prec(I64 k) {
     if (k == K_OR) return 1;
     if (k == K_AND) return 2;
@@ -31,9 +45,39 @@ I64 Prec(I64 k) {
 }
 extern Node *Expr(I64 min);
 extern Node *Primary();
+Node *AggregateAddress(Node *n) {
+    Node *address;
+    if (n->kind == N_LOCAL) { address = NewNode(N_LOCAL_ADDRESS, n->token); address->slot = n->slot; address->type = T_PTR+n->type; address->mutable = n->mutable; return address; }
+    if (n->kind == N_LOAD) return n->a;
+    return n;
+}
+Node *AggregateLiteral(I64 type, Token *token) {
+    Node *n = NewNode(N_AGG_LITERAL, token), *item, *tail = NULL, *prior; Field *field; I64 count = 0, element;
+    Layout(type); ValidateBorrowedElements(type); n->type = type; n->storage = Storage(type); Need('{', "expected aggregate initializer");
+    if (!Take('}')) {
+        do {
+            if (Shape(type)->kind == A_SLICE) Error("slice literals must be empty; borrow an array with [low:high]");
+            if (Shape(type)->kind == A_STRUCT) { field = FindField(type, Ident(), token); Need(':', "expected ':' after field name"); element = field->type; }
+            else element = Shape(type)->element;
+            item = Expr(1); Coerce(item, element);
+            if (Shape(type)->kind == A_STRUCT) { item->offset = field->offset; item->field_key = field; } else item->offset = count*ByteSize(element);
+            if (Shape(type)->kind == A_STRUCT) { for (prior = n->a; prior; prior = prior->next) if (prior->field_key == item->field_key) ErrorAt(token, "duplicate initializer field"); }
+            if (tail) tail->next = item; else n->a = item; tail = item; count++;
+            if (At()->kind == '}') break;
+            Need(',', "expected ',' between initializers");
+        } while (At()->kind != '}');
+        Need('}', "expected '}' after initializer");
+        if (count != Shape(type)->count) ErrorAt(token, "aggregate initializer must supply every element");
+    } else if (Shape(type)->kind == A_STRUCT) {
+        for (field = Shape(type)->fields; field; field = field->next) FindField(type, field->name, token);
+    }
+    return n;
+}
 Node *Atom() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
+    if (At()->kind == '[') { ty = ParseType(); return AggregateLiteral(ty, t); }
+    if (Is("sizeof")) { pos++; Need('(', "expected '('"); ty = ParseType(); Need(')', "expected ')'"); n = NewNode(N_INT, t); n->type = T_U64; n->value = ByteSize(ty); return n; }
     if (Is("null")) { pos++; n = NewNode(N_INT, t); n->type = T_NULL; return n; }
     if (Is("cast") && tokens[pos+1].kind == '[') {
         pos += 2; ty = ParseType(); Need(']', "expected ']' after cast type"); Need('(', "expected '(' after cast type");
@@ -47,16 +91,16 @@ Node *Atom() {
     if (Take('&')) {
         if (!unsafe_depth) ErrorAt(t, "taking an address requires unsafe");
         n = NewNode(N_LOCAL_ADDRESS, t); n->a = Primary();
-        if (n->a->kind != N_LOCAL) ErrorAt(t, "address operand must be a local variable");
-        l = FindLocal(n->a->name);
-        if (!l->mutable) ErrorAt(t, "cannot take a mutable address of let binding or parameter");
-        n->slot = l->slot; n->type = T_PTR + l->type; return n;
+        if (!n->a->mutable) ErrorAt(t, "cannot take a mutable address of let binding or parameter");
+        if (n->a->kind == N_LOAD) return n->a->a;
+        if (n->a->kind != N_LOCAL) ErrorAt(t, "address operand must be a local variable or projection");
+        n->slot = n->a->slot; n->type = T_PTR + n->a->type; return n;
     }
     if (Take('*')) {
         if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe");
         n = NewNode(N_LOAD, t); n->a = Primary();
         if (!Pointer(n->a->type) || n->a->type == T_PTR) ErrorAt(t, "dereference requires a typed pointer");
-        n->type = n->a->type - T_PTR; return n;
+        n->type = n->a->type - T_PTR; n->mutable = TRUE; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }
     if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; if (t->val < 0) n->type = T_U64; return n; }
     if (Take(K_FLOAT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_F64; return n; }
@@ -71,7 +115,9 @@ Node *Atom() {
         return n;
     }
     name = Ident();
-    if (Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
+    if (!FindLocal(name) && Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
+    ty = FindType(package, name);
+    if (ty >= 0 && At()->kind == '{') { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return AggregateLiteral(ty, t); }
     if (Take('(')) {
         n = NewNode(N_CALL, t); n->name = name;
         if (!Take(')')) {
@@ -80,13 +126,17 @@ Node *Atom() {
             Need(')', "expected ')' after arguments");
         }
         n->value = count;
+        if (!qualified && Eq(name, "len")) {
+            if (count != 1 || (AggregateKind(n->a->type) != A_ARRAY && AggregateKind(n->a->type) != A_SLICE)) ErrorAt(t, "len expects an array or slice");
+            n->kind = N_LENGTH; n->type = T_U64; return n;
+        }
         ty = -1; if (!qualified) ty = TypeName(name);
         if (ty >= 0) {
             if (count != 1 || ty == T_VOID || ty == T_STRING || !Numeric(n->a->type) || !Numeric(ty)) ErrorAt(t, "cast expects one numeric operand and a numeric target");
             n->kind = N_CAST; n->type = ty; return n;
         }
         if (qualified && Eq(package, "std/io") && (Eq(name, "print") || Eq(name, "println"))) {
-            if (count != 1 || n->a->type == T_VOID) ErrorAt(t, "print/println expects one scalar value");
+            if (count != 1 || n->a->type == T_VOID || Aggregate(n->a->type)) ErrorAt(t, "print/println expects one scalar value");
             n->slot = -1; n->type = T_VOID; return n;
         }
         if (qualified && Eq(package, "std/mem")) {
@@ -117,21 +167,45 @@ Node *Atom() {
         if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
         arg = n->a;
         for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); arg = arg->next; }
-        n->slot = id; n->type = functions[id].result; return n;
+        n->slot = id; n->type = functions[id].result; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }
     l = FindLocal(name);
     if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
-    n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; return n;
+    n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; n->mutable = l->mutable; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
 }
 Node *Primary() {
-    Node *n = Atom(), *index, *address, *load; Token *t;
-    while (At()->kind == '[') {
-        t = At(); pos++;
-        if (!unsafe_depth) ErrorAt(t, "raw pointer indexing requires unsafe");
-        if (!Pointer(n->type) || n->type == T_PTR) ErrorAt(t, "indexing requires a typed pointer");
-        index = Expr(1); if (!Integer(index->type)) ErrorAt(t, "index must be an integer");
-        Need(']', "expected ']'"); address = NewNode(N_ADDRESS, t); address->a = n; address->b = index; address->type = n->type;
-        load = NewNode(N_LOAD, t); load->a = address; load->type = n->type - T_PTR; n = load;
+    Node *n = Atom(), *index, *address, *load, *high; Token *t; I64 kind, element; Field *field; Bool mutable;
+    while (At()->kind == '[' || At()->kind == '.') {
+        t = At();
+        if (Take('.')) {
+            kind = n->type; mutable = n->mutable;
+            if (Pointer(kind)) { if (!unsafe_depth) ErrorAt(t, "pointer field access requires unsafe"); kind -= T_PTR; address = n; mutable = TRUE; }
+            else address = AggregateAddress(n);
+            if (AggregateKind(kind) != A_STRUCT) ErrorAt(t, "field access requires a struct");
+            field = FindField(kind, Ident(), t); load = NewNode(N_FIELD_ADDRESS, t); load->a = address; load->value = field->offset; load->type = T_PTR+field->type;
+            n = NewNode(N_LOAD, t); n->a = load; n->type = field->type; n->mutable = mutable; if (Aggregate(n->type)) n->storage = Storage(n->type);
+        } else {
+            pos++; kind = AggregateKind(n->type); mutable = n->mutable;
+            if (kind != A_ARRAY && kind != A_SLICE && (!Pointer(n->type) || n->type == T_PTR)) ErrorAt(t, "indexing requires an array, slice or typed pointer");
+            if (!kind && !unsafe_depth) ErrorAt(t, "raw pointer indexing requires unsafe");
+            if (At()->kind == ':') { index = NewNode(N_INT, t); index->type = T_INT; } else index = Expr(1);
+            if (!Integer(index->type)) ErrorAt(t, "index must be an integer");
+            if (kind) element = Shape(n->type)->element; else element = n->type-T_PTR;
+            if (Take(':')) {
+                if (!kind) ErrorAt(t, "slicing requires an array or slice");
+                if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");
+                if (kind == A_ARRAY && !mutable) ErrorAt(t, "mutable slice requires a var array");
+                high = NULL; if (At()->kind != ']') { high = Expr(1); if (!Integer(high->type)) ErrorAt(t, "slice bound must be an integer"); }
+                Need(']', "expected ']'"); address = NewNode(N_SLICE, t); address->a = n; if (kind == A_ARRAY) address->a = AggregateAddress(n);
+                address->b = index; address->c = high; address->op = kind; address->value = Shape(n->type)->count;
+                address->type = SequenceType(A_SLICE, element, 0, t); address->storage = Storage(address->type); n = address;
+            } else {
+                Need(']', "expected ']'"); address = NewNode(N_ADDRESS, t); address->a = n; address->b = index; address->type = T_PTR+element;
+                if (kind) { address->kind = N_INDEX_ADDRESS; address->op = kind; address->value = Shape(n->type)->count; if (kind == A_ARRAY) address->a = AggregateAddress(n); }
+                load = NewNode(N_LOAD, t); load->a = address; load->type = element; load->mutable = mutable || kind == A_SLICE || !kind;
+                if (Aggregate(element)) load->storage = Storage(element); n = load;
+            }
+        }
     }
     return n;
 }
@@ -153,7 +227,7 @@ Node *Expr(I64 min) {
                 if (a->kind == N_INT) Coerce(a, n->b->type); else Coerce(n->b, a->type);
             }
             if (op == K_EQ || op == K_NE) {
-                if (a->type == T_VOID || a->type == T_STRING) ErrorAt(t, "equality requires integers or bool");
+                if (a->type == T_VOID || a->type == T_STRING || Aggregate(a->type)) ErrorAt(t, "equality requires integers or bool");
                 n->type = T_BOOL;
             } else {
                 if (!Numeric(a->type)) ErrorAt(t, "operator requires numeric operands");
@@ -212,6 +286,7 @@ Node *Statement() {
         if (!Take(')')) {
             post = NewNode(N_EXPR, At()); post->a = Expr(1);
             if (Take('=')) {
+                if (!post->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
                 if (post->a->kind == N_LOCAL) {
                     l = FindLocal(post->a->name); if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
                     post->kind = N_ASSIGN; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type);
@@ -255,6 +330,7 @@ Node *Statement() {
     n = NewNode(N_EXPR, t); n->a = Expr(1);
     if (Take('=')) {
         if (n->a->kind != N_LOAD) ErrorAt(t, "invalid assignment target");
+        if (!n->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
         n->kind = N_STORE; n->type = n->a->type; n->a = n->a->a;
         n->b = Expr(1); Coerce(n->b, n->type);
     }
@@ -270,6 +346,7 @@ Bool Returns(Node *n) {
 U0 ParseProgram() {
     Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
+    CollectTypes();
     while (At()->kind) {
         if (Is("package")) { pos++; Ident(); Need(';', "expected ';' after package"); }
         else if (Is("import")) {
@@ -279,9 +356,10 @@ U0 ParseProgram() {
             path = At()->text;
             if (!alias) { alias = path; for (j = 0; path[j]; j++) if (path[j] == '/') alias = path + j + 1; }
             if (!*alias) Error("empty import name");
-            AddAlias(t, alias, path); pos++; Need(';', "expected ';' after import");
+            pos++; Need(';', "expected ';' after import");
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
+            if (Is("struct")) { pos++; name = Ident(); id = FindType(At()->package, name); Layout(id); ValidateBorrowedElements(id); pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
             foreign = FALSE;
             if (Is("extern")) {
                 foreign = TRUE; pos++;
@@ -290,6 +368,7 @@ U0 ParseProgram() {
             }
             if (!Is("fn")) Error("expected fn, package or import declaration");
             pos++; name = Ident();
+            if (FindType(At()->package, name) >= 0) Error("function name conflicts with a type");
             id = FindFunIn(At()->package, name); old = NULL;
             if (id >= 0) {
                 if (!allow_redefinition) Error("duplicate function declaration");
@@ -308,13 +387,14 @@ U0 ParseProgram() {
                 do {
                     if (f->argc >= 32) Error("function argument limit exceeded");
                     f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter");
-                    f->arg_types[f->argc] = ParseType();
+                    f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]);
                     if (!f->arg_types[f->argc]) Error("parameter cannot be void");
                     f->argc++;
                 } while (Take(','));
                 Need(')', "expected ')'");
             }
             if (Take(K_ARROW)) f->result = ParseType();
+            if (Borrowed(f->result)) ErrorAt(f->token, "returning borrowed slices requires lifetime analysis and is not supported yet");
             if (old) {
                 if (old->argc != f->argc || old->result != f->result) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
@@ -327,6 +407,8 @@ U0 ParseProgram() {
                         for (j = 0; j < f->argc; j++) if (functions[k].arg_types[j] != f->arg_types[j]) Error("conflicting C function signature");
                     }
                 }
+                if (Aggregate(f->result)) Error("C ABI aggregate values are not supported; use a pointer");
+                for (j = 0; j < f->argc; j++) if (Aggregate(f->arg_types[j])) Error("C ABI aggregate values are not supported; use a pointer");
                 if (f->result == T_STRING) Error("C ABI strings must use an explicit pointer");
                 for (j = 0; j < f->argc; j++) if (f->arg_types[j] == T_STRING) Error("C ABI strings must use an explicit pointer");
                 Need(';', "expected ';' after extern declaration"); f->body = NULL; goto declaration_next;

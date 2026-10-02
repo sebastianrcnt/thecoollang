@@ -1,5 +1,6 @@
 #include "Core.cool"
 #include "Lexer.cool"
+#include "Types.cool"
 #include "Parser.cool"
 #include "Interpreter.cool"
 #include "LLVM.cool"
@@ -53,7 +54,15 @@ U0 LanguageMain() {
     }
     ParseProgram();
     if (Eq(mode, "symbols")) {
-        I64 si, sj; Text *line;
+        I64 si, sj; Text *line; Field *field;
+        for (si = 0; si < naggregates; si++) {
+            line = TextNew(); Append(line, "@type\t"); Number(line, T_AGG+si); Char(line, '\t'); AppendType(line, T_AGG+si); Char(line, '\n'); Out(line->data);
+            if (aggregate_types[si].kind == A_STRUCT && aggregate_types[si].public) {
+                line = TextNew(); Append(line, "@struct\t"); Append(line, aggregate_types[si].package); Append(line, "\tpub struct "); Append(line, aggregate_types[si].name); Append(line, " { ");
+                for (field = aggregate_types[si].fields; field; field = field->next) if (field->public) { Append(line, "pub "); Append(line, field->name); Append(line, ": "); AppendType(line, field->type); Append(line, "; "); }
+                Append(line, "}\n"); Out(line->data);
+            }
+        }
         for (si = 0; si < nfun; si++) {
             line = TextNew(); Append(line, functions[si].package); Char(line, '\t'); Append(line, functions[si].name); Char(line, '\t');
             Number(line, functions[si].public); Char(line, '\t'); Number(line, functions[si].result); Char(line, '\t');
