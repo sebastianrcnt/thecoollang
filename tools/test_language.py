@@ -21,7 +21,7 @@ def good(source, output, status=0):
         assert (p.returncode, p.stdout, p.stderr) == (status, output, ''), (mode, source, p.returncode, p.stdout, p.stderr)
 
 def bad(source, diagnostic):
-    p = invoke(source, 'check')
+    p = invoke('import "std/io";\n' + source, 'check')
     assert p.returncode == 2 and diagnostic in p.stderr, (source, p.returncode, p.stdout, p.stderr)
 
 good('fn main() -> i32 { return 7; }', '', 7)
@@ -49,6 +49,12 @@ bad('fn main() {} /*', 'unterminated comment')
 good('fn main() { var x = 0; while (x < 10000) { if ((x > 3 && x < 7) || x == 9) { io.print(x); } x = x + 1; } io.println(true); }', '4569true\n')
 good('fn main() { var x: i32 = 2147483647; let y: i64 = x + 1; io.println(y); }', '-2147483648\n')
 good('fn main() { var a = 0; while (a < 3) { var b = 0; while (b < 3) { b = b + 1; if (b == 2) { break; } io.print(a); } a = a + 1; } }', '012')
+good('fn main() { let n = 18446744073709551615; io.println(n); io.println(n / 2); io.println(n > u64(1)); io.println(n >> 63); io.println(i8(255)); io.println(u16(65536)); io.println(i16(65535)); io.println(u32(-1)); io.println(-9223372036854775808); }', '18446744073709551615\n9223372036854775807\ntrue\n1\n-1\n0\n-1\n4294967295\n-9223372036854775808\n')
+bad('fn main() { let x: i64 = 18446744073709551615; }', 'incompatible types')
+bad('fn main() { let x: u8 = 1; io.println(x << 8); }', 'shift count')
+good('fn main() { let x = 1.5; let y: f64 = 2; io.println(x + y); io.println(x * y); io.println(-x); io.println(i32(3.9)); io.println(f64(u64(42))); io.println(f32(1.25) + f32(2.5)); io.println(1e-3 < 0.01); let nan = 0.0 / 0.0; io.println(nan != nan); }', '3.5\n3\n-1.5\n3\n42\n3.75\ntrue\ntrue\n')
+bad('fn main() { let x = 1.0 & 2.0; }', 'integer operands')
+bad('fn main() { let x = 1e; }', 'exponent digits')
 print('new language: parser/type checks + tree/bytecode/native-JIT differential cases PASS')
 
 # The same typed program must produce identical observable behavior under LLVM AOT.

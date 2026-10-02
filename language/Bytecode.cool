@@ -113,21 +113,10 @@ I64 Compute(Instruction *ins, I64 *values) {
         for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];
         result = Invoke(n, args); Free(args); return result;
     }
-    if (ins->op == BC_CAST) return Normalize(a, n->type);
+    if (ins->op == BC_CAST) return ConvertNumber(a, n->a->type, n->type, n->token);
     op = n->op;
-    if (ins->op == BC_UNARY) { if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
-    if ((op == '/' || op == '%') && (!b || (a == (-0x7FFFFFFFFFFFFFFF - 1) && b == -1))) ErrorAt(n->token, "invalid integer division");
-    if ((op == K_SHL || op == K_SHR) && (b < 0 || b >= 64)) ErrorAt(n->token, "shift count outside 0..63");
-    switch (op) {
-        case '+': result = a + b; break; case '-': result = a - b; break;
-        case '*': result = a * b; break; case '/': result = a / b; break; case '%': result = a % b; break;
-        case '&': result = a & b; break; case '|': result = a | b; break; case '^': result = a ^ b; break;
-        case K_SHL: result = a << b; break; case K_SHR: result = a >> b; break;
-        case K_EQ: result = a == b; break; case K_NE: result = a != b; break;
-        case '<': result = a < b; break; case '>': result = a > b; break;
-        case K_LE: result = a <= b; break; case K_GE: result = a >= b; break;
-    }
-    return Normalize(result, n->type);
+    if (ins->op == BC_UNARY) { if (Floating(n->type)) return AsBits(-AsFloat(a)); if (op == '!') return !a; if (op == '-') return Normalize(-a, n->type); return Normalize(~a, n->type); }
+    return Arithmetic(n, a, b);
 }
 I64 RunBytecode(Function *f, I64 *values) {
     I64 pc = 0; Instruction *ins;

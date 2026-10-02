@@ -11,7 +11,13 @@ U0 Immediate(I64 register_id, U64 value) {
 }
 U0 LoadReg(I64 register_id, I64 slot) { Word(0xF9400000 | (slot << 10) | (19 << 5) | register_id); }
 U0 StoreReg(I64 register_id, I64 slot) { Word(0xF9000000 | (slot << 10) | (19 << 5) | register_id); }
-U0 NormalizeReg(I64 type) { if (type == T_U8) Word(0x92401C00); if (type == T_I32) Word(0x93407C00); }
+U0 NormalizeReg(I64 type) {
+    I64 width = Width(type);
+    if (Integer(type) && width < 64) {
+        if (Unsigned(type)) Word(0xD3400000 | ((width - 1) << 10));
+        else Word(0x93400000 | ((width - 1) << 10));
+    }
+}
 U0 CompileNative(Function *f) {
     I64 *offsets = CAlloc((f->code_count + 1) * 8), *patches = CAlloc((f->code_count + 1) * 8);
     I64 i, op, encoded, cond, delta, at; Instruction *ins;
@@ -22,14 +28,14 @@ U0 CompileNative(Function *f) {
     for (i = 0; i < f->code_count; i++) {
         ins = &f->bytecode(Instruction *)[i]; offsets[i] = machine->len;
         if (ins->op == BC_CONST) { Immediate(0, ins->value); StoreReg(0, ins->dst); }
-        else if (ins->op == BC_COPY || ins->op == BC_CAST) { LoadReg(0, ins->a); if (ins->op == BC_CAST) NormalizeReg(ins->node->type); StoreReg(0, ins->dst); }
+        else if (ins->op == BC_COPY || (ins->op == BC_CAST && !Floating(ins->node->type) && !Floating(ins->node->a->type))) { LoadReg(0, ins->a); if (ins->op == BC_CAST) NormalizeReg(ins->node->type); StoreReg(0, ins->dst); }
         else if (ins->op == BC_RETURN) { LoadReg(0, ins->a); Word(0xA8C17BF3); Word(0xD65F03C0); }
         else if (ins->op == BC_JUMP || ins->op == BC_JZERO) {
             if (ins->op == BC_JZERO) LoadReg(0, ins->a);
             patches[i] = machine->len; Word(0);
         } else {
             encoded = 0; cond = -1;
-            if (ins->op == BC_BINARY) {
+            if (ins->op == BC_BINARY && !Floating(ins->node->a->type)) {
                 op = ins->node->op;
                 switch (op) {
                     case '+': encoded = 0x8B010000; break; case '-': encoded = 0xCB010000; break;
@@ -39,6 +45,10 @@ U0 CompileNative(Function *f) {
                     case '<': cond = 11; break; case '>': cond = 12; break;
                     case K_LE: cond = 13; break; case K_GE: cond = 10; break;
                 }
+            }
+            if (cond >= 0 && Unsigned(ins->node->a->type)) {
+                if (cond == 11) cond = 3; else if (cond == 12) cond = 8;
+                else if (cond == 13) cond = 9; else if (cond == 10) cond = 2;
             }
             if (encoded || cond >= 0) {
                 LoadReg(0, ins->a); LoadReg(1, ins->b);

@@ -1,10 +1,11 @@
 Bool Alpha(I64 ch) { return ('a' <= ch <= 'z') || ('A' <= ch <= 'Z') || ch == '_'; }
 Bool Digit(I64 ch) { return '0' <= ch <= '9'; }
 U0 LexSource(U8 *src, U8 *file) {
-    I64 i = 0, line = 1, col = 1, start, ch, next, base, d;
-    Token *t; Text *text;
+    I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok;
+    Token *t; Text *text; Bool emitted;
     if (!tokens) tokens = CAlloc(MAX_TOKENS * sizeof(Token));
     while (src[i]) {
+        emitted = FALSE;
         ch = src[i]; next = src[i + 1];
         if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
             i++; col++; if (ch == '\n') { line++; col = 1; } goto lex_next;
@@ -19,7 +20,7 @@ U0 LexSource(U8 *src, U8 *file) {
             i += 2; col += 2; goto lex_next;
         }
         if (ntok >= MAX_TOKENS - 2) NativeExit(70);
-        t = &tokens[ntok++]; t->val = 0; t->text = NULL; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i;
+        t = &tokens[ntok++]; t->val = 0; t->text = NULL; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i; t->start = i; emitted = TRUE;
         if (Alpha(ch)) {
             do { i++; col++; } while (Alpha(src[i]) || Digit(src[i]));
             t->kind = K_ID; t->text = Slice(src, start, i); goto lex_next;
@@ -35,9 +36,20 @@ U0 LexSource(U8 *src, U8 *file) {
                 if ('A' <= ch <= 'F') d = ch - 'A' + 10;
                 if (ch == '_') { i++; col++; goto digit_next; }
                 if (d < 0 || d >= base) break;
-                if (t->val > (0x7FFFFFFFFFFFFFFF - d) / base) ErrorAt(t, "integer literal exceeds i64 range");
+                if (t->val(U64) > (0xFFFFFFFFFFFFFFFF - d)(U64) / base(U64)) ErrorAt(t, "integer literal exceeds u64 range");
                 t->val = t->val * base + d; i++; col++;
 digit_next:;
+            }
+            if (base == 10 && ((src[i] == '.' && Digit(src[i+1])) || src[i] == 'e' || src[i] == 'E')) {
+                if (src[i] == '.') { i++; col++; while (Digit(src[i])) { i++; col++; } }
+                if (src[i] == 'e' || src[i] == 'E') {
+                    i++; col++; if (src[i] == '+' || src[i] == '-') { i++; col++; }
+                    if (!Digit(src[i])) ErrorAt(t, "expected exponent digits");
+                    while (Digit(src[i])) { i++; col++; }
+                }
+                t->val = NativeParseFloat(Slice(src, t->start, i), &ok);
+                if (!ok) ErrorAt(t, "floating literal out of range or invalid");
+                t->kind = K_FLOAT;
             }
             if (i == start || Alpha(src[i]) || Digit(src[i])) ErrorAt(t, "invalid integer literal");
             goto lex_next;
@@ -68,7 +80,8 @@ digit_next:;
         if (ch == '<' && next == '<') t->kind = K_SHL;
         if (ch == '>' && next == '>') t->kind = K_SHR;
         if (t->kind >= K_EQ) { i++; col++; }
-lex_next:;
+lex_next:
+        if (emitted) { t->end = i; t->raw = Slice(src, t->start, i); }
     }
     tokens[ntok].kind = 0; tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col;
 }

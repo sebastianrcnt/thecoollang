@@ -19,10 +19,10 @@ U0 Branch(I64 value, I64 yes, I64 no) {
 }
 I64 Truncate(I64 r, I64 type) {
     I64 n, width;
-    if (type != T_U8 && type != T_I32) return r;
-    width = 32; if (type == T_U8) width = 8;
+    if (!Integer(type) || Width(type) == 64) return r;
+    width = Width(type);
     n = Fresh(); IR("  %t"); RI(n); IR(" = trunc i64 "); Reg(r); IR(" to i"); RI(width); IR("\n  "); Reg(n);
-    if (type == T_U8) IR(" = zext i"); else IR(" = sext i");
+    if (Unsigned(type)) IR(" = zext i"); else IR(" = sext i");
     RI(width); IR(" %t"); RI(n); IR(" to i64\n"); return n;
 }
 extern I64 EmitExpr(Node *n);
@@ -45,7 +45,7 @@ U0 EmitCleanup(EScope *until) {
     while (s != until) { d = s->calls; while (d) { EmitCall(d->call, d->args); d = d->next; } s = s->parent; }
 }
 I64 EmitExpr(Node *n) {
-    I64 a, b, r, op, yes, no, end, id, i, ch, predecessor, *args; U8 *instruction = NULL, *hex = "0123456789ABCDEF";
+    I64 a, b, r, casted, op, yes, no, end, id, i, ch, predecessor, *args; U8 *instruction = NULL, *hex = "0123456789ABCDEF";
     if (n->kind == N_INT) return Constant(n->value);
     if (n->kind == N_STRING) {
         id = ++string_id; Append(globals, "@s"); Number(globals, id); Append(globals, " = private constant ["); Number(globals, StrLen(n->name) + 1); Append(globals, " x i8] c\"");
@@ -55,8 +55,14 @@ I64 EmitExpr(Node *n) {
     if (n->kind == N_LOCAL) { r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return r; }
     if (n->kind == N_CALL) { args = EmitArgs(n); r = EmitCall(n, args); Free(args); return r; }
     a = EmitExpr(n->a);
-    if (n->kind == N_CAST) return Truncate(a, n->type);
+    if (n->kind == N_CAST) {
+        if (!Floating(n->type) && !Floating(n->a->type)) return Truncate(a, n->type);
+        r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_cast(i64 "); Reg(a); IR(", i64 "); RI(n->a->type); IR(", i64 "); RI(n->type); IR(")\n"); return r;
+    }
     op = n->op;
+    if (n->kind == N_UNARY && Floating(n->type)) {
+        r = Fresh(); IR("  "); Reg(r); IR(" = xor i64 "); Reg(a); IR(", -9223372036854775808\n"); return r;
+    }
     if (n->kind == N_UNARY) {
         r = Fresh(); IR("  "); Reg(r);
         if (op == '!') { IR(" = xor i64 "); Reg(a); IR(", 1\n"); }
@@ -73,10 +79,27 @@ I64 EmitExpr(Node *n) {
         IR(" ], [ "); RI(op == K_OR); IR(", %L"); RI(no); IR(" ]\n"); return r;
     }
     b = EmitExpr(n->b); r = Fresh();
+    if (Floating(n->a->type)) {
+        IR("  %fa"); RI(r); IR(" = bitcast i64 "); Reg(a); IR(" to double\n  %fb"); RI(r); IR(" = bitcast i64 "); Reg(b); IR(" to double\n");
+        switch (op) {
+            case '+': instruction = "fadd"; break; case '-': instruction = "fsub"; break;
+            case '*': instruction = "fmul"; break; case '/': instruction = "fdiv"; break;
+            case K_EQ: instruction = "fcmp oeq"; break; case K_NE: instruction = "fcmp une"; break;
+            case '<': instruction = "fcmp olt"; break; case '>': instruction = "fcmp ogt"; break;
+            case K_LE: instruction = "fcmp ole"; break; case K_GE: instruction = "fcmp oge"; break;
+        }
+        IR("  %fr"); RI(r); IR(" = "); IR(instruction); IR(" double %fa"); RI(r); IR(", %fb"); RI(r); IR("\n  "); Reg(r);
+        if (n->type == T_BOOL) { IR(" = zext i1 %fr"); RI(r); IR(" to i64\n"); }
+        else { IR(" = bitcast double %fr"); RI(r); IR(" to i64\n"); }
+        if (n->type == T_F32) {
+            casted = Fresh(); IR("  "); Reg(casted); IR(" = call i64 @cool_cast(i64 "); Reg(r); IR(", i64 11, i64 12)\n"); return casted;
+        }
+        return r;
+    }
     if (op == '/' || op == '%' || op == K_SHL || op == K_SHR) {
         IR("  "); Reg(r); IR(" = call i64 @");
         if (op == '/' || op == '%') IR("cool_div"); else IR("cool_shift");
-        IR("(i64 "); Reg(a); IR(", i64 "); Reg(b); IR(", i64 "); RI(op == '%' || op == K_SHR); IR(")\n"); return Truncate(r, n->type);
+        IR("(i64 "); Reg(a); IR(", i64 "); Reg(b); IR(", i64 "); RI(op == '%' || op == K_SHR); IR(", i64 "); RI(Unsigned(n->a->type)); IR(", i64 "); RI(Width(n->a->type)); IR(")\n"); return Truncate(r, n->type);
     }
     switch (op) {
         case '+': instruction = "add"; break; case '-': instruction = "sub"; break;
@@ -90,6 +113,10 @@ I64 EmitExpr(Node *n) {
         case K_EQ: instruction = "eq"; break; case K_NE: instruction = "ne"; break;
         case '<': instruction = "slt"; break; case '>': instruction = "sgt"; break;
         case K_LE: instruction = "sle"; break; case K_GE: instruction = "sge"; break;
+    }
+    if (Unsigned(n->a->type)) {
+        if (op == '<') instruction = "ult"; if (op == '>') instruction = "ugt";
+        if (op == K_LE) instruction = "ule"; if (op == K_GE) instruction = "uge";
     }
     IR("  %b"); RI(r); IR(" = icmp "); IR(instruction); IR(" i64 "); Reg(a); IR(", "); Reg(b); IR("\n  ");
     Reg(r); IR(" = zext i1 %b"); RI(r); IR(" to i64\n"); return r;
@@ -137,7 +164,8 @@ U0 EmitLLVM(U8 *output) {
     if (functions[main].argc || (functions[main].result != T_VOID && !Integer(functions[main].result))) ErrorAt(functions[main].token, "invalid main signature");
     ir = TextNew(); globals = TextNew();
     IR("; Generated by the Cool-written frontend. No C transpilation.\n");
-    IR("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64)\n");
+    IR("declare i64 @cool_cast(i64, i64, i64)\n");
+    IR("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n");
     for (i = 0; i < nfun; i++) {
         f = &functions[i]; reg_id = 0; terminated = FALSE; scope = NULL;
         IR("define i64 @f"); RI(i); IR("(");

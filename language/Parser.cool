@@ -3,6 +3,14 @@ I64 TypeName(U8 *s) {
     if (Eq(s, "i64")) return T_INT;
     if (Eq(s, "i32")) return T_I32;
     if (Eq(s, "u8")) return T_U8;
+    if (Eq(s, "i8")) return T_I8;
+    if (Eq(s, "i16")) return T_I16;
+    if (Eq(s, "u16")) return T_U16;
+    if (Eq(s, "u32")) return T_U32;
+    if (Eq(s, "u64") || Eq(s, "usize")) return T_U64;
+    if (Eq(s, "isize")) return T_INT;
+    if (Eq(s, "f64")) return T_F64;
+    if (Eq(s, "f32")) return T_F32;
     if (Eq(s, "bool")) return T_BOOL;
     if (Eq(s, "string")) return T_STRING;
     return -1;
@@ -25,15 +33,16 @@ extern Node *Expr(I64 min);
 Node *Primary() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
-    if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; return n; }
+    if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; if (t->val < 0) n->type = T_U64; return n; }
+    if (Take(K_FLOAT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_F64; return n; }
     if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = t->text; n->type = T_STRING; return n; }
     if (Is("true") || Is("false")) { n = NewNode(N_INT, t); n->type = T_BOOL; n->value = Is("true"); pos++; return n; }
     if (Take('(')) { n = Expr(1); Need(')', "expected ')'"); return n; }
     if (t->kind == '-' || t->kind == '!' || t->kind == '~') {
         k = t->kind; pos++; n = NewNode(N_UNARY, t); n->op = k; n->a = Primary(); n->type = n->a->type;
         if (k == '!' && n->type != T_BOOL) ErrorAt(t, "logical negation requires bool");
-        if (k != '!' && !Integer(n->type)) ErrorAt(t, "integer operand required");
-        if (k == '-' && n->a->kind == N_INT) { n->kind = N_INT; n->value = -n->a->value; }
+        if ((k == '~' && !Integer(n->type)) || (k == '-' && !Numeric(n->type))) ErrorAt(t, "integer operand required");
+        if (k == '-' && n->a->kind == N_INT && !Floating(n->type)) { if (n->a->type == T_U64 && n->a->value != (-0x7FFFFFFFFFFFFFFF - 1)) ErrorAt(t, "negative literal exceeds i64 range"); n->kind = N_INT; n->value = -n->a->value; if (n->a->type == T_U64) n->type = T_INT; }
         return n;
     }
     name = Ident();
@@ -48,7 +57,7 @@ Node *Primary() {
         n->value = count;
         ty = -1; if (!qualified) ty = TypeName(name);
         if (ty >= 0) {
-            if (count != 1 || ty == T_VOID || ty == T_STRING || !Integer(n->a->type) || !Integer(ty)) ErrorAt(t, "cast expects one integer operand and an integer target");
+            if (count != 1 || ty == T_VOID || ty == T_STRING || !Numeric(n->a->type) || !Numeric(ty)) ErrorAt(t, "cast expects one numeric operand and a numeric target");
             n->kind = N_CAST; n->type = ty; return n;
         }
         if (qualified && Eq(package, "std/io") && (Eq(name, "print") || Eq(name, "println"))) {
@@ -87,13 +96,14 @@ Node *Expr(I64 min) {
                 if (a->type == T_VOID || a->type == T_STRING) ErrorAt(t, "equality requires integers or bool");
                 n->type = T_BOOL;
             } else {
-                if (!Integer(a->type)) ErrorAt(t, "operator requires integer operands");
+                if (!Numeric(a->type)) ErrorAt(t, "operator requires numeric operands");
+                if (Floating(a->type) && (op == '%' || op == '&' || op == '|' || op == '^' || op == K_SHL || op == K_SHR)) ErrorAt(t, "operator requires integer operands");
                 n->type = a->type;
                 if (op == '<' || op == '>' || op == K_LE || op == K_GE) n->type = T_BOOL;
             }
         }
-        if ((op == '/' || op == '%') && n->b->kind == N_INT && !n->b->value) ErrorAt(t, "division by zero");
-        if ((op == K_SHL || op == K_SHR) && n->b->kind == N_INT && (n->b->value < 0 || n->b->value >= 64)) ErrorAt(t, "shift count must be in 0..63");
+        if (!Floating(a->type) && (op == '/' || op == '%') && n->b->kind == N_INT && !n->b->value) ErrorAt(t, "division by zero");
+        if ((op == K_SHL || op == K_SHR) && n->b->kind == N_INT && (n->b->value < 0 || n->b->value >= Width(n->a->type))) ErrorAt(t, "shift count must be below operand width");
         a = n;
     }
     return a;

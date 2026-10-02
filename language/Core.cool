@@ -20,6 +20,12 @@ import U0 NativeExit(I64 code);
 import I64 NativeArgCount();
 import U8 *NativeArg(I64 index);
 import I64 NativeGetChar();
+import I64 NativeParseFloat(U8 *text, I64 *ok);
+import I64 NativeNumericCast(I64 bits, I64 from, I64 to, I64 *ok);
+import U0 NativePrintFloat(I64 bits);
+union NumberBits { I64 bits; F64 real; };
+F64 AsFloat(I64 bits) { NumberBits n; n.bits = bits; return n.real; }
+I64 AsBits(F64 value) { NumberBits n; n.real = value; return n.bits; }
 import I64 AIWNIOS_SetJmp(I64 *context);
 import U0 AIWNIOS_LongJmp(I64 *context);
 I64 *recovery_context;
@@ -61,6 +67,13 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define T_STRING 3
 #define T_I32 4
 #define T_U8 5
+#define T_I8 6
+#define T_I16 7
+#define T_U16 8
+#define T_U32 9
+#define T_U64 10
+#define T_F64 11
+#define T_F32 12
 #define K_ID 256
 #define K_INT 257
 #define K_STRING 258
@@ -73,7 +86,8 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define K_ARROW 265
 #define K_SHL 266
 #define K_SHR 267
-class Token { I64 kind, val, line, col; U8 *text, *file, *package; };
+#define K_FLOAT 268
+class Token { I64 kind, val, line, col, start, end; U8 *text, *file, *package, *raw; };
 #define MAX_TOKENS 262144
 Token *tokens;
 I64 ntok, pos;
@@ -144,14 +158,32 @@ Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth;
     res->slot = functions[current_fun].slots++; res->next = locals; locals = res; return res;
 }
-Bool Integer(I64 type) { return type == T_INT || type == T_I32 || type == T_U8; }
-Bool Fits(I64 v, I64 type) { if (type == T_I32) return -2147483648 <= v <= 2147483647; if (type == T_U8) return 0 <= v <= 255; return type == T_INT; }
+Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
+Bool Floating(I64 type) { return type == T_F64 || type == T_F32; }
+Bool Numeric(I64 type) { return Integer(type) || Floating(type); }
+Bool Unsigned(I64 type) { return type == T_U8 || type == T_U16 || type == T_U32 || type == T_U64; }
+I64 Width(I64 type) {
+    if (type == T_I8 || type == T_U8) return 8;
+    if (type == T_I16 || type == T_U16) return 16;
+    if (type == T_I32 || type == T_U32) return 32;
+    return 64;
+}
+Bool Fits(I64 v, I64 type) {
+    I64 width = Width(type);
+    if (Unsigned(type)) { if (v < 0) return FALSE; if (width == 64) return TRUE; return v < (1 << width); }
+    if (width == 64) return TRUE;
+    return -(1 << (width - 1)) <= v < (1 << (width - 1));
+}
 U0 Coerce(Node *n, I64 type) {
     Node *child;
     if (n->type == type) return;
+    if ((n->type == T_F32 && type == T_F64) || (n->kind == N_INT && Integer(n->type) && Floating(type) && -16777216 <= n->value <= 16777216)) {
+        child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
+        n->kind = N_CAST; n->a = child; n->type = type; return;
+    }
     if (Integer(n->type) && Integer(type)) {
-        if (n->kind == N_INT && Fits(n->value, type)) { n->type = type; return; }
-        if (type == T_INT || (type == T_I32 && n->type == T_U8)) {
+        if (n->kind == N_INT && !(Unsigned(n->type) && n->value < 0 && type != T_U64) && Fits(n->value, type)) { n->type = type; return; }
+        if ((Unsigned(type) == Unsigned(n->type) && Width(type) > Width(n->type)) || (!Unsigned(type) && Unsigned(n->type) && Width(type) > Width(n->type))) {
             child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
             n->kind = N_CAST; n->a = child; n->type = type; return;
         }

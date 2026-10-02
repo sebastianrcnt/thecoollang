@@ -17,6 +17,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include "../../language/numeric.h"
 
 #ifdef WARM_PROGRAM_HEADER
 #include WARM_PROGRAM_HEADER
@@ -115,6 +116,14 @@ static int64_t host_ticks(void) {
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 static double host_atan2_xy(double x, double y) { return atan2(y, x); }
+static int64_t host_parse_float(const char *text, int64_t *ok) {
+    char *end;
+    errno = 0;
+    double value = strtod(text, &end);
+    *ok = end != text && !*end && errno != ERANGE;
+    return cool_bits(value);
+}
+static void host_print_float(int64_t bits) { printf("%.17g", cool_double(bits)); }
 static void host_err_puts(const char *text) {
     fputs(text, stderr);
     fflush(stderr);
@@ -442,6 +451,9 @@ static void register_host_symbols(Module *m) {
     HOST("NativeArgCount", host_arg_count);
     HOST("NativeArg", host_arg);
     HOST("NativeGetChar", host_get_char);
+    HOST("NativeParseFloat", host_parse_float);
+    HOST("NativeNumericCast", cool_numeric_cast);
+    HOST("NativePrintFloat", host_print_float);
     HOST("AIWNIOS_SetJmp", AIWNIOS_SetJmp);
     HOST("AIWNIOS_LongJmp", AIWNIOS_LongJmp);
     HOST("ExtDft", host_ext_dft);

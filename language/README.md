@@ -64,3 +64,20 @@ effects are not transactional. Signature changes require a new session. External
 package loading inside REPL, aggregate layout changes, concurrent redefinition,
 completion and source-history memory reclamation are not implemented yet. The
 session currently has explicit token/function/depth limits.
+
+## Numeric and developer tools coverage
+
+The scalar core now supports signed/unsigned 8/16/32/64-bit integers, 64-bit
+isize/usize on supported execution hosts, f32/f64 and explicit numeric casts.
+Floating-point operations preserve IEEE comparisons (including NaN); conversion
+to an out-of-range integer is a runtime error. f32 values are rounded at casts
+and arithmetic operations. Wide unsigned literals and signed minimum i64 are
+accepted. Integer arithmetic wraps; constant/runtime shift counts are checked
+against the operand width.
+
+`cool fmt [--check|--diff] paths...` preserves comments and literal token spelling,
+relexes its output before writing, and is idempotence-tested. `cool test` discovers
+`test_` functions in directory packages including `_test.cool` files; `--backend
+jit` runs them under native JIT. `cool doc` prints public typed function signatures.
+Documentation comments, a full documentation site and language-server services
+remain outstanding.
