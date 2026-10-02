@@ -1,0 +1,20 @@
+package result;
+
+pub enum Result[T, E] {
+    Ok(T);
+    Err(E);
+}
+
+pub fn is_ok[T, E](value: Result[T, E]) -> bool {
+    match (value) {
+        Result[T, E].Ok(_) => { return true; }
+        Result[T, E].Err(_) => { return false; }
+    }
+}
+
+pub fn value_or[T, E](value: Result[T, E], fallback: T) -> T borrows(value, fallback) {
+    match (value) {
+        Result[T, E].Ok(result) => { return result; }
+        Result[T, E].Err(_) => { return fallback; }
+    }
+}

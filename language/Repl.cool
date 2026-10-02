@@ -32,14 +32,14 @@ U0 ReplRestore() {
     MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
     if (repl_executing && retained_slots > functions[0].slots) functions[0].slots = retained_slots;
     nfun = repl_saved_nfun; ntok = repl_saved_ntok; naggregates = repl_saved_types;
-    aliases = repl_aliases; locals = repl_locals; call_depth = 0;
+    aliases = repl_aliases; locals = repl_locals; call_depth = 0; type_bindings = NULL; specialization_depth = 0;
 }
 U0 ReplStep(Text *text) {
     I64 start = ntok, result, register_id, i; Node *statement, *call, *arg; Function *f; I64 *grown;
     repl_executing = FALSE;
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
-    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("struct")) { ParseProgram(); return; }
+    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("struct") || Is("enum")) { ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {

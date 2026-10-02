@@ -70,6 +70,7 @@ digit_next:;
             Reserve(text, 0); t->text = text->data; t->kind = K_STRING; i++; col++; goto lex_next;
         }
         t->kind = ch; i++; col++;
+        if (ch == '=' && next == '>') t->kind = K_FAT_ARROW;
         if (ch == '=' && next == '=') t->kind = K_EQ;
         if (ch == '!' && next == '=') t->kind = K_NE;
         if (ch == '<' && next == '=') t->kind = K_LE;

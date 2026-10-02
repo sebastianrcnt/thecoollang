@@ -24,10 +24,11 @@ I64 ParseType() {
         else { count = At()->val; Need(K_INT, "array length must be an integer literal"); Need(']', "expected ']'"); }
         return SequenceType(kind, ParseType(), count, token);
     }
-    name = Ident(); t = TypeName(name); if (t >= 0) return t;
-    if (Take('.')) { package = ResolveAlias(token, name); name = Ident(); }
+    name = Ident(); t = BindingType(name); if (t >= 0) return t; t = TypeName(name); if (t >= 0) return t;
+    if (FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(token, name); name = Ident(); }
     t = FindType(package, name); if (t < 0) ErrorAt(token, "unsupported or unknown type");
     if (!Eq(package, token->package) && !Shape(t)->public) ErrorAt(token, "type is private to its package");
+    if (Shape(t)->generic_count) t = InstantiateType(t);
     return t;
 }
 I64 Prec(I64 k) {
@@ -45,9 +46,10 @@ I64 Prec(I64 k) {
 }
 extern Node *Expr(I64 min);
 extern Node *Primary();
+extern I64 SpecializeFunction(I64 template_id, I64 *types, I64 count);
 Node *AggregateAddress(Node *n) {
     Node *address;
-    if (n->kind == N_LOCAL) { address = NewNode(N_LOCAL_ADDRESS, n->token); address->slot = n->slot; address->type = T_PTR+n->type; address->mutable = n->mutable; return address; }
+    if (n->kind == N_LOCAL) { address = NewNode(N_LOCAL_ADDRESS, n->token); address->slot = n->slot; address->type = T_PTR+n->type; address->mutable = n->mutable; address->local_ref = n->local_ref; return address; }
     if (n->kind == N_LOAD) return n->a;
     return n;
 }
@@ -73,8 +75,17 @@ Node *AggregateLiteral(I64 type, Token *token) {
     }
     return n;
 }
+Node *EnumLiteral(I64 type, Token *token) {
+    Field *variant; Node *n, *tag, *payload;
+    Layout(type); ValidateBorrowedElements(type); Need('.', "enum construction requires a variant"); variant = FindField(type, Ident(), token);
+    n = NewNode(N_AGG_LITERAL, token); n->type = type; n->storage = Storage(type);
+    tag = NewNode(N_INT, token); tag->type = T_INT; tag->value = variant->tag; n->a = tag;
+    if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Need(')', "expected ')' after payload"); payload->offset = 8; tag->next = payload; }
+    else if (Take('(')) Need(')', "unit variant takes no arguments");
+    return n;
+}
 Node *Atom() {
-    Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty; U8 *name, *package; Bool qualified = FALSE;
+    Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty, type_args[8], type_count = 0; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
     if (At()->kind == '[') { ty = ParseType(); return AggregateLiteral(ty, t); }
     if (Is("sizeof")) { pos++; Need('(', "expected '('"); ty = ParseType(); Need(')', "expected ')'"); n = NewNode(N_INT, t); n->type = T_U64; n->value = ByteSize(ty); return n; }
@@ -115,8 +126,11 @@ Node *Atom() {
         return n;
     }
     name = Ident();
-    if (!FindLocal(name) && Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
+    if (!FindLocal(name) && FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
     ty = FindType(package, name);
+    if (ty >= 0 && Shape(ty)->generic_count) ty = InstantiateType(ty);
+    if (ty >= 0 && AggregateKind(ty) == A_ENUM) { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return EnumLiteral(ty, t); }
+    if (ty < 0 && !FindLocal(name) && At()->kind == '[') type_count = TypeArguments(type_args);
     if (ty >= 0 && At()->kind == '{') { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return AggregateLiteral(ty, t); }
     if (Take('(')) {
         n = NewNode(N_CALL, t); n->name = name;
@@ -164,6 +178,7 @@ Node *Atom() {
         if (id < 0) ErrorAt(t, "unknown function");
         if (functions[id].foreign && !unsafe_depth) ErrorAt(t, "foreign calls require unsafe");
         if (qualified && !functions[id].public) ErrorAt(t, "function is private to its package");
+        id = SpecializeFunction(id, type_args, type_count);
         if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
         arg = n->a;
         for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); arg = arg->next; }
@@ -171,7 +186,7 @@ Node *Atom() {
     }
     l = FindLocal(name);
     if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
-    n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; n->mutable = l->mutable; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
+    n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; n->local_ref = l; n->mutable = l->mutable; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
 }
 Node *Primary() {
     Node *n = Atom(), *index, *address, *load, *high; Token *t; I64 kind, element; Field *field; Bool mutable;
@@ -183,7 +198,7 @@ Node *Primary() {
             else address = AggregateAddress(n);
             if (AggregateKind(kind) != A_STRUCT) ErrorAt(t, "field access requires a struct");
             field = FindField(kind, Ident(), t); load = NewNode(N_FIELD_ADDRESS, t); load->a = address; load->value = field->offset; load->type = T_PTR+field->type;
-            n = NewNode(N_LOAD, t); n->a = load; n->type = field->type; n->mutable = mutable; if (Aggregate(n->type)) n->storage = Storage(n->type);
+            load->origin_source = n; n = NewNode(N_LOAD, t); n->origin_source = load->origin_source; n->a = load; n->type = field->type; n->mutable = mutable; if (Aggregate(n->type)) n->storage = Storage(n->type);
         } else {
             pos++; kind = AggregateKind(n->type); mutable = n->mutable;
             if (kind != A_ARRAY && kind != A_SLICE && (!Pointer(n->type) || n->type == T_PTR)) ErrorAt(t, "indexing requires an array, slice or typed pointer");
@@ -197,12 +212,12 @@ Node *Primary() {
                 if (kind == A_ARRAY && !mutable) ErrorAt(t, "mutable slice requires a var array");
                 high = NULL; if (At()->kind != ']') { high = Expr(1); if (!Integer(high->type)) ErrorAt(t, "slice bound must be an integer"); }
                 Need(']', "expected ']'"); address = NewNode(N_SLICE, t); address->a = n; if (kind == A_ARRAY) address->a = AggregateAddress(n);
-                address->b = index; address->c = high; address->op = kind; address->value = Shape(n->type)->count;
+                address->origin_source = n; address->b = index; address->c = high; address->op = kind; address->value = Shape(n->type)->count;
                 address->type = SequenceType(A_SLICE, element, 0, t); address->storage = Storage(address->type); n = address;
             } else {
                 Need(']', "expected ']'"); address = NewNode(N_ADDRESS, t); address->a = n; address->b = index; address->type = T_PTR+element;
                 if (kind) { address->kind = N_INDEX_ADDRESS; address->op = kind; address->value = Shape(n->type)->count; if (kind == A_ARRAY) address->a = AggregateAddress(n); }
-                load = NewNode(N_LOAD, t); load->a = address; load->type = element; load->mutable = mutable || kind == A_SLICE || !kind;
+                load = NewNode(N_LOAD, t); load->origin_source = n; load->a = address; load->type = element; load->mutable = mutable || kind == A_SLICE || !kind;
                 if (Aggregate(element)) load->storage = Storage(element); n = load;
             }
         }
@@ -253,9 +268,49 @@ Node *Block() {
     }
     depth--; locals = saved; return n;
 }
+Node *MatchStatement() {
+    Token *token = At(); Node *block, *value, *binding, *branch, *last = NULL, *previous = NULL, *address, *load, *constant, *test, *arm, *payload_bind = NULL;
+    I64 type, pattern, slot, count = 0, *seen; Field *variant; Local *saved, *local; U8 *name; Bool wildcard = FALSE;
+    pos++; Need('(', "expected '(' after match"); value = Expr(1); Need(')', "expected ')' after match value"); type = value->type;
+    if (AggregateKind(type) != A_ENUM) ErrorAt(token, "match requires an enum"); Layout(type);
+    block = NewNode(N_BLOCK, token); binding = NewNode(N_BIND, token); binding->type = type; binding->a = value; slot = Storage(type); binding->slot = slot; block->a = binding;
+    seen = CAlloc(Shape(type)->count*8); Need('{', "expected match arms");
+    while (!Take('}')) {
+        if (wildcard) Error("wildcard must be the last match arm");
+        saved = locals; depth++; payload_bind = NULL;
+        if (Is("_")) { pos++; wildcard = TRUE; }
+        else {
+            pattern = ParseType(); if (pattern != type) Error("match pattern has a different enum type"); Need('.', "expected enum variant"); variant = FindField(type, Ident(), token);
+            if (seen[variant->tag]) Error("duplicate match arm"); seen[variant->tag] = TRUE; count++;
+            address = NewNode(N_LOCAL_ADDRESS, token); address->slot = slot; address->type = T_PTR+type;
+            load = NewNode(N_LOAD, token); load->a = address; load->type = T_INT;
+            constant = NewNode(N_INT, token); constant->type = T_INT; constant->value = variant->tag;
+            test = NewNode(N_BINARY, token); test->op = K_EQ; test->a = load; test->b = constant; test->type = T_BOOL;
+            if (variant->type) {
+                Need('(', "payload variant requires a binding"); name = Ident(); Need(')', "expected ')' after pattern binding");
+                if (!Eq(name, "_")) {
+                    branch = NewNode(N_FIELD_ADDRESS, token); branch->a = address; branch->value = 8; branch->type = T_PTR+variant->type;
+                    load = NewNode(N_LOAD, token); load->a = branch; load->origin_source = value; load->type = variant->type; if (Aggregate(load->type)) load->storage = Storage(load->type);
+                    local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); payload_bind->a = load; payload_bind->local_ref = local; payload_bind->type = variant->type; payload_bind->slot = local->slot;
+                }
+            } else if (Take('(')) Need(')', "unit variant takes no binding");
+        }
+        Need(K_FAT_ARROW, "expected '=>' after match pattern"); arm = Block();
+        if (payload_bind) { branch = NewNode(N_BLOCK, token); branch->a = payload_bind; payload_bind->next = arm; arm = branch; }
+        locals = saved; depth--; Take(',');
+        if (wildcard) { if (last) last->c = arm; else binding->next = arm; }
+        else { branch = NewNode(N_IF, token); branch->a = test; branch->b = arm; if (last) last->c = branch; else binding->next = branch; previous = last; last = branch; }
+    }
+    if (!wildcard) {
+        if (count != Shape(type)->count) ErrorAt(token, "non-exhaustive match");
+        if (previous) previous->c = last->b; else binding->next = last->b;
+    }
+    Free(seen); return block;
+}
 Node *Statement() {
     Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable;
     if (t->kind == '{') return Block();
+    if (Is("match")) return MatchStatement();
     if (Is("unsafe")) { pos++; unsafe_depth++; n = Block(); unsafe_depth--; return n; }
     if (Is("let") || Is("var")) {
         mutable = Is("var"); pos++; name = Ident(); if (Take(':')) ty = ParseType();
@@ -263,7 +318,7 @@ Node *Statement() {
         n = NewNode(N_BIND, t); n->a = Expr(1);
         if (ty < 0) ty = n->a->type;
         if (ty == T_VOID) ErrorAt(t, "cannot bind a void value");
-        Coerce(n->a, ty); l = AddLocal(name, ty, mutable); n->slot = l->slot; n->type = ty;
+        Coerce(n->a, ty); l = AddLocal(name, ty, mutable); n->slot = l->slot; n->local_ref = l; n->type = ty;
         Need(';', "expected ';'"); return n;
     }
     if (Is("return")) {
@@ -289,7 +344,7 @@ Node *Statement() {
                 if (!post->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
                 if (post->a->kind == N_LOCAL) {
                     l = FindLocal(post->a->name); if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
-                    post->kind = N_ASSIGN; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type);
+                    post->kind = N_ASSIGN; post->local_ref = l; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type);
                 } else if (post->a->kind == N_LOAD) {
                     post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type);
                 } else ErrorAt(t, "invalid for update assignment");
@@ -324,7 +379,7 @@ Node *Statement() {
         name = Ident(); pos++; l = FindLocal(name);
         if (!l) ErrorAt(t, "unknown assignment target");
         if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
-        n = NewNode(N_ASSIGN, t); n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type);
+        n = NewNode(N_ASSIGN, t); n->local_ref = l; n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type);
         Need(';', "expected ';'"); return n;
     }
     n = NewNode(N_EXPR, t); n->a = Expr(1);
@@ -343,6 +398,38 @@ Bool Returns(Node *n) {
     if (n->kind == N_BLOCK) { n = n->a; while (n) { if (Returns(n)) return TRUE; n = n->next; } }
     return FALSE;
 }
+U0 FunctionSignature(Function *f) {
+    I64 i; U8 *name; f->borrow_contract = f->has_contract = 0;
+    Need('(', "expected '(' after function name");
+    if (!Take(')')) {
+        do { if (f->argc == 32) Error("function argument limit exceeded"); f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter"); f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]); if (!f->arg_types[f->argc]) Error("parameter cannot be void"); f->argc++; } while (Take(','));
+        Need(')', "expected ')'");
+    }
+    if (Take(K_ARROW)) f->result = ParseType();
+    if (Is("borrows")) {
+        pos++; f->has_contract = TRUE; Need('(', "expected '(' after borrows");
+        if (!Take(')')) {
+            do { name = Ident(); for (i = 0; i < f->argc; i++) if (Eq(name, f->arg_names[i])) break; if (i == f->argc) Error("unknown parameter in borrows contract"); if (Borrowed(f->result) && !Borrowed(f->arg_types[i])) Error("borrows source must contain borrowed references"); f->borrow_contract |= 1 << i; } while (Take(','));
+            Need(')', "expected ')' after borrows contract");
+        }
+    }
+    if (Borrowed(f->result) && !f->has_contract) ErrorAt(f->token, "returning borrowed slices requires a borrows(parameter) contract");
+}
+I64 specialization_depth;
+I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
+    Function *base = &functions[template_id], *f; I64 i, j, id, saved_pos = pos, saved_fun = current_fun, saved_depth = depth, saved_loop = loop_depth, saved_unsafe = unsafe_depth; Local *saved_locals = locals; TypeBinding *saved_bindings = type_bindings;
+    if (count != base->generic_count) Error("wrong generic argument count");
+    if (!count) return template_id;
+    for (i = 0; i < nfun; i++) if (functions[i].origin == template_id+1) { for (j = 0; j < count; j++) if (functions[i].generic_args[j] != types[j]) goto function_different; return i; function_different:; }
+    if (++specialization_depth > 64 || nfun == MAX_FUNCTIONS) Error("generic specialization limit exceeded");
+    id = nfun++; f = &functions[id]; MemSet(f, 0, sizeof(Function)); f->name = base->name; f->package = base->package; f->public = base->public; f->token = base->token; f->origin = template_id+1;
+    for (j = 0; j < count; j++) f->generic_args[j] = types[j];
+    BindTypes(base->generic_names, types, count); pos = base->signature; FunctionSignature(f); f->begin = pos;
+    current_fun = id; locals = NULL; depth = loop_depth = unsafe_depth = 0;
+    for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }
+    f->body = Block(); AnalyzeBorrows(f); f->end = pos; if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
+    pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
+}
 U0 ParseProgram() {
     Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -359,7 +446,7 @@ U0 ParseProgram() {
             pos++; Need(';', "expected ';' after import");
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
-            if (Is("struct")) { pos++; name = Ident(); id = FindType(At()->package, name); Layout(id); ValidateBorrowedElements(id); pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
+            if (Is("struct") || Is("enum")) { pos++; name = Ident(); id = FindType(At()->package, name); if (!Shape(id)->generic_count) { Layout(id); ValidateBorrowedElements(id); } pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
             foreign = FALSE;
             if (Is("extern")) {
                 foreign = TRUE; pos++;
@@ -380,23 +467,14 @@ U0 ParseProgram() {
             }
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
-            f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
+            f->all_locals = NULL; f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
             f->foreign = foreign; f->name = name; f->package = At()->package; f->public = public; f->token = At();
-            Need('(', "expected '(' after function name");
-            if (!Take(')')) {
-                do {
-                    if (f->argc >= 32) Error("function argument limit exceeded");
-                    f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter");
-                    f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]);
-                    if (!f->arg_types[f->argc]) Error("parameter cannot be void");
-                    f->argc++;
-                } while (Take(','));
-                Need(')', "expected ')'");
-            }
-            if (Take(K_ARROW)) f->result = ParseType();
-            if (Borrowed(f->result)) ErrorAt(f->token, "returning borrowed slices requires lifetime analysis and is not supported yet");
+            if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
+            f->generic_count = GenericNames(f->generic_names); f->signature = pos;
+            if (f->generic_count) { if (foreign) Error("foreign functions cannot be generic"); while (At()->kind && At()->kind != '{') pos++; }
+            else FunctionSignature(f);
             if (old) {
-                if (old->argc != f->argc || old->result != f->result) ErrorAt(f->token, "signature change requires a new session");
+                if (old->argc != f->argc || old->result != f->result || old->borrow_contract != f->borrow_contract) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
             }
             if (foreign) {
@@ -423,9 +501,9 @@ declaration_next:;
         }
     }
     for (i = 0; i < count; i++) {
-        current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
-        for (j = 0; j < f->argc; j++) AddLocal(f->arg_names[j], f->arg_types[j], FALSE);
-        f->body = Block();
+        current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign || f->generic_count) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
+        for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }
+        f->body = Block(); AnalyzeBorrows(f);
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
 parsed_next:;
     }

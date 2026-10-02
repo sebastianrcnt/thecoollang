@@ -1,0 +1,20 @@
+package option;
+
+pub enum Option[T] {
+    None;
+    Some(T);
+}
+
+pub fn is_some[T](value: Option[T]) -> bool {
+    match (value) {
+        Option[T].None => { return false; }
+        Option[T].Some(_) => { return true; }
+    }
+}
+
+pub fn value_or[T](value: Option[T], fallback: T) -> T borrows(value, fallback) {
+    match (value) {
+        Option[T].None => { return fallback; }
+        Option[T].Some(result) => { return result; }
+    }
+}

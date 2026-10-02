@@ -87,6 +87,12 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
         for dependency in sorted(imports):
             if dependency in ('std/io', 'std/mem'):
                 continue
+            if dependency.startswith('std/'):
+                standard = ROOT/'stdlib'/dependency[4:]
+                if not standard.is_dir() or '..' in Path(dependency).parts:
+                    raise ValueError(f'unknown standard package: {dependency}')
+                visit(dependency, standard)
+                continue
             if graph is None:
                 raise ValueError(f'import {dependency} requires cool.mod')
             visit(dependency, graph.package(dependency))

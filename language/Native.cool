@@ -1,6 +1,7 @@
 #include "Core.cool"
 #include "Lexer.cool"
 #include "Types.cool"
+#include "Borrow.cool"
 #include "Parser.cool"
 #include "Interpreter.cool"
 #include "LLVM.cool"
@@ -57,17 +58,25 @@ U0 LanguageMain() {
         I64 si, sj; Text *line; Field *field;
         for (si = 0; si < naggregates; si++) {
             line = TextNew(); Append(line, "@type\t"); Number(line, T_AGG+si); Char(line, '\t'); AppendType(line, T_AGG+si); Char(line, '\n'); Out(line->data);
-            if (aggregate_types[si].kind == A_STRUCT && aggregate_types[si].public) {
+            if (aggregate_types[si].kind == A_STRUCT && aggregate_types[si].public && !aggregate_types[si].generic_count && !aggregate_types[si].origin) {
                 line = TextNew(); Append(line, "@struct\t"); Append(line, aggregate_types[si].package); Append(line, "\tpub struct "); Append(line, aggregate_types[si].name); Append(line, " { ");
                 for (field = aggregate_types[si].fields; field; field = field->next) if (field->public) { Append(line, "pub "); Append(line, field->name); Append(line, ": "); AppendType(line, field->type); Append(line, "; "); }
                 Append(line, "}\n"); Out(line->data);
             }
         }
         for (si = 0; si < nfun; si++) {
+            if (functions[si].origin) goto symbol_next;
+            if (functions[si].generic_count) {
+                if (functions[si].public) { line = TextNew(); Append(line, "@struct\t"); Append(line, functions[si].package); Append(line, "\tpub fn "); Append(line, functions[si].name); Char(line, '[');
+                    for (sj = 0; sj < functions[si].generic_count; sj++) { if (sj) Append(line, ", "); Append(line, functions[si].generic_names[sj]); } Append(line, "] ");
+                    for (sj = functions[si].signature; sj < functions[si].begin; sj++) { Append(line, tokens[sj].raw); Char(line, ' '); } Append(line, ";\n"); Out(line->data); }
+                goto symbol_next;
+            }
             line = TextNew(); Append(line, functions[si].package); Char(line, '\t'); Append(line, functions[si].name); Char(line, '\t');
             Number(line, functions[si].public); Char(line, '\t'); Number(line, functions[si].result); Char(line, '\t');
             for (sj = 0; sj < functions[si].argc; sj++) { if (sj) Char(line, ','); Append(line, functions[si].arg_names[sj]); Char(line, ':'); Number(line, functions[si].arg_types[sj]); }
             Char(line, '\n'); Out(line->data);
+symbol_next:;
         }
         return;
     }
@@ -75,7 +84,7 @@ U0 LanguageMain() {
         I64 ti, tests = 0, values[1]; Node *call; Text *summary;
         execution_mode = 1; if (Eq(mode, "jit-test-bundle")) execution_mode = 2;
         for (ti = 0; ti < nfun; ti++) {
-            if (Eq(functions[ti].package, "__main") && StrLen(functions[ti].name) >= 5 && functions[ti].name[0] == 't' && functions[ti].name[1] == 'e' && functions[ti].name[2] == 's' && functions[ti].name[3] == 't' && functions[ti].name[4] == '_') {
+            if (!functions[ti].generic_count && !functions[ti].origin && Eq(functions[ti].package, "__main") && StrLen(functions[ti].name) >= 5 && functions[ti].name[0] == 't' && functions[ti].name[1] == 'e' && functions[ti].name[2] == 's' && functions[ti].name[3] == 't' && functions[ti].name[4] == '_') {
                 if (functions[ti].argc || functions[ti].result) ErrorAt(functions[ti].token, "test functions must take no arguments and return void");
                 call = NewNode(N_CALL, functions[ti].token); call->slot = ti; Invoke(call, values);
                 Out("PASS "); Out(functions[ti].name); Out("\n"); tests++;

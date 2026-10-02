@@ -84,6 +84,7 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define A_STRUCT 1
 #define A_ARRAY 2
 #define A_SLICE 3
+#define A_ENUM 4
 #define K_ID 256
 #define K_INT 257
 #define K_STRING 258
@@ -97,6 +98,7 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define K_SHL 266
 #define K_SHR 267
 #define K_FLOAT 268
+#define K_FAT_ARROW 269
 class Token { I64 kind, val, line, col, start, end; U8 *text, *file, *package, *raw; };
 #define MAX_TOKENS 262144
 Token *tokens;
@@ -144,10 +146,11 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_INDEX_ADDRESS 25
 #define N_SLICE 26
 #define N_LENGTH 27
-class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next; };
-class Local { U8 *name; I64 type, slot, mutable, depth; Local *next; };
+class Local { U8 *name; I64 type, slot, mutable, depth, region; Local *next, *all_next; U8 *sources; };
+class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
 class Function {
-    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign;
+    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals;
+    U8 *generic_names[8]; I64 generic_args[8];
     U8 *bytecode, *machine; I64 code_count, code_capacity, registers, calls;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
 };
@@ -157,7 +160,7 @@ I64 nfun;
 Local *locals;
 I64 depth, loop_depth, current_fun, unsafe_depth;
 Node *NewNode(I64 kind, Token *t) { Node *n = CAlloc(sizeof(Node)); n->kind = kind; n->token = t; n->slot = -1; return n; }
-I64 FindFunIn(U8 *package, U8 *name) { I64 i; for (i = 0; i < nfun; i++) if (Eq(functions[i].package, package) && Eq(functions[i].name, name)) return i; return -1; }
+I64 FindFunIn(U8 *package, U8 *name) { I64 i; for (i = 0; i < nfun; i++) if (!functions[i].origin && Eq(functions[i].package, package) && Eq(functions[i].name, name)) return i; return -1; }
 I64 FindFun(U8 *name) { return FindFunIn("__main", name); }
 class Alias { U8 *file, *name, *path; Alias *next; };
 Alias *aliases;
@@ -177,12 +180,12 @@ Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
     res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth;
-    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; return res;
+    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
 Bool Pointer(I64 type) { return type >= T_PTR; }
-class Field { U8 *name; I64 type, offset, public; Field *next; };
-class AggregateType { U8 *name, *package; I64 kind, element, count, size, align, state, begin, end, public; Token *token; Field *fields; };
+class Field { U8 *name; I64 type, offset, public, tag; Field *next; };
+class AggregateType { U8 *name, *package; I64 kind, element, count, size, align, state, begin, end, public, generic_count, origin; U8 *generic_names[8]; I64 generic_args[8]; Token *token; Field *fields; };
 #define MAX_TYPES 4096
 AggregateType aggregate_types[MAX_TYPES];
 I64 naggregates;

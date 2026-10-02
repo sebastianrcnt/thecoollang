@@ -1,0 +1,29 @@
+package slice;
+
+pub fn fill[T](values: []T, value: T) {
+    for (var i: usize = 0; i < len(values); i = i + 1) {
+        values[i] = value;
+    }
+}
+
+pub fn reverse[T](values: []T) {
+    var left: usize = 0;
+    var right = len(values);
+    while (left < right) {
+        right = right - 1;
+        if (left >= right) { break; }
+        let temporary = values[left];
+        values[left] = values[right];
+        values[right] = temporary;
+        left = left + 1;
+    }
+}
+
+pub fn tail[T](values: []T) -> []T borrows(values) {
+    assert(len(values) > 0);
+    return values[1:];
+}
+
+pub fn take[T](values: []T, count: usize) -> []T borrows(values) {
+    return values[:count];
+}

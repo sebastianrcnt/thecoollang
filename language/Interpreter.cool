@@ -171,6 +171,6 @@ U0 Execute(Node *n, Frame *frame) {
 I64 RunMain() {
     I64 id = FindFun("main"), args[1]; Node *call;
     if (id < 0) Error("no main function");
-    if (functions[id].argc || (functions[id].result != T_VOID && functions[id].result != T_I32 && functions[id].result != T_INT)) ErrorAt(functions[id].token, "main must take no arguments and return void, i32 or i64");
+    if (functions[id].generic_count || functions[id].argc || (functions[id].result != T_VOID && functions[id].result != T_I32 && functions[id].result != T_INT)) ErrorAt(functions[id].token, "main must take no arguments and return void, i32 or i64");
     call = NewNode(N_CALL, functions[id].token); call->slot = id; return Invoke(call, args);
 }

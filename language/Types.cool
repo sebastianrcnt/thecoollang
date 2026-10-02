@@ -1,6 +1,6 @@
 // Aggregate layouts and structural array/slice types. Pointer depth uses T_PTR.
 I64 FindType(U8 *package, U8 *name) {
-    I64 i; for (i = 0; i < naggregates; i++) if (aggregate_types[i].kind == A_STRUCT && Eq(aggregate_types[i].package, package) && Eq(aggregate_types[i].name, name)) return T_AGG + i;
+    I64 i; for (i = 0; i < naggregates; i++) if ((aggregate_types[i].kind == A_STRUCT || aggregate_types[i].kind == A_ENUM) && !aggregate_types[i].origin && Eq(aggregate_types[i].package, package) && Eq(aggregate_types[i].name, name)) return T_AGG + i;
     return -1;
 }
 I64 NewType(I64 kind, Token *token) {
@@ -14,30 +14,60 @@ I64 SequenceType(I64 kind, I64 element, I64 count, Token *token) {
     for (i = 0; i < naggregates; i++) if (aggregate_types[i].kind == kind && aggregate_types[i].element == element && aggregate_types[i].count == count) return T_AGG+i;
     type = NewType(kind, token); Shape(type)->element = element; Shape(type)->count = count; return type;
 }
+class TypeBinding { U8 *name; I64 type; TypeBinding *next; };
+TypeBinding *type_bindings;
+I64 BindingType(U8 *name) { TypeBinding *b; for (b = type_bindings; b; b = b->next) if (Eq(b->name, name)) return b->type; return -1; }
+U0 BindTypes(U8 **names, I64 *types, I64 count) { I64 i; TypeBinding *b; type_bindings = NULL; for (i = 0; i < count; i++) { b = CAlloc(sizeof(TypeBinding)); b->name = names[i]; b->type = types[i]; b->next = type_bindings; type_bindings = b; } }
+I64 GenericNames(U8 **names) {
+    I64 count = 0, j;
+    if (!Take('[')) return 0;
+    do { if (count == 8) Error("generic parameter limit exceeded"); names[count] = Ident(); for (j = 0; j < count; j++) if (Eq(names[j], names[count])) Error("duplicate type parameter"); count++; } while (Take(','));
+    Need(']', "expected ']' after type parameters"); return count;
+}
+extern I64 ParseType();
+I64 TypeArguments(I64 *types) {
+    I64 count = 0; Need('[', "generic arguments must be explicit");
+    do { if (count == 8) Error("generic argument limit exceeded"); types[count] = ParseType(); if (types[count] == T_VOID) Error("generic argument cannot be void"); count++; } while (Take(','));
+    Need(']', "expected ']' after type arguments"); return count;
+}
+I64 InstantiateType(I64 template_type) {
+    I64 args[8], count, i, j, type; AggregateType *base = Shape(template_type), *a;
+    count = TypeArguments(args); if (count != base->generic_count) Error("wrong generic argument count");
+    for (i = 0; i < naggregates; i++) if (aggregate_types[i].origin == template_type) {
+        for (j = 0; j < count; j++) if (aggregate_types[i].generic_args[j] != args[j]) goto type_different;
+        return T_AGG+i;
+    type_different:;
+    }
+    type = NewType(base->kind, base->token); a = Shape(type); MemCpy(a, base, sizeof(AggregateType)); a->origin = template_type; a->generic_count = 0;
+    for (j = 0; j < count; j++) a->generic_args[j] = args[j]; return type;
+}
 I64 AlignSize(I64 size, I64 align) { return (size + align - 1) / align * align; }
 I64 Alignment(I64 type) { if (Aggregate(type)) { Layout(type); return Shape(type)->align; } return ByteSize(type); }
 extern I64 ParseType();
 U0 Layout(I64 type) {
-    AggregateType *a = Shape(type); Field *f, *tail = NULL, *other; I64 saved, field_type, align; U8 *name; Bool public;
+    AggregateType *a = Shape(type); Field *f, *tail = NULL, *other; I64 saved, field_type, align, max_payload = 0; U8 *name; Bool public; TypeBinding *saved_bindings;
+    if (a->generic_count) ErrorAt(a->token, "generic type requires explicit arguments");
     if (a->state == 2) return;
     if (a->state == 1) ErrorAt(a->token, "recursive aggregate requires a pointer");
     a->state = 1; a->align = 1;
     if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }
     else if (a->kind == A_ARRAY) { a->size = ByteSize(a->element) * a->count; a->align = Alignment(a->element); }
     else {
-        saved = pos; pos = a->begin; a->fields = NULL; a->count = 0;
+        saved = pos; saved_bindings = type_bindings; type_bindings = NULL; if (a->origin) BindTypes(Shape(a->origin)->generic_names, a->generic_args, Shape(a->origin)->generic_count); pos = a->begin; a->fields = NULL; a->count = 0;
         while (pos < a->end) {
             public = FALSE; if (Is("pub")) { pos++; public = TRUE; }
-            name = Ident(); Need(':', "expected ':' after field name"); field_type = ParseType();
-            if (!field_type) Error("field cannot be void");
+            name = Ident();
+            if (a->kind == A_ENUM) { field_type = T_VOID; public = TRUE; if (Take('(')) { field_type = ParseType(); Need(')', "expected ')' after variant payload"); } }
+            else { Need(':', "expected ':' after field name"); field_type = ParseType(); if (!field_type) Error("field cannot be void"); }
             Need(';', "expected ';' after field");
             for (other = a->fields; other; other = other->next) if (Eq(other->name, name)) Error("duplicate field");
-            align = Alignment(field_type); a->size = AlignSize(a->size, align);
-            f = CAlloc(sizeof(Field)); f->name = name; f->type = field_type; f->offset = a->size; f->public = public;
+            align = 1; if (field_type) align = Alignment(field_type); if (a->kind != A_ENUM) a->size = AlignSize(a->size, align);
+            f = CAlloc(sizeof(Field)); f->name = name; f->type = field_type; f->offset = a->size; f->public = public; f->tag = a->count; if (a->kind == A_ENUM) f->offset = 8;
             if (tail) tail->next = f; else a->fields = f; tail = f;
-            a->size += ByteSize(field_type); if (align > a->align) a->align = align; a->count++;
+            if (a->kind == A_ENUM) { if (ByteSize(field_type) > max_payload) max_payload = ByteSize(field_type); } else a->size += ByteSize(field_type); if (align > a->align) a->align = align; a->count++;
         }
-        a->size = AlignSize(a->size, a->align); pos = saved;
+        if (a->kind == A_ENUM) { if (!a->count) ErrorAt(a->token, "enum must contain a variant"); a->align = 8; a->size = 8+max_payload; }
+        a->size = AlignSize(a->size, a->align); pos = saved; type_bindings = saved_bindings;
     }
     if (a->size > 524288) ErrorAt(a->token, "aggregate exceeds 512 KiB implementation limit");
     a->state = 2;
@@ -71,18 +101,19 @@ Field *FindField(I64 type, U8 *name, Token *token) {
 // Collect imports and nominal names before parsing signatures or layouts.
 extern I64 TypeName(U8 *name);
 U0 CollectTypes() {
-    I64 saved = pos, nesting = 0, type; Token *t; U8 *name, *alias, *path; Bool public; I64 j;
+    I64 saved = pos, nesting = 0, type; Token *t; U8 *name, *alias, *path; Bool public; I64 j, kind;
     while (At()->kind) {
         if (!nesting && Is("import")) {
             t = At(); pos++; alias = NULL; if (At()->kind == K_ID) alias = Ident();
             if (At()->kind != K_STRING) Error("expected import path string"); path = At()->text;
             if (!alias) { alias = path; for (j = 0; path[j]; j++) if (path[j] == '/') alias = path+j+1; }
             if (!*alias) Error("empty import name"); AddAlias(t, alias, path); pos++; Need(';', "expected ';' after import");
-        } else if (!nesting && (Is("struct") || (Is("pub") && tokens[pos+1].kind == K_ID && Eq(tokens[pos+1].text, "struct")))) {
+        } else if (!nesting && (Is("struct") || Is("enum") || (Is("pub") && tokens[pos+1].kind == K_ID && (Eq(tokens[pos+1].text, "struct") || Eq(tokens[pos+1].text, "enum"))))) {
             public = FALSE; if (Is("pub")) { pos++; public = TRUE; }
-            t = At(); pos++; name = Ident(); if (TypeName(name) >= 0) ErrorAt(t, "struct name conflicts with a builtin type"); if (FindType(t->package, name) >= 0) ErrorAt(t, "duplicate struct or layout redefinition");
-            type = NewType(A_STRUCT, t); Shape(type)->name = name; Shape(type)->package = t->package; Shape(type)->public = public;
-            Need('{', "expected struct body"); Shape(type)->begin = pos;
+            t = At(); kind = A_STRUCT; if (Is("enum")) kind = A_ENUM; pos++; name = Ident(); if (TypeName(name) >= 0) ErrorAt(t, "struct name conflicts with a builtin type"); if (FindType(t->package, name) >= 0) ErrorAt(t, "duplicate struct or layout redefinition");
+            type = NewType(kind, t); Shape(type)->name = name; Shape(type)->package = t->package; Shape(type)->public = public;
+            Shape(type)->generic_count = GenericNames(Shape(type)->generic_names);
+            Need('{', "expected type body"); Shape(type)->begin = pos;
             while (At()->kind && At()->kind != '}') pos++;
             Shape(type)->end = pos; Need('}', "unterminated struct"); Take(';');
         } else { if (Take('{')) nesting++; else if (Take('}')) nesting--; else pos++; }
@@ -90,10 +121,14 @@ U0 CollectTypes() {
     pos = saved;
 }
 U0 AppendType(Text *text, I64 type) {
-    U8 *name = NULL;
+    U8 *name = NULL; I64 i; AggregateType *a;
     if (Pointer(type)) { Char(text, '*'); AppendType(text, type-T_PTR); return; }
     if (Aggregate(type)) {
-        if (Shape(type)->kind == A_STRUCT) Append(text, Shape(type)->name);
+        if (Shape(type)->kind == A_STRUCT || Shape(type)->kind == A_ENUM) {
+            a = Shape(type); Append(text, a->name);
+            if (a->origin) { Char(text, '['); for (i = 0; i < Shape(a->origin)->generic_count; i++) { if (i) Char(text, ','); AppendType(text, a->generic_args[i]); } Char(text, ']'); }
+            else if (a->generic_count) { Char(text, '['); for (i = 0; i < a->generic_count; i++) { if (i) Char(text, ','); Append(text, a->generic_names[i]); } Char(text, ']'); }
+        }
         else { Char(text, '['); if (Shape(type)->kind == A_ARRAY) Number(text, Shape(type)->count); Char(text, ']'); AppendType(text, Shape(type)->element); }
         return;
     }

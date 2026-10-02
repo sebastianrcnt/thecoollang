@@ -65,3 +65,8 @@ benchmark: all
 aggregate-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_aggregates.py
 test: aggregate-test
+
+.PHONY: generic-test
+generic-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_generics.py
+test: generic-test
