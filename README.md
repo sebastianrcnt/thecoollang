@@ -2,7 +2,7 @@
 
 C처럼 저수준 코드를 표현하되 읽기 쉬운 문법, 단순한 패키지 구조와 빠른 반복 실행을 목표로 하는 언어입니다. 원본 coolcom이나 OS 저장소 없이 빌드합니다.
 
-현재는 **언어 구현 진행 단계**입니다. 스칼라 타입, 함수, 패키지, 인터프리터·JIT·LLVM 실행 경로는 구현됐지만 구조체·배열·슬라이스·제네릭·소유권 검사는 아직 없습니다. 전체 목표와 실제 지원 범위를 구별해 기록합니다.
+현재는 **언어 구현 진행 단계**입니다. 스칼라·구조체·고정 배열·범위 검사 슬라이스, 함수, 패키지, 인터프리터·JIT·LLVM 실행 경로를 구현했습니다. 제네릭·소유권·슬라이스 반환 수명 분석은 아직 없습니다. 전체 목표와 실제 지원 범위를 구별해 기록합니다.
 
 ## 시작하기
 
@@ -13,6 +13,7 @@ cd ~/t5/coollang
 make -j4
 export PATH="$PWD/build:$PATH"
 cool run examples/modern.cool
+cool run examples/aggregates.cool
 cool build examples/modern.cool -o build/modern
 ./build/modern
 cool repl

@@ -1,0 +1,31 @@
+package main;
+import "std/io";
+struct Point {
+    x: f64;
+    y: f64;
+}
+fn translated(point: Point, dx: f64) -> Point {
+    var result = point;
+    result.x = result.x + dx;
+    return result;
+}
+fn translate_all(points: []Point, dx: f64) {
+    for (var i: usize = 0; i < len(points); i = i + 1) {
+        points[i] = translated(points[i], dx);
+    }
+}
+fn main() {
+    var points = [2]Point {
+        Point {
+            x: 1.0, y: 2.0
+        }, Point {
+            x: 3.0, y: 4.0
+        }
+    };
+    let snapshot = points;
+    let view = points[:];
+    translate_all(view, 10.0);
+    io.println(snapshot[0].x);
+    io.println(points[0].x);
+    io.println(points[1].x);
+}

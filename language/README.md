@@ -24,8 +24,8 @@ currently refer to immutable literals; no ownership claim is made.
 on normal block exit, return, break and continue. Panic/runtime failure terminates
 the process and does not promise cleanup.
 
-This is an implementation stage, not the full language: aggregate types, generic
-specialization, ownership checking and the complete runtime are still pending.
+This is an implementation stage, not the full language: generic specialization,
+ownership checking and the complete runtime are still pending.
 The new frontend is
 written in existing Cool; new-syntax self-hosting is not yet achieved.
 
@@ -54,7 +54,7 @@ registry/proxy protocol are pending. `cool.sum` protects pinned content; no tran
 ## Persistent session
 
 `cool repl` supports persistent scalar bindings, expressions, imports of std/io,
-function definitions and same-signature body replacement. `:stats` reports actual
+function/struct definitions and same-signature function body replacement. `:stats` reports actual
 bytecode/native compilation counters; `:quit` exits. Functions start in bytecode
 and become baseline native code on the fourth call (`run --backend auto`, default).
 Call sites dispatch through stable function IDs, so a changed callee is replaced
@@ -117,3 +117,62 @@ the Python driver. LLVM build medians were 128 ms cold and 99 ms cached; the bui
 executable including startup took 2.7 ms. These are small-workload measurements,
 not large-project throughput or in-process incremental compilation latency.
 The driver overhead remains a performance task.
+
+## Structs, arrays and borrowed slices
+
+```cool
+struct Point { x: i32; y: f32; }
+fn offset(p: Point) -> Point {
+    var copy = p;
+    copy.x = copy.x + 1;
+    return copy;
+}
+fn fill(values: []i32) { values[0] = 42; }
+fn main() {
+    var points = [2]Point{Point{x: 1, y: f32(2.5)}, Point{x: 2, y: f32(3.5)}};
+    let snapshot = points;
+    points[0] = offset(points[0]);
+    var numbers = [3]i32{1, 2, 3};
+    fill(numbers[1:]);
+}
+```
+
+- Structs and fixed arrays have value semantics for bindings, assignment,
+  arguments, returns and captured defer arguments. Evaluation snapshots values
+  before later arguments or deferred calls can mutate the source. Nested arrays
+  and structs are supported. All initializer elements are required; an explicit
+  empty initializer (`Point{}` or `[3]i32{}`) zero-initializes the entire value.
+- Array types are `[N]T`; slice types are `[]T`. `len(value)` works on either.
+  `sizeof(T)` reports the byte layout. Scalar field alignment follows native
+  widths, with padding between fields and at the end of structs. Empty structs
+  have size zero; do not assume their layout is a standard C struct.
+- `array[low:high]` and `slice[low:high]` create views with an exclusive upper bound;
+  omitted bounds use zero and length. Indexing and slicing check bounds in every
+  execution engine, including optimized LLVM. Slice writes update the source;
+  array/struct assignment copies into existing storage, preserving live views.
+- Safe mutable slices require a `var` array. `let` aggregate values and aggregate
+  parameters cannot be mutated directly. A `let` slice freezes the descriptor,
+  while its referenced array remains writable, as with a pointer's pointee.
+- Values and temporary copies occupy fixed function-frame storage; repeated
+  loop execution does not allocate an ever-growing list of aggregate temporaries.
+  Aggregate returns copy into caller-owned storage before the callee frame ends.
+  Current limits are 512 KiB per aggregate and 65,536 storage slots per function;
+  baseline JIT falls back to bytecode for large register files.
+- Slices borrow storage; no GC or reference counting was introduced. Function
+  parameters may accept slices, but returning a slice or a value containing one
+  is rejected until lifetime analysis exists. Mutable slice elements cannot contain
+  further slices, which prevents storing a local borrow into caller-owned storage.
+  Slice growth/append, dynamic arrays
+  and owning containers are not implemented. Unsafe pointers retain manual
+  lifetime obligations.
+- `pub struct` and `pub` fields expose package APIs. Nominal types and layouts are
+  collected before function signatures, permitting forward declarations and
+  recursive pointers. By-value layout cycles are rejected. REPL layouts cannot
+  be redefined, and failed declarations roll back new type registrations. Runtime
+  failure retains storage that surviving REPL views may still reference.
+- Raw pointers to aggregates work with C ABI calls. Aggregate arguments/results
+  by value at the C boundary remain explicitly unsupported.
+
+`examples/aggregates.cool` demonstrates independent array copies and shared slice
+views. `make aggregate-test` checks bounds, package visibility, LLVM JIT, tools
+and REPL behavior in addition to the differential cases in `language-test`.
