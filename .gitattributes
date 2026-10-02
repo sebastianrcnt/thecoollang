@@ -1,0 +1,6 @@
+*.cool linguist-language=HolyC
+*.coolh linguist-language=HolyC
+*.HC linguist-language=HolyC
+*.HH linguist-language=HolyC
+# Formatter fixtures intentionally exercise trailing spaces and CRLF bytes.
+coolc/Fmt/tests/** -text -whitespace

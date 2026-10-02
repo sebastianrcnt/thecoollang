@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Build, run and format Cool programs on Apple silicon macOS."""
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def ensure(*targets):
+    if os.environ.get('COOL_TOOLCHAIN_READY') == '1' and all((ROOT / t).exists() for t in targets):
+        return
+    if subprocess.run(['make', '-s', '-f', 'tools/toolchain.mk', '-q', *targets], cwd=ROOT, stdout=subprocess.DEVNULL).returncode == 0:
+        return
+    (ROOT / 'build').mkdir(exist_ok=True)
+    with (ROOT / 'build/.cool.lock').open('w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        subprocess.run(['make', '-s', '-f', 'tools/toolchain.mk', *targets], cwd=ROOT, check=True, stdout=sys.stderr)
+
+
+def environment():
+    (ROOT / 'build/tmp').mkdir(parents=True, exist_ok=True)
+    return dict(os.environ, TMPDIR=str(ROOT / 'build/tmp'),
+                COOLC_COMPILER_BIN=str(ROOT / 'coolc/seed/Compiler.BIN'))
+
+
+def invoke(args, **kwargs):
+    subprocess.run(list(map(str, args)), env=environment(), check=True, **kwargs)
+
+
+def compiler(args):
+    ensure('build/warmc')
+    invoke([ROOT / 'build/warmc', *args])
+
+
+def native(source, output, target='arm64'):
+    ensure('build/coolc')
+    p = subprocess.run([str(ROOT / 'build/coolc'), '--target', target, str(source), str(output)],
+                       env=environment(), capture_output=True)
+    if p.returncode or b'Errs:0 ' not in p.stdout:
+        sys.stdout.buffer.write(p.stdout)
+        sys.stderr.buffer.write(p.stderr)
+        raise subprocess.CalledProcessError(p.returncode or 1, p.args)
+
+
+def standalone(binary, output, work):
+    header = work / 'Program.h'
+    data = binary.read_bytes()
+    header.write_text('static const unsigned char warm_program[] = {\n' +
+                      ',\n'.join(','.join(str(b) for b in data[i:i+32]) for i in range(0, len(data), 32)) + '\n};\n')
+    invoke(['clang', '-std=c11', '-Wall', '-Wextra', '-Werror', '-O2',
+            '-fno-omit-frame-pointer', '-ffixed-x28',
+            '-DWARM_PROGRAM_HEADER="' + str(header) + '"',
+            ROOT / 'coolc/Host/native.c', ROOT / 'coolc/Host/except.S', '-o', work / 'executable'])
+    with tempfile.NamedTemporaryFile(prefix='.' + output.name + '-', dir=output.parent, delete=False) as staged:
+        staged_path = Path(staged.name)
+        staged.write((work / 'executable').read_bytes())
+    try:
+        staged_path.chmod(0o755)
+        staged_path.replace(output)
+    finally:
+        staged_path.unlink(missing_ok=True)
+
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='command', required=True)
+    for command in ('run', 'build'):
+        p = sub.add_parser(command)
+        p.add_argument('source', type=Path)
+        if command == 'build':
+            p.add_argument('-o', '--output', type=Path, default=Path('a.out'))
+    p = sub.add_parser('fmt')
+    p.add_argument('--check', action='store_true')
+    p.add_argument('--diff', action='store_true')
+    p.add_argument('paths', nargs='+', type=Path)
+    p = sub.add_parser('compile', help='emit a BIN module (arm64 or x86_64)')
+    p.add_argument('--target', choices=('arm64', 'x86_64'), default='arm64')
+    p.add_argument('source', type=Path)
+    p.add_argument('-o', '--output', required=True, type=Path)
+    p = sub.add_parser('vet', help='report compiler style diagnostics')
+    p.add_argument('source', type=Path)
+    raw = sys.argv[1:]
+    forwarded = []
+    if '--' in raw:
+        at = raw.index('--')
+        raw, forwarded = raw[:at], raw[at + 1:]
+    args = parser.parse_args(raw)
+    if forwarded and args.command != 'run':
+        parser.error('program arguments are only accepted by run')
+    if args.command == 'fmt':
+        sources = []
+        for path in args.paths:
+            if not path.exists():
+                raise ValueError(f'input does not exist: {path}')
+            if path.is_dir():
+                for base, dirs, files in os.walk(path):
+                    dirs[:] = sorted(d for d in dirs if not d.startswith('.') and d not in ('build', 'vendor')
+                                     and not (Path(base) / d).is_symlink())
+                    sources.extend(Path(base, name).resolve() for name in sorted(files)
+                                   if Path(name).suffix in ('.cool', '.coolh', '.HC', '.HH'))
+            else:
+                sources.append(path.resolve())
+        if not sources:
+            raise ValueError('no Cool sources to format')
+        ensure('build/hcfmt.BIN')
+        invoke([ROOT / 'tools/hcfmt.sh', *(['--diff'] if args.diff else ['--check'] if args.check else []),
+                '--', *dict.fromkeys(sources)])
+        return
+    source = args.source.resolve()
+    if not source.is_file():
+        raise ValueError(f'input does not exist: {source}')
+    ensure('build/coolc')
+    if args.command == 'vet':
+        invoke([ROOT / 'build/coolc', '--vet', source])
+        return
+    if args.command in ('build', 'compile') and source == args.output.resolve():
+        raise ValueError('output must differ from the source')
+    if args.command == 'compile':
+        output = args.output.resolve()
+        with tempfile.TemporaryDirectory(prefix='.cool-', dir=output.parent) as tmp:
+            binary = Path(tmp) / 'program.BIN'
+            native(source, binary, args.target)
+            binary.replace(output)
+        return
+    if args.command == 'run' and source.suffix.upper() == '.BIN':
+        invoke([ROOT / 'build/coolc', '--run', source, *forwarded])
+        return
+    with tempfile.TemporaryDirectory(prefix='cool-') as tmp:
+        work = Path(tmp)
+        binary = work / 'program.BIN'
+        native(source, binary)
+        if args.command == 'run':
+            invoke([ROOT / 'build/coolc', '--run', binary, *forwarded])
+        else:
+            standalone(binary, args.output.resolve(), work)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(error.returncode if error.returncode > 0 else 128 - error.returncode)
+    except (OSError, ValueError) as error:
+        print(f'cool: {error}', file=sys.stderr)
+        raise SystemExit(2)

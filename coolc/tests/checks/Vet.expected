@@ -1,0 +1,29 @@
+vet: [assign-cond] assignment used as a condition (== intended? else add parentheses)
+  Vet.cool,6
+vet: [assign-cond] assignment used as a condition (== intended? else add parentheses)
+  Vet.cool,8
+vet: [empty-stmt] empty statement after if/for/while (use {} if it is meant)
+  Vet.cool,14
+vet: [empty-stmt] empty statement after if/for/while (use {} if it is meant)
+  Vet.cool,15
+vet: [empty-stmt] empty statement after if/for/while (use {} if it is meant)
+  Vet.cool,16
+vet: [unreachable] unreachable code after return, break or goto
+  Vet.cool,28
+vet: [unreachable] unreachable code after return, break or goto
+  Vet.cool,39
+vet: [unreachable] unreachable code after return, break or goto
+  Vet.cool,42
+vet: [unreachable] unreachable code after return, break or goto
+  Vet.cool,46
+vet: [u0-ptr] use "U8 *" instead of "U0 *"
+  Vet.cool,65
+vet: [unused-arg] argument 'unused_arg' of fun 'Others' is never used
+  Vet.cool,65
+vet: [unused-arg] argument 'p' of fun 'Others' is never used
+  Vet.cool,65
+vet: [unneeded-no-warn] no_warn on 'x' in fun 'Others', which is used
+  Vet.cool,65
+vet: [arg-name] Function 'Renamed': argument 1 is named 'b' here but 'a' in the declaration (declared at Vet.cool,71)
+  Vet.cool,73
+Vet: assign-cond=2 empty-stmt=3 unreachable=4 unused-arg=2 unneeded-no-warn=1 dup-type=0 unused-extern=0 u0-ptr=1 arg-name=1 strict=0 Errs:0

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Assemble the tracked HolyC sources for a native compiler self-build.
+set -eu
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+cd "$ROOT"
+STAGE=$ROOT/build/native-src
+mkdir -p "$STAGE"
+cp coolc/Frontend/*.cool coolc/Frontend/*.coolh coolc/Runtime/*.cool \
+   coolc/Compiler/*.cool coolc/Compiler/*.coolh "$STAGE/"
+python3 - "$STAGE/Native.cool" "${NATIVE_FIXES:-1}" <<'PY'
+import pathlib
+import sys
+p = pathlib.Path(sys.argv[1])
+s = p.read_text()
+needle = '#include "Compiler.cool"'
+assert s.count(needle) == 1
+if sys.argv[2] == '1':
+    s = '#define COOLC_FRONTEND_FIXES 1\n' + s
+p.write_text(s.replace(needle, '#define BACKEND_NATIVE 1\n#include "Backend.cool"\n' + needle))
+PY
