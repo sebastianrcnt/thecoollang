@@ -183,6 +183,14 @@ def inline_test(env):
                          'I64 V() {return 2;}\nPrint("%d\\n", Old());\n')
     p = subprocess.run([str(ROOT/'build/coolc'), str(redefined), str(OUT/'InlineRedefined.BIN')], cwd=ROOT, env=env, capture_output=True)
     assert p.returncode and b'defined again after its first definition was inlined' in p.stdout, p.stdout.decode()[-2000:]
+    static_source = OUT / 'StaticLifetime.cool'
+    static_source.write_text('#include "TestBase.coolh"\nI64 Next() {static I64 value=7; return ++value;}\nI64 Zero() {static I64 value; return ++value;}\nI64 a=Next(), b=Next(), c=Zero(), d=Zero(); Print("%d %d %d %d\\n",a,b,c,d);\n')
+    for target, host in [('arm64', 'coolc'), ('x86_64', 'coolc-x86_64')]:
+        image = OUT / f'StaticLifetime-{target}.BIN'
+        run([str(ROOT/'build/coolc'), '--target', target, str(static_source), str(image)], OUT/f'StaticLifetime-{target}.compile.log', env)
+        output = OUT / f'StaticLifetime-{target}.out'
+        run([str(ROOT/'build'/host), '--run', str(image)], output)
+        assert output.read_text() == '8 9 1 2\n', output.read_text()
     print('PASS: inlining (same results inlined on arm64/x86_64 and not inlined; trace; AOT redefinition)')
 
 

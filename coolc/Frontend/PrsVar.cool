@@ -41,7 +41,7 @@ U0 PrsVarInit(CCmpCtrl *cc, U8 **_dst, CHashClass *tmpc, CArrayDim *tmpad,
             cc->flags = CCF_NO_ABSS | cc->flags &
                     ~(CCF_AOT_COMPILE | CCF_HAS_MISC_DATA | CCF_NOT_CONST);
             machine_code = LexExpression2Bin(cc, &type);
-            if (old_flags & CCF_AOT_COMPILE
+            if ((old_flags & CCF_AOT_COMPILE) && to
                     /*cc->flags&CCF_NOT_CONST && */ //Const-folding is done in the C end
                     //Nroot forces all AOT globals to go on the heap for Apple hardedned runtime
                     /*!Bt(&cc->opts,OPTf_GLBLS_ON_DATA_HEAP)*/
@@ -561,9 +561,9 @@ pvl_restart3:
                         LexExcept(cc, "Static unions are not implemented ");
                     k = (i + 7) & ~7;
                     if (cc->flags & CCF_AOT_COMPILE)
-                        tmpm->static_data = MAlloc(k);
+                        tmpm->static_data = CAlloc(k);
                     else
-                        tmpm->static_data = MAlloc(k /*,Fs->code_heap*/);
+                        tmpm->static_data = CAlloc(k /*,Fs->code_heap*/);
                     if (cc->flags & CCF_AOT_COMPILE) { //TODO gutted by nroot
                         tmpm->static_data_rip = cc->aotc->rip;
                         k >>= 3;
@@ -608,8 +608,8 @@ pvl_restart3:
                         tmpm->use_cnt = 0;
                         cc->flags |= CCF_DONT_MAKE_RES;
                     }
-                    if (cc->flags & CCF_AOT_COMPILE)
-                        Free(tmpm->static_data);
+                    // Code generation still reads this initializer when constructing
+                    // the static data heap. MemberLstDel owns its lifetime.
                     break;
                 case PRS1B_LOCAL_VAR:
                     if (mode & PRSF_UNION) {

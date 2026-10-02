@@ -251,6 +251,7 @@ U0 MemberLstDel(CMemberLst *tmpm)
     while (tmpm) {
         tmpm1 = tmpm->next;
         Free(tmpm->str);
+        if (tmpm->flags & MLF_STATIC) Free(tmpm->static_data);
         LinkedLstDel(tmpm->dim.next);
         if (tmpm->flags & MLF_STR_DFT_AVAILABLE)
             Free(tmpm->dft_val);
