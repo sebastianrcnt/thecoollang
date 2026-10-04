@@ -1,0 +1,3301 @@
+fn IR(arg_v_s13: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s13: *u8 = arg_v_s13;
+var t0: *Text = null;
+var t1: *u8 = null;
+t0 = ctx.v_ir;
+t1 = v_s13;
+Append(t0, t1);
+}
+return;
+}
+
+
+fn RI(arg_v_n30: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n30: i64 = arg_v_n30;
+var t0: *Text = null;
+var t1: i64 = i64(0);
+t0 = ctx.v_ir;
+t1 = v_n30;
+Number(t0, t1);
+}
+return;
+}
+
+
+fn Reg(arg_v_r: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_r: i64 = arg_v_r;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+t0 = cast[*u8]("%r");
+IR(t0);
+t1 = v_r;
+RI(t1);
+}
+return;
+}
+
+
+fn Fresh() -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+ctx.v_reg_id = ctx.v_reg_id + i64(1);
+return ctx.v_reg_id;
+}
+return i64(0);
+}
+
+
+fn Label() -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+ctx.v_label_id = ctx.v_label_id + i64(1);
+return ctx.v_label_id;
+}
+return i64(0);
+}
+
+
+fn AtLabel(arg_v_label: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_label: i64 = arg_v_label;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+ctx.v_active_label = v_label;
+t0 = cast[*u8]("L");
+IR(t0);
+t1 = v_label;
+RI(t1);
+t2 = cast[*u8](":\n");
+IR(t2);
+ctx.v_terminated = i8(0);
+}
+return;
+}
+
+
+fn Jump(arg_v_label1: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_label1: i64 = arg_v_label1;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+t0 = cast[*u8]("  br label %L");
+IR(t0);
+t1 = v_label1;
+RI(t1);
+t2 = cast[*u8]("\n");
+IR(t2);
+ctx.v_terminated = i8(1);
+}
+return;
+}
+
+
+fn Constant(arg_v_value6: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_value6: i64 = arg_v_value6;
+var v_r1: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+t0 = Fresh();
+v_r1 = t0;
+t1 = cast[*u8]("  ");
+IR(t1);
+t2 = v_r1;
+Reg(t2);
+t3 = cast[*u8](" = add i64 0, ");
+IR(t3);
+t4 = v_value6;
+RI(t4);
+t5 = cast[*u8]("\n");
+IR(t5);
+return v_r1;
+}
+return i64(0);
+}
+
+
+fn Truth(arg_v_r2: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_r2: i64 = arg_v_r2;
+var v_b5: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+t0 = Fresh();
+v_b5 = t0;
+t1 = cast[*u8]("  %b");
+IR(t1);
+t2 = v_b5;
+RI(t2);
+t3 = cast[*u8](" = icmp ne i64 ");
+IR(t3);
+t4 = v_r2;
+Reg(t4);
+t5 = cast[*u8](", 0\n");
+IR(t5);
+return v_b5;
+}
+return i64(0);
+}
+
+
+fn Branch(arg_v_value7: i64, arg_v_yes: i64, arg_v_no: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_value7: i64 = arg_v_value7;
+var v_yes: i64 = arg_v_yes;
+var v_no: i64 = arg_v_no;
+var v_b6: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+t0 = v_value7;
+t1 = Truth(t0);
+v_b6 = t1;
+t2 = cast[*u8]("  br i1 %b");
+IR(t2);
+t3 = v_b6;
+RI(t3);
+t4 = cast[*u8](", label %L");
+IR(t4);
+t5 = v_yes;
+RI(t5);
+t6 = cast[*u8](", label %L");
+IR(t6);
+t7 = v_no;
+RI(t7);
+t8 = cast[*u8]("\n");
+IR(t8);
+ctx.v_terminated = i8(1);
+}
+return;
+}
+
+
+fn Truncate(arg_v_r3: i64, arg_v_type36: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_r3: i64 = arg_v_r3;
+var v_type36: i64 = arg_v_type36;
+var v_n31: i64 = i64(0);
+var v_width2: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+var t15: i64 = i64(0);
+var t16: i64 = i64(0);
+var t17: i8 = i8(0);
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: i64 = i64(0);
+var t21: *u8 = null;
+var t22: i64 = i64(0);
+var t23: *u8 = null;
+t0 = v_type36;
+t1 = Integer(t0);
+t2 = !((t1 != i8(0)));
+if (!t2) {
+t3 = v_type36;
+t4 = Width(t3);
+t2 = (t4 == 64);
+}
+if (t2) {
+return v_r3;
+}
+t5 = v_type36;
+t6 = Width(t5);
+v_width2 = t6;
+t7 = Fresh();
+v_n31 = t7;
+t8 = cast[*u8]("  %t");
+IR(t8);
+t9 = v_n31;
+RI(t9);
+t10 = cast[*u8](" = trunc i64 ");
+IR(t10);
+t11 = v_r3;
+Reg(t11);
+t12 = cast[*u8](" to i");
+IR(t12);
+t13 = v_width2;
+RI(t13);
+t14 = cast[*u8]("\n  ");
+IR(t14);
+t15 = v_n31;
+Reg(t15);
+t16 = v_type36;
+t17 = Unsigned(t16);
+if ((t17 != i8(0))) {
+t18 = cast[*u8](" = zext i");
+IR(t18);
+} else {
+t19 = cast[*u8](" = sext i");
+IR(t19);
+}
+t20 = v_width2;
+RI(t20);
+t21 = cast[*u8](" %t");
+IR(t21);
+t22 = v_n31;
+RI(t22);
+t23 = cast[*u8](" to i64\n");
+IR(t23);
+return v_n31;
+}
+return i64(0);
+}
+
+
+fn LocalRead(arg_v_r4: i64, arg_v_type37: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_r4: i64 = arg_v_r4;
+var v_type37: i64 = arg_v_type37;
+var v_n32: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+var t15: i64 = i64(0);
+var t16: *u8 = null;
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: i64 = i64(0);
+var t20: *u8 = null;
+if ((v_type37 != 12)) {
+t0 = v_r4;
+t1 = v_type37;
+t2 = Truncate(t0, t1);
+return t2;
+}
+t3 = Fresh();
+v_n32 = t3;
+t4 = cast[*u8]("  %raw");
+IR(t4);
+t5 = v_n32;
+RI(t5);
+t6 = cast[*u8](" = trunc i64 ");
+IR(t6);
+t7 = v_r4;
+Reg(t7);
+t8 = cast[*u8](" to i32\n  %single");
+IR(t8);
+t9 = v_n32;
+RI(t9);
+t10 = cast[*u8](" = bitcast i32 %raw");
+IR(t10);
+t11 = v_n32;
+RI(t11);
+t12 = cast[*u8](" to float\n  %double");
+IR(t12);
+t13 = v_n32;
+RI(t13);
+t14 = cast[*u8](" = fpext float %single");
+IR(t14);
+t15 = v_n32;
+RI(t15);
+t16 = cast[*u8](" to double\n  ");
+IR(t16);
+t17 = v_n32;
+Reg(t17);
+t18 = cast[*u8](" = bitcast double %double");
+IR(t18);
+t19 = v_n32;
+RI(t19);
+t20 = cast[*u8](" to i64\n");
+IR(t20);
+return v_n32;
+}
+return i64(0);
+}
+
+
+fn LocalWrite(arg_v_r5: i64, arg_v_type38: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_r5: i64 = arg_v_r5;
+var v_type38: i64 = arg_v_type38;
+var v_n33: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+var t14: i64 = i64(0);
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: *u8 = null;
+if ((v_type38 != 12)) {
+return v_r5;
+}
+t0 = Fresh();
+v_n33 = t0;
+t1 = cast[*u8]("  %double");
+IR(t1);
+t2 = v_n33;
+RI(t2);
+t3 = cast[*u8](" = bitcast i64 ");
+IR(t3);
+t4 = v_r5;
+Reg(t4);
+t5 = cast[*u8](" to double\n  %single");
+IR(t5);
+t6 = v_n33;
+RI(t6);
+t7 = cast[*u8](" = fptrunc double %double");
+IR(t7);
+t8 = v_n33;
+RI(t8);
+t9 = cast[*u8](" to float\n  %raw");
+IR(t9);
+t10 = v_n33;
+RI(t10);
+t11 = cast[*u8](" = bitcast float %single");
+IR(t11);
+t12 = v_n33;
+RI(t12);
+t13 = cast[*u8](" to i32\n  ");
+IR(t13);
+t14 = v_n33;
+Reg(t14);
+t15 = cast[*u8](" = zext i32 %raw");
+IR(t15);
+t16 = v_n33;
+RI(t16);
+t17 = cast[*u8](" to i64\n");
+IR(t17);
+return v_n33;
+}
+return i64(0);
+}
+
+
+fn SlotAddress(arg_v_slot4: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_slot4: i64 = arg_v_slot4;
+var v_r6: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+t0 = Fresh();
+v_r6 = t0;
+t1 = cast[*u8]("  ");
+IR(t1);
+t2 = v_r6;
+Reg(t2);
+t3 = cast[*u8](" = ptrtoint ptr %v");
+IR(t3);
+t4 = v_slot4;
+RI(t4);
+t5 = cast[*u8](" to i64\n");
+IR(t5);
+return v_r6;
+}
+return i64(0);
+}
+
+
+fn EmitCopy(arg_v_destination4: i64, arg_v_source5: i64, arg_v_type40: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_destination4: i64 = arg_v_destination4;
+var v_source5: i64 = arg_v_source5;
+var v_type40: i64 = arg_v_type40;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: i8 = i8(0);
+var t13: *u8 = null;
+var t14: i64 = i64(0);
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: *u8 = null;
+t0 = v_destination4;
+t1 = v_type40;
+EmitDrop(t0, t1);
+t2 = cast[*u8]("  call void @cool_copy(i64 ");
+IR(t2);
+t3 = v_destination4;
+Reg(t3);
+t4 = cast[*u8](", i64 ");
+IR(t4);
+t5 = v_source5;
+Reg(t5);
+t6 = cast[*u8](", i64 ");
+IR(t6);
+t7 = v_type40;
+t8 = ByteSize(t7);
+t9 = t8;
+RI(t9);
+t10 = cast[*u8](")\n");
+IR(t10);
+t11 = v_type40;
+t12 = Owned(t11);
+if ((t12 != i8(0))) {
+t13 = cast[*u8]("  call void @cool_zero(i64 ");
+IR(t13);
+t14 = v_source5;
+Reg(t14);
+t15 = cast[*u8](", i64 ");
+IR(t15);
+t16 = v_type40;
+t17 = ByteSize(t16);
+t18 = t17;
+RI(t18);
+t19 = cast[*u8](")\n");
+IR(t19);
+}
+}
+return;
+}
+
+
+fn EmitWrite(arg_v_destination5: i64, arg_v_source6: i64, arg_v_type41: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_destination5: i64 = arg_v_destination5;
+var v_source6: i64 = arg_v_source6;
+var v_type41: i64 = arg_v_type41;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+t0 = v_type41;
+t1 = Aggregate(t0);
+if ((t1 != i8(0))) {
+t2 = v_destination5;
+t3 = v_source6;
+t4 = v_type41;
+EmitCopy(t2, t3, t4);
+return;
+}
+t5 = cast[*u8]("  call void @cool_store(i64 ");
+IR(t5);
+t6 = v_destination5;
+Reg(t6);
+t7 = cast[*u8](", i64 ");
+IR(t7);
+t8 = v_type41;
+RI(t8);
+t9 = cast[*u8](", i64 ");
+IR(t9);
+t10 = v_source6;
+Reg(t10);
+t11 = cast[*u8](")\n");
+IR(t11);
+}
+return;
+}
+
+
+fn EmitRead(arg_v_address9: i64, arg_v_type42: i64, arg_v_storage: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address9: i64 = arg_v_address9;
+var v_type42: i64 = arg_v_type42;
+var v_storage: i64 = arg_v_storage;
+var v_r7: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i8 = i8(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+var t15: i64 = i64(0);
+var t16: *u8 = null;
+t0 = v_type42;
+t1 = Owned(t0);
+if ((t1 != i8(0))) {
+return v_address9;
+}
+t2 = v_type42;
+t3 = Aggregate(t2);
+if ((t3 != i8(0))) {
+t4 = v_storage;
+t5 = SlotAddress(t4);
+v_r7 = t5;
+t6 = v_r7;
+t7 = v_address9;
+t8 = v_type42;
+EmitCopy(t6, t7, t8);
+return v_r7;
+}
+t9 = Fresh();
+v_r7 = t9;
+t10 = cast[*u8]("  ");
+IR(t10);
+t11 = v_r7;
+Reg(t11);
+t12 = cast[*u8](" = call i64 @cool_load(i64 ");
+IR(t12);
+t13 = v_address9;
+Reg(t13);
+t14 = cast[*u8](", i64 ");
+IR(t14);
+t15 = v_type42;
+RI(t15);
+t16 = cast[*u8](")\n");
+IR(t16);
+return v_r7;
+}
+return i64(0);
+}
+
+
+fn OffsetAddress(arg_v_address10: i64, arg_v_offset1: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address10: i64 = arg_v_address10;
+var v_offset1: i64 = arg_v_offset1;
+var v_r8: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+t0 = Fresh();
+v_r8 = t0;
+t1 = cast[*u8]("  ");
+IR(t1);
+t2 = v_r8;
+Reg(t2);
+t3 = cast[*u8](" = add i64 ");
+IR(t3);
+t4 = v_address10;
+Reg(t4);
+t5 = cast[*u8](", ");
+IR(t5);
+t6 = v_offset1;
+RI(t6);
+t7 = cast[*u8]("\n");
+IR(t7);
+return v_r8;
+}
+return i64(0);
+}
+
+
+fn EmitLength(arg_v_address11: i64, arg_v_count11: i64, arg_v_kind6: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address11: i64 = arg_v_address11;
+var v_count11: i64 = arg_v_count11;
+var v_kind6: i64 = arg_v_kind6;
+var v_r9: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+t0 = Fresh();
+v_r9 = t0;
+t1 = cast[*u8]("  ");
+IR(t1);
+t2 = v_r9;
+Reg(t2);
+t3 = cast[*u8](" = call i64 @cool_length(i64 ");
+IR(t3);
+t4 = v_address11;
+Reg(t4);
+t5 = cast[*u8](", i64 ");
+IR(t5);
+t6 = v_count11;
+RI(t6);
+t7 = cast[*u8](", i64 ");
+IR(t7);
+t8 = i64(BoolInt((v_kind6 == 3)));
+RI(t8);
+t9 = cast[*u8](")\n");
+IR(t9);
+return v_r9;
+}
+return i64(0);
+}
+
+
+fn EmitExpr(arg_v_n34: *Node) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n34: *Node = arg_v_n34;
+var v_a10: i64 = i64(0);
+var v_b7: i64 = i64(0);
+var v_r10: i64 = i64(0);
+var v_casted: i64 = i64(0);
+var v_op3: i64 = i64(0);
+var v_yes1: i64 = i64(0);
+var v_no1: i64 = i64(0);
+var v_end1: i64 = i64(0);
+var v_id4: i64 = i64(0);
+var v_i16: i64 = i64(0);
+var v_ch4: i64 = i64(0);
+var v_predecessor: i64 = i64(0);
+var v_args5: *i64 = null;
+var v_instruction: *u8 = null;
+var v_hex: *u8 = null;
+var v_item2: *Node = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *Text = null;
+var t3: *u8 = null;
+var t4: *Text = null;
+var t5: i64 = i64(0);
+var t6: *Text = null;
+var t7: *u8 = null;
+var t8: *Text = null;
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: *Text = null;
+var t13: *u8 = null;
+var t14: *Text = null;
+var t15: i64 = i64(0);
+var t16: *Text = null;
+var t17: i64 = i64(0);
+var t18: *Text = null;
+var t19: i64 = i64(0);
+var t20: i64 = i64(0);
+var t21: *Text = null;
+var t22: *u8 = null;
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *u8 = null;
+var t27: i64 = i64(0);
+var t28: *u8 = null;
+var t29: *Node = null;
+var t30: i64 = i64(0);
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: *u8 = null;
+var t37: i64 = i64(0);
+var t38: *u8 = null;
+var t39: i64 = i64(0);
+var t40: *AggregateType = null;
+var t41: i64 = i64(0);
+var t42: i64 = i64(0);
+var t43: i64 = i64(0);
+var t44: *u8 = null;
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: i64 = i64(0);
+var t50: i64 = i64(0);
+var t51: *AggregateType = null;
+var t52: i64 = i64(0);
+var t53: i64 = i64(0);
+var t54: i64 = i64(0);
+var t55: i64 = i64(0);
+var t56: i64 = i64(0);
+var t57: *u8 = null;
+var t58: i64 = i64(0);
+var t59: *u8 = null;
+var t60: i64 = i64(0);
+var t61: i64 = i64(0);
+var t62: i64 = i64(0);
+var t63: *u8 = null;
+var t64: *Node = null;
+var t65: i64 = i64(0);
+var t66: i64 = i64(0);
+var t67: i64 = i64(0);
+var t68: i64 = i64(0);
+var t69: i64 = i64(0);
+var t70: i64 = i64(0);
+var t71: i64 = i64(0);
+var t72: i64 = i64(0);
+var t73: i8 = i8(0);
+var t74: i64 = i64(0);
+var t75: i64 = i64(0);
+var t76: i64 = i64(0);
+var t77: i64 = i64(0);
+var t78: i64 = i64(0);
+var t79: i64 = i64(0);
+var t80: i64 = i64(0);
+var t81: *u8 = null;
+var t82: i64 = i64(0);
+var t83: *u8 = null;
+var t84: i64 = i64(0);
+var t85: *u8 = null;
+var t86: i64 = i64(0);
+var t87: i64 = i64(0);
+var t88: i64 = i64(0);
+var t89: i64 = i64(0);
+var t90: *u8 = null;
+var t91: i64 = i64(0);
+var t92: *u8 = null;
+var t93: i64 = i64(0);
+var t94: *u8 = null;
+var t95: *Node = null;
+var t96: *i64 = null;
+var t97: *Node = null;
+var t98: *i64 = null;
+var t99: i64 = i64(0);
+var t100: *u8 = null;
+var t101: *Node = null;
+var t102: i64 = i64(0);
+var t103: i64 = i64(0);
+var t104: i64 = i64(0);
+var t105: i64 = i64(0);
+var t106: i64 = i64(0);
+var t107: i64 = i64(0);
+var t108: i64 = i64(0);
+var t109: *u8 = null;
+var t110: i64 = i64(0);
+var t111: *u8 = null;
+var t112: i64 = i64(0);
+var t113: *u8 = null;
+var t114: i64 = i64(0);
+var t115: i64 = i64(0);
+var t116: i64 = i64(0);
+var t117: i64 = i64(0);
+var t118: i64 = i64(0);
+var t119: i64 = i64(0);
+var t120: i64 = i64(0);
+var t121: i64 = i64(0);
+var t122: i64 = i64(0);
+var t123: *AggregateType = null;
+var t124: i64 = i64(0);
+var t125: i64 = i64(0);
+var t126: i64 = i64(0);
+var t127: i64 = i64(0);
+var t128: i64 = i64(0);
+var t129: *Node = null;
+var t130: i64 = i64(0);
+var t131: i64 = i64(0);
+var t132: *u8 = null;
+var t133: i64 = i64(0);
+var t134: *u8 = null;
+var t135: i64 = i64(0);
+var t136: *u8 = null;
+var t137: i64 = i64(0);
+var t138: *u8 = null;
+var t139: i64 = i64(0);
+var t140: *u8 = null;
+var t141: i64 = i64(0);
+var t142: i64 = i64(0);
+var t143: i64 = i64(0);
+var t144: *u8 = null;
+var t145: i64 = i64(0);
+var t146: *u8 = null;
+var t147: *Node = null;
+var t148: i64 = i64(0);
+var t149: *Node = null;
+var t150: i64 = i64(0);
+var t151: i64 = i64(0);
+var t152: i64 = i64(0);
+var t153: i64 = i64(0);
+var t154: i64 = i64(0);
+var t155: i64 = i64(0);
+var t156: i64 = i64(0);
+var t157: *u8 = null;
+var t158: i64 = i64(0);
+var t159: *u8 = null;
+var t160: i64 = i64(0);
+var t161: *u8 = null;
+var t162: i64 = i64(0);
+var t163: *u8 = null;
+var t164: i64 = i64(0);
+var t165: *u8 = null;
+var t166: i64 = i64(0);
+var t167: *u8 = null;
+var t168: i64 = i64(0);
+var t169: *AggregateType = null;
+var t170: i64 = i64(0);
+var t171: i64 = i64(0);
+var t172: i64 = i64(0);
+var t173: *u8 = null;
+var t174: i64 = i64(0);
+var t175: *u8 = null;
+var t176: *Node = null;
+var t177: i64 = i64(0);
+var t178: i64 = i64(0);
+var t179: *u8 = null;
+var t180: i64 = i64(0);
+var t181: *u8 = null;
+var t182: i64 = i64(0);
+var t183: *u8 = null;
+var t184: i64 = i64(0);
+var t185: i64 = i64(0);
+var t186: i64 = i64(0);
+var t187: *u8 = null;
+var t188: i64 = i64(0);
+var t189: *u8 = null;
+var t190: i64 = i64(0);
+var t191: *u8 = null;
+var t192: *u8 = null;
+var t193: i64 = i64(0);
+var t194: *u8 = null;
+var t195: i64 = i64(0);
+var t196: *u8 = null;
+var t197: i64 = i64(0);
+var t198: i8 = i8(0);
+var t199: bool = false;
+var t200: i64 = i64(0);
+var t201: i8 = i8(0);
+var t202: i64 = i64(0);
+var t203: i64 = i64(0);
+var t204: i64 = i64(0);
+var t205: i64 = i64(0);
+var t206: *u8 = null;
+var t207: i64 = i64(0);
+var t208: *u8 = null;
+var t209: i64 = i64(0);
+var t210: *u8 = null;
+var t211: i64 = i64(0);
+var t212: *u8 = null;
+var t213: i64 = i64(0);
+var t214: *u8 = null;
+var t215: bool = false;
+var t216: i64 = i64(0);
+var t217: i8 = i8(0);
+var t218: i64 = i64(0);
+var t219: *u8 = null;
+var t220: i64 = i64(0);
+var t221: *u8 = null;
+var t222: i64 = i64(0);
+var t223: *u8 = null;
+var t224: i64 = i64(0);
+var t225: *u8 = null;
+var t226: i64 = i64(0);
+var t227: *u8 = null;
+var t228: i64 = i64(0);
+var t229: *u8 = null;
+var t230: *u8 = null;
+var t231: i64 = i64(0);
+var t232: *u8 = null;
+var t233: *u8 = null;
+var t234: i64 = i64(0);
+var t235: *u8 = null;
+var t236: i64 = i64(0);
+var t237: i64 = i64(0);
+var t238: i64 = i64(0);
+var t239: bool = false;
+var t240: i64 = i64(0);
+var t241: i64 = i64(0);
+var t242: i64 = i64(0);
+var t243: i64 = i64(0);
+var t244: i64 = i64(0);
+var t245: i64 = i64(0);
+var t246: i64 = i64(0);
+var t247: i64 = i64(0);
+var t248: i64 = i64(0);
+var t249: i64 = i64(0);
+var t250: *Node = null;
+var t251: i64 = i64(0);
+var t252: i64 = i64(0);
+var t253: i64 = i64(0);
+var t254: i64 = i64(0);
+var t255: i64 = i64(0);
+var t256: i64 = i64(0);
+var t257: *u8 = null;
+var t258: i64 = i64(0);
+var t259: *u8 = null;
+var t260: i64 = i64(0);
+var t261: *u8 = null;
+var t262: i64 = i64(0);
+var t263: *u8 = null;
+var t264: i64 = i64(0);
+var t265: *u8 = null;
+var t266: i64 = i64(0);
+var t267: *u8 = null;
+var t268: *Node = null;
+var t269: i64 = i64(0);
+var t270: i64 = i64(0);
+var t271: i64 = i64(0);
+var t272: i8 = i8(0);
+var t273: *u8 = null;
+var t274: i64 = i64(0);
+var t275: *u8 = null;
+var t276: i64 = i64(0);
+var t277: *u8 = null;
+var t278: i64 = i64(0);
+var t279: *u8 = null;
+var t280: i64 = i64(0);
+var t281: *u8 = null;
+var t282: i64 = i64(0);
+var t283: *u8 = null;
+var t284: i64 = i64(0);
+var t285: *u8 = null;
+var t286: *u8 = null;
+var t287: *u8 = null;
+var t288: i64 = i64(0);
+var t289: *u8 = null;
+var t290: i64 = i64(0);
+var t291: *u8 = null;
+var t292: i64 = i64(0);
+var t293: *u8 = null;
+var t294: i64 = i64(0);
+var t295: *u8 = null;
+var t296: *u8 = null;
+var t297: i64 = i64(0);
+var t298: *u8 = null;
+var t299: i64 = i64(0);
+var t300: *u8 = null;
+var t301: i64 = i64(0);
+var t302: *u8 = null;
+var t303: i64 = i64(0);
+var t304: *u8 = null;
+var t305: bool = false;
+var t306: bool = false;
+var t307: bool = false;
+var t308: *u8 = null;
+var t309: i64 = i64(0);
+var t310: *u8 = null;
+var t311: bool = false;
+var t312: *u8 = null;
+var t313: *u8 = null;
+var t314: *u8 = null;
+var t315: i64 = i64(0);
+var t316: *u8 = null;
+var t317: i64 = i64(0);
+var t318: *u8 = null;
+var t319: bool = false;
+var t320: i64 = i64(0);
+var t321: *u8 = null;
+var t322: i64 = i64(0);
+var t323: i8 = i8(0);
+var t324: i64 = i64(0);
+var t325: *u8 = null;
+var t326: i64 = i64(0);
+var t327: i64 = i64(0);
+var t328: i64 = i64(0);
+var t329: *u8 = null;
+var t330: i64 = i64(0);
+var t331: i64 = i64(0);
+var t332: i64 = i64(0);
+var t333: i64 = i64(0);
+var t334: *u8 = null;
+var t335: i64 = i64(0);
+var t336: *u8 = null;
+var t337: *u8 = null;
+var t338: *u8 = null;
+var t339: i64 = i64(0);
+var t340: *u8 = null;
+var t341: i64 = i64(0);
+var t342: *u8 = null;
+var t343: i64 = i64(0);
+var t344: i64 = i64(0);
+var t345: i64 = i64(0);
+var t346: i64 = i64(0);
+var t347: i64 = i64(0);
+var t348: i8 = i8(0);
+var t349: *u8 = null;
+var t350: i64 = i64(0);
+var t351: *u8 = null;
+var t352: *u8 = null;
+var t353: *u8 = null;
+var t354: i64 = i64(0);
+var t355: *u8 = null;
+var t356: i64 = i64(0);
+var t357: *u8 = null;
+var t358: i64 = i64(0);
+var t359: *u8 = null;
+var t360: i64 = i64(0);
+var t361: *u8 = null;
+v_instruction = null;
+v_hex = cast[*u8]("0123456789ABCDEF");
+if (((v_n34).kind == 1)) {
+t0 = (v_n34).value;
+t1 = Constant(t0);
+return t1;
+}
+if (((v_n34).kind == 2)) {
+ctx.v_string_id = ctx.v_string_id + i64(1);
+v_id4 = ctx.v_string_id;
+t2 = ctx.v_globals;
+t3 = cast[*u8]("@s");
+Append(t2, t3);
+t4 = ctx.v_globals;
+t5 = v_id4;
+Number(t4, t5);
+t6 = ctx.v_globals;
+t7 = cast[*u8](" = private constant [");
+Append(t6, t7);
+t8 = ctx.v_globals;
+t9 = (v_n34).name;
+t10 = StrLen(t9);
+t11 = (t10 + 1);
+Number(t8, t11);
+t12 = ctx.v_globals;
+t13 = cast[*u8](" x i8] c\"");
+Append(t12, t13);
+v_i16 = 0;
+while (true) {
+if (!((((v_n34).name)[v_i16] != u8(0)))) { break; }
+v_ch4 = i64(((v_n34).name)[v_i16]);
+t14 = ctx.v_globals;
+t15 = 92;
+Char(t14, t15);
+t16 = ctx.v_globals;
+t17 = i64((v_hex)[(v_ch4 >> 4)]);
+Char(t16, t17);
+t18 = ctx.v_globals;
+t19 = i64((v_hex)[(v_ch4 & 15)]);
+Char(t18, t19);
+t20 = v_i16;
+v_i16 = v_i16 + i64(1);
+}
+t21 = ctx.v_globals;
+t22 = cast[*u8]("\\00\"\n");
+Append(t21, t22);
+t23 = Fresh();
+v_r10 = t23;
+t24 = cast[*u8]("  ");
+IR(t24);
+t25 = v_r10;
+Reg(t25);
+t26 = cast[*u8](" = ptrtoint ptr @s");
+IR(t26);
+t27 = v_id4;
+RI(t27);
+t28 = cast[*u8](" to i64\n");
+IR(t28);
+return v_r10;
+}
+if (((v_n34).kind == 28)) {
+if (((v_n34).a != null)) {
+t29 = (v_n34).a;
+t30 = EmitExpr(t29);
+v_a10 = t30;
+}
+t31 = (v_n34).storage;
+t32 = SlotAddress(t31);
+v_r10 = t32;
+t33 = v_r10;
+t34 = (v_n34).type;
+EmitDrop(t33, t34);
+t35 = Fresh();
+v_b7 = t35;
+t36 = cast[*u8]("  ");
+IR(t36);
+t37 = v_b7;
+Reg(t37);
+t38 = cast[*u8](" = call i64 @cool_owner_alloc(i64 ");
+IR(t38);
+t39 = (v_n34).type;
+t40 = Shape(t39);
+t41 = (t40).element;
+t42 = ByteSize(t41);
+t43 = t42;
+RI(t43);
+t44 = cast[*u8](")\n");
+IR(t44);
+t45 = v_r10;
+t46 = v_b7;
+t47 = 1;
+EmitWrite(t45, t46, t47);
+if (((v_n34).a != null)) {
+t48 = v_b7;
+t49 = v_a10;
+t50 = (v_n34).type;
+t51 = Shape(t50);
+t52 = (t51).element;
+EmitWrite(t48, t49, t52);
+}
+return v_r10;
+}
+if (((v_n34).kind == 23)) {
+t53 = (v_n34).storage;
+t54 = SlotAddress(t53);
+v_r10 = t54;
+t55 = v_r10;
+t56 = (v_n34).type;
+EmitDrop(t55, t56);
+t57 = cast[*u8]("  call void @cool_zero(i64 ");
+IR(t57);
+t58 = v_r10;
+Reg(t58);
+t59 = cast[*u8](", i64 ");
+IR(t59);
+t60 = (v_n34).type;
+t61 = ByteSize(t60);
+t62 = t61;
+RI(t62);
+t63 = cast[*u8](")\n");
+IR(t63);
+v_item2 = (v_n34).a;
+while (true) {
+if (!((v_item2 != null))) { break; }
+t64 = v_item2;
+t65 = EmitExpr(t64);
+v_a10 = t65;
+t66 = v_r10;
+t67 = (v_item2).offset;
+t68 = OffsetAddress(t66, t67);
+v_b7 = t68;
+t69 = v_b7;
+t70 = v_a10;
+t71 = (v_item2).type;
+EmitWrite(t69, t70, t71);
+v_item2 = (v_item2).next;
+}
+return v_r10;
+}
+if (((v_n34).kind == 3)) {
+t72 = (v_n34).type;
+t73 = Aggregate(t72);
+if ((t73 != i8(0))) {
+t74 = (v_n34).slot;
+t75 = SlotAddress(t74);
+t76 = t75;
+t77 = (v_n34).type;
+t78 = (v_n34).storage;
+t79 = EmitRead(t76, t77, t78);
+return t79;
+}
+t80 = Fresh();
+v_r10 = t80;
+t81 = cast[*u8]("  ");
+IR(t81);
+t82 = v_r10;
+Reg(t82);
+t83 = cast[*u8](" = load i64, ptr %v");
+IR(t83);
+t84 = (v_n34).slot;
+RI(t84);
+t85 = cast[*u8]("\n");
+IR(t85);
+t86 = v_r10;
+t87 = (v_n34).type;
+t88 = LocalRead(t86, t87);
+return t88;
+}
+if (((v_n34).kind == 22)) {
+t89 = Fresh();
+v_r10 = t89;
+t90 = cast[*u8]("  ");
+IR(t90);
+t91 = v_r10;
+Reg(t91);
+t92 = cast[*u8](" = ptrtoint ptr %v");
+IR(t92);
+t93 = (v_n34).slot;
+RI(t93);
+t94 = cast[*u8](" to i64\n");
+IR(t94);
+return v_r10;
+}
+if (((v_n34).kind == 4)) {
+t95 = v_n34;
+t96 = EmitArgs(t95);
+v_args5 = t96;
+t97 = v_n34;
+t98 = v_args5;
+t99 = EmitCall(t97, t98);
+v_r10 = t99;
+t100 = cast[*u8](v_args5);
+Free(t100);
+return v_r10;
+}
+t101 = (v_n34).a;
+t102 = EmitExpr(t101);
+v_a10 = t102;
+if (((v_n34).kind == 29)) {
+t103 = (v_n34).storage;
+t104 = SlotAddress(t103);
+v_r10 = t104;
+t105 = v_r10;
+t106 = v_a10;
+t107 = (v_n34).type;
+EmitCopy(t105, t106, t107);
+return v_r10;
+}
+if (((v_n34).kind == 30)) {
+t108 = Fresh();
+v_r10 = t108;
+t109 = cast[*u8]("  ");
+IR(t109);
+t110 = v_r10;
+Reg(t110);
+t111 = cast[*u8](" = call i64 @cool_owner_address(i64 ");
+IR(t111);
+t112 = v_a10;
+Reg(t112);
+t113 = cast[*u8](")\n");
+IR(t113);
+return v_r10;
+}
+if (((v_n34).kind == 18)) {
+t114 = v_a10;
+t115 = (v_n34).type;
+t116 = (v_n34).storage;
+t117 = EmitRead(t114, t115, t116);
+return t117;
+}
+if (((v_n34).kind == 24)) {
+t118 = v_a10;
+t119 = (v_n34).value;
+t120 = OffsetAddress(t118, t119);
+return t120;
+}
+if (((v_n34).kind == 27)) {
+t121 = v_a10;
+t122 = ((v_n34).a).type;
+t123 = Shape(t122);
+t124 = (t123).count;
+t125 = ((v_n34).a).type;
+t126 = AggregateKind(t125);
+t127 = t126;
+t128 = EmitLength(t121, t124, t127);
+return t128;
+}
+if (((v_n34).kind == 25)) {
+t129 = (v_n34).b;
+t130 = EmitExpr(t129);
+v_b7 = t130;
+t131 = Fresh();
+v_r10 = t131;
+t132 = cast[*u8]("  ");
+IR(t132);
+t133 = v_r10;
+Reg(t133);
+t134 = cast[*u8](" = call i64 @cool_index(i64 ");
+IR(t134);
+t135 = v_a10;
+Reg(t135);
+t136 = cast[*u8](", i64 ");
+IR(t136);
+t137 = v_b7;
+Reg(t137);
+t138 = cast[*u8](", i64 ");
+IR(t138);
+t139 = (v_n34).value;
+RI(t139);
+t140 = cast[*u8](", i64 ");
+IR(t140);
+t141 = ((v_n34).type - 100000);
+t142 = ByteSize(t141);
+t143 = t142;
+RI(t143);
+t144 = cast[*u8](", i64 ");
+IR(t144);
+t145 = i64(BoolInt(((v_n34).op == 3)));
+RI(t145);
+t146 = cast[*u8](")\n");
+IR(t146);
+return v_r10;
+}
+if (((v_n34).kind == 26)) {
+t147 = (v_n34).b;
+t148 = EmitExpr(t147);
+v_b7 = t148;
+if (((v_n34).c != null)) {
+t149 = (v_n34).c;
+t150 = EmitExpr(t149);
+v_casted = t150;
+} else {
+t151 = v_a10;
+t152 = (v_n34).value;
+t153 = (v_n34).op;
+t154 = EmitLength(t151, t152, t153);
+v_casted = t154;
+}
+t155 = (v_n34).storage;
+t156 = SlotAddress(t155);
+v_r10 = t156;
+t157 = cast[*u8]("  call void @cool_slice(i64 ");
+IR(t157);
+t158 = v_r10;
+Reg(t158);
+t159 = cast[*u8](", i64 ");
+IR(t159);
+t160 = v_a10;
+Reg(t160);
+t161 = cast[*u8](", i64 ");
+IR(t161);
+t162 = v_b7;
+Reg(t162);
+t163 = cast[*u8](", i64 ");
+IR(t163);
+t164 = v_casted;
+Reg(t164);
+t165 = cast[*u8](", i64 ");
+IR(t165);
+t166 = (v_n34).value;
+RI(t166);
+t167 = cast[*u8](", i64 ");
+IR(t167);
+t168 = (v_n34).type;
+t169 = Shape(t168);
+t170 = (t169).element;
+t171 = ByteSize(t170);
+t172 = t171;
+RI(t172);
+t173 = cast[*u8](", i64 ");
+IR(t173);
+t174 = i64(BoolInt(((v_n34).op == 3)));
+RI(t174);
+t175 = cast[*u8](")\n");
+IR(t175);
+return v_r10;
+}
+if (((v_n34).kind == 20)) {
+t176 = (v_n34).b;
+t177 = EmitExpr(t176);
+v_b7 = t177;
+t178 = Fresh();
+v_casted = t178;
+t179 = cast[*u8]("  ");
+IR(t179);
+t180 = v_casted;
+Reg(t180);
+t181 = cast[*u8](" = mul i64 ");
+IR(t181);
+t182 = v_b7;
+Reg(t182);
+t183 = cast[*u8](", ");
+IR(t183);
+t184 = ((v_n34).type - 100000);
+t185 = ByteSize(t184);
+t186 = t185;
+RI(t186);
+t187 = cast[*u8]("\n");
+IR(t187);
+t188 = Fresh();
+v_r10 = t188;
+t189 = cast[*u8]("  ");
+IR(t189);
+t190 = v_r10;
+Reg(t190);
+if (((v_n34).op == 45)) {
+t191 = cast[*u8](" = sub i64 ");
+IR(t191);
+} else {
+t192 = cast[*u8](" = add i64 ");
+IR(t192);
+}
+t193 = v_a10;
+Reg(t193);
+t194 = cast[*u8](", ");
+IR(t194);
+t195 = v_casted;
+Reg(t195);
+t196 = cast[*u8]("\n");
+IR(t196);
+return v_r10;
+}
+if (((v_n34).kind == 17)) {
+t197 = (v_n34).type;
+t198 = Floating(t197);
+t199 = !((t198 != i8(0)));
+if (t199) {
+t200 = ((v_n34).a).type;
+t201 = Floating(t200);
+t199 = !((t201 != i8(0)));
+}
+if (t199) {
+t202 = v_a10;
+t203 = (v_n34).type;
+t204 = Truncate(t202, t203);
+return t204;
+}
+t205 = Fresh();
+v_r10 = t205;
+t206 = cast[*u8]("  ");
+IR(t206);
+t207 = v_r10;
+Reg(t207);
+t208 = cast[*u8](" = call i64 @cool_cast(i64 ");
+IR(t208);
+t209 = v_a10;
+Reg(t209);
+t210 = cast[*u8](", i64 ");
+IR(t210);
+t211 = ((v_n34).a).type;
+RI(t211);
+t212 = cast[*u8](", i64 ");
+IR(t212);
+t213 = (v_n34).type;
+RI(t213);
+t214 = cast[*u8](")\n");
+IR(t214);
+return v_r10;
+}
+v_op3 = (v_n34).op;
+t215 = ((v_n34).kind == 6);
+if (t215) {
+t216 = (v_n34).type;
+t217 = Floating(t216);
+t215 = (i64(t217) != i64(0));
+}
+if (t215) {
+t218 = Fresh();
+v_r10 = t218;
+t219 = cast[*u8]("  ");
+IR(t219);
+t220 = v_r10;
+Reg(t220);
+t221 = cast[*u8](" = xor i64 ");
+IR(t221);
+t222 = v_a10;
+Reg(t222);
+t223 = cast[*u8](", -9223372036854775808\n");
+IR(t223);
+return v_r10;
+}
+if (((v_n34).kind == 6)) {
+t224 = Fresh();
+v_r10 = t224;
+t225 = cast[*u8]("  ");
+IR(t225);
+t226 = v_r10;
+Reg(t226);
+if ((v_op3 == 33)) {
+t227 = cast[*u8](" = xor i64 ");
+IR(t227);
+t228 = v_a10;
+Reg(t228);
+t229 = cast[*u8](", 1\n");
+IR(t229);
+} else {
+if ((v_op3 == 126)) {
+t230 = cast[*u8](" = xor i64 ");
+IR(t230);
+t231 = v_a10;
+Reg(t231);
+t232 = cast[*u8](", -1\n");
+IR(t232);
+} else {
+t233 = cast[*u8](" = sub i64 0, ");
+IR(t233);
+t234 = v_a10;
+Reg(t234);
+t235 = cast[*u8]("\n");
+IR(t235);
+}
+}
+t236 = v_r10;
+t237 = (v_n34).type;
+t238 = Truncate(t236, t237);
+return t238;
+}
+t239 = (v_op3 == 263);
+if (!t239) {
+t239 = (v_op3 == 264);
+}
+if (t239) {
+t240 = Label();
+v_yes1 = t240;
+t241 = Label();
+v_no1 = t241;
+t242 = Label();
+v_end1 = t242;
+if ((v_op3 == 263)) {
+t243 = v_a10;
+t244 = v_yes1;
+t245 = v_no1;
+Branch(t243, t244, t245);
+} else {
+t246 = v_a10;
+t247 = v_no1;
+t248 = v_yes1;
+Branch(t246, t247, t248);
+}
+t249 = v_yes1;
+AtLabel(t249);
+t250 = (v_n34).b;
+t251 = EmitExpr(t250);
+v_b7 = t251;
+v_predecessor = ctx.v_active_label;
+t252 = v_end1;
+Jump(t252);
+t253 = v_no1;
+AtLabel(t253);
+t254 = v_end1;
+Jump(t254);
+t255 = v_end1;
+AtLabel(t255);
+t256 = Fresh();
+v_r10 = t256;
+t257 = cast[*u8]("  ");
+IR(t257);
+t258 = v_r10;
+Reg(t258);
+t259 = cast[*u8](" = phi i64 [ ");
+IR(t259);
+t260 = v_b7;
+Reg(t260);
+t261 = cast[*u8](", %L");
+IR(t261);
+t262 = v_predecessor;
+RI(t262);
+t263 = cast[*u8](" ], [ ");
+IR(t263);
+t264 = i64(BoolInt((v_op3 == 264)));
+RI(t264);
+t265 = cast[*u8](", %L");
+IR(t265);
+t266 = v_no1;
+RI(t266);
+t267 = cast[*u8](" ]\n");
+IR(t267);
+return v_r10;
+}
+t268 = (v_n34).b;
+t269 = EmitExpr(t268);
+v_b7 = t269;
+t270 = Fresh();
+v_r10 = t270;
+t271 = ((v_n34).a).type;
+t272 = Floating(t271);
+if ((t272 != i8(0))) {
+t273 = cast[*u8]("  %fa");
+IR(t273);
+t274 = v_r10;
+RI(t274);
+t275 = cast[*u8](" = bitcast i64 ");
+IR(t275);
+t276 = v_a10;
+Reg(t276);
+t277 = cast[*u8](" to double\n  %fb");
+IR(t277);
+t278 = v_r10;
+RI(t278);
+t279 = cast[*u8](" = bitcast i64 ");
+IR(t279);
+t280 = v_b7;
+Reg(t280);
+t281 = cast[*u8](" to double\n");
+IR(t281);
+t282 = v_op3;
+if (t282 == 43) { while (true) {
+v_instruction = cast[*u8]("fadd");
+break; } }
+if (t282 == 45) { while (true) {
+v_instruction = cast[*u8]("fsub");
+break; } }
+if (t282 == 42) { while (true) {
+v_instruction = cast[*u8]("fmul");
+break; } }
+if (t282 == 47) { while (true) {
+v_instruction = cast[*u8]("fdiv");
+break; } }
+if (t282 == 259) { while (true) {
+v_instruction = cast[*u8]("fcmp oeq");
+break; } }
+if (t282 == 260) { while (true) {
+v_instruction = cast[*u8]("fcmp une");
+break; } }
+if (t282 == 60) { while (true) {
+v_instruction = cast[*u8]("fcmp olt");
+break; } }
+if (t282 == 62) { while (true) {
+v_instruction = cast[*u8]("fcmp ogt");
+break; } }
+if (t282 == 261) { while (true) {
+v_instruction = cast[*u8]("fcmp ole");
+break; } }
+if (t282 == 262) { while (true) {
+v_instruction = cast[*u8]("fcmp oge");
+break; } }
+t283 = cast[*u8]("  %fr");
+IR(t283);
+t284 = v_r10;
+RI(t284);
+t285 = cast[*u8](" = ");
+IR(t285);
+t286 = v_instruction;
+IR(t286);
+t287 = cast[*u8](" double %fa");
+IR(t287);
+t288 = v_r10;
+RI(t288);
+t289 = cast[*u8](", %fb");
+IR(t289);
+t290 = v_r10;
+RI(t290);
+t291 = cast[*u8]("\n  ");
+IR(t291);
+t292 = v_r10;
+Reg(t292);
+if (((v_n34).type == 2)) {
+t293 = cast[*u8](" = zext i1 %fr");
+IR(t293);
+t294 = v_r10;
+RI(t294);
+t295 = cast[*u8](" to i64\n");
+IR(t295);
+} else {
+t296 = cast[*u8](" = bitcast double %fr");
+IR(t296);
+t297 = v_r10;
+RI(t297);
+t298 = cast[*u8](" to i64\n");
+IR(t298);
+}
+if (((v_n34).type == 12)) {
+t299 = Fresh();
+v_casted = t299;
+t300 = cast[*u8]("  ");
+IR(t300);
+t301 = v_casted;
+Reg(t301);
+t302 = cast[*u8](" = call i64 @cool_cast(i64 ");
+IR(t302);
+t303 = v_r10;
+Reg(t303);
+t304 = cast[*u8](", i64 11, i64 12)\n");
+IR(t304);
+return v_casted;
+}
+return v_r10;
+}
+t305 = (v_op3 == 47);
+if (!t305) {
+t305 = (v_op3 == 37);
+}
+t306 = t305;
+if (!t306) {
+t306 = (v_op3 == 266);
+}
+t307 = t306;
+if (!t307) {
+t307 = (v_op3 == 267);
+}
+if (t307) {
+t308 = cast[*u8]("  ");
+IR(t308);
+t309 = v_r10;
+Reg(t309);
+t310 = cast[*u8](" = call i64 @");
+IR(t310);
+t311 = (v_op3 == 47);
+if (!t311) {
+t311 = (v_op3 == 37);
+}
+if (t311) {
+t312 = cast[*u8]("cool_div");
+IR(t312);
+} else {
+t313 = cast[*u8]("cool_shift");
+IR(t313);
+}
+t314 = cast[*u8]("(i64 ");
+IR(t314);
+t315 = v_a10;
+Reg(t315);
+t316 = cast[*u8](", i64 ");
+IR(t316);
+t317 = v_b7;
+Reg(t317);
+t318 = cast[*u8](", i64 ");
+IR(t318);
+t319 = (v_op3 == 37);
+if (!t319) {
+t319 = (v_op3 == 267);
+}
+t320 = i64(BoolInt(t319));
+RI(t320);
+t321 = cast[*u8](", i64 ");
+IR(t321);
+t322 = ((v_n34).a).type;
+t323 = Unsigned(t322);
+t324 = i64(t323);
+RI(t324);
+t325 = cast[*u8](", i64 ");
+IR(t325);
+t326 = ((v_n34).a).type;
+t327 = Width(t326);
+t328 = t327;
+RI(t328);
+t329 = cast[*u8](")\n");
+IR(t329);
+t330 = v_r10;
+t331 = (v_n34).type;
+t332 = Truncate(t330, t331);
+return t332;
+}
+t333 = v_op3;
+if (t333 == 43) { while (true) {
+v_instruction = cast[*u8]("add");
+break; } }
+if (t333 == 45) { while (true) {
+v_instruction = cast[*u8]("sub");
+break; } }
+if (t333 == 42) { while (true) {
+v_instruction = cast[*u8]("mul");
+break; } }
+if (t333 == 38) { while (true) {
+v_instruction = cast[*u8]("and");
+break; } }
+if (t333 == 124) { while (true) {
+v_instruction = cast[*u8]("or");
+break; } }
+if (t333 == 94) { while (true) {
+v_instruction = cast[*u8]("xor");
+break; } }
+if ((v_instruction != null)) {
+t334 = cast[*u8]("  ");
+IR(t334);
+t335 = v_r10;
+Reg(t335);
+t336 = cast[*u8](" = ");
+IR(t336);
+t337 = v_instruction;
+IR(t337);
+t338 = cast[*u8](" i64 ");
+IR(t338);
+t339 = v_a10;
+Reg(t339);
+t340 = cast[*u8](", ");
+IR(t340);
+t341 = v_b7;
+Reg(t341);
+t342 = cast[*u8]("\n");
+IR(t342);
+t343 = v_r10;
+t344 = (v_n34).type;
+t345 = Truncate(t343, t344);
+return t345;
+}
+t346 = v_op3;
+if (t346 == 259) { while (true) {
+v_instruction = cast[*u8]("eq");
+break; } }
+if (t346 == 260) { while (true) {
+v_instruction = cast[*u8]("ne");
+break; } }
+if (t346 == 60) { while (true) {
+v_instruction = cast[*u8]("slt");
+break; } }
+if (t346 == 62) { while (true) {
+v_instruction = cast[*u8]("sgt");
+break; } }
+if (t346 == 261) { while (true) {
+v_instruction = cast[*u8]("sle");
+break; } }
+if (t346 == 262) { while (true) {
+v_instruction = cast[*u8]("sge");
+break; } }
+t347 = ((v_n34).a).type;
+t348 = Unsigned(t347);
+if ((t348 != i8(0))) {
+if ((v_op3 == 60)) {
+v_instruction = cast[*u8]("ult");
+}
+if ((v_op3 == 62)) {
+v_instruction = cast[*u8]("ugt");
+}
+if ((v_op3 == 261)) {
+v_instruction = cast[*u8]("ule");
+}
+if ((v_op3 == 262)) {
+v_instruction = cast[*u8]("uge");
+}
+}
+t349 = cast[*u8]("  %b");
+IR(t349);
+t350 = v_r10;
+RI(t350);
+t351 = cast[*u8](" = icmp ");
+IR(t351);
+t352 = v_instruction;
+IR(t352);
+t353 = cast[*u8](" i64 ");
+IR(t353);
+t354 = v_a10;
+Reg(t354);
+t355 = cast[*u8](", ");
+IR(t355);
+t356 = v_b7;
+Reg(t356);
+t357 = cast[*u8]("\n  ");
+IR(t357);
+t358 = v_r10;
+Reg(t358);
+t359 = cast[*u8](" = zext i1 %b");
+IR(t359);
+t360 = v_r10;
+RI(t360);
+t361 = cast[*u8](" to i64\n");
+IR(t361);
+return v_r10;
+}
+return i64(0);
+}
+
+
+fn EmitArgs(arg_v_n35: *Node) -> *i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n35: *Node = arg_v_n35;
+var v_args6: *i64 = null;
+var v_i17: i64 = i64(0);
+var v_a11: *Node = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *Node = null;
+var t4: i64 = i64(0);
+t0 = (((v_n35).value + 1) * 8);
+t1 = CAlloc(t0);
+v_args6 = cast[*i64](t1);
+v_i17 = 0;
+v_a11 = (v_n35).a;
+while (true) {
+if (!((v_a11 != null))) { break; }
+t2 = v_i17;
+v_i17 = v_i17 + i64(1);
+t3 = v_a11;
+t4 = EmitExpr(t3);
+(v_args6)[t2] = t4;
+v_a11 = (v_a11).next;
+}
+return v_args6;
+}
+return null;
+}
+
+
+fn EmitCall(arg_v_n36: *Node, arg_v_args7: *i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n36: *Node = arg_v_n36;
+var v_args7: *i64 = arg_v_args7;
+var v_r11: i64 = i64(0);
+var v_i18: i64 = i64(0);
+var v_destination6: i64 = i64(0);
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: *u8 = null;
+var t7: i8 = i8(0);
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+var t14: i64 = i64(0);
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: i64 = i64(0);
+var t20: i64 = i64(0);
+var t21: *u8 = null;
+var t22: i64 = i64(0);
+var t23: *u8 = null;
+var t24: i64 = i64(0);
+var t25: *u8 = null;
+var t26: *u8 = null;
+var t27: i64 = i64(0);
+var t28: *u8 = null;
+var t29: i64 = i64(0);
+var t30: i64 = i64(0);
+var t31: *u8 = null;
+var t32: i64 = i64(0);
+var t33: *u8 = null;
+var t34: i64 = i64(0);
+var t35: *u8 = null;
+var t36: i64 = i64(0);
+var t37: *u8 = null;
+var t38: i64 = i64(0);
+var t39: i64 = i64(0);
+var t40: *u8 = null;
+var t41: i64 = i64(0);
+var t42: *u8 = null;
+var t43: i64 = i64(0);
+var t44: i64 = i64(0);
+var t45: i64 = i64(0);
+var t46: i8 = i8(0);
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: i64 = i64(0);
+var t50: *u8 = null;
+var t51: i64 = i64(0);
+var t52: *u8 = null;
+var t53: i64 = i64(0);
+var t54: *u8 = null;
+var t55: i64 = i64(0);
+var t56: i8 = i8(0);
+var t57: *u8 = null;
+var t58: i64 = i64(0);
+var t59: bool = false;
+var t60: i64 = i64(0);
+var t61: i8 = i8(0);
+var t62: *u8 = null;
+var t63: *u8 = null;
+var t64: i64 = i64(0);
+var t65: i64 = i64(0);
+var t66: *u8 = null;
+if (((v_n36).slot == (-1))) {
+t0 = cast[*u8]("  call void @cool_print(i64 ");
+IR(t0);
+t1 = (v_args7)[0];
+Reg(t1);
+t2 = cast[*u8](", i64 ");
+IR(t2);
+t3 = ((v_n36).a).type;
+RI(t3);
+t4 = cast[*u8](", i64 ");
+IR(t4);
+t5 = (v_n36).name;
+t6 = cast[*u8]("println");
+t7 = Eq(t5, t6);
+t8 = i64(t7);
+RI(t8);
+t9 = cast[*u8](")\n");
+IR(t9);
+t10 = 0;
+t11 = Constant(t10);
+return t11;
+}
+if (((v_n36).slot == (-6))) {
+t12 = Fresh();
+v_r11 = t12;
+t13 = cast[*u8]("  ");
+IR(t13);
+t14 = v_r11;
+Reg(t14);
+t15 = cast[*u8](" = call i64 @cool_owner_count()\n");
+IR(t15);
+return v_r11;
+}
+if (((v_n36).slot == (-7))) {
+t16 = (v_args7)[0];
+t17 = (v_n36).op;
+EmitDrop(t16, t17);
+t18 = 0;
+t19 = Constant(t18);
+return t19;
+}
+if (((v_n36).slot == (-3))) {
+t20 = Fresh();
+v_r11 = t20;
+t21 = cast[*u8]("  ");
+IR(t21);
+t22 = v_r11;
+Reg(t22);
+t23 = cast[*u8](" = call i64 @cool_alloc(i64 ");
+IR(t23);
+t24 = (v_args7)[0];
+Reg(t24);
+t25 = cast[*u8](")\n");
+IR(t25);
+return v_r11;
+}
+if (((v_n36).slot == (-4))) {
+t26 = cast[*u8]("  call void @cool_free(i64 ");
+IR(t26);
+t27 = (v_args7)[0];
+Reg(t27);
+t28 = cast[*u8](")\n");
+IR(t28);
+t29 = 0;
+t30 = Constant(t29);
+return t30;
+}
+if (((v_n36).slot == (-5))) {
+t31 = cast[*u8]("  call void @cool_copy(i64 ");
+IR(t31);
+t32 = (v_args7)[0];
+Reg(t32);
+t33 = cast[*u8](", i64 ");
+IR(t33);
+t34 = (v_args7)[1];
+Reg(t34);
+t35 = cast[*u8](", i64 ");
+IR(t35);
+t36 = (v_args7)[2];
+Reg(t36);
+t37 = cast[*u8](")\n");
+IR(t37);
+t38 = 0;
+t39 = Constant(t38);
+return t39;
+}
+if (((v_n36).slot == (-2))) {
+t40 = cast[*u8]("  call void @cool_assert(i64 ");
+IR(t40);
+t41 = (v_args7)[0];
+Reg(t41);
+t42 = cast[*u8](")\n");
+IR(t42);
+t43 = 0;
+t44 = Constant(t43);
+return t44;
+}
+t45 = (v_n36).type;
+t46 = Aggregate(t45);
+if ((t46 != i8(0))) {
+t47 = (v_n36).storage;
+t48 = SlotAddress(t47);
+v_destination6 = t48;
+}
+t49 = Fresh();
+v_r11 = t49;
+t50 = cast[*u8]("  ");
+IR(t50);
+t51 = v_r11;
+Reg(t51);
+t52 = cast[*u8](" = call i64 @__cool_fn");
+IR(t52);
+t53 = (v_n36).slot;
+RI(t53);
+t54 = cast[*u8]("(");
+IR(t54);
+t55 = (v_n36).type;
+t56 = Aggregate(t55);
+if ((t56 != i8(0))) {
+t57 = cast[*u8]("i64 ");
+IR(t57);
+t58 = v_destination6;
+Reg(t58);
+}
+v_i18 = 0;
+while (true) {
+if (!((v_i18 < (v_n36).value))) { break; }
+t59 = (v_i18 != i64(0));
+if (!t59) {
+t60 = (v_n36).type;
+t61 = Aggregate(t60);
+t59 = (i64(t61) != i64(0));
+}
+if (t59) {
+t62 = cast[*u8](", ");
+IR(t62);
+}
+t63 = cast[*u8]("i64 ");
+IR(t63);
+t64 = (v_args7)[v_i18];
+Reg(t64);
+t65 = v_i18;
+v_i18 = v_i18 + i64(1);
+}
+t66 = cast[*u8](")\n");
+IR(t66);
+return v_r11;
+}
+return i64(0);
+}
+
+
+fn EmitCleanup(arg_v_until: *EScope) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_until: *EScope = arg_v_until;
+var v_s14: *EScope = null;
+var v_d4: *EDeferred = null;
+var t0: *Node = null;
+var t1: *i64 = null;
+var t2: i64 = i64(0);
+v_s14 = ctx.v_scope;
+while (true) {
+if (!((v_s14 != v_until))) { break; }
+v_d4 = (v_s14).calls;
+while (true) {
+if (!((v_d4 != null))) { break; }
+t0 = (v_d4).call;
+t1 = (v_d4).args;
+t2 = EmitCall(t0, t1);
+v_d4 = (v_d4).next;
+}
+v_s14 = (v_s14).parent;
+}
+}
+return;
+}
+
+
+fn EmitStmt(arg_v_n37: *Node) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n37: *Node = arg_v_n37;
+var v_s15: *Node = null;
+var v_saved5: *EScope = null;
+var v_saved_loop1: *EScope = null;
+var v_d5: *EDeferred = null;
+var v_r12: i64 = i64(0);
+var v_value8: i64 = i64(0);
+var v_yes2: i64 = i64(0);
+var v_no2: i64 = i64(0);
+var v_end2: i64 = i64(0);
+var v_cond: i64 = i64(0);
+var v_update: i64 = i64(0);
+var v_saved_break: i64 = i64(0);
+var v_saved_continue: i64 = i64(0);
+var v_left_done: i8 = i8(0);
+var t0: bool = false;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: bool = false;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: *Node = null;
+var t8: *i64 = null;
+var t9: *Node = null;
+var t10: *EScope = null;
+var t11: *Node = null;
+var t12: i64 = i64(0);
+var t13: *Node = null;
+var t14: i64 = i64(0);
+var t15: i64 = i64(0);
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: i8 = i8(0);
+var t20: *Node = null;
+var t21: i64 = i64(0);
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: i64 = i64(0);
+var t26: i64 = i64(0);
+var t27: *Node = null;
+var t28: i64 = i64(0);
+var t29: i64 = i64(0);
+var t30: i64 = i64(0);
+var t31: i64 = i64(0);
+var t32: *u8 = null;
+var t33: i64 = i64(0);
+var t34: *u8 = null;
+var t35: i64 = i64(0);
+var t36: *u8 = null;
+var t37: *Node = null;
+var t38: i64 = i64(0);
+var t39: i64 = i64(0);
+var t40: i64 = i64(0);
+var t41: i64 = i64(0);
+var t42: i64 = i64(0);
+var t43: *Node = null;
+var t44: i64 = i64(0);
+var t45: bool = false;
+var t46: i64 = i64(0);
+var t47: i8 = i8(0);
+var t48: i64 = i64(0);
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: *u8 = null;
+var t52: i64 = i64(0);
+var t53: i64 = i64(0);
+var t54: i64 = i64(0);
+var t55: *EScope = null;
+var t56: *u8 = null;
+var t57: i64 = i64(0);
+var t58: *u8 = null;
+var t59: *Node = null;
+var t60: i64 = i64(0);
+var t61: i64 = i64(0);
+var t62: i64 = i64(0);
+var t63: i64 = i64(0);
+var t64: i64 = i64(0);
+var t65: i64 = i64(0);
+var t66: i64 = i64(0);
+var t67: i64 = i64(0);
+var t68: *Node = null;
+var t69: i64 = i64(0);
+var t70: i64 = i64(0);
+var t71: *Node = null;
+var t72: bool = false;
+var t73: i64 = i64(0);
+var t74: i64 = i64(0);
+var t75: i64 = i64(0);
+var t76: i64 = i64(0);
+var t77: i64 = i64(0);
+var t78: i64 = i64(0);
+var t79: i64 = i64(0);
+var t80: i64 = i64(0);
+var t81: *Node = null;
+var t82: i64 = i64(0);
+var t83: i64 = i64(0);
+var t84: i64 = i64(0);
+var t85: i64 = i64(0);
+var t86: i64 = i64(0);
+var t87: *Node = null;
+var t88: i64 = i64(0);
+var t89: i64 = i64(0);
+var t90: *Node = null;
+var t91: i64 = i64(0);
+var t92: i64 = i64(0);
+var t93: *EScope = null;
+var t94: i64 = i64(0);
+var t95: *EScope = null;
+var t96: i64 = i64(0);
+t0 = !((v_n37 != null));
+if (!t0) {
+t0 = (i64(ctx.v_terminated) != i64(0));
+}
+if (t0) {
+return;
+}
+t1 = (v_n37).kind;
+if (t1 == 12) { while (true) {
+v_saved5 = ctx.v_scope;
+t2 = i64(sizeof(EScope));
+t3 = CAlloc(t2);
+ctx.v_scope = cast[*EScope](t3);
+(ctx.v_scope).parent = v_saved5;
+v_s15 = (v_n37).a;
+while (true) {
+t4 = (v_s15 != null);
+if (t4) {
+t4 = !((ctx.v_terminated != i8(0)));
+}
+if (!(t4)) { break; }
+if (((v_s15).kind == 15)) {
+t5 = i64(sizeof(EDeferred));
+t6 = CAlloc(t5);
+v_d5 = cast[*EDeferred](t6);
+(v_d5).call = (v_s15).a;
+t7 = (v_s15).a;
+t8 = EmitArgs(t7);
+(v_d5).args = t8;
+(v_d5).next = (ctx.v_scope).calls;
+(ctx.v_scope).calls = v_d5;
+} else {
+t9 = v_s15;
+EmitStmt(t9);
+}
+v_s15 = (v_s15).next;
+}
+if (!((ctx.v_terminated != i8(0)))) {
+t10 = v_saved5;
+EmitCleanup(t10);
+}
+ctx.v_scope = v_saved5;
+break; } }
+if (t1 == 19) { while (true) {
+t11 = (v_n37).a;
+t12 = EmitExpr(t11);
+v_r12 = t12;
+t13 = (v_n37).b;
+t14 = EmitExpr(t13);
+v_value8 = t14;
+t15 = v_r12;
+t16 = v_value8;
+t17 = (v_n37).type;
+EmitWrite(t15, t16, t17);
+break; } }
+if (t1 == 7 || t1 == 8) { while (true) {
+t18 = (v_n37).type;
+t19 = Aggregate(t18);
+if ((t19 != i8(0))) {
+t20 = (v_n37).a;
+t21 = EmitExpr(t20);
+v_r12 = t21;
+t22 = (v_n37).slot;
+t23 = SlotAddress(t22);
+t24 = t23;
+t25 = v_r12;
+t26 = (v_n37).type;
+EmitCopy(t24, t25, t26);
+break;
+}
+t27 = (v_n37).a;
+t28 = EmitExpr(t27);
+t29 = t28;
+t30 = (v_n37).type;
+t31 = LocalWrite(t29, t30);
+v_r12 = t31;
+t32 = cast[*u8]("  store i64 ");
+IR(t32);
+t33 = v_r12;
+Reg(t33);
+t34 = cast[*u8](", ptr %v");
+IR(t34);
+t35 = (v_n37).slot;
+RI(t35);
+t36 = cast[*u8]("\n");
+IR(t36);
+break; } }
+if (t1 == 16) { while (true) {
+t37 = (v_n37).a;
+t38 = EmitExpr(t37);
+v_r12 = t38;
+t39 = v_r12;
+t40 = ((v_n37).a).type;
+EmitDrop(t39, t40);
+break; } }
+if (t1 == 9) { while (true) {
+t41 = 0;
+t42 = Constant(t41);
+v_r12 = t42;
+if (((v_n37).a != null)) {
+t43 = (v_n37).a;
+t44 = EmitExpr(t43);
+v_r12 = t44;
+}
+t45 = ((v_n37).a != null);
+if (t45) {
+t46 = ((v_n37).a).type;
+t47 = Aggregate(t46);
+t45 = (i64(t47) != i64(0));
+}
+if (t45) {
+t48 = Fresh();
+v_value8 = t48;
+t49 = cast[*u8]("  ");
+IR(t49);
+t50 = v_value8;
+Reg(t50);
+t51 = cast[*u8](" = add i64 0, %result\n");
+IR(t51);
+t52 = v_value8;
+t53 = v_r12;
+t54 = ((v_n37).a).type;
+EmitCopy(t52, t53, t54);
+v_r12 = v_value8;
+}
+t55 = null;
+EmitCleanup(t55);
+t56 = cast[*u8]("  ret i64 ");
+IR(t56);
+t57 = v_r12;
+Reg(t57);
+t58 = cast[*u8]("\n");
+IR(t58);
+ctx.v_terminated = i8(1);
+break; } }
+if (t1 == 10) { while (true) {
+t59 = (v_n37).a;
+t60 = EmitExpr(t59);
+v_r12 = t60;
+t61 = Label();
+v_yes2 = t61;
+t62 = Label();
+v_no2 = t62;
+t63 = Label();
+v_end2 = t63;
+t64 = v_r12;
+t65 = v_yes2;
+t66 = v_no2;
+Branch(t64, t65, t66);
+t67 = v_yes2;
+AtLabel(t67);
+t68 = (v_n37).b;
+EmitStmt(t68);
+v_left_done = ctx.v_terminated;
+if (!((ctx.v_terminated != i8(0)))) {
+t69 = v_end2;
+Jump(t69);
+}
+t70 = v_no2;
+AtLabel(t70);
+t71 = (v_n37).c;
+EmitStmt(t71);
+t72 = (i64(v_left_done) != i64(0));
+if (t72) {
+t72 = (i64(ctx.v_terminated) != i64(0));
+}
+if (t72) {
+break;
+}
+if (!((ctx.v_terminated != i8(0)))) {
+t73 = v_end2;
+Jump(t73);
+}
+t74 = v_end2;
+AtLabel(t74);
+break; } }
+if (t1 == 21 || t1 == 11) { while (true) {
+t75 = Label();
+v_cond = t75;
+t76 = Label();
+v_yes2 = t76;
+t77 = Label();
+v_end2 = t77;
+t78 = Label();
+v_update = t78;
+t79 = v_cond;
+Jump(t79);
+t80 = v_cond;
+AtLabel(t80);
+t81 = (v_n37).a;
+t82 = EmitExpr(t81);
+v_r12 = t82;
+t83 = v_r12;
+t84 = v_yes2;
+t85 = v_end2;
+Branch(t83, t84, t85);
+t86 = v_yes2;
+AtLabel(t86);
+v_saved_break = ctx.v_loop_break;
+v_saved_continue = ctx.v_loop_continue;
+v_saved_loop1 = ctx.v_loop_scope;
+ctx.v_loop_break = v_end2;
+ctx.v_loop_continue = v_cond;
+if (((v_n37).kind == 21)) {
+ctx.v_loop_continue = v_update;
+}
+ctx.v_loop_scope = ctx.v_scope;
+t87 = (v_n37).b;
+EmitStmt(t87);
+ctx.v_loop_break = v_saved_break;
+ctx.v_loop_continue = v_saved_continue;
+ctx.v_loop_scope = v_saved_loop1;
+if (((v_n37).kind == 21)) {
+if (!((ctx.v_terminated != i8(0)))) {
+t88 = v_update;
+Jump(t88);
+}
+t89 = v_update;
+AtLabel(t89);
+t90 = (v_n37).c;
+EmitStmt(t90);
+}
+if (!((ctx.v_terminated != i8(0)))) {
+t91 = v_cond;
+Jump(t91);
+}
+t92 = v_end2;
+AtLabel(t92);
+break; } }
+if (t1 == 13) { while (true) {
+t93 = ctx.v_loop_scope;
+EmitCleanup(t93);
+t94 = ctx.v_loop_break;
+Jump(t94);
+break; } }
+if (t1 == 14) { while (true) {
+t95 = ctx.v_loop_scope;
+EmitCleanup(t95);
+t96 = ctx.v_loop_continue;
+Jump(t96);
+break; } }
+}
+return;
+}
+
+
+fn EmitLLVM(arg_v_output: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_output: *u8 = arg_v_output;
+var v_i20: i64 = i64(0);
+var v_j8: i64 = i64(0);
+var v_k5: i64 = i64(0);
+var v_parameter2: i64 = i64(0);
+var v_offset2: i64 = i64(0);
+var v_main: i64 = i64(0);
+var v_f17: *Function = null;
+var v_all: *Text = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: *Text = null;
+var t6: *u8 = null;
+var t7: *Text = null;
+var t8: *u8 = null;
+var t9: *Text = null;
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: *Function = null;
+var t15: i64 = i64(0);
+var t16: *u8 = null;
+var t17: *u8 = null;
+var t18: *Function = null;
+var t19: *Node = null;
+var t20: i64 = i64(0);
+var t21: i64 = i64(0);
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: i64 = i64(0);
+var t26: i64 = i64(0);
+var t27: i64 = i64(0);
+var t28: *u8 = null;
+var t29: i64 = i64(0);
+var t30: *u8 = null;
+var t31: i64 = i64(0);
+var t32: *u8 = null;
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: i64 = i64(0);
+var t37: i8 = i8(0);
+var t38: *u8 = null;
+var t39: i64 = i64(0);
+var t40: *u8 = null;
+var t41: i64 = i64(0);
+var t42: *u8 = null;
+var t43: i64 = i64(0);
+var t44: bool = false;
+var t45: *u8 = null;
+var t46: i64 = i64(0);
+var t47: *u8 = null;
+var t48: i64 = i64(0);
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: *u8 = null;
+var t52: i64 = i64(0);
+var t53: *u8 = null;
+var t54: *u8 = null;
+var t55: i64 = i64(0);
+var t56: *u8 = null;
+var t57: *u8 = null;
+var t58: i64 = i64(0);
+var t59: i64 = i64(0);
+var t60: *u8 = null;
+var t61: *u8 = null;
+var t62: bool = false;
+var t63: i64 = i64(0);
+var t64: i8 = i8(0);
+var t65: *u8 = null;
+var t66: i64 = i64(0);
+var t67: i8 = i8(0);
+var t68: *u8 = null;
+var t69: i64 = i64(0);
+var t70: *u8 = null;
+var t71: i64 = i64(0);
+var t72: *Function = null;
+var t73: i64 = i64(0);
+var t74: bool = false;
+var t75: *u8 = null;
+var t76: *u8 = null;
+var t77: i8 = i8(0);
+var t78: *u8 = null;
+var t79: *u8 = null;
+var t80: *u8 = null;
+var t81: *u8 = null;
+var t82: *u8 = null;
+var t83: *u8 = null;
+var t84: *u8 = null;
+var t85: *Text = null;
+var t86: *Text = null;
+var t87: *Token = null;
+var t88: *u8 = null;
+var t89: bool = false;
+var t90: bool = false;
+var t91: bool = false;
+var t92: bool = false;
+var t93: *u8 = null;
+var t94: *u8 = null;
+var t95: i64 = i64(0);
+var pc: i64 = 107;
+while (true) {
+if (pc == 1) {
+pc = 82;
+continue;
+}
+if (pc == 2) {
+pc = 15;
+continue;
+}
+if (pc == 3) {
+return;
+}
+if (pc == 4) {
+t1 = v_output;
+t2 = (v_all).data;
+t3 = (v_all).len;
+t4 = FileWrite(t1, t2, t3);
+if (!((t4 != i64(0)))) { pc = 5; } else { pc = 3; }
+continue;
+}
+if (pc == 5) {
+t0 = cast[*u8]("failed to write LLVM IR");
+Error(t0);
+pc = 3;
+continue;
+}
+if (pc == 6) {
+t5 = v_all;
+t6 = (ctx.v_ir).data;
+Append(t5, t6);
+pc = 4;
+continue;
+}
+if (pc == 7) {
+if (((ctx.v_globals).len != i64(0))) { pc = 8; } else { pc = 6; }
+continue;
+}
+if (pc == 8) {
+t7 = v_all;
+t8 = (ctx.v_globals).data;
+Append(t7, t8);
+pc = 6;
+continue;
+}
+if (pc == 9) {
+t9 = TextNew();
+v_all = t9;
+pc = 7;
+continue;
+}
+if (pc == 10) {
+t10 = cast[*u8]("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
+IR(t10);
+pc = 9;
+continue;
+}
+if (pc == 11) {
+t11 = v_main;
+RI(t11);
+pc = 10;
+continue;
+}
+if (pc == 12) {
+t12 = cast[*u8]("define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @cool_args_init(i32 %argc, ptr %argv)\n  %exit = call i64 @__cool_fn");
+IR(t12);
+pc = 11;
+continue;
+}
+if (pc == 13) {
+if ((v_i20 < ctx.v_nfun)) { pc = 77; } else { pc = 12; }
+continue;
+}
+if (pc == 14) {
+t13 = v_i20;
+v_i20 = v_i20 + i64(1);
+pc = 13;
+continue;
+}
+if (pc == 15) {
+pc = 14;
+continue;
+}
+if (pc == 16) {
+if (((v_f17).exported != i64(0))) { pc = 17; } else { pc = 2; }
+continue;
+}
+if (pc == 17) {
+t14 = v_f17;
+t15 = v_i20;
+ExportWrapper(t14, t15);
+pc = 2;
+continue;
+}
+if (pc == 18) {
+t16 = cast[*u8]("}\n");
+IR(t16);
+pc = 16;
+continue;
+}
+if (pc == 19) {
+if (!((ctx.v_terminated != i8(0)))) { pc = 20; } else { pc = 18; }
+continue;
+}
+if (pc == 20) {
+t17 = cast[*u8]("  ret i64 0\n");
+IR(t17);
+pc = 18;
+continue;
+}
+if (pc == 21) {
+if (((v_f17).foreign != i64(0))) { pc = 23; } else { pc = 24; }
+continue;
+}
+if (pc == 22) {
+ctx.v_terminated = i8(1);
+pc = 19;
+continue;
+}
+if (pc == 23) {
+t18 = v_f17;
+ForeignWrapper(t18);
+pc = 22;
+continue;
+}
+if (pc == 24) {
+t19 = (v_f17).body;
+EmitStmt(t19);
+pc = 19;
+continue;
+}
+if (pc == 25) {
+t44 = !(((v_f17).foreign != i64(0)));
+if (t44) {
+t44 = (v_j8 < (v_f17).argc);
+}
+if (t44) { pc = 41; } else { pc = 21; }
+continue;
+}
+if (pc == 26) {
+t20 = v_j8;
+v_j8 = v_j8 + i64(1);
+pc = 25;
+continue;
+}
+if (pc == 27) {
+t21 = (&((v_f17).arg_types)[0])[v_j8];
+t22 = TypeSlots(t21);
+v_offset2 = v_offset2 + t22;
+pc = 26;
+continue;
+}
+if (pc == 28) {
+t36 = (&((v_f17).arg_types)[0])[v_j8];
+t37 = Aggregate(t36);
+if ((t37 != i8(0))) { pc = 29; } else { pc = 35; }
+continue;
+}
+if (pc == 29) {
+t23 = v_offset2;
+t24 = SlotAddress(t23);
+t25 = t24;
+t26 = v_parameter2;
+t27 = (&((v_f17).arg_types)[0])[v_j8];
+EmitCopy(t25, t26, t27);
+pc = 27;
+continue;
+}
+if (pc == 30) {
+t28 = cast[*u8]("\n");
+IR(t28);
+pc = 27;
+continue;
+}
+if (pc == 31) {
+t29 = v_offset2;
+RI(t29);
+pc = 30;
+continue;
+}
+if (pc == 32) {
+t30 = cast[*u8](", ptr %v");
+IR(t30);
+pc = 31;
+continue;
+}
+if (pc == 33) {
+t31 = v_parameter2;
+Reg(t31);
+pc = 32;
+continue;
+}
+if (pc == 34) {
+t32 = cast[*u8]("  store i64 ");
+IR(t32);
+pc = 33;
+continue;
+}
+if (pc == 35) {
+t33 = v_parameter2;
+t34 = (&((v_f17).arg_types)[0])[v_j8];
+t35 = LocalWrite(t33, t34);
+v_parameter2 = t35;
+pc = 34;
+continue;
+}
+if (pc == 36) {
+t38 = cast[*u8]("\n");
+IR(t38);
+pc = 28;
+continue;
+}
+if (pc == 37) {
+t39 = v_j8;
+RI(t39);
+pc = 36;
+continue;
+}
+if (pc == 38) {
+t40 = cast[*u8](" = add i64 0, %a");
+IR(t40);
+pc = 37;
+continue;
+}
+if (pc == 39) {
+t41 = v_parameter2;
+Reg(t41);
+pc = 38;
+continue;
+}
+if (pc == 40) {
+t42 = cast[*u8]("  ");
+IR(t42);
+pc = 39;
+continue;
+}
+if (pc == 41) {
+t43 = Fresh();
+v_parameter2 = t43;
+pc = 40;
+continue;
+}
+if (pc == 42) {
+v_j8 = 0;
+pc = 25;
+continue;
+}
+if (pc == 43) {
+v_offset2 = 0;
+pc = 42;
+continue;
+}
+if (pc == 44) {
+if (((v_f17).drops != null)) { pc = 47; } else { pc = 43; }
+continue;
+}
+if (pc == 45) {
+t45 = cast[*u8](")\n");
+IR(t45);
+pc = 43;
+continue;
+}
+if (pc == 46) {
+t46 = (((v_f17).slots + 1) * 8);
+RI(t46);
+pc = 45;
+continue;
+}
+if (pc == 47) {
+t47 = cast[*u8]("  %frame_address = ptrtoint ptr %frame to i64\n  call void @cool_zero(i64 %frame_address, i64 ");
+IR(t47);
+pc = 46;
+continue;
+}
+if (pc == 48) {
+if ((v_j8 < (v_f17).slots)) { pc = 54; } else { pc = 44; }
+continue;
+}
+if (pc == 49) {
+t48 = v_j8;
+v_j8 = v_j8 + i64(1);
+pc = 48;
+continue;
+}
+if (pc == 50) {
+t49 = cast[*u8]("\n");
+IR(t49);
+pc = 49;
+continue;
+}
+if (pc == 51) {
+t50 = v_j8;
+RI(t50);
+pc = 50;
+continue;
+}
+if (pc == 52) {
+t51 = cast[*u8](" = getelementptr i64, ptr %frame, i64 ");
+IR(t51);
+pc = 51;
+continue;
+}
+if (pc == 53) {
+t52 = v_j8;
+RI(t52);
+pc = 52;
+continue;
+}
+if (pc == 54) {
+t53 = cast[*u8]("  %v");
+IR(t53);
+pc = 53;
+continue;
+}
+if (pc == 55) {
+v_j8 = 0;
+pc = 48;
+continue;
+}
+if (pc == 56) {
+t54 = cast[*u8](" x i64], align 8\n");
+IR(t54);
+pc = 55;
+continue;
+}
+if (pc == 57) {
+t55 = ((v_f17).slots + 1);
+RI(t55);
+pc = 56;
+continue;
+}
+if (pc == 58) {
+t56 = cast[*u8]("  %frame = alloca [");
+IR(t56);
+pc = 57;
+continue;
+}
+if (pc == 59) {
+t57 = cast[*u8](") {\nentry:\n");
+IR(t57);
+pc = 58;
+continue;
+}
+if (pc == 60) {
+if ((v_j8 < (v_f17).argc)) { pc = 64; } else { pc = 59; }
+continue;
+}
+if (pc == 61) {
+t58 = v_j8;
+v_j8 = v_j8 + i64(1);
+pc = 60;
+continue;
+}
+if (pc == 62) {
+t59 = v_j8;
+RI(t59);
+pc = 61;
+continue;
+}
+if (pc == 63) {
+t60 = cast[*u8]("i64 %a");
+IR(t60);
+pc = 62;
+continue;
+}
+if (pc == 64) {
+t62 = (v_j8 != i64(0));
+if (!t62) {
+t63 = (v_f17).result;
+t64 = Aggregate(t63);
+t62 = (i64(t64) != i64(0));
+}
+if (t62) { pc = 65; } else { pc = 63; }
+continue;
+}
+if (pc == 65) {
+t61 = cast[*u8](", ");
+IR(t61);
+pc = 63;
+continue;
+}
+if (pc == 66) {
+v_j8 = 0;
+pc = 60;
+continue;
+}
+if (pc == 67) {
+t66 = (v_f17).result;
+t67 = Aggregate(t66);
+if ((t67 != i8(0))) { pc = 68; } else { pc = 66; }
+continue;
+}
+if (pc == 68) {
+t65 = cast[*u8]("i64 %result");
+IR(t65);
+pc = 66;
+continue;
+}
+if (pc == 69) {
+t68 = cast[*u8]("(");
+IR(t68);
+pc = 67;
+continue;
+}
+if (pc == 70) {
+t69 = v_i20;
+RI(t69);
+pc = 69;
+continue;
+}
+if (pc == 71) {
+t70 = cast[*u8]("define i64 @__cool_fn");
+IR(t70);
+pc = 70;
+continue;
+}
+if (pc == 72) {
+ctx.v_scope = null;
+pc = 71;
+continue;
+}
+if (pc == 73) {
+ctx.v_terminated = i8(0);
+pc = 72;
+continue;
+}
+if (pc == 74) {
+ctx.v_reg_id = 0;
+pc = 73;
+continue;
+}
+if (pc == 75) {
+if (((v_f17).generic_count != i64(0))) { pc = 76; } else { pc = 74; }
+continue;
+}
+if (pc == 76) {
+pc = 2;
+continue;
+}
+if (pc == 77) {
+v_f17 = &((ctx.v_functions)[v_i20]);
+pc = 75;
+continue;
+}
+if (pc == 78) {
+v_i20 = 0;
+pc = 13;
+continue;
+}
+if (pc == 79) {
+EmitDropFunctions();
+pc = 78;
+continue;
+}
+if (pc == 80) {
+if ((v_i20 < ctx.v_nfun)) { pc = 90; } else { pc = 79; }
+continue;
+}
+if (pc == 81) {
+t71 = v_i20;
+v_i20 = v_i20 + i64(1);
+pc = 80;
+continue;
+}
+if (pc == 82) {
+pc = 81;
+continue;
+}
+if (pc == 83) {
+if (((v_f17).foreign != i64(0))) { pc = 89; } else { pc = 1; }
+continue;
+}
+if (pc == 84) {
+t72 = v_f17;
+ForeignDeclaration(t72);
+pc = 1;
+continue;
+}
+if (pc == 85) {
+if ((v_k5 < v_i20)) { pc = 87; } else { pc = 84; }
+continue;
+}
+if (pc == 86) {
+t73 = v_k5;
+v_k5 = v_k5 + i64(1);
+pc = 85;
+continue;
+}
+if (pc == 87) {
+t74 = (((ctx.v_functions)[v_k5]).foreign != i64(0));
+if (t74) {
+t75 = ((ctx.v_functions)[v_k5]).name;
+t76 = (v_f17).name;
+t77 = Eq(t75, t76);
+t74 = (i64(t77) != i64(0));
+}
+if (t74) { pc = 88; } else { pc = 86; }
+continue;
+}
+if (pc == 88) {
+pc = 1;
+continue;
+}
+if (pc == 89) {
+v_k5 = 0;
+pc = 85;
+continue;
+}
+if (pc == 90) {
+v_f17 = &((ctx.v_functions)[v_i20]);
+pc = 83;
+continue;
+}
+if (pc == 91) {
+v_i20 = 0;
+pc = 80;
+continue;
+}
+if (pc == 92) {
+t78 = cast[*u8]("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n");
+IR(t78);
+pc = 91;
+continue;
+}
+if (pc == 93) {
+t79 = cast[*u8]("declare i64 @cool_cast(i64, i64, i64)\n");
+IR(t79);
+pc = 92;
+continue;
+}
+if (pc == 94) {
+t80 = cast[*u8]("declare void @cool_args_init(i32, ptr)\n");
+IR(t80);
+pc = 93;
+continue;
+}
+if (pc == 95) {
+t81 = cast[*u8]("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n");
+IR(t81);
+pc = 94;
+continue;
+}
+if (pc == 96) {
+t82 = cast[*u8]("declare void @cool_zero(i64, i64)\ndeclare i64 @cool_length(i64, i64, i64)\ndeclare i64 @cool_index(i64, i64, i64, i64, i64)\ndeclare void @cool_slice(i64, i64, i64, i64, i64, i64, i64)\n");
+IR(t82);
+pc = 95;
+continue;
+}
+if (pc == 97) {
+t83 = cast[*u8]("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
+IR(t83);
+pc = 96;
+continue;
+}
+if (pc == 98) {
+t84 = cast[*u8]("; Generated by the Cool-written frontend. No C transpilation.\n");
+IR(t84);
+pc = 97;
+continue;
+}
+if (pc == 99) {
+t85 = TextNew();
+ctx.v_globals = t85;
+pc = 98;
+continue;
+}
+if (pc == 100) {
+t86 = TextNew();
+ctx.v_ir = t86;
+pc = 99;
+continue;
+}
+if (pc == 101) {
+t89 = (((ctx.v_functions)[v_main]).generic_count != i64(0));
+if (!t89) {
+t89 = (((ctx.v_functions)[v_main]).argc != i64(0));
+}
+t90 = t89;
+if (!t90) {
+t91 = (((ctx.v_functions)[v_main]).result != 0);
+if (t91) {
+t91 = (((ctx.v_functions)[v_main]).result != 4);
+}
+t92 = t91;
+if (t92) {
+t92 = (((ctx.v_functions)[v_main]).result != 1);
+}
+t90 = t92;
+}
+if (t90) { pc = 102; } else { pc = 100; }
+continue;
+}
+if (pc == 102) {
+t87 = ((ctx.v_functions)[v_main]).token;
+t88 = cast[*u8]("invalid main signature");
+ErrorAt(t87, t88);
+pc = 100;
+continue;
+}
+if (pc == 103) {
+if ((v_main < 0)) { pc = 104; } else { pc = 101; }
+continue;
+}
+if (pc == 104) {
+t93 = cast[*u8]("no main function");
+Error(t93);
+pc = 101;
+continue;
+}
+if (pc == 105) {
+pc = 103;
+continue;
+}
+if (pc == 106) {
+pc = 105;
+continue;
+}
+if (pc == 107) {
+t94 = cast[*u8]("main");
+t95 = FindFun(t94);
+v_main = t95;
+pc = 106;
+continue;
+}
+}
+}
+return;
+}
+

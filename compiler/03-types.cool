@@ -1,0 +1,1644 @@
+fn Owned(arg_v_type1: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type1: i64 = arg_v_type1;
+var v_f: *Field = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *AggregateType = null;
+var t5: i64 = i64(0);
+var t6: *AggregateType = null;
+var t7: i64 = i64(0);
+var t8: *AggregateType = null;
+var t9: i64 = i64(0);
+var t10: i8 = i8(0);
+var t11: i64 = i64(0);
+var t12: *AggregateType = null;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+t0 = v_type1;
+t1 = Aggregate(t0);
+if (!((t1 != i8(0)))) {
+return i8(0);
+}
+t2 = v_type1;
+Layout(t2);
+t3 = v_type1;
+t4 = Shape(t3);
+if (((t4).kind == 5)) {
+return i8(1);
+}
+t5 = v_type1;
+t6 = Shape(t5);
+if (((t6).kind == 2)) {
+t7 = v_type1;
+t8 = Shape(t7);
+t9 = (t8).element;
+t10 = Owned(t9);
+return t10;
+}
+t11 = v_type1;
+t12 = Shape(t11);
+v_f = (t12).fields;
+while (true) {
+if (!((v_f != null))) { break; }
+t13 = (v_f).type;
+t14 = Owned(t13);
+if ((t14 != i8(0))) {
+return i8(1);
+}
+v_f = (v_f).next;
+}
+return i8(0);
+}
+return i8(0);
+}
+
+
+fn Layout(arg_v_type8: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type8: i64 = arg_v_type8;
+var v_a3: *AggregateType = null;
+var v_f1: *Field = null;
+var v_tail: *Field = null;
+var v_other: *Field = null;
+var v_saved: i64 = i64(0);
+var v_field_type: i64 = i64(0);
+var v_align: i64 = i64(0);
+var v_max_payload: i64 = i64(0);
+var v_name6: *u8 = null;
+var v_public: i8 = i8(0);
+var v_saved_bindings: *TypeBinding = null;
+var t0: i64 = i64(0);
+var t1: *AggregateType = null;
+var t2: *Token = null;
+var t3: *u8 = null;
+var t4: *Token = null;
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: *AggregateType = null;
+var t12: **u8 = null;
+var t13: *i64 = null;
+var t14: i64 = i64(0);
+var t15: *AggregateType = null;
+var t16: i64 = i64(0);
+var t17: *u8 = null;
+var t18: i8 = i8(0);
+var t19: i64 = i64(0);
+var t20: *u8 = null;
+var t21: i64 = i64(0);
+var t22: i8 = i8(0);
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: *u8 = null;
+var t26: i64 = i64(0);
+var t27: *u8 = null;
+var t28: i64 = i64(0);
+var t29: *u8 = null;
+var t30: i64 = i64(0);
+var t31: *u8 = null;
+var t32: *u8 = null;
+var t33: *u8 = null;
+var t34: i8 = i8(0);
+var t35: *u8 = null;
+var t36: i64 = i64(0);
+var t37: i64 = i64(0);
+var t38: i64 = i64(0);
+var t39: i64 = i64(0);
+var t40: i64 = i64(0);
+var t41: i64 = i64(0);
+var t42: *u8 = null;
+var t43: i64 = i64(0);
+var t44: i64 = i64(0);
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: i64 = i64(0);
+var t50: *Token = null;
+var t51: *u8 = null;
+var t52: i64 = i64(0);
+var t53: i64 = i64(0);
+var t54: i64 = i64(0);
+var t55: *Token = null;
+var t56: *u8 = null;
+t0 = v_type8;
+t1 = Shape(t0);
+v_a3 = t1;
+v_tail = null;
+v_max_payload = 0;
+if (((v_a3).generic_count != i64(0))) {
+t2 = (v_a3).token;
+t3 = cast[*u8]("generic type requires explicit arguments");
+ErrorAt(t2, t3);
+}
+if (((v_a3).state == 2)) {
+return;
+}
+if (((v_a3).state == 1)) {
+t4 = (v_a3).token;
+t5 = cast[*u8]("recursive aggregate requires a pointer");
+ErrorAt(t4, t5);
+}
+(v_a3).state = 1;
+(v_a3).align = 1;
+if (((v_a3).kind == 5)) {
+(v_a3).align = 8;
+(v_a3).size = (v_a3).align;
+} else {
+if (((v_a3).kind == 3)) {
+(v_a3).size = 16;
+(v_a3).align = 8;
+} else {
+if (((v_a3).kind == 2)) {
+t6 = (v_a3).element;
+t7 = ByteSize(t6);
+(v_a3).size = (t7 * (v_a3).count);
+t8 = (v_a3).element;
+t9 = Alignment(t8);
+(v_a3).align = t9;
+} else {
+v_saved = ctx.v_pos;
+v_saved_bindings = ctx.v_type_bindings;
+ctx.v_type_bindings = null;
+if (((v_a3).origin != i64(0))) {
+t10 = (v_a3).origin;
+t11 = Shape(t10);
+t12 = &((t11).generic_names)[0];
+t13 = &((v_a3).generic_args)[0];
+t14 = (v_a3).origin;
+t15 = Shape(t14);
+t16 = (t15).generic_count;
+BindTypes(t12, t13, t16);
+}
+ctx.v_pos = (v_a3).begin;
+(v_a3).fields = null;
+(v_a3).count = 0;
+while (true) {
+if (!((ctx.v_pos < (v_a3).end))) { break; }
+v_public = i8(0);
+t17 = cast[*u8]("pub");
+t18 = Is(t17);
+if ((t18 != i8(0))) {
+t19 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+v_public = i8(1);
+}
+t20 = Ident();
+v_name6 = t20;
+if (((v_a3).kind == 4)) {
+v_field_type = 0;
+v_public = i8(1);
+t21 = 40;
+t22 = Take(t21);
+if ((t22 != i8(0))) {
+t23 = ParseType();
+v_field_type = t23;
+t24 = 41;
+t25 = cast[*u8]("expected ')' after variant payload");
+Need(t24, t25);
+}
+} else {
+t26 = 58;
+t27 = cast[*u8]("expected ':' after field name");
+Need(t26, t27);
+t28 = ParseType();
+v_field_type = t28;
+if (!((v_field_type != i64(0)))) {
+t29 = cast[*u8]("field cannot be void");
+Error(t29);
+}
+}
+t30 = 59;
+t31 = cast[*u8]("expected ';' after field");
+Need(t30, t31);
+v_other = (v_a3).fields;
+while (true) {
+if (!((v_other != null))) { break; }
+t32 = (v_other).name;
+t33 = v_name6;
+t34 = Eq(t32, t33);
+if ((t34 != i8(0))) {
+t35 = cast[*u8]("duplicate field");
+Error(t35);
+}
+v_other = (v_other).next;
+}
+v_align = 1;
+if ((v_field_type != i64(0))) {
+t36 = v_field_type;
+t37 = Alignment(t36);
+v_align = t37;
+}
+if (((v_a3).kind != 4)) {
+t38 = (v_a3).size;
+t39 = v_align;
+t40 = AlignSize(t38, t39);
+(v_a3).size = t40;
+}
+t41 = i64(sizeof(Field));
+t42 = CAlloc(t41);
+v_f1 = cast[*Field](t42);
+(v_f1).name = v_name6;
+(v_f1).type = v_field_type;
+(v_f1).offset = (v_a3).size;
+(v_f1).public = i64(v_public);
+(v_f1).tag = (v_a3).count;
+if (((v_a3).kind == 4)) {
+(v_f1).offset = 8;
+}
+if ((v_tail != null)) {
+(v_tail).next = v_f1;
+} else {
+(v_a3).fields = v_f1;
+}
+v_tail = v_f1;
+if (((v_a3).kind == 4)) {
+t43 = v_field_type;
+t44 = ByteSize(t43);
+if ((t44 > v_max_payload)) {
+t45 = v_field_type;
+t46 = ByteSize(t45);
+v_max_payload = t46;
+}
+} else {
+t47 = v_field_type;
+t48 = ByteSize(t47);
+(v_a3).size = (v_a3).size + t48;
+}
+if ((v_align > (v_a3).align)) {
+(v_a3).align = v_align;
+}
+t49 = (v_a3).count;
+(v_a3).count = (v_a3).count + i64(1);
+}
+if (((v_a3).kind == 4)) {
+if (!(((v_a3).count != i64(0)))) {
+t50 = (v_a3).token;
+t51 = cast[*u8]("enum must contain a variant");
+ErrorAt(t50, t51);
+}
+(v_a3).align = 8;
+(v_a3).size = (8 + v_max_payload);
+}
+t52 = (v_a3).size;
+t53 = (v_a3).align;
+t54 = AlignSize(t52, t53);
+(v_a3).size = t54;
+ctx.v_pos = v_saved;
+ctx.v_type_bindings = v_saved_bindings;
+}
+}
+}
+if (((v_a3).size > 524288)) {
+t55 = (v_a3).token;
+t56 = cast[*u8]("aggregate exceeds 512 KiB implementation limit");
+ErrorAt(t55, t56);
+}
+(v_a3).state = 2;
+}
+return;
+}
+
+
+fn FindType(arg_v_package1: *u8, arg_v_name7: *u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_package1: *u8 = arg_v_package1;
+var v_name7: *u8 = arg_v_name7;
+var v_i3: i64 = i64(0);
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: i8 = i8(0);
+var t6: bool = false;
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: i8 = i8(0);
+var t10: i64 = i64(0);
+v_i3 = 0;
+while (true) {
+if (!((v_i3 < ctx.v_naggregates))) { break; }
+t0 = (((ctx.v_aggregate_types)[v_i3]).kind == 1);
+if (!t0) {
+t0 = (((ctx.v_aggregate_types)[v_i3]).kind == 4);
+}
+t1 = t0;
+if (t1) {
+t1 = !((((ctx.v_aggregate_types)[v_i3]).origin != i64(0)));
+}
+t2 = t1;
+if (t2) {
+t3 = ((ctx.v_aggregate_types)[v_i3]).package;
+t4 = v_package1;
+t5 = Eq(t3, t4);
+t2 = (i64(t5) != i64(0));
+}
+t6 = t2;
+if (t6) {
+t7 = ((ctx.v_aggregate_types)[v_i3]).name;
+t8 = v_name7;
+t9 = Eq(t7, t8);
+t6 = (i64(t9) != i64(0));
+}
+if (t6) {
+return (1000 + v_i3);
+}
+t10 = v_i3;
+v_i3 = v_i3 + i64(1);
+}
+return (-1);
+}
+return i64(0);
+}
+
+
+fn NewType(arg_v_kind1: i64, arg_v_token: *Token) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_kind1: i64 = arg_v_kind1;
+var v_token: *Token = arg_v_token;
+var v_type18: i64 = i64(0);
+var t0: *Token = null;
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: *AggregateType = null;
+var t9: i64 = i64(0);
+var t10: *AggregateType = null;
+if ((ctx.v_naggregates == 4096)) {
+t0 = v_token;
+t1 = cast[*u8]("type limit exceeded");
+ErrorAt(t0, t1);
+}
+t2 = ctx.v_naggregates;
+ctx.v_naggregates = ctx.v_naggregates + i64(1);
+v_type18 = (1000 + t2);
+t3 = cast[*u8](&((ctx.v_aggregate_types)[(v_type18 - 1000)]));
+t4 = 0;
+t5 = i64(sizeof(AggregateType));
+t6 = MemSet(t3, t4, t5);
+t7 = v_type18;
+t8 = Shape(t7);
+(t8).kind = v_kind1;
+t9 = v_type18;
+t10 = Shape(t9);
+(t10).token = v_token;
+return v_type18;
+}
+return i64(0);
+}
+
+
+fn SequenceType(arg_v_kind2: i64, arg_v_element: i64, arg_v_count: i64, arg_v_token1: *Token) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_kind2: i64 = arg_v_kind2;
+var v_element: i64 = arg_v_element;
+var v_count: i64 = arg_v_count;
+var v_token1: *Token = arg_v_token1;
+var v_i4: i64 = i64(0);
+var v_type19: i64 = i64(0);
+var t0: bool = false;
+var t1: *Token = null;
+var t2: *u8 = null;
+var t3: bool = false;
+var t4: *Token = null;
+var t5: *u8 = null;
+var t6: bool = false;
+var t7: bool = false;
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: *Token = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *AggregateType = null;
+var t14: i64 = i64(0);
+var t15: *AggregateType = null;
+t0 = (v_element == 0);
+if (!t0) {
+t0 = (v_element == 13);
+}
+if (t0) {
+t1 = v_token1;
+t2 = cast[*u8]("invalid element type");
+ErrorAt(t1, t2);
+}
+t3 = (v_count < 0);
+if (!t3) {
+t3 = (v_count > 65536);
+}
+if (t3) {
+t4 = v_token1;
+t5 = cast[*u8]("array length outside 0..65536");
+ErrorAt(t4, t5);
+}
+v_i4 = 0;
+while (true) {
+if (!((v_i4 < ctx.v_naggregates))) { break; }
+t6 = (((ctx.v_aggregate_types)[v_i4]).kind == v_kind2);
+if (t6) {
+t6 = (((ctx.v_aggregate_types)[v_i4]).element == v_element);
+}
+t7 = t6;
+if (t7) {
+t7 = (((ctx.v_aggregate_types)[v_i4]).count == v_count);
+}
+if (t7) {
+return (1000 + v_i4);
+}
+t8 = v_i4;
+v_i4 = v_i4 + i64(1);
+}
+t9 = v_kind2;
+t10 = v_token1;
+t11 = NewType(t9, t10);
+v_type19 = t11;
+t12 = v_type19;
+t13 = Shape(t12);
+(t13).element = v_element;
+t14 = v_type19;
+t15 = Shape(t14);
+(t15).count = v_count;
+return v_type19;
+}
+return i64(0);
+}
+
+
+fn BindingType(arg_v_name8: *u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_name8: *u8 = arg_v_name8;
+var v_b1: *TypeBinding = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+v_b1 = ctx.v_type_bindings;
+while (true) {
+if (!((v_b1 != null))) { break; }
+t0 = (v_b1).name;
+t1 = v_name8;
+t2 = Eq(t0, t1);
+if ((t2 != i8(0))) {
+return (v_b1).type;
+}
+v_b1 = (v_b1).next;
+}
+return (-1);
+}
+return i64(0);
+}
+
+
+fn BindTypes(arg_v_names: **u8, arg_v_types: *i64, arg_v_count1: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_names: **u8 = arg_v_names;
+var v_types: *i64 = arg_v_types;
+var v_count1: i64 = arg_v_count1;
+var v_i5: i64 = i64(0);
+var v_b2: *TypeBinding = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+ctx.v_type_bindings = null;
+v_i5 = 0;
+while (true) {
+if (!((v_i5 < v_count1))) { break; }
+t0 = i64(sizeof(TypeBinding));
+t1 = CAlloc(t0);
+v_b2 = cast[*TypeBinding](t1);
+(v_b2).name = (v_names)[v_i5];
+(v_b2).type = (v_types)[v_i5];
+(v_b2).next = ctx.v_type_bindings;
+ctx.v_type_bindings = v_b2;
+t2 = v_i5;
+v_i5 = v_i5 + i64(1);
+}
+}
+return;
+}
+
+
+fn GenericNames(arg_v_names1: **u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_names1: **u8 = arg_v_names1;
+var v_count2: i64 = i64(0);
+var v_j: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+var t5: *u8 = null;
+var t6: *u8 = null;
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: i8 = i8(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+v_count2 = 0;
+t0 = 91;
+t1 = Take(t0);
+if (!((t1 != i8(0)))) {
+return 0;
+}
+t2 = true;
+while (true) {
+if (!t2) {
+t3 = 44;
+t4 = Take(t3);
+if (!((t4 != i8(0)))) { break; }
+}
+t2 = false;
+if ((v_count2 == 8)) {
+t5 = cast[*u8]("generic parameter limit exceeded");
+Error(t5);
+}
+t6 = Ident();
+(v_names1)[v_count2] = t6;
+v_j = 0;
+while (true) {
+if (!((v_j < v_count2))) { break; }
+t7 = (v_names1)[v_j];
+t8 = (v_names1)[v_count2];
+t9 = Eq(t7, t8);
+if ((t9 != i8(0))) {
+t10 = cast[*u8]("duplicate type parameter");
+Error(t10);
+}
+t11 = v_j;
+v_j = v_j + i64(1);
+}
+t12 = v_count2;
+v_count2 = v_count2 + i64(1);
+}
+t13 = 93;
+t14 = cast[*u8]("expected ']' after type parameters");
+Need(t13, t14);
+return v_count2;
+}
+return i64(0);
+}
+
+
+fn TypeArguments(arg_v_types1: *i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_types1: *i64 = arg_v_types1;
+var v_count4: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+v_count4 = 0;
+t0 = 91;
+t1 = cast[*u8]("generic arguments must be explicit");
+Need(t0, t1);
+t2 = true;
+while (true) {
+if (!t2) {
+t3 = 44;
+t4 = Take(t3);
+if (!((t4 != i8(0)))) { break; }
+}
+t2 = false;
+if ((v_count4 == 8)) {
+t5 = cast[*u8]("generic argument limit exceeded");
+Error(t5);
+}
+t6 = ParseType();
+(v_types1)[v_count4] = t6;
+if (((v_types1)[v_count4] == 0)) {
+t7 = cast[*u8]("generic argument cannot be void");
+Error(t7);
+}
+t8 = v_count4;
+v_count4 = v_count4 + i64(1);
+}
+t9 = 93;
+t10 = cast[*u8]("expected ']' after type arguments");
+Need(t9, t10);
+return v_count4;
+}
+return i64(0);
+}
+
+
+fn InstantiateType(arg_v_template_type: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_template_type: i64 = arg_v_template_type;
+var v_args: [8]i64 = [8]i64{};
+var v_count5: i64 = i64(0);
+var v_i6: i64 = i64(0);
+var v_j1: i64 = i64(0);
+var v_type20: i64 = i64(0);
+var v_base1: *AggregateType = null;
+var v_a4: *AggregateType = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *AggregateType = null;
+var t7: i64 = i64(0);
+var t8: *Token = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: *i64 = null;
+var t14: i64 = i64(0);
+var t15: i64 = i64(0);
+var t16: *AggregateType = null;
+var pc: i64 = 28;
+while (true) {
+if (pc == 1) {
+pc = 16;
+continue;
+}
+if (pc == 2) {
+return i64(0);
+}
+if (pc == 3) {
+return v_type20;
+}
+if (pc == 4) {
+if ((v_j1 < v_count5)) { pc = 6; } else { pc = 3; }
+continue;
+}
+if (pc == 5) {
+t0 = v_j1;
+v_j1 = v_j1 + i64(1);
+pc = 4;
+continue;
+}
+if (pc == 6) {
+(&((v_a4).generic_args)[0])[v_j1] = (&(v_args)[0])[v_j1];
+pc = 5;
+continue;
+}
+if (pc == 7) {
+v_j1 = 0;
+pc = 4;
+continue;
+}
+if (pc == 8) {
+(v_a4).generic_count = 0;
+pc = 7;
+continue;
+}
+if (pc == 9) {
+(v_a4).origin = v_template_type;
+pc = 8;
+continue;
+}
+if (pc == 10) {
+t1 = cast[*u8](v_a4);
+t2 = cast[*u8](v_base1);
+t3 = i64(sizeof(AggregateType));
+t4 = MemCpy(t1, t2, t3);
+pc = 9;
+continue;
+}
+if (pc == 11) {
+t5 = v_type20;
+t6 = Shape(t5);
+v_a4 = t6;
+pc = 10;
+continue;
+}
+if (pc == 12) {
+t7 = (v_base1).kind;
+t8 = (v_base1).token;
+t9 = NewType(t7, t8);
+v_type20 = t9;
+pc = 11;
+continue;
+}
+if (pc == 13) {
+if ((v_i6 < ctx.v_naggregates)) { pc = 15; } else { pc = 12; }
+continue;
+}
+if (pc == 14) {
+t10 = v_i6;
+v_i6 = v_i6 + i64(1);
+pc = 13;
+continue;
+}
+if (pc == 15) {
+if ((((ctx.v_aggregate_types)[v_i6]).origin == v_template_type)) { pc = 22; } else { pc = 14; }
+continue;
+}
+if (pc == 16) {
+pc = 14;
+continue;
+}
+if (pc == 17) {
+return (1000 + v_i6);
+}
+if (pc == 18) {
+if ((v_j1 < v_count5)) { pc = 20; } else { pc = 17; }
+continue;
+}
+if (pc == 19) {
+t11 = v_j1;
+v_j1 = v_j1 + i64(1);
+pc = 18;
+continue;
+}
+if (pc == 20) {
+if (((&(((ctx.v_aggregate_types)[v_i6]).generic_args)[0])[v_j1] != (&(v_args)[0])[v_j1])) { pc = 21; } else { pc = 19; }
+continue;
+}
+if (pc == 21) {
+pc = 1;
+continue;
+}
+if (pc == 22) {
+v_j1 = 0;
+pc = 18;
+continue;
+}
+if (pc == 23) {
+v_i6 = 0;
+pc = 13;
+continue;
+}
+if (pc == 24) {
+if ((v_count5 != (v_base1).generic_count)) { pc = 25; } else { pc = 23; }
+continue;
+}
+if (pc == 25) {
+t12 = cast[*u8]("wrong generic argument count");
+Error(t12);
+pc = 23;
+continue;
+}
+if (pc == 26) {
+t13 = &(v_args)[0];
+t14 = TypeArguments(t13);
+v_count5 = t14;
+pc = 24;
+continue;
+}
+if (pc == 27) {
+t15 = v_template_type;
+t16 = Shape(t15);
+v_base1 = t16;
+pc = 26;
+continue;
+}
+if (pc == 28) {
+pc = 27;
+continue;
+}
+}
+}
+return i64(0);
+}
+
+
+fn AlignSize(arg_v_size1: i64, arg_v_align1: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_size1: i64 = arg_v_size1;
+var v_align1: i64 = arg_v_align1;
+return ((((v_size1 + v_align1) - 1) / v_align1) * v_align1);
+}
+return i64(0);
+}
+
+
+fn Alignment(arg_v_type21: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type21: i64 = arg_v_type21;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *AggregateType = null;
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+t0 = v_type21;
+t1 = Aggregate(t0);
+if ((t1 != i8(0))) {
+t2 = v_type21;
+Layout(t2);
+t3 = v_type21;
+t4 = Shape(t3);
+return (t4).align;
+}
+t5 = v_type21;
+t6 = ByteSize(t5);
+return t6;
+}
+return i64(0);
+}
+
+
+fn Borrowed(arg_v_type22: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type22: i64 = arg_v_type22;
+var v_f2: *Field = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *AggregateType = null;
+var t5: i64 = i64(0);
+var t6: *AggregateType = null;
+var t7: i64 = i64(0);
+var t8: *AggregateType = null;
+var t9: i64 = i64(0);
+var t10: i8 = i8(0);
+var t11: i64 = i64(0);
+var t12: *AggregateType = null;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+t0 = v_type22;
+t1 = Aggregate(t0);
+if (!((t1 != i8(0)))) {
+return i8(0);
+}
+t2 = v_type22;
+Layout(t2);
+t3 = v_type22;
+t4 = Shape(t3);
+if (((t4).kind == 3)) {
+return i8(1);
+}
+t5 = v_type22;
+t6 = Shape(t5);
+if (((t6).kind == 2)) {
+t7 = v_type22;
+t8 = Shape(t7);
+t9 = (t8).element;
+t10 = Borrowed(t9);
+return t10;
+}
+t11 = v_type22;
+t12 = Shape(t11);
+v_f2 = (t12).fields;
+while (true) {
+if (!((v_f2 != null))) { break; }
+t13 = (v_f2).type;
+t14 = Borrowed(t13);
+if ((t14 != i8(0))) {
+return i8(1);
+}
+v_f2 = (v_f2).next;
+}
+return i8(0);
+}
+return i8(0);
+}
+
+
+fn ValidateBorrowedElements(arg_v_type23: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type23: i64 = arg_v_type23;
+var v_field: *Field = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *AggregateType = null;
+var t5: i64 = i64(0);
+var t6: *AggregateType = null;
+var t7: i64 = i64(0);
+var t8: i8 = i8(0);
+var t9: i64 = i64(0);
+var t10: *AggregateType = null;
+var t11: *Token = null;
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: *AggregateType = null;
+var t15: i64 = i64(0);
+var t16: *AggregateType = null;
+var t17: i64 = i64(0);
+var t18: i8 = i8(0);
+var t19: i64 = i64(0);
+var t20: *AggregateType = null;
+var t21: *Token = null;
+var t22: *u8 = null;
+var t23: i64 = i64(0);
+var t24: *AggregateType = null;
+var t25: i64 = i64(0);
+var t26: i8 = i8(0);
+var t27: i64 = i64(0);
+var t28: *AggregateType = null;
+var t29: *Token = null;
+var t30: *u8 = null;
+var t31: i64 = i64(0);
+var t32: *AggregateType = null;
+var t33: i64 = i64(0);
+var t34: *AggregateType = null;
+var t35: i64 = i64(0);
+var t36: i64 = i64(0);
+var t37: *AggregateType = null;
+var t38: i64 = i64(0);
+t0 = v_type23;
+t1 = Aggregate(t0);
+if (!((t1 != i8(0)))) {
+return;
+}
+t2 = v_type23;
+Layout(t2);
+t3 = v_type23;
+t4 = Shape(t3);
+if (((t4).kind == 5)) {
+t5 = v_type23;
+t6 = Shape(t5);
+t7 = (t6).element;
+t8 = Borrowed(t7);
+if ((t8 != i8(0))) {
+t9 = v_type23;
+t10 = Shape(t9);
+t11 = (t10).token;
+t12 = cast[*u8]("owned storage cannot contain borrowed references");
+ErrorAt(t11, t12);
+}
+} else {
+t13 = v_type23;
+t14 = Shape(t13);
+if (((t14).kind == 3)) {
+t15 = v_type23;
+t16 = Shape(t15);
+t17 = (t16).element;
+t18 = Owned(t17);
+if ((t18 != i8(0))) {
+t19 = v_type23;
+t20 = Shape(t19);
+t21 = (t20).token;
+t22 = cast[*u8]("slices of owners require exclusive borrow tracking");
+ErrorAt(t21, t22);
+}
+t23 = v_type23;
+t24 = Shape(t23);
+t25 = (t24).element;
+t26 = Borrowed(t25);
+if ((t26 != i8(0))) {
+t27 = v_type23;
+t28 = Shape(t27);
+t29 = (t28).token;
+t30 = cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists");
+ErrorAt(t29, t30);
+}
+} else {
+t31 = v_type23;
+t32 = Shape(t31);
+if (((t32).kind == 2)) {
+t33 = v_type23;
+t34 = Shape(t33);
+t35 = (t34).element;
+ValidateBorrowedElements(t35);
+} else {
+t36 = v_type23;
+t37 = Shape(t36);
+v_field = (t37).fields;
+while (true) {
+if (!((v_field != null))) { break; }
+t38 = (v_field).type;
+ValidateBorrowedElements(t38);
+v_field = (v_field).next;
+}
+}
+}
+}
+}
+return;
+}
+
+
+fn FindField(arg_v_type24: i64, arg_v_name10: *u8, arg_v_token3: *Token) -> *Field {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type24: i64 = arg_v_type24;
+var v_name10: *u8 = arg_v_name10;
+var v_token3: *Token = arg_v_token3;
+var v_f3: *Field = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *AggregateType = null;
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: i8 = i8(0);
+var t6: bool = false;
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: *AggregateType = null;
+var t10: *u8 = null;
+var t11: i8 = i8(0);
+var t12: *Token = null;
+var t13: *u8 = null;
+var t14: *Token = null;
+var t15: *u8 = null;
+t0 = v_type24;
+Layout(t0);
+t1 = v_type24;
+t2 = Shape(t1);
+v_f3 = (t2).fields;
+while (true) {
+if (!((v_f3 != null))) { break; }
+t3 = (v_f3).name;
+t4 = v_name10;
+t5 = Eq(t3, t4);
+if ((t5 != i8(0))) {
+t6 = !(((v_f3).public != i64(0)));
+if (t6) {
+t7 = (v_token3).package;
+t8 = v_type24;
+t9 = Shape(t8);
+t10 = (t9).package;
+t11 = Eq(t7, t10);
+t6 = !((t11 != i8(0)));
+}
+if (t6) {
+t12 = v_token3;
+t13 = cast[*u8]("field is private to its package");
+ErrorAt(t12, t13);
+}
+return v_f3;
+}
+v_f3 = (v_f3).next;
+}
+t14 = v_token3;
+t15 = cast[*u8]("unknown field");
+ErrorAt(t14, t15);
+return null;
+}
+return null;
+}
+
+
+fn CollectTypes() {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_saved1: i64 = i64(0);
+var v_nesting: i64 = i64(0);
+var v_type25: i64 = i64(0);
+var v_t10: *Token = null;
+var v_name11: *u8 = null;
+var v_alias: *u8 = null;
+var v_path1: *u8 = null;
+var v_public1: i8 = i8(0);
+var v_j2: i64 = i64(0);
+var v_kind4: i64 = i64(0);
+var t0: *Token = null;
+var t1: bool = false;
+var t2: *u8 = null;
+var t3: i8 = i8(0);
+var t4: *Token = null;
+var t5: i64 = i64(0);
+var t6: *Token = null;
+var t7: *u8 = null;
+var t8: *Token = null;
+var t9: *u8 = null;
+var t10: *Token = null;
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: *Token = null;
+var t14: *u8 = null;
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: bool = false;
+var t20: *u8 = null;
+var t21: i8 = i8(0);
+var t22: bool = false;
+var t23: *u8 = null;
+var t24: i8 = i8(0);
+var t25: bool = false;
+var t26: *u8 = null;
+var t27: i8 = i8(0);
+var t28: bool = false;
+var t29: bool = false;
+var t30: *u8 = null;
+var t31: *u8 = null;
+var t32: i8 = i8(0);
+var t33: bool = false;
+var t34: *u8 = null;
+var t35: *u8 = null;
+var t36: i8 = i8(0);
+var t37: *u8 = null;
+var t38: i8 = i8(0);
+var t39: i64 = i64(0);
+var t40: *Token = null;
+var t41: *u8 = null;
+var t42: i8 = i8(0);
+var t43: i64 = i64(0);
+var t44: *u8 = null;
+var t45: *u8 = null;
+var t46: i64 = i64(0);
+var t47: *Token = null;
+var t48: *u8 = null;
+var t49: *u8 = null;
+var t50: *u8 = null;
+var t51: i64 = i64(0);
+var t52: *Token = null;
+var t53: *u8 = null;
+var t54: i64 = i64(0);
+var t55: *Token = null;
+var t56: i64 = i64(0);
+var t57: i64 = i64(0);
+var t58: *AggregateType = null;
+var t59: i64 = i64(0);
+var t60: *AggregateType = null;
+var t61: i64 = i64(0);
+var t62: *AggregateType = null;
+var t63: i64 = i64(0);
+var t64: *AggregateType = null;
+var t65: i64 = i64(0);
+var t66: *AggregateType = null;
+var t67: **u8 = null;
+var t68: i64 = i64(0);
+var t69: i64 = i64(0);
+var t70: *u8 = null;
+var t71: i64 = i64(0);
+var t72: *AggregateType = null;
+var t73: *Token = null;
+var t74: bool = false;
+var t75: *Token = null;
+var t76: i64 = i64(0);
+var t77: i64 = i64(0);
+var t78: *AggregateType = null;
+var t79: i64 = i64(0);
+var t80: *u8 = null;
+var t81: i64 = i64(0);
+var t82: i8 = i8(0);
+var t83: i64 = i64(0);
+var t84: i8 = i8(0);
+var t85: i64 = i64(0);
+var t86: i64 = i64(0);
+var t87: i8 = i8(0);
+var t88: i64 = i64(0);
+var t89: i64 = i64(0);
+v_saved1 = ctx.v_pos;
+v_nesting = 0;
+while (true) {
+t0 = At();
+if (!(((t0).kind != i64(0)))) { break; }
+t1 = !((v_nesting != i64(0)));
+if (t1) {
+t2 = cast[*u8]("import");
+t3 = Is(t2);
+t1 = (i64(t3) != i64(0));
+}
+if (t1) {
+t4 = At();
+v_t10 = t4;
+t5 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+v_alias = null;
+t6 = At();
+if (((t6).kind == 256)) {
+t7 = Ident();
+v_alias = t7;
+}
+t8 = At();
+if (((t8).kind != 258)) {
+t9 = cast[*u8]("expected import path string");
+Error(t9);
+}
+t10 = At();
+v_path1 = (t10).text;
+if (!((v_alias != null))) {
+v_alias = v_path1;
+v_j2 = 0;
+while (true) {
+if (!(((v_path1)[v_j2] != u8(0)))) { break; }
+if ((i64((v_path1)[v_j2]) == 47)) {
+v_alias = ((v_path1 + v_j2) + 1);
+}
+t11 = v_j2;
+v_j2 = v_j2 + i64(1);
+}
+}
+if (!((*(v_alias) != u8(0)))) {
+t12 = cast[*u8]("empty import name");
+Error(t12);
+}
+t13 = v_t10;
+t14 = v_alias;
+t15 = v_path1;
+AddAlias(t13, t14, t15);
+t16 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t17 = 59;
+t18 = cast[*u8]("expected ';' after import");
+Need(t17, t18);
+} else {
+t19 = !((v_nesting != i64(0)));
+if (t19) {
+t20 = cast[*u8]("struct");
+t21 = Is(t20);
+t22 = (i64(t21) != i64(0));
+if (!t22) {
+t23 = cast[*u8]("enum");
+t24 = Is(t23);
+t22 = (i64(t24) != i64(0));
+}
+t25 = t22;
+if (!t25) {
+t26 = cast[*u8]("pub");
+t27 = Is(t26);
+t28 = (i64(t27) != i64(0));
+if (t28) {
+t28 = (((ctx.v_tokens)[(ctx.v_pos + 1)]).kind == 256);
+}
+t29 = t28;
+if (t29) {
+t30 = ((ctx.v_tokens)[(ctx.v_pos + 1)]).text;
+t31 = cast[*u8]("struct");
+t32 = Eq(t30, t31);
+t33 = (i64(t32) != i64(0));
+if (!t33) {
+t34 = ((ctx.v_tokens)[(ctx.v_pos + 1)]).text;
+t35 = cast[*u8]("enum");
+t36 = Eq(t34, t35);
+t33 = (i64(t36) != i64(0));
+}
+t29 = t33;
+}
+t25 = t29;
+}
+t19 = t25;
+}
+if (t19) {
+v_public1 = i8(0);
+t37 = cast[*u8]("pub");
+t38 = Is(t37);
+if ((t38 != i8(0))) {
+t39 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+v_public1 = i8(1);
+}
+t40 = At();
+v_t10 = t40;
+v_kind4 = 1;
+t41 = cast[*u8]("enum");
+t42 = Is(t41);
+if ((t42 != i8(0))) {
+v_kind4 = 4;
+}
+t43 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t44 = Ident();
+v_name11 = t44;
+t45 = v_name11;
+t46 = TypeName(t45);
+if ((t46 >= 0)) {
+t47 = v_t10;
+t48 = cast[*u8]("struct name conflicts with a builtin type");
+ErrorAt(t47, t48);
+}
+t49 = (v_t10).package;
+t50 = v_name11;
+t51 = FindType(t49, t50);
+if ((t51 >= 0)) {
+t52 = v_t10;
+t53 = cast[*u8]("duplicate struct or layout redefinition");
+ErrorAt(t52, t53);
+}
+t54 = v_kind4;
+t55 = v_t10;
+t56 = NewType(t54, t55);
+v_type25 = t56;
+t57 = v_type25;
+t58 = Shape(t57);
+(t58).name = v_name11;
+t59 = v_type25;
+t60 = Shape(t59);
+(t60).package = (v_t10).package;
+t61 = v_type25;
+t62 = Shape(t61);
+(t62).public = i64(v_public1);
+t63 = v_type25;
+t64 = Shape(t63);
+t65 = v_type25;
+t66 = Shape(t65);
+t67 = &((t66).generic_names)[0];
+t68 = GenericNames(t67);
+(t64).generic_count = t68;
+t69 = 123;
+t70 = cast[*u8]("expected type body");
+Need(t69, t70);
+t71 = v_type25;
+t72 = Shape(t71);
+(t72).begin = ctx.v_pos;
+while (true) {
+t73 = At();
+t74 = ((t73).kind != i64(0));
+if (t74) {
+t75 = At();
+t74 = ((t75).kind != 125);
+}
+if (!(t74)) { break; }
+t76 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+}
+t77 = v_type25;
+t78 = Shape(t77);
+(t78).end = ctx.v_pos;
+t79 = 125;
+t80 = cast[*u8]("unterminated struct");
+Need(t79, t80);
+t81 = 59;
+t82 = Take(t81);
+} else {
+t83 = 123;
+t84 = Take(t83);
+if ((t84 != i8(0))) {
+t85 = v_nesting;
+v_nesting = v_nesting + i64(1);
+} else {
+t86 = 125;
+t87 = Take(t86);
+if ((t87 != i8(0))) {
+t88 = v_nesting;
+v_nesting = v_nesting - i64(1);
+} else {
+t89 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+}
+}
+}
+}
+}
+ctx.v_pos = v_saved1;
+}
+return;
+}
+
+
+fn AppendType(arg_v_text1: *Text, arg_v_type26: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_text1: *Text = arg_v_text1;
+var v_type26: i64 = arg_v_type26;
+var v_name12: *u8 = null;
+var v_i7: i64 = i64(0);
+var v_a5: *AggregateType = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: *Text = null;
+var t3: i64 = i64(0);
+var t4: *Text = null;
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i8 = i8(0);
+var t8: i64 = i64(0);
+var t9: *AggregateType = null;
+var t10: bool = false;
+var t11: i64 = i64(0);
+var t12: *AggregateType = null;
+var t13: i64 = i64(0);
+var t14: *AggregateType = null;
+var t15: *Text = null;
+var t16: *u8 = null;
+var t17: *Text = null;
+var t18: i64 = i64(0);
+var t19: i64 = i64(0);
+var t20: *AggregateType = null;
+var t21: *Text = null;
+var t22: i64 = i64(0);
+var t23: *Text = null;
+var t24: i64 = i64(0);
+var t25: i64 = i64(0);
+var t26: *Text = null;
+var t27: i64 = i64(0);
+var t28: *Text = null;
+var t29: i64 = i64(0);
+var t30: *Text = null;
+var t31: i64 = i64(0);
+var t32: *Text = null;
+var t33: *u8 = null;
+var t34: i64 = i64(0);
+var t35: *Text = null;
+var t36: i64 = i64(0);
+var t37: i64 = i64(0);
+var t38: *AggregateType = null;
+var t39: *Text = null;
+var t40: *u8 = null;
+var t41: *Text = null;
+var t42: i64 = i64(0);
+var t43: *AggregateType = null;
+var t44: i64 = i64(0);
+var t45: *Text = null;
+var t46: i64 = i64(0);
+var t47: *Text = null;
+var t48: i64 = i64(0);
+var t49: i64 = i64(0);
+var t50: *AggregateType = null;
+var t51: *Text = null;
+var t52: i64 = i64(0);
+var t53: *AggregateType = null;
+var t54: i64 = i64(0);
+var t55: *Text = null;
+var t56: i64 = i64(0);
+var t57: *Text = null;
+var t58: i64 = i64(0);
+var t59: *AggregateType = null;
+var t60: i64 = i64(0);
+var t61: i64 = i64(0);
+var t62: *Text = null;
+var t63: *u8 = null;
+v_name12 = null;
+t0 = v_type26;
+t1 = Pointer(t0);
+if ((t1 != i8(0))) {
+t2 = v_text1;
+t3 = 42;
+Char(t2, t3);
+t4 = v_text1;
+t5 = (v_type26 - 100000);
+AppendType(t4, t5);
+return;
+}
+t6 = v_type26;
+t7 = Aggregate(t6);
+if ((t7 != i8(0))) {
+t8 = v_type26;
+t9 = Shape(t8);
+t10 = ((t9).kind == 1);
+if (!t10) {
+t11 = v_type26;
+t12 = Shape(t11);
+t10 = ((t12).kind == 4);
+}
+if (t10) {
+t13 = v_type26;
+t14 = Shape(t13);
+v_a5 = t14;
+t15 = v_text1;
+t16 = (v_a5).name;
+Append(t15, t16);
+if (((v_a5).origin != i64(0))) {
+t17 = v_text1;
+t18 = 91;
+Char(t17, t18);
+v_i7 = 0;
+while (true) {
+t19 = (v_a5).origin;
+t20 = Shape(t19);
+if (!((v_i7 < (t20).generic_count))) { break; }
+if ((v_i7 != i64(0))) {
+t21 = v_text1;
+t22 = 44;
+Char(t21, t22);
+}
+t23 = v_text1;
+t24 = (&((v_a5).generic_args)[0])[v_i7];
+AppendType(t23, t24);
+t25 = v_i7;
+v_i7 = v_i7 + i64(1);
+}
+t26 = v_text1;
+t27 = 93;
+Char(t26, t27);
+} else {
+if (((v_a5).generic_count != i64(0))) {
+t28 = v_text1;
+t29 = 91;
+Char(t28, t29);
+v_i7 = 0;
+while (true) {
+if (!((v_i7 < (v_a5).generic_count))) { break; }
+if ((v_i7 != i64(0))) {
+t30 = v_text1;
+t31 = 44;
+Char(t30, t31);
+}
+t32 = v_text1;
+t33 = (&((v_a5).generic_names)[0])[v_i7];
+Append(t32, t33);
+t34 = v_i7;
+v_i7 = v_i7 + i64(1);
+}
+t35 = v_text1;
+t36 = 93;
+Char(t35, t36);
+}
+}
+} else {
+t37 = v_type26;
+t38 = Shape(t37);
+if (((t38).kind == 5)) {
+t39 = v_text1;
+t40 = cast[*u8]("own[");
+Append(t39, t40);
+t41 = v_text1;
+t42 = v_type26;
+t43 = Shape(t42);
+t44 = (t43).element;
+AppendType(t41, t44);
+t45 = v_text1;
+t46 = 93;
+Char(t45, t46);
+} else {
+t47 = v_text1;
+t48 = 91;
+Char(t47, t48);
+t49 = v_type26;
+t50 = Shape(t49);
+if (((t50).kind == 2)) {
+t51 = v_text1;
+t52 = v_type26;
+t53 = Shape(t52);
+t54 = (t53).count;
+Number(t51, t54);
+}
+t55 = v_text1;
+t56 = 93;
+Char(t55, t56);
+t57 = v_text1;
+t58 = v_type26;
+t59 = Shape(t58);
+t60 = (t59).element;
+AppendType(t57, t60);
+}
+}
+return;
+}
+t61 = v_type26;
+if (t61 == 0) { while (true) {
+v_name12 = cast[*u8]("void");
+break; } }
+if (t61 == 1) { while (true) {
+v_name12 = cast[*u8]("i64");
+break; } }
+if (t61 == 2) { while (true) {
+v_name12 = cast[*u8]("bool");
+break; } }
+if (t61 == 3) { while (true) {
+v_name12 = cast[*u8]("string");
+break; } }
+if (t61 == 4) { while (true) {
+v_name12 = cast[*u8]("i32");
+break; } }
+if (t61 == 5) { while (true) {
+v_name12 = cast[*u8]("u8");
+break; } }
+if (t61 == 6) { while (true) {
+v_name12 = cast[*u8]("i8");
+break; } }
+if (t61 == 7) { while (true) {
+v_name12 = cast[*u8]("i16");
+break; } }
+if (t61 == 8) { while (true) {
+v_name12 = cast[*u8]("u16");
+break; } }
+if (t61 == 9) { while (true) {
+v_name12 = cast[*u8]("u32");
+break; } }
+if (t61 == 10) { while (true) {
+v_name12 = cast[*u8]("u64");
+break; } }
+if (t61 == 11) { while (true) {
+v_name12 = cast[*u8]("f64");
+break; } }
+if (t61 == 12) { while (true) {
+v_name12 = cast[*u8]("f32");
+break; } }
+if (!((v_name12 != null))) {
+v_name12 = cast[*u8]("<unknown>");
+}
+t62 = v_text1;
+t63 = v_name12;
+Append(t62, t63);
+}
+return;
+}
+

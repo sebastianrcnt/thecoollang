@@ -28,7 +28,7 @@ This is an implementation stage, not the full language: the complete standard
 library covers core collections, text, checked arithmetic, files and process
 arguments, with additional domains still pending.
 This directory retains the bootstrap frontend. The production frontend in
-`compiler/main.cool` uses new syntax and compiles itself; `make selfhost-check`
+`compiler/` directory package uses new syntax and compiles itself; `make selfhost-check`
 verifies both IR and native binary convergence.
 
 ## Additional execution paths and projects

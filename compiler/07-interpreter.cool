@@ -1,0 +1,1799 @@
+fn Eval(arg_v_n22: *Node, arg_v_frame: *Frame) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n22: *Node = arg_v_n22;
+var v_frame: *Frame = arg_v_frame;
+var v_a7: i64 = i64(0);
+var v_b3: i64 = i64(0);
+var v_op1: i64 = i64(0);
+var v_result1: i64 = i64(0);
+var v_args1: *i64 = null;
+var v_item1: *Node = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *Node = null;
+var t5: *Frame = null;
+var t6: *i64 = null;
+var t7: *Node = null;
+var t8: *i64 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+var t12: *Node = null;
+var t13: *Frame = null;
+var t14: i64 = i64(0);
+var t15: i64 = i64(0);
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: *Node = null;
+var t20: *Frame = null;
+var t21: i64 = i64(0);
+var t22: *Token = null;
+var t23: *u8 = null;
+var t24: *Node = null;
+var t25: *Frame = null;
+var t26: i64 = i64(0);
+var t27: i64 = i64(0);
+var t28: i64 = i64(0);
+var t29: i64 = i64(0);
+var t30: *AggregateType = null;
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+var t33: i64 = i64(0);
+var t34: *u8 = null;
+var t35: i64 = i64(0);
+var t36: i64 = i64(0);
+var t37: i64 = i64(0);
+var t38: *AggregateType = null;
+var t39: i64 = i64(0);
+var t40: i64 = i64(0);
+var t41: i64 = i64(0);
+var t42: i64 = i64(0);
+var t43: *u8 = null;
+var t44: i64 = i64(0);
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: *u8 = null;
+var t49: i64 = i64(0);
+var t50: i64 = i64(0);
+var t51: *Node = null;
+var t52: *Frame = null;
+var t53: i64 = i64(0);
+var t54: i64 = i64(0);
+var t55: *Node = null;
+var t56: *Frame = null;
+var t57: i64 = i64(0);
+var t58: *Node = null;
+var t59: *Frame = null;
+var t60: i64 = i64(0);
+var t61: *Node = null;
+var t62: *Frame = null;
+var t63: i64 = i64(0);
+var t64: *Node = null;
+var t65: i64 = i64(0);
+var t66: i64 = i64(0);
+var t67: i64 = i64(0);
+var t68: *Node = null;
+var t69: *Frame = null;
+var t70: i64 = i64(0);
+var t71: *Node = null;
+var t72: *Frame = null;
+var t73: i64 = i64(0);
+var t74: *Node = null;
+var t75: i64 = i64(0);
+var t76: i64 = i64(0);
+var t77: *Node = null;
+var t78: *Frame = null;
+var t79: i64 = i64(0);
+var t80: *Node = null;
+var t81: i64 = i64(0);
+var t82: i64 = i64(0);
+var t83: i64 = i64(0);
+var t84: i64 = i64(0);
+var t85: i64 = i64(0);
+var t86: *Node = null;
+var t87: *Frame = null;
+var t88: i64 = i64(0);
+var t89: i64 = i64(0);
+var t90: i64 = i64(0);
+var t91: i64 = i64(0);
+var t92: *AggregateType = null;
+var t93: *Node = null;
+var t94: *Frame = null;
+var t95: i64 = i64(0);
+var t96: *Node = null;
+var t97: *Frame = null;
+var t98: i64 = i64(0);
+var t99: i64 = i64(0);
+var t100: i64 = i64(0);
+var t101: *Node = null;
+var t102: *Frame = null;
+var t103: i64 = i64(0);
+var t104: *Token = null;
+var t105: *u8 = null;
+var t106: i64 = i64(0);
+var t107: i64 = i64(0);
+var t108: i64 = i64(0);
+var t109: i64 = i64(0);
+var t110: *Node = null;
+var t111: *Frame = null;
+var t112: i64 = i64(0);
+var t113: i64 = i64(0);
+var t114: i64 = i64(0);
+var t115: i64 = i64(0);
+var t116: *Token = null;
+var t117: i64 = i64(0);
+var t118: *Node = null;
+var t119: *Frame = null;
+var t120: i64 = i64(0);
+var t121: i64 = i64(0);
+var t122: i8 = i8(0);
+var t123: i64 = i64(0);
+var t124: f64 = f64(0);
+var t125: f64 = f64(0);
+var t126: i64 = i64(0);
+var t127: i64 = i64(0);
+var t128: i64 = i64(0);
+var t129: i64 = i64(0);
+var t130: i64 = i64(0);
+var t131: i64 = i64(0);
+var t132: i64 = i64(0);
+var t133: bool = false;
+var t134: bool = false;
+var t135: *Node = null;
+var t136: *Frame = null;
+var t137: i64 = i64(0);
+var t138: *Node = null;
+var t139: i64 = i64(0);
+var t140: i64 = i64(0);
+var t141: i64 = i64(0);
+v_result1 = 0;
+if (((v_n22).kind == 1)) {
+return (v_n22).value;
+}
+if (((v_n22).kind == 2)) {
+return i64(cast[i64]((v_n22).name));
+}
+if (((v_n22).kind == 3)) {
+t0 = i64(cast[i64](&(((v_frame).values)[(v_n22).slot])));
+t1 = (v_n22).type;
+t2 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t3 = ValueRead(t0, t1, t2);
+return t3;
+}
+if (((v_n22).kind == 22)) {
+return i64(cast[i64](&(((v_frame).values)[(v_n22).slot])));
+}
+if (((v_n22).kind == 4)) {
+t4 = v_n22;
+t5 = v_frame;
+t6 = Arguments(t4, t5);
+v_args1 = t6;
+t7 = v_n22;
+t8 = v_args1;
+t9 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t10 = Invoke(t7, t8, t9);
+v_result1 = t10;
+t11 = cast[*u8](v_args1);
+Free(t11);
+return v_result1;
+}
+if (((v_n22).kind == 29)) {
+t12 = (v_n22).a;
+t13 = v_frame;
+t14 = Eval(t12, t13);
+v_a7 = t14;
+t15 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t16 = v_a7;
+t17 = (v_n22).type;
+t18 = MoveValue(t15, t16, t17);
+return t18;
+}
+if (((v_n22).kind == 30)) {
+t19 = (v_n22).a;
+t20 = v_frame;
+t21 = Eval(t19, t20);
+v_a7 = t21;
+v_result1 = (cast[*i64](v_a7))[0];
+if (!((v_result1 != i64(0)))) {
+t22 = (v_n22).token;
+t23 = cast[*u8]("empty or moved owner");
+ErrorAt(t22, t23);
+}
+return v_result1;
+}
+if (((v_n22).kind == 28)) {
+v_a7 = 0;
+if (((v_n22).a != null)) {
+t24 = (v_n22).a;
+t25 = v_frame;
+t26 = Eval(t24, t25);
+v_a7 = t26;
+}
+v_result1 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t27 = v_result1;
+t28 = (v_n22).type;
+DropValue(t27, t28);
+t29 = (v_n22).type;
+t30 = Shape(t29);
+t31 = (t30).element;
+t32 = ByteSize(t31);
+t33 = t32;
+t34 = CAlloc(t33);
+v_b3 = i64(cast[i64](t34));
+t35 = ctx.v_owner_live;
+ctx.v_owner_live = ctx.v_owner_live + i64(1);
+(cast[*i64](v_result1))[0] = v_b3;
+if (((v_n22).a != null)) {
+t36 = v_b3;
+t37 = (v_n22).type;
+t38 = Shape(t37);
+t39 = (t38).element;
+t40 = v_a7;
+ValueWrite(t36, t39, t40);
+}
+return v_result1;
+}
+if (((v_n22).kind == 23)) {
+v_result1 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t41 = v_result1;
+t42 = (v_n22).type;
+DropValue(t41, t42);
+t43 = cast[*u8](v_result1);
+t44 = 0;
+t45 = (v_n22).type;
+t46 = ByteSize(t45);
+t47 = t46;
+t48 = MemSet(t43, t44, t47);
+v_item1 = (v_n22).a;
+while (true) {
+if (!((v_item1 != null))) { break; }
+t49 = (v_result1 + (v_item1).offset);
+t50 = (v_item1).type;
+t51 = v_item1;
+t52 = v_frame;
+t53 = Eval(t51, t52);
+t54 = t53;
+ValueWrite(t49, t50, t54);
+v_item1 = (v_item1).next;
+}
+return v_result1;
+}
+if (((v_n22).kind == 24)) {
+t55 = (v_n22).a;
+t56 = v_frame;
+t57 = Eval(t55, t56);
+return (t57 + (v_n22).value);
+}
+if (((v_n22).kind == 25)) {
+t58 = (v_n22).a;
+t59 = v_frame;
+t60 = Eval(t58, t59);
+v_a7 = t60;
+t61 = (v_n22).b;
+t62 = v_frame;
+t63 = Eval(t61, t62);
+v_b3 = t63;
+t64 = v_n22;
+t65 = v_a7;
+t66 = v_b3;
+t67 = IndexAddress(t64, t65, t66);
+return t67;
+}
+if (((v_n22).kind == 26)) {
+t68 = (v_n22).a;
+t69 = v_frame;
+t70 = Eval(t68, t69);
+v_a7 = t70;
+t71 = (v_n22).b;
+t72 = v_frame;
+t73 = Eval(t71, t72);
+v_b3 = t73;
+t74 = v_n22;
+t75 = v_a7;
+t76 = SequenceLength(t74, t75);
+v_result1 = t76;
+if (((v_n22).c != null)) {
+t77 = (v_n22).c;
+t78 = v_frame;
+t79 = Eval(t77, t78);
+v_result1 = t79;
+}
+t80 = v_n22;
+t81 = v_a7;
+t82 = v_b3;
+t83 = v_result1;
+t84 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t85 = MakeSlice(t80, t81, t82, t83, t84);
+return t85;
+}
+if (((v_n22).kind == 27)) {
+t86 = (v_n22).a;
+t87 = v_frame;
+t88 = Eval(t86, t87);
+v_a7 = t88;
+t89 = ((v_n22).a).type;
+t90 = AggregateKind(t89);
+if ((t90 == 3)) {
+return (cast[*i64](v_a7))[1];
+}
+t91 = ((v_n22).a).type;
+t92 = Shape(t91);
+return (t92).count;
+}
+if (((v_n22).kind == 20)) {
+t93 = (v_n22).a;
+t94 = v_frame;
+t95 = Eval(t93, t94);
+v_a7 = t95;
+t96 = (v_n22).b;
+t97 = v_frame;
+t98 = Eval(t96, t97);
+t99 = ((v_n22).type - 100000);
+t100 = ByteSize(t99);
+v_b3 = (t98 * t100);
+if (((v_n22).op == 45)) {
+return (v_a7 - v_b3);
+}
+return (v_a7 + v_b3);
+}
+if (((v_n22).kind == 18)) {
+t101 = (v_n22).a;
+t102 = v_frame;
+t103 = Eval(t101, t102);
+v_a7 = t103;
+if (!((v_a7 != i64(0)))) {
+t104 = (v_n22).token;
+t105 = cast[*u8]("null pointer dereference");
+ErrorAt(t104, t105);
+}
+t106 = v_a7;
+t107 = (v_n22).type;
+t108 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t109 = ValueRead(t106, t107, t108);
+return t109;
+}
+if (((v_n22).kind == 17)) {
+t110 = (v_n22).a;
+t111 = v_frame;
+t112 = Eval(t110, t111);
+t113 = t112;
+t114 = ((v_n22).a).type;
+t115 = (v_n22).type;
+t116 = (v_n22).token;
+t117 = ConvertNumber(t113, t114, t115, t116);
+return t117;
+}
+t118 = (v_n22).a;
+t119 = v_frame;
+t120 = Eval(t118, t119);
+v_a7 = t120;
+v_op1 = (v_n22).op;
+if (((v_n22).kind == 6)) {
+t121 = (v_n22).type;
+t122 = Floating(t121);
+if ((t122 != i8(0))) {
+t123 = v_a7;
+t124 = AsFloat(t123);
+t125 = (-t124);
+t126 = AsBits(t125);
+return t126;
+}
+if ((v_op1 == 33)) {
+return i64(BoolInt(!((v_a7 != i64(0)))));
+}
+if ((v_op1 == 45)) {
+t127 = (-v_a7);
+t128 = (v_n22).type;
+t129 = Normalize(t127, t128);
+return t129;
+}
+t130 = (~v_a7);
+t131 = (v_n22).type;
+t132 = Normalize(t130, t131);
+return t132;
+}
+t133 = (v_op1 == 263);
+if (t133) {
+t133 = !((v_a7 != i64(0)));
+}
+if (t133) {
+return 0;
+}
+t134 = (v_op1 == 264);
+if (t134) {
+t134 = (v_a7 != i64(0));
+}
+if (t134) {
+return 1;
+}
+t135 = (v_n22).b;
+t136 = v_frame;
+t137 = Eval(t135, t136);
+v_b3 = t137;
+t138 = v_n22;
+t139 = v_a7;
+t140 = v_b3;
+t141 = Arithmetic(t138, t139, t140);
+return t141;
+}
+return i64(0);
+}
+
+
+fn Execute(arg_v_n23: *Node, arg_v_frame1: *Frame) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n23: *Node = arg_v_n23;
+var v_frame1: *Frame = arg_v_frame1;
+var v_s12: *Node = null;
+var v_address4: i64 = i64(0);
+var v_value2: i64 = i64(0);
+var v_deferred1: *Deferred = null;
+var v_d3: *Deferred = null;
+var t0: i64 = i64(0);
+var t1: bool = false;
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: *Node = null;
+var t5: *Frame = null;
+var t6: *i64 = null;
+var t7: *Node = null;
+var t8: *Frame = null;
+var t9: *Node = null;
+var t10: *i64 = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+var t14: *u8 = null;
+var t15: *Node = null;
+var t16: *Frame = null;
+var t17: i64 = i64(0);
+var t18: *Node = null;
+var t19: *Frame = null;
+var t20: i64 = i64(0);
+var t21: *Token = null;
+var t22: *u8 = null;
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: i64 = i64(0);
+var t26: i64 = i64(0);
+var t27: i64 = i64(0);
+var t28: *Node = null;
+var t29: *Frame = null;
+var t30: i64 = i64(0);
+var t31: i64 = i64(0);
+var t32: *Node = null;
+var t33: *Frame = null;
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: i8 = i8(0);
+var t37: i64 = i64(0);
+var t38: i64 = i64(0);
+var t39: *Node = null;
+var t40: *Frame = null;
+var t41: i64 = i64(0);
+var t42: i64 = i64(0);
+var t43: i8 = i8(0);
+var t44: i64 = i64(0);
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: *Node = null;
+var t48: *Frame = null;
+var t49: i64 = i64(0);
+var t50: *Node = null;
+var t51: *Frame = null;
+var t52: *Node = null;
+var t53: *Frame = null;
+var t54: *Node = null;
+var t55: *Frame = null;
+var t56: i64 = i64(0);
+var t57: *Node = null;
+var t58: *Frame = null;
+var t59: *Node = null;
+var t60: *Frame = null;
+v_deferred1 = null;
+if (!((v_n23 != null))) {
+return;
+}
+t0 = (v_n23).kind;
+if (t0 == 12) { while (true) {
+v_s12 = (v_n23).a;
+while (true) {
+t1 = (v_s12 != null);
+if (t1) {
+t1 = !(((v_frame1).flow != i64(0)));
+}
+if (!(t1)) { break; }
+if (((v_s12).kind == 15)) {
+t2 = i64(sizeof(Deferred));
+t3 = CAlloc(t2);
+v_d3 = cast[*Deferred](t3);
+(v_d3).call = (v_s12).a;
+t4 = (v_s12).a;
+t5 = v_frame1;
+t6 = Arguments(t4, t5);
+(v_d3).args = t6;
+(v_d3).next = v_deferred1;
+v_deferred1 = v_d3;
+} else {
+t7 = v_s12;
+t8 = v_frame1;
+Execute(t7, t8);
+}
+v_s12 = (v_s12).next;
+}
+while (true) {
+if (!((v_deferred1 != null))) { break; }
+v_d3 = v_deferred1;
+t9 = (v_d3).call;
+t10 = (v_d3).args;
+t11 = 0;
+t12 = Invoke(t9, t10, t11);
+v_deferred1 = (v_d3).next;
+t13 = cast[*u8]((v_d3).args);
+Free(t13);
+t14 = cast[*u8](v_d3);
+Free(t14);
+}
+break; } }
+if (t0 == 19) { while (true) {
+t15 = (v_n23).a;
+t16 = v_frame1;
+t17 = Eval(t15, t16);
+v_address4 = t17;
+t18 = (v_n23).b;
+t19 = v_frame1;
+t20 = Eval(t18, t19);
+v_value2 = t20;
+if (!((v_address4 != i64(0)))) {
+t21 = (v_n23).token;
+t22 = cast[*u8]("null pointer dereference");
+ErrorAt(t21, t22);
+}
+t23 = v_address4;
+t24 = (v_n23).type;
+t25 = v_value2;
+ValueWrite(t23, t24, t25);
+break; } }
+if (t0 == 7 || t0 == 8) { while (true) {
+t26 = i64(cast[i64](&(((v_frame1).values)[(v_n23).slot])));
+t27 = (v_n23).type;
+t28 = (v_n23).a;
+t29 = v_frame1;
+t30 = Eval(t28, t29);
+t31 = t30;
+ValueWrite(t26, t27, t31);
+break; } }
+if (t0 == 16) { while (true) {
+t32 = (v_n23).a;
+t33 = v_frame1;
+t34 = Eval(t32, t33);
+v_value2 = t34;
+t35 = ((v_n23).a).type;
+t36 = Owned(t35);
+if ((t36 != i8(0))) {
+t37 = v_value2;
+t38 = ((v_n23).a).type;
+DropValue(t37, t38);
+}
+break; } }
+if (t0 == 9) { while (true) {
+if (((v_n23).a != null)) {
+t39 = (v_n23).a;
+t40 = v_frame1;
+t41 = Eval(t39, t40);
+(v_frame1).result = t41;
+t42 = ((v_n23).a).type;
+t43 = Aggregate(t42);
+if ((t43 != i8(0))) {
+t44 = (v_frame1).destination;
+t45 = ((v_n23).a).type;
+t46 = (v_frame1).result;
+ValueWrite(t44, t45, t46);
+(v_frame1).result = (v_frame1).destination;
+}
+}
+(v_frame1).flow = 1;
+break; } }
+if (t0 == 10) { while (true) {
+t47 = (v_n23).a;
+t48 = v_frame1;
+t49 = Eval(t47, t48);
+if ((t49 != i64(0))) {
+t50 = (v_n23).b;
+t51 = v_frame1;
+Execute(t50, t51);
+} else {
+t52 = (v_n23).c;
+t53 = v_frame1;
+Execute(t52, t53);
+}
+break; } }
+if (t0 == 21 || t0 == 11) { while (true) {
+while (true) {
+t54 = (v_n23).a;
+t55 = v_frame1;
+t56 = Eval(t54, t55);
+if (!((t56 != i64(0)))) { break; }
+t57 = (v_n23).b;
+t58 = v_frame1;
+Execute(t57, t58);
+if (((v_frame1).flow == 1)) {
+break;
+}
+if (((v_frame1).flow == 2)) {
+(v_frame1).flow = 0;
+break;
+}
+(v_frame1).flow = 0;
+if (((v_n23).kind == 21)) {
+t59 = (v_n23).c;
+t60 = v_frame1;
+Execute(t59, t60);
+}
+}
+break; } }
+if (t0 == 13) { while (true) {
+(v_frame1).flow = 2;
+break; } }
+if (t0 == 14) { while (true) {
+(v_frame1).flow = 3;
+break; } }
+}
+return;
+}
+
+
+fn Normalize(arg_v_v2: i64, arg_v_type31: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_v2: i64 = arg_v_v2;
+var v_type31: i64 = arg_v_type31;
+var v_width1: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: i8 = i8(0);
+var t4: bool = false;
+var t5: i64 = i64(0);
+var t6: i8 = i8(0);
+t0 = v_type31;
+t1 = Width(t0);
+v_width1 = t1;
+t2 = v_type31;
+t3 = Integer(t2);
+t4 = !((t3 != i8(0)));
+if (!t4) {
+t4 = (v_width1 == 64);
+}
+if (t4) {
+return v_v2;
+}
+t5 = v_type31;
+t6 = Unsigned(t5);
+if ((t6 != i8(0))) {
+return (v_v2 & ((1 << v_width1) - 1));
+}
+return ((v_v2 << (64 - v_width1)) >> (64 - v_width1));
+}
+return i64(0);
+}
+
+
+fn UnsignedNumber(arg_v_text2: *Text, arg_v_value3: u64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_text2: *Text = arg_v_text2;
+var v_value3: u64 = arg_v_value3;
+var v_digits1: [32]u8 = [32]u8{};
+var v_i12: i64 = i64(0);
+var t0: bool = false;
+var t1: i64 = i64(0);
+var t2: *Text = null;
+var t3: i64 = i64(0);
+v_i12 = 0;
+t0 = true;
+while (true) {
+if (!t0) {
+if (!((v_value3 != u64(0)))) { break; }
+}
+t0 = false;
+t1 = v_i12;
+v_i12 = v_i12 + i64(1);
+(&(v_digits1)[0])[t1] = u8((u64(48) + (v_value3 % u64(10))));
+v_value3 = v_value3 / u64(10);
+}
+while (true) {
+if (!((v_i12 != i64(0)))) { break; }
+t2 = v_text2;
+v_i12 = v_i12 - i64(1);
+t3 = i64((&(v_digits1)[0])[v_i12]);
+Char(t2, t3);
+}
+}
+return;
+}
+
+
+fn ConvertNumber(arg_v_value4: i64, arg_v_from: i64, arg_v_to: i64, arg_v_t16: *Token) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_value4: i64 = arg_v_value4;
+var v_from: i64 = arg_v_from;
+var v_to: i64 = arg_v_to;
+var v_t16: *Token = arg_v_t16;
+var v_ok1: i64 = i64(0);
+var v_result2: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: *i64 = null;
+var t12: i64 = i64(0);
+var t13: *Token = null;
+var t14: *u8 = null;
+t0 = v_from;
+t1 = Floating(t0);
+t2 = !((t1 != i8(0)));
+if (t2) {
+t3 = v_to;
+t4 = Floating(t3);
+t2 = !((t4 != i8(0)));
+}
+if (t2) {
+t5 = v_value4;
+t6 = v_to;
+t7 = Normalize(t5, t6);
+return t7;
+}
+t8 = v_value4;
+t9 = v_from;
+t10 = v_to;
+t11 = &(v_ok1);
+t12 = NativeNumericCast(t8, t9, t10, t11);
+v_result2 = t12;
+if (!((v_ok1 != i64(0)))) {
+t13 = v_t16;
+t14 = cast[*u8]("floating conversion out of range");
+ErrorAt(t13, t14);
+}
+return v_result2;
+}
+return i64(0);
+}
+
+
+fn Arithmetic(arg_v_n24: *Node, arg_v_a8: i64, arg_v_b4: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n24: *Node = arg_v_n24;
+var v_a8: i64 = arg_v_a8;
+var v_b4: i64 = arg_v_b4;
+var v_op2: i64 = i64(0);
+var v_result3: i64 = i64(0);
+var v_is_unsigned: i8 = i8(0);
+var v_x: f64 = f64(0);
+var v_y: f64 = f64(0);
+var v_z: f64 = f64(0);
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i8 = i8(0);
+var t4: i64 = i64(0);
+var t5: f64 = f64(0);
+var t6: i64 = i64(0);
+var t7: f64 = f64(0);
+var t8: i64 = i64(0);
+var t9: f64 = f64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: *Token = null;
+var t15: i64 = i64(0);
+var t16: bool = false;
+var t17: bool = false;
+var t18: bool = false;
+var t19: bool = false;
+var t20: bool = false;
+var t21: *Token = null;
+var t22: *u8 = null;
+var t23: bool = false;
+var t24: bool = false;
+var t25: bool = false;
+var t26: i64 = i64(0);
+var t27: i64 = i64(0);
+var t28: *Token = null;
+var t29: *u8 = null;
+var t30: i64 = i64(0);
+var t31: bool = false;
+var t32: bool = false;
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+v_op2 = (v_n24).op;
+v_result3 = 0;
+t0 = ((v_n24).a).type;
+t1 = Unsigned(t0);
+v_is_unsigned = t1;
+v_z = 0.0;
+t2 = ((v_n24).a).type;
+t3 = Floating(t2);
+if ((t3 != i8(0))) {
+t4 = v_a8;
+t5 = AsFloat(t4);
+v_x = t5;
+t6 = v_b4;
+t7 = AsFloat(t6);
+v_y = t7;
+t8 = v_op2;
+if (t8 == 43) { while (true) {
+v_z = (v_x + v_y);
+break; } }
+if (t8 == 45) { while (true) {
+v_z = (v_x - v_y);
+break; } }
+if (t8 == 42) { while (true) {
+v_z = (v_x * v_y);
+break; } }
+if (t8 == 47) { while (true) {
+v_z = (v_x / v_y);
+break; } }
+if (t8 == 259) { while (true) {
+return i64(BoolInt((v_x == v_y)));
+break; } }
+if (t8 == 260) { while (true) {
+return i64(BoolInt((v_x != v_y)));
+break; } }
+if (t8 == 60) { while (true) {
+return i64(BoolInt((v_x < v_y)));
+break; } }
+if (t8 == 62) { while (true) {
+return i64(BoolInt((v_x > v_y)));
+break; } }
+if (t8 == 261) { while (true) {
+return i64(BoolInt((v_x <= v_y)));
+break; } }
+if (t8 == 262) { while (true) {
+return i64(BoolInt((v_x >= v_y)));
+break; } }
+t9 = v_z;
+t10 = AsBits(t9);
+t11 = t10;
+t12 = 11;
+t13 = (v_n24).type;
+t14 = (v_n24).token;
+t15 = ConvertNumber(t11, t12, t13, t14);
+return t15;
+}
+t16 = (v_op2 == 47);
+if (!t16) {
+t16 = (v_op2 == 37);
+}
+t17 = t16;
+if (t17) {
+t18 = !((v_b4 != i64(0)));
+if (!t18) {
+t19 = !((v_is_unsigned != i8(0)));
+if (t19) {
+t19 = (v_a8 == ((-9223372036854775807) - 1));
+}
+t20 = t19;
+if (t20) {
+t20 = (v_b4 == (-1));
+}
+t18 = t20;
+}
+t17 = t18;
+}
+if (t17) {
+t21 = (v_n24).token;
+t22 = cast[*u8]("invalid integer division");
+ErrorAt(t21, t22);
+}
+t23 = (v_op2 == 266);
+if (!t23) {
+t23 = (v_op2 == 267);
+}
+t24 = t23;
+if (t24) {
+t25 = (v_b4 < 0);
+if (!t25) {
+t26 = ((v_n24).a).type;
+t27 = Width(t26);
+t25 = (v_b4 >= t27);
+}
+t24 = t25;
+}
+if (t24) {
+t28 = (v_n24).token;
+t29 = cast[*u8]("shift count outside operand width");
+ErrorAt(t28, t29);
+}
+t30 = v_op2;
+if (t30 == 43) { while (true) {
+v_result3 = (v_a8 + v_b4);
+break; } }
+if (t30 == 45) { while (true) {
+v_result3 = (v_a8 - v_b4);
+break; } }
+if (t30 == 42) { while (true) {
+v_result3 = (v_a8 * v_b4);
+break; } }
+if (t30 == 47) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64((u64(v_a8) / u64(v_b4)));
+} else {
+v_result3 = (v_a8 / v_b4);
+}
+break; } }
+if (t30 == 37) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64((u64(v_a8) % u64(v_b4)));
+} else {
+v_result3 = (v_a8 % v_b4);
+}
+break; } }
+if (t30 == 38) { while (true) {
+v_result3 = (v_a8 & v_b4);
+break; } }
+if (t30 == 124) { while (true) {
+v_result3 = (v_a8 | v_b4);
+break; } }
+if (t30 == 94) { while (true) {
+v_result3 = (v_a8 ^ v_b4);
+break; } }
+if (t30 == 266) { while (true) {
+v_result3 = (v_a8 << v_b4);
+break; } }
+if (t30 == 267) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64((u64(v_a8) >> u64(v_b4)));
+} else {
+v_result3 = (v_a8 >> v_b4);
+}
+break; } }
+if (t30 == 259) { while (true) {
+v_result3 = i64(BoolInt((v_a8 == v_b4)));
+break; } }
+if (t30 == 260) { while (true) {
+v_result3 = i64(BoolInt((v_a8 != v_b4)));
+break; } }
+if (t30 == 60) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64(BoolInt((u64(v_a8) < u64(v_b4))));
+} else {
+v_result3 = i64(BoolInt((v_a8 < v_b4)));
+}
+break; } }
+if (t30 == 62) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64(BoolInt((u64(v_a8) > u64(v_b4))));
+} else {
+v_result3 = i64(BoolInt((v_a8 > v_b4)));
+}
+break; } }
+if (t30 == 261) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64(BoolInt((u64(v_a8) <= u64(v_b4))));
+} else {
+v_result3 = i64(BoolInt((v_a8 <= v_b4)));
+}
+break; } }
+if (t30 == 262) { while (true) {
+if ((v_is_unsigned != i8(0))) {
+v_result3 = i64(BoolInt((u64(v_a8) >= u64(v_b4))));
+} else {
+v_result3 = i64(BoolInt((v_a8 >= v_b4)));
+}
+break; } }
+if (t30 == 263) { while (true) {
+t31 = (v_a8 != i64(0));
+if (t31) {
+t31 = (v_b4 != i64(0));
+}
+v_result3 = i64(BoolInt(t31));
+break; } }
+if (t30 == 264) { while (true) {
+t32 = (v_a8 != i64(0));
+if (!t32) {
+t32 = (v_b4 != i64(0));
+}
+v_result3 = i64(BoolInt(t32));
+break; } }
+t33 = v_result3;
+t34 = (v_n24).type;
+t35 = Normalize(t33, t34);
+return t35;
+}
+return i64(0);
+}
+
+
+fn DropValue(arg_v_address5: i64, arg_v_type32: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address5: i64 = arg_v_address5;
+var v_type32: i64 = arg_v_type32;
+var v_pointer: i64 = i64(0);
+var v_i13: i64 = i64(0);
+var v_tag1: i64 = i64(0);
+var v_field3: *Field = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: *AggregateType = null;
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *AggregateType = null;
+var t14: i64 = i64(0);
+var t15: *AggregateType = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: i64 = i64(0);
+var t20: *AggregateType = null;
+var t21: i64 = i64(0);
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: i64 = i64(0);
+var t26: *AggregateType = null;
+var t27: i64 = i64(0);
+var t28: i64 = i64(0);
+var t29: i64 = i64(0);
+var t30: *AggregateType = null;
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+t0 = v_type32;
+t1 = Owned(t0);
+if (!((t1 != i8(0)))) {
+return;
+}
+t2 = v_type32;
+t3 = AggregateKind(t2);
+if ((t3 == 5)) {
+v_pointer = (cast[*i64](v_address5))[0];
+if (!((v_pointer != i64(0)))) {
+return;
+}
+(cast[*i64](v_address5))[0] = 0;
+t4 = v_pointer;
+t5 = v_type32;
+t6 = Shape(t5);
+t7 = (t6).element;
+DropValue(t4, t7);
+t8 = cast[*u8](v_pointer);
+Free(t8);
+t9 = ctx.v_owner_live;
+ctx.v_owner_live = ctx.v_owner_live - i64(1);
+return;
+}
+t10 = v_type32;
+t11 = AggregateKind(t10);
+if ((t11 == 2)) {
+v_i13 = 0;
+while (true) {
+t12 = v_type32;
+t13 = Shape(t12);
+if (!((v_i13 < (t13).count))) { break; }
+t14 = v_type32;
+t15 = Shape(t14);
+t16 = (t15).element;
+t17 = ByteSize(t16);
+t18 = (v_address5 + (v_i13 * t17));
+t19 = v_type32;
+t20 = Shape(t19);
+t21 = (t20).element;
+DropValue(t18, t21);
+t22 = v_i13;
+v_i13 = v_i13 + i64(1);
+}
+return;
+}
+t23 = v_type32;
+t24 = AggregateKind(t23);
+if ((t24 == 4)) {
+v_tag1 = (cast[*i64](v_address5))[0];
+t25 = v_type32;
+t26 = Shape(t25);
+v_field3 = (t26).fields;
+while (true) {
+if (!((v_field3 != null))) { break; }
+if (((v_field3).tag == v_tag1)) {
+t27 = (v_address5 + (v_field3).offset);
+t28 = (v_field3).type;
+DropValue(t27, t28);
+return;
+}
+v_field3 = (v_field3).next;
+}
+} else {
+t29 = v_type32;
+t30 = Shape(t29);
+v_field3 = (t30).fields;
+while (true) {
+if (!((v_field3 != null))) { break; }
+t31 = (v_address5 + (v_field3).offset);
+t32 = (v_field3).type;
+DropValue(t31, t32);
+v_field3 = (v_field3).next;
+}
+}
+}
+return;
+}
+
+
+fn MoveValue(arg_v_destination: i64, arg_v_source1: i64, arg_v_type33: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_destination: i64 = arg_v_destination;
+var v_source1: i64 = arg_v_source1;
+var v_type33: i64 = arg_v_type33;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+if ((v_destination == v_source1)) {
+return v_destination;
+}
+t0 = v_destination;
+t1 = v_type33;
+DropValue(t0, t1);
+t2 = cast[*u8](v_destination);
+t3 = cast[*u8](v_source1);
+t4 = v_type33;
+t5 = ByteSize(t4);
+t6 = t5;
+t7 = MemCpy(t2, t3, t6);
+t8 = cast[*u8](v_source1);
+t9 = 0;
+t10 = v_type33;
+t11 = ByteSize(t10);
+t12 = t11;
+t13 = MemSet(t8, t9, t12);
+return v_destination;
+}
+return i64(0);
+}
+
+
+fn ValueRead(arg_v_address6: i64, arg_v_type34: i64, arg_v_destination1: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address6: i64 = arg_v_address6;
+var v_type34: i64 = arg_v_type34;
+var v_destination1: i64 = arg_v_destination1;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+var t5: *u8 = null;
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+if (!((v_address6 != i64(0)))) {
+t0 = cast[*u8]("null pointer dereference");
+Error(t0);
+}
+t1 = v_type34;
+t2 = Owned(t1);
+if ((t2 != i8(0))) {
+return v_address6;
+}
+t3 = v_type34;
+t4 = Aggregate(t3);
+if ((t4 != i8(0))) {
+t5 = cast[*u8](v_destination1);
+t6 = cast[*u8](v_address6);
+t7 = v_type34;
+t8 = ByteSize(t7);
+t9 = t8;
+t10 = MemCpy(t5, t6, t9);
+return v_destination1;
+}
+t11 = v_address6;
+t12 = v_type34;
+t13 = NativeMemoryRead(t11, t12);
+return t13;
+}
+return i64(0);
+}
+
+
+fn ValueWrite(arg_v_address7: i64, arg_v_type35: i64, arg_v_value5: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address7: i64 = arg_v_address7;
+var v_type35: i64 = arg_v_type35;
+var v_value5: i64 = arg_v_value5;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i8 = i8(0);
+var t9: *u8 = null;
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+var t15: i64 = i64(0);
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+if (!((v_address7 != i64(0)))) {
+t0 = cast[*u8]("null pointer dereference");
+Error(t0);
+}
+t1 = v_type35;
+t2 = Owned(t1);
+if ((t2 != i8(0))) {
+t3 = v_address7;
+t4 = v_value5;
+t5 = v_type35;
+t6 = MoveValue(t3, t4, t5);
+return;
+}
+t7 = v_type35;
+t8 = Aggregate(t7);
+if ((t8 != i8(0))) {
+t9 = cast[*u8](v_address7);
+t10 = cast[*u8](v_value5);
+t11 = v_type35;
+t12 = ByteSize(t11);
+t13 = t12;
+t14 = MemCpy(t9, t10, t13);
+} else {
+t15 = v_address7;
+t16 = v_type35;
+t17 = v_value5;
+NativeMemoryWrite(t15, t16, t17);
+}
+}
+return;
+}
+
+
+fn SequenceLength(arg_v_n25: *Node, arg_v_source2: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n25: *Node = arg_v_n25;
+var v_source2: i64 = arg_v_source2;
+if (((v_n25).op == 3)) {
+return (cast[*i64](v_source2))[1];
+}
+return (v_n25).value;
+}
+return i64(0);
+}
+
+
+fn IndexAddress(arg_v_n26: *Node, arg_v_source3: i64, arg_v_index1: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n26: *Node = arg_v_n26;
+var v_source3: i64 = arg_v_source3;
+var v_index1: i64 = arg_v_index1;
+var v_length: i64 = i64(0);
+var t0: *Node = null;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: bool = false;
+var t4: *Token = null;
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+t0 = v_n26;
+t1 = v_source3;
+t2 = SequenceLength(t0, t1);
+v_length = t2;
+t3 = (v_index1 < 0);
+if (!t3) {
+t3 = (v_index1 >= v_length);
+}
+if (t3) {
+t4 = (v_n26).token;
+t5 = cast[*u8]("index out of bounds");
+ErrorAt(t4, t5);
+}
+if (((v_n26).op == 3)) {
+v_source3 = (cast[*i64](v_source3))[0];
+}
+t6 = ((v_n26).type - 100000);
+t7 = ByteSize(t6);
+return (v_source3 + (v_index1 * t7));
+}
+return i64(0);
+}
+
+
+fn MakeSlice(arg_v_n27: *Node, arg_v_source4: i64, arg_v_low: i64, arg_v_high1: i64, arg_v_destination2: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n27: *Node = arg_v_n27;
+var v_source4: i64 = arg_v_source4;
+var v_low: i64 = arg_v_low;
+var v_high1: i64 = arg_v_high1;
+var v_destination2: i64 = arg_v_destination2;
+var v_length1: i64 = i64(0);
+var t0: *Node = null;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: bool = false;
+var t4: bool = false;
+var t5: *Token = null;
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: *AggregateType = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+t0 = v_n27;
+t1 = v_source4;
+t2 = SequenceLength(t0, t1);
+v_length1 = t2;
+t3 = (v_low < 0);
+if (!t3) {
+t3 = (v_high1 < v_low);
+}
+t4 = t3;
+if (!t4) {
+t4 = (v_high1 > v_length1);
+}
+if (t4) {
+t5 = (v_n27).token;
+t6 = cast[*u8]("slice bounds out of range");
+ErrorAt(t5, t6);
+}
+if (((v_n27).op == 3)) {
+v_source4 = (cast[*i64](v_source4))[0];
+}
+t7 = (v_n27).type;
+t8 = Shape(t7);
+t9 = (t8).element;
+t10 = ByteSize(t9);
+(cast[*i64](v_destination2))[0] = (v_source4 + (v_low * t10));
+(cast[*i64](v_destination2))[1] = (v_high1 - v_low);
+return v_destination2;
+}
+return i64(0);
+}
+
+
+fn Invoke(arg_v_n28: *Node, arg_v_args2: *i64, arg_v_destination3: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n28: *Node = arg_v_n28;
+var v_args2: *i64 = arg_v_args2;
+var v_destination3: i64 = arg_v_destination3;
+var v_f13: *Function = null;
+var v_frame2: *Frame = null;
+var v_text3: *Text = null;
+var v_i14: i64 = i64(0);
+var v_offset: i64 = i64(0);
+var v_result4: i64 = i64(0);
+var v_ok2: i64 = i64(0);
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: *Text = null;
+var t7: i64 = i64(0);
+var t8: i8 = i8(0);
+var t9: *Text = null;
+var t10: u64 = u64(0);
+var t11: *Text = null;
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+var t14: *u8 = null;
+var t15: *u8 = null;
+var t16: *u8 = null;
+var t17: *u8 = null;
+var t18: i8 = i8(0);
+var t19: *u8 = null;
+var t20: i64 = i64(0);
+var t21: i64 = i64(0);
+var t22: *Token = null;
+var t23: *u8 = null;
+var t24: i64 = i64(0);
+var t25: *u8 = null;
+var t26: *u8 = null;
+var t27: *Token = null;
+var t28: *u8 = null;
+var t29: *u8 = null;
+var t30: *u8 = null;
+var t31: i64 = i64(0);
+var t32: *u8 = null;
+var t33: *Token = null;
+var t34: *u8 = null;
+var t35: *u8 = null;
+var t36: i64 = i64(0);
+var t37: *i64 = null;
+var t38: *i64 = null;
+var t39: i64 = i64(0);
+var t40: *i64 = null;
+var t41: i64 = i64(0);
+var t42: *Token = null;
+var t43: *u8 = null;
+var t44: *Token = null;
+var t45: *u8 = null;
+var t46: i64 = i64(0);
+var t47: *u8 = null;
+var t48: bool = false;
+var t49: *Function = null;
+var t50: i64 = i64(0);
+var t51: *u8 = null;
+var t52: i64 = i64(0);
+var t53: i64 = i64(0);
+var t54: i64 = i64(0);
+var t55: i64 = i64(0);
+var t56: i64 = i64(0);
+var t57: i64 = i64(0);
+var t58: i64 = i64(0);
+var t59: bool = false;
+var t60: bool = false;
+var t61: *Function = null;
+var t62: *i64 = null;
+var t63: i64 = i64(0);
+var t64: *Function = null;
+var t65: *i64 = null;
+var t66: i64 = i64(0);
+var t67: *Node = null;
+var t68: *Frame = null;
+var t69: i64 = i64(0);
+var t70: i8 = i8(0);
+var t71: bool = false;
+var t72: i64 = i64(0);
+var t73: i64 = i64(0);
+var t74: i64 = i64(0);
+var t75: *u8 = null;
+var t76: *u8 = null;
+var t77: i64 = i64(0);
+v_offset = 0;
+if (((v_n28).slot == (-1))) {
+if ((((v_n28).a).type == 3)) {
+t0 = cast[*u8]((v_args2)[0]);
+Out(t0);
+} else {
+t1 = ((v_n28).a).type;
+t2 = Floating(t1);
+if ((t2 != i8(0))) {
+t3 = (v_args2)[0];
+NativePrintFloat(t3);
+} else {
+if ((((v_n28).a).type == 2)) {
+if (((v_args2)[0] != i64(0))) {
+t4 = cast[*u8]("true");
+Out(t4);
+} else {
+t5 = cast[*u8]("false");
+Out(t5);
+}
+} else {
+t6 = TextNew();
+v_text3 = t6;
+t7 = ((v_n28).a).type;
+t8 = Unsigned(t7);
+if ((t8 != i8(0))) {
+t9 = v_text3;
+t10 = u64((v_args2)[0]);
+UnsignedNumber(t9, t10);
+} else {
+t11 = v_text3;
+t12 = (v_args2)[0];
+Number(t11, t12);
+}
+t13 = (v_text3).data;
+Out(t13);
+t14 = (v_text3).data;
+Free(t14);
+t15 = cast[*u8](v_text3);
+Free(t15);
+}
+}
+}
+t16 = (v_n28).name;
+t17 = cast[*u8]("println");
+t18 = Eq(t16, t17);
+if ((t18 != i8(0))) {
+t19 = cast[*u8]("\n");
+Out(t19);
+}
+return 0;
+}
+if (((v_n28).slot == (-6))) {
+return ctx.v_owner_live;
+}
+if (((v_n28).slot == (-7))) {
+t20 = (v_args2)[0];
+t21 = (v_n28).op;
+DropValue(t20, t21);
+return 0;
+}
+if (((v_n28).slot == (-3))) {
+if (((v_args2)[0] < 0)) {
+t22 = (v_n28).token;
+t23 = cast[*u8]("allocation size exceeds host range");
+ErrorAt(t22, t23);
+}
+t24 = (v_args2)[0];
+t25 = CAlloc(t24);
+return i64(cast[i64](t25));
+}
+if (((v_n28).slot == (-4))) {
+t26 = cast[*u8]((v_args2)[0]);
+Free(t26);
+return 0;
+}
+if (((v_n28).slot == (-5))) {
+if (((v_args2)[2] < 0)) {
+t27 = (v_n28).token;
+t28 = cast[*u8]("copy size exceeds host range");
+ErrorAt(t27, t28);
+}
+t29 = cast[*u8]((v_args2)[0]);
+t30 = cast[*u8]((v_args2)[1]);
+t31 = (v_args2)[2];
+t32 = MemCpy(t29, t30, t31);
+return 0;
+}
+if (((v_n28).slot == (-2))) {
+if (!(((v_args2)[0] != i64(0)))) {
+t33 = (v_n28).token;
+t34 = cast[*u8]("assertion failed");
+ErrorAt(t33, t34);
+}
+return 0;
+}
+v_f13 = &((ctx.v_functions)[(v_n28).slot]);
+if (((v_f13).foreign != i64(0))) {
+t35 = (v_f13).name;
+t36 = (v_f13).result;
+t37 = &((v_f13).arg_types)[0];
+t38 = v_args2;
+t39 = (v_f13).argc;
+t40 = &(v_ok2);
+t41 = NativeForeignCall(t35, t36, t37, t38, t39, t40);
+v_result4 = t41;
+if (!((v_ok2 != i64(0)))) {
+t42 = (v_n28).token;
+t43 = cast[*u8]("could not resolve foreign function or unsupported C ABI");
+ErrorAt(t42, t43);
+}
+return v_result4;
+}
+ctx.v_call_depth = ctx.v_call_depth + i64(1);
+if ((ctx.v_call_depth > 1024)) {
+t44 = (v_n28).token;
+t45 = cast[*u8]("call depth limit exceeded");
+ErrorAt(t44, t45);
+}
+v_f13 = &((ctx.v_functions)[(v_n28).slot]);
+t46 = i64(sizeof(Frame));
+t47 = CAlloc(t46);
+v_frame2 = cast[*Frame](t47);
+t48 = (ctx.v_execution_mode != i64(0));
+if (t48) {
+t48 = !(((v_f13).bytecode != null));
+}
+if (t48) {
+t49 = v_f13;
+CompileBytecode(t49);
+}
+t50 = ((((v_f13).slots + (v_f13).registers) + 1) * 8);
+t51 = CAlloc(t50);
+(v_frame2).values = cast[*i64](t51);
+(v_frame2).destination = v_destination3;
+v_i14 = 0;
+while (true) {
+if (!((v_i14 < (v_f13).argc))) { break; }
+t52 = i64(cast[i64](&(((v_frame2).values)[v_offset])));
+t53 = (&((v_f13).arg_types)[0])[v_i14];
+t54 = (v_args2)[v_i14];
+ValueWrite(t52, t53, t54);
+t55 = (&((v_f13).arg_types)[0])[v_i14];
+t56 = TypeSlots(t55);
+v_offset = v_offset + t56;
+t57 = v_i14;
+v_i14 = v_i14 + i64(1);
+}
+if ((ctx.v_execution_mode != i64(0))) {
+((v_frame2).values)[(v_f13).registers] = v_destination3;
+}
+(v_frame2).function = v_f13;
+(v_frame2).parent = ctx.v_active_frame;
+ctx.v_active_frame = v_frame2;
+t58 = (v_f13).calls;
+(v_f13).calls = (v_f13).calls + i64(1);
+t59 = (ctx.v_execution_mode == 2);
+if (!t59) {
+t60 = (ctx.v_execution_mode == 3);
+if (t60) {
+t60 = ((v_f13).calls >= 4);
+}
+t59 = t60;
+}
+if (t59) {
+t61 = v_f13;
+t62 = (v_frame2).values;
+t63 = RunNative(t61, t62);
+v_result4 = t63;
+} else {
+if ((ctx.v_execution_mode != i64(0))) {
+t64 = v_f13;
+t65 = (v_frame2).values;
+t66 = RunBytecode(t64, t65);
+v_result4 = t66;
+} else {
+t67 = (v_f13).body;
+t68 = v_frame2;
+Execute(t67, t68);
+v_result4 = (v_frame2).result;
+}
+}
+t69 = (v_f13).result;
+t70 = Aggregate(t69);
+t71 = (i64(t70) != i64(0));
+if (t71) {
+t71 = (v_result4 != v_destination3);
+}
+if (t71) {
+t72 = v_destination3;
+t73 = (v_f13).result;
+t74 = v_result4;
+ValueWrite(t72, t73, t74);
+v_result4 = v_destination3;
+}
+ctx.v_active_frame = (v_frame2).parent;
+t75 = cast[*u8]((v_frame2).values);
+Free(t75);
+t76 = cast[*u8](v_frame2);
+Free(t76);
+t77 = ctx.v_call_depth;
+ctx.v_call_depth = ctx.v_call_depth - i64(1);
+return v_result4;
+}
+return i64(0);
+}
+
+
+fn Arguments(arg_v_n29: *Node, arg_v_frame3: *Frame) -> *i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n29: *Node = arg_v_n29;
+var v_frame3: *Frame = arg_v_frame3;
+var v_i15: i64 = i64(0);
+var v_args3: *i64 = null;
+var v_a9: *Node = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: *Node = null;
+var t4: *Frame = null;
+var t5: i64 = i64(0);
+v_i15 = 0;
+t0 = (((v_n29).value + 1) * 8);
+t1 = CAlloc(t0);
+v_args3 = cast[*i64](t1);
+v_a9 = (v_n29).a;
+while (true) {
+if (!((v_a9 != null))) { break; }
+t2 = v_i15;
+v_i15 = v_i15 + i64(1);
+t3 = v_a9;
+t4 = v_frame3;
+t5 = Eval(t3, t4);
+(v_args3)[t2] = t5;
+v_a9 = (v_a9).next;
+}
+return v_args3;
+}
+return null;
+}
+
+
+fn RunMain() -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_id3: i64 = i64(0);
+var v_args4: [1]i64 = [1]i64{};
+var v_call1: *Node = null;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: bool = false;
+var t4: bool = false;
+var t5: bool = false;
+var t6: bool = false;
+var t7: *Token = null;
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *Token = null;
+var t11: *Node = null;
+var t12: *Node = null;
+var t13: *i64 = null;
+var t14: i64 = i64(0);
+var t15: i64 = i64(0);
+t0 = cast[*u8]("main");
+t1 = FindFun(t0);
+v_id3 = t1;
+if ((v_id3 < 0)) {
+t2 = cast[*u8]("no main function");
+Error(t2);
+}
+t3 = (((ctx.v_functions)[v_id3]).generic_count != i64(0));
+if (!t3) {
+t3 = (((ctx.v_functions)[v_id3]).argc != i64(0));
+}
+t4 = t3;
+if (!t4) {
+t5 = (((ctx.v_functions)[v_id3]).result != 0);
+if (t5) {
+t5 = (((ctx.v_functions)[v_id3]).result != 4);
+}
+t6 = t5;
+if (t6) {
+t6 = (((ctx.v_functions)[v_id3]).result != 1);
+}
+t4 = t6;
+}
+if (t4) {
+t7 = ((ctx.v_functions)[v_id3]).token;
+t8 = cast[*u8]("main must take no arguments and return void, i32 or i64");
+ErrorAt(t7, t8);
+}
+t9 = 4;
+t10 = ((ctx.v_functions)[v_id3]).token;
+t11 = NewNode(t9, t10);
+v_call1 = t11;
+(v_call1).slot = v_id3;
+t12 = v_call1;
+t13 = &(v_args4)[0];
+t14 = 0;
+t15 = Invoke(t12, t13, t14);
+return t15;
+}
+return i64(0);
+}
+

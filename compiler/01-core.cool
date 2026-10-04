@@ -1,0 +1,1262 @@
+fn AsFloat(arg_v_bits: i64) -> f64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_bits: i64 = arg_v_bits;
+var v_n: NumberBits = NumberBits{};
+(v_n).bits = v_bits;
+return *(cast[*f64](&(v_n).bits));
+}
+return f64(0);
+}
+
+
+fn AsBits(arg_v_value: f64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_value: f64 = arg_v_value;
+var v_n1: NumberBits = NumberBits{};
+*(cast[*f64](&(v_n1).bits)) = v_value;
+return (v_n1).bits;
+}
+return i64(0);
+}
+
+
+fn TextNew() -> *Text {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+t0 = i64(sizeof(Text));
+t1 = CAlloc(t0);
+return cast[*Text](t1);
+}
+return null;
+}
+
+
+fn Reserve(arg_v_t: *Text, arg_v_more: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t: *Text = arg_v_t;
+var v_more: i64 = arg_v_more;
+var v_p: *u8 = null;
+var v_cap: i64 = i64(0);
+var t0: bool = false;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: *u8 = null;
+t0 = (v_more < 0);
+if (!t0) {
+t0 = ((v_t).len > (1073741823 - v_more));
+}
+if (t0) {
+t1 = 70;
+NativeExit(t1);
+}
+if (((((v_t).len + v_more) + 1) <= (v_t).cap)) {
+return;
+}
+v_cap = ((v_t).cap * 2);
+if ((v_cap < (((v_t).len + v_more) + 1))) {
+v_cap = (((v_t).len + v_more) + 4096);
+}
+t2 = v_cap;
+t3 = CAlloc(t2);
+v_p = t3;
+if (((v_t).len != i64(0))) {
+t4 = v_p;
+t5 = (v_t).data;
+t6 = (v_t).len;
+t7 = MemCpy(t4, t5, t6);
+}
+t8 = (v_t).data;
+Free(t8);
+(v_t).data = v_p;
+(v_t).cap = v_cap;
+}
+return;
+}
+
+
+fn Char(arg_v_t1: *Text, arg_v_ch: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t1: *Text = arg_v_t1;
+var v_ch: i64 = arg_v_ch;
+var t0: *Text = null;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+t0 = v_t1;
+t1 = 1;
+Reserve(t0, t1);
+t2 = (v_t1).len;
+(v_t1).len = (v_t1).len + i64(1);
+((v_t1).data)[t2] = u8(v_ch);
+((v_t1).data)[(v_t1).len] = u8(0);
+}
+return;
+}
+
+
+fn Append(arg_v_t2: *Text, arg_v_s: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t2: *Text = arg_v_t2;
+var v_s: *u8 = arg_v_s;
+var v_n2: i64 = i64(0);
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *Text = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+t0 = v_s;
+t1 = StrLen(t0);
+v_n2 = t1;
+t2 = v_t2;
+t3 = v_n2;
+Reserve(t2, t3);
+t4 = ((v_t2).data + (v_t2).len);
+t5 = v_s;
+t6 = v_n2;
+t7 = MemCpy(t4, t5, t6);
+(v_t2).len = (v_t2).len + v_n2;
+((v_t2).data)[(v_t2).len] = u8(0);
+}
+return;
+}
+
+
+fn Number(arg_v_t3: *Text, arg_v_n3: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t3: *Text = arg_v_t3;
+var v_n3: i64 = arg_v_n3;
+var v_digits: [32]u8 = [32]u8{};
+var v_i: i64 = i64(0);
+var v_v: u64 = u64(0);
+var t0: *Text = null;
+var t1: i64 = i64(0);
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: *Text = null;
+var t5: i64 = i64(0);
+v_i = 0;
+if ((v_n3 < 0)) {
+t0 = v_t3;
+t1 = 45;
+Char(t0, t1);
+v_v = u64((-v_n3));
+} else {
+v_v = u64(v_n3);
+}
+t2 = true;
+while (true) {
+if (!t2) {
+if (!((v_v != u64(0)))) { break; }
+}
+t2 = false;
+t3 = v_i;
+v_i = v_i + i64(1);
+(&(v_digits)[0])[t3] = u8((u64(48) + (v_v % u64(10))));
+v_v = v_v / u64(10);
+}
+while (true) {
+if (!((v_i != i64(0)))) { break; }
+t4 = v_t3;
+v_i = v_i - i64(1);
+t5 = i64((&(v_digits)[0])[v_i]);
+Char(t4, t5);
+}
+}
+return;
+}
+
+
+fn Out(arg_v_s1: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s1: *u8 = arg_v_s1;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+t0 = 1;
+t1 = v_s1;
+t2 = v_s1;
+t3 = StrLen(t2);
+t4 = t3;
+t5 = NativeWrite(t0, t1, t4);
+}
+return;
+}
+
+
+fn Slice(arg_v_s2: *u8, arg_v_start: i64, arg_v_end: i64) -> *u8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s2: *u8 = arg_v_s2;
+var v_start: i64 = arg_v_start;
+var v_end: i64 = arg_v_end;
+var v_p1: *u8 = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+t0 = ((v_end - v_start) + 1);
+t1 = CAlloc(t0);
+v_p1 = t1;
+t2 = v_p1;
+t3 = (v_s2 + v_start);
+t4 = (v_end - v_start);
+t5 = MemCpy(t2, t3, t4);
+return v_p1;
+}
+return null;
+}
+
+
+fn Eq(arg_v_a: *u8, arg_v_b: *u8) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_a: *u8 = arg_v_a;
+var v_b: *u8 = arg_v_b;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+t0 = v_a;
+t1 = v_b;
+t2 = StrCmp(t0, t1);
+return i8(BoolInt((t2 == 0)));
+}
+return i8(0);
+}
+
+
+fn At() -> *Token {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+return &((ctx.v_tokens)[ctx.v_pos]);
+}
+return null;
+}
+
+
+fn ErrorAt(arg_v_t4: *Token, arg_v_message: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t4: *Token = arg_v_t4;
+var v_message: *u8 = arg_v_message;
+var v_s3: *Text = null;
+var t0: *Text = null;
+var t1: *Text = null;
+var t2: *u8 = null;
+var t3: *Text = null;
+var t4: i64 = i64(0);
+var t5: *Text = null;
+var t6: i64 = i64(0);
+var t7: *Text = null;
+var t8: i64 = i64(0);
+var t9: *Text = null;
+var t10: i64 = i64(0);
+var t11: *Text = null;
+var t12: *u8 = null;
+var t13: *Text = null;
+var t14: *u8 = null;
+var t15: *Text = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: i64 = i64(0);
+var t20: i64 = i64(0);
+var t21: *i64 = null;
+var t22: i64 = i64(0);
+t0 = TextNew();
+v_s3 = t0;
+t1 = v_s3;
+t2 = (v_t4).file;
+Append(t1, t2);
+t3 = v_s3;
+t4 = 58;
+Char(t3, t4);
+t5 = v_s3;
+t6 = (v_t4).line;
+Number(t5, t6);
+t7 = v_s3;
+t8 = 58;
+Char(t7, t8);
+t9 = v_s3;
+t10 = (v_t4).col;
+Number(t9, t10);
+t11 = v_s3;
+t12 = cast[*u8](": error: ");
+Append(t11, t12);
+t13 = v_s3;
+t14 = v_message;
+Append(t13, t14);
+t15 = v_s3;
+t16 = 10;
+Char(t15, t16);
+t17 = 2;
+t18 = (v_s3).data;
+t19 = (v_s3).len;
+t20 = NativeWrite(t17, t18, t19);
+if ((ctx.v_recovery_context != null)) {
+t21 = ctx.v_recovery_context;
+NativeRaise(t21);
+}
+t22 = 2;
+NativeExit(t22);
+}
+return;
+}
+
+
+fn Error(arg_v_message1: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_message1: *u8 = arg_v_message1;
+var t0: *Token = null;
+var t1: *Token = null;
+var t2: *u8 = null;
+t0 = At();
+t1 = t0;
+t2 = v_message1;
+ErrorAt(t1, t2);
+}
+return;
+}
+
+
+fn Is(arg_v_s4: *u8) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s4: *u8 = arg_v_s4;
+var t0: *Token = null;
+var t1: bool = false;
+var t2: *Token = null;
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: i8 = i8(0);
+t0 = At();
+t1 = ((t0).kind == 256);
+if (t1) {
+t2 = At();
+t3 = (t2).text;
+t4 = v_s4;
+t5 = Eq(t3, t4);
+t1 = (i64(t5) != i64(0));
+}
+return i8(BoolInt(t1));
+}
+return i8(0);
+}
+
+
+fn Take(arg_v_k: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_k: i64 = arg_v_k;
+var t0: *Token = null;
+var t1: i64 = i64(0);
+t0 = At();
+if (((t0).kind != v_k)) {
+return i8(0);
+}
+t1 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+return i8(1);
+}
+return i8(0);
+}
+
+
+fn Need(arg_v_k1: i64, arg_v_msg: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_k1: i64 = arg_v_k1;
+var v_msg: *u8 = arg_v_msg;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: *u8 = null;
+t0 = v_k1;
+t1 = Take(t0);
+if (!((t1 != i8(0)))) {
+t2 = v_msg;
+Error(t2);
+}
+}
+return;
+}
+
+
+fn Ident() -> *u8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s5: *u8 = null;
+var t0: *Token = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+t0 = At();
+v_s5 = (t0).text;
+t1 = 256;
+t2 = cast[*u8]("expected identifier");
+Need(t1, t2);
+return v_s5;
+}
+return null;
+}
+
+
+fn NewNode(arg_v_kind: i64, arg_v_t5: *Token) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_kind: i64 = arg_v_kind;
+var v_t5: *Token = arg_v_t5;
+var v_n4: *Node = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+t0 = i64(sizeof(Node));
+t1 = CAlloc(t0);
+v_n4 = cast[*Node](t1);
+(v_n4).kind = v_kind;
+(v_n4).token = v_t5;
+(v_n4).slot = (-1);
+return v_n4;
+}
+return null;
+}
+
+
+fn FindFunIn(arg_v_package: *u8, arg_v_name: *u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_package: *u8 = arg_v_package;
+var v_name: *u8 = arg_v_name;
+var v_i1: i64 = i64(0);
+var t0: bool = false;
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: i8 = i8(0);
+var t4: bool = false;
+var t5: *u8 = null;
+var t6: *u8 = null;
+var t7: i8 = i8(0);
+var t8: i64 = i64(0);
+v_i1 = 0;
+while (true) {
+if (!((v_i1 < ctx.v_nfun))) { break; }
+t0 = !((((ctx.v_functions)[v_i1]).origin != i64(0)));
+if (t0) {
+t1 = ((ctx.v_functions)[v_i1]).package;
+t2 = v_package;
+t3 = Eq(t1, t2);
+t0 = (i64(t3) != i64(0));
+}
+t4 = t0;
+if (t4) {
+t5 = ((ctx.v_functions)[v_i1]).name;
+t6 = v_name;
+t7 = Eq(t5, t6);
+t4 = (i64(t7) != i64(0));
+}
+if (t4) {
+return v_i1;
+}
+t8 = v_i1;
+v_i1 = v_i1 + i64(1);
+}
+return (-1);
+}
+return i64(0);
+}
+
+
+fn FindFun(arg_v_name1: *u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_name1: *u8 = arg_v_name1;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+t0 = cast[*u8]("__main");
+t1 = v_name1;
+t2 = FindFunIn(t0, t1);
+return t2;
+}
+return i64(0);
+}
+
+
+fn ResolveAlias(arg_v_t6: *Token, arg_v_name2: *u8) -> *u8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t6: *Token = arg_v_t6;
+var v_name2: *u8 = arg_v_name2;
+var v_a1: *Alias = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+var t3: bool = false;
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: i8 = i8(0);
+var t7: *Token = null;
+var t8: *u8 = null;
+v_a1 = ctx.v_aliases;
+while (true) {
+if (!((v_a1 != null))) { break; }
+t0 = (v_a1).file;
+t1 = (v_t6).file;
+t2 = Eq(t0, t1);
+t3 = (i64(t2) != i64(0));
+if (t3) {
+t4 = (v_a1).name;
+t5 = v_name2;
+t6 = Eq(t4, t5);
+t3 = (i64(t6) != i64(0));
+}
+if (t3) {
+return (v_a1).path;
+}
+v_a1 = (v_a1).next;
+}
+t7 = v_t6;
+t8 = cast[*u8]("unknown imported package alias");
+ErrorAt(t7, t8);
+return null;
+}
+return null;
+}
+
+
+fn AddAlias(arg_v_t7: *Token, arg_v_name3: *u8, arg_v_path: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t7: *Token = arg_v_t7;
+var v_name3: *u8 = arg_v_name3;
+var v_path: *u8 = arg_v_path;
+var v_a2: *Alias = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+var t3: bool = false;
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: i8 = i8(0);
+var t7: *Token = null;
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+v_a2 = ctx.v_aliases;
+while (true) {
+if (!((v_a2 != null))) { break; }
+t0 = (v_a2).file;
+t1 = (v_t7).file;
+t2 = Eq(t0, t1);
+t3 = (i64(t2) != i64(0));
+if (t3) {
+t4 = (v_a2).name;
+t5 = v_name3;
+t6 = Eq(t4, t5);
+t3 = (i64(t6) != i64(0));
+}
+if (t3) {
+t7 = v_t7;
+t8 = cast[*u8]("duplicate import alias");
+ErrorAt(t7, t8);
+}
+v_a2 = (v_a2).next;
+}
+t9 = i64(sizeof(Alias));
+t10 = CAlloc(t9);
+v_a2 = cast[*Alias](t10);
+(v_a2).file = (v_t7).file;
+(v_a2).name = v_name3;
+(v_a2).path = v_path;
+(v_a2).next = ctx.v_aliases;
+ctx.v_aliases = v_a2;
+}
+return;
+}
+
+
+fn FindLocal(arg_v_name4: *u8) -> *Local {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_name4: *u8 = arg_v_name4;
+var v_l: *Local = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+v_l = ctx.v_locals;
+while (true) {
+if (!((v_l != null))) { break; }
+t0 = (v_l).name;
+t1 = v_name4;
+t2 = Eq(t0, t1);
+if ((t2 != i8(0))) {
+return v_l;
+}
+v_l = (v_l).next;
+}
+return null;
+}
+return null;
+}
+
+
+fn TypeSlots(arg_v_type: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type: i64 = arg_v_type;
+var v_size: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+t0 = v_type;
+t1 = ByteSize(t0);
+v_size = t1;
+if (!((v_size != i64(0)))) {
+return 1;
+}
+return ((v_size + 7) / 8);
+}
+return i64(0);
+}
+
+
+fn RegisterDrop(arg_v_slot: i64, arg_v_type2: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_slot: i64 = arg_v_slot;
+var v_type2: i64 = arg_v_type2;
+var v_d: *DropSlot = null;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+t0 = v_type2;
+t1 = Owned(t0);
+if (!((t1 != i8(0)))) {
+return;
+}
+t2 = i64(sizeof(DropSlot));
+t3 = CAlloc(t2);
+v_d = cast[*DropSlot](t3);
+(v_d).slot = v_slot;
+(v_d).type = v_type2;
+(v_d).next = ((ctx.v_functions)[ctx.v_current_fun]).drops;
+((ctx.v_functions)[ctx.v_current_fun]).drops = v_d;
+}
+return;
+}
+
+
+fn AddLocal(arg_v_name5: *u8, arg_v_type3: i64, arg_v_mutable: i8) -> *Local {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_name5: *u8 = arg_v_name5;
+var v_type3: i64 = arg_v_type3;
+var v_mutable: i8 = arg_v_mutable;
+var v_l1: *Local = null;
+var v_res: *Local = null;
+var t0: bool = false;
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: i8 = i8(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+v_l1 = ctx.v_locals;
+while (true) {
+t0 = (v_l1 != null);
+if (t0) {
+t0 = ((v_l1).depth == ctx.v_depth);
+}
+if (!(t0)) { break; }
+t1 = (v_l1).name;
+t2 = v_name5;
+t3 = Eq(t1, t2);
+if ((t3 != i8(0))) {
+t4 = cast[*u8]("duplicate local declaration");
+Error(t4);
+}
+v_l1 = (v_l1).next;
+}
+t5 = i64(sizeof(Local));
+t6 = CAlloc(t5);
+v_res = cast[*Local](t6);
+(v_res).name = v_name5;
+(v_res).type = v_type3;
+(v_res).mutable = i64(v_mutable);
+(v_res).depth = ctx.v_depth;
+(v_res).loop_level = ctx.v_loop_depth;
+(v_res).slot = ((ctx.v_functions)[ctx.v_current_fun]).slots;
+t7 = v_type3;
+t8 = TypeSlots(t7);
+((ctx.v_functions)[ctx.v_current_fun]).slots = ((ctx.v_functions)[ctx.v_current_fun]).slots + t8;
+if ((((ctx.v_functions)[ctx.v_current_fun]).slots > 65536)) {
+t9 = cast[*u8]("function storage limit exceeded");
+Error(t9);
+}
+(v_res).next = ctx.v_locals;
+ctx.v_locals = v_res;
+t10 = (v_res).slot;
+t11 = v_type3;
+RegisterDrop(t10, t11);
+(v_res).all_next = ((ctx.v_functions)[ctx.v_current_fun]).all_locals;
+((ctx.v_functions)[ctx.v_current_fun]).all_locals = v_res;
+return v_res;
+}
+return null;
+}
+
+
+fn Integer(arg_v_type4: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type4: i64 = arg_v_type4;
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+t0 = (v_type4 == 1);
+if (!t0) {
+t0 = (v_type4 == 4);
+}
+t1 = t0;
+if (!t1) {
+t2 = (5 <= v_type4);
+if (t2) {
+t2 = (v_type4 <= 10);
+}
+t1 = t2;
+}
+return i8(BoolInt(t1));
+}
+return i8(0);
+}
+
+
+fn Pointer(arg_v_type5: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type5: i64 = arg_v_type5;
+return i8(BoolInt((v_type5 >= 100000)));
+}
+return i8(0);
+}
+
+
+fn Aggregate(arg_v_type6: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type6: i64 = arg_v_type6;
+var t0: bool = false;
+t0 = (1000 <= v_type6);
+if (t0) {
+t0 = (v_type6 < (1000 + ctx.v_naggregates));
+}
+return i8(BoolInt(t0));
+}
+return i8(0);
+}
+
+
+fn Shape(arg_v_type7: i64) -> *AggregateType {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type7: i64 = arg_v_type7;
+return &((ctx.v_aggregate_types)[(v_type7 - 1000)]);
+}
+return null;
+}
+
+
+fn Storage(arg_v_type9: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type9: i64 = arg_v_type9;
+var v_slot1: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+v_slot1 = ((ctx.v_functions)[ctx.v_current_fun]).slots;
+t0 = v_type9;
+t1 = TypeSlots(t0);
+((ctx.v_functions)[ctx.v_current_fun]).slots = ((ctx.v_functions)[ctx.v_current_fun]).slots + t1;
+if ((((ctx.v_functions)[ctx.v_current_fun]).slots > 65536)) {
+t2 = cast[*u8]("function storage limit exceeded");
+Error(t2);
+}
+t3 = v_slot1;
+t4 = v_type9;
+RegisterDrop(t3, t4);
+return v_slot1;
+}
+return i64(0);
+}
+
+
+fn AggregateKind(arg_v_type10: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type10: i64 = arg_v_type10;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: *AggregateType = null;
+t0 = v_type10;
+t1 = Aggregate(t0);
+if (!((t1 != i8(0)))) {
+return 0;
+}
+t2 = v_type10;
+t3 = Shape(t2);
+return (t3).kind;
+}
+return i64(0);
+}
+
+
+fn Floating(arg_v_type11: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type11: i64 = arg_v_type11;
+var t0: bool = false;
+t0 = (v_type11 == 11);
+if (!t0) {
+t0 = (v_type11 == 12);
+}
+return i8(BoolInt(t0));
+}
+return i8(0);
+}
+
+
+fn Numeric(arg_v_type12: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type12: i64 = arg_v_type12;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+t0 = v_type12;
+t1 = Integer(t0);
+t2 = (i64(t1) != i64(0));
+if (!t2) {
+t3 = v_type12;
+t4 = Floating(t3);
+t2 = (i64(t4) != i64(0));
+}
+return i8(BoolInt(t2));
+}
+return i8(0);
+}
+
+
+fn Unsigned(arg_v_type13: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type13: i64 = arg_v_type13;
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+t0 = (v_type13 == 5);
+if (!t0) {
+t0 = (v_type13 == 8);
+}
+t1 = t0;
+if (!t1) {
+t1 = (v_type13 == 9);
+}
+t2 = t1;
+if (!t2) {
+t2 = (v_type13 == 10);
+}
+return i8(BoolInt(t2));
+}
+return i8(0);
+}
+
+
+fn Width(arg_v_type14: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type14: i64 = arg_v_type14;
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+t0 = (v_type14 == 6);
+if (!t0) {
+t0 = (v_type14 == 5);
+}
+if (t0) {
+return 8;
+}
+t1 = (v_type14 == 7);
+if (!t1) {
+t1 = (v_type14 == 8);
+}
+if (t1) {
+return 16;
+}
+t2 = (v_type14 == 4);
+if (!t2) {
+t2 = (v_type14 == 9);
+}
+if (t2) {
+return 32;
+}
+return 64;
+}
+return i64(0);
+}
+
+
+fn ByteSize(arg_v_type15: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type15: i64 = arg_v_type15;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: i64 = i64(0);
+var t3: i64 = i64(0);
+var t4: *AggregateType = null;
+var t5: bool = false;
+var t6: i64 = i64(0);
+var t7: i8 = i8(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+t0 = v_type15;
+t1 = Aggregate(t0);
+if ((t1 != i8(0))) {
+t2 = v_type15;
+Layout(t2);
+t3 = v_type15;
+t4 = Shape(t3);
+return (t4).size;
+}
+if ((v_type15 == 0)) {
+return 0;
+}
+if ((v_type15 == 2)) {
+return 1;
+}
+if ((v_type15 == 12)) {
+return 4;
+}
+t5 = (v_type15 == 11);
+if (!t5) {
+t6 = v_type15;
+t7 = Pointer(t6);
+t5 = (i64(t7) != i64(0));
+}
+if (t5) {
+return 8;
+}
+t8 = v_type15;
+t9 = Width(t8);
+return (t9 / 8);
+}
+return i64(0);
+}
+
+
+fn Fits(arg_v_v1: i64, arg_v_type16: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_v1: i64 = arg_v_v1;
+var v_type16: i64 = arg_v_type16;
+var v_width: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: i8 = i8(0);
+var t4: bool = false;
+t0 = v_type16;
+t1 = Width(t0);
+v_width = t1;
+t2 = v_type16;
+t3 = Unsigned(t2);
+if ((t3 != i8(0))) {
+if ((v_v1 < 0)) {
+return i8(0);
+}
+if ((v_width == 64)) {
+return i8(1);
+}
+return i8(BoolInt((v_v1 < (1 << v_width))));
+}
+if ((v_width == 64)) {
+return i8(1);
+}
+t4 = ((-(1 << (v_width - 1))) <= v_v1);
+if (t4) {
+t4 = (v_v1 < (1 << (v_width - 1)));
+}
+return i8(BoolInt(t4));
+}
+return i8(0);
+}
+
+
+fn Coerce(arg_v_n5: *Node, arg_v_type17: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n5: *Node = arg_v_n5;
+var v_type17: i64 = arg_v_type17;
+var v_child: *Node = null;
+var t0: bool = false;
+var t1: i64 = i64(0);
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: i8 = i8(0);
+var t5: bool = false;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+var t12: bool = false;
+var t13: bool = false;
+var t14: bool = false;
+var t15: i64 = i64(0);
+var t16: i8 = i8(0);
+var t17: bool = false;
+var t18: i64 = i64(0);
+var t19: i8 = i8(0);
+var t20: bool = false;
+var t21: bool = false;
+var t22: i64 = i64(0);
+var t23: *u8 = null;
+var t24: *u8 = null;
+var t25: *u8 = null;
+var t26: i64 = i64(0);
+var t27: *u8 = null;
+var t28: i64 = i64(0);
+var t29: i8 = i8(0);
+var t30: bool = false;
+var t31: i64 = i64(0);
+var t32: i8 = i8(0);
+var t33: bool = false;
+var t34: i64 = i64(0);
+var t35: i8 = i8(0);
+var t36: bool = false;
+var t37: bool = false;
+var t38: bool = false;
+var t39: i64 = i64(0);
+var t40: i64 = i64(0);
+var t41: i8 = i8(0);
+var t42: i64 = i64(0);
+var t43: i8 = i8(0);
+var t44: i64 = i64(0);
+var t45: i8 = i8(0);
+var t46: bool = false;
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: i64 = i64(0);
+var t50: i64 = i64(0);
+var t51: bool = false;
+var t52: i64 = i64(0);
+var t53: i8 = i8(0);
+var t54: bool = false;
+var t55: i64 = i64(0);
+var t56: i8 = i8(0);
+var t57: bool = false;
+var t58: i64 = i64(0);
+var t59: i64 = i64(0);
+var t60: i64 = i64(0);
+var t61: i64 = i64(0);
+var t62: i64 = i64(0);
+var t63: *u8 = null;
+var t64: *u8 = null;
+var t65: *u8 = null;
+var t66: i64 = i64(0);
+var t67: *u8 = null;
+var t68: *Token = null;
+var t69: *u8 = null;
+if (((v_n5).type == v_type17)) {
+return;
+}
+t0 = ((v_n5).type == 13);
+if (t0) {
+t1 = v_type17;
+t2 = Pointer(t1);
+t0 = (i64(t2) != i64(0));
+}
+if (t0) {
+(v_n5).type = v_type17;
+return;
+}
+t3 = (v_n5).type;
+t4 = Pointer(t3);
+t5 = (i64(t4) != i64(0));
+if (t5) {
+t5 = (v_type17 == 100000);
+}
+if (t5) {
+t6 = i64(sizeof(Node));
+t7 = CAlloc(t6);
+v_child = cast[*Node](t7);
+t8 = cast[*u8](v_child);
+t9 = cast[*u8](v_n5);
+t10 = i64(sizeof(Node));
+t11 = MemCpy(t8, t9, t10);
+(v_child).next = null;
+(v_n5).kind = 17;
+(v_n5).a = v_child;
+(v_n5).type = v_type17;
+return;
+}
+t12 = ((v_n5).type == 12);
+if (t12) {
+t12 = (v_type17 == 11);
+}
+t13 = t12;
+if (!t13) {
+t14 = ((v_n5).kind == 1);
+if (t14) {
+t15 = (v_n5).type;
+t16 = Integer(t15);
+t14 = (i64(t16) != i64(0));
+}
+t17 = t14;
+if (t17) {
+t18 = v_type17;
+t19 = Floating(t18);
+t17 = (i64(t19) != i64(0));
+}
+t20 = t17;
+if (t20) {
+t21 = ((-16777216) <= (v_n5).value);
+if (t21) {
+t21 = ((v_n5).value <= 16777216);
+}
+t20 = t21;
+}
+t13 = t20;
+}
+if (t13) {
+t22 = i64(sizeof(Node));
+t23 = CAlloc(t22);
+v_child = cast[*Node](t23);
+t24 = cast[*u8](v_child);
+t25 = cast[*u8](v_n5);
+t26 = i64(sizeof(Node));
+t27 = MemCpy(t24, t25, t26);
+(v_child).next = null;
+(v_n5).kind = 17;
+(v_n5).a = v_child;
+(v_n5).type = v_type17;
+return;
+}
+t28 = (v_n5).type;
+t29 = Integer(t28);
+t30 = (i64(t29) != i64(0));
+if (t30) {
+t31 = v_type17;
+t32 = Integer(t31);
+t30 = (i64(t32) != i64(0));
+}
+if (t30) {
+t33 = ((v_n5).kind == 1);
+if (t33) {
+t34 = (v_n5).type;
+t35 = Unsigned(t34);
+t36 = (i64(t35) != i64(0));
+if (t36) {
+t36 = ((v_n5).value < 0);
+}
+t37 = t36;
+if (t37) {
+t37 = (v_type17 != 10);
+}
+t33 = !(t37);
+}
+t38 = t33;
+if (t38) {
+t39 = (v_n5).value;
+t40 = v_type17;
+t41 = Fits(t39, t40);
+t38 = (i64(t41) != i64(0));
+}
+if (t38) {
+(v_n5).type = v_type17;
+return;
+}
+t42 = v_type17;
+t43 = Unsigned(t42);
+t44 = (v_n5).type;
+t45 = Unsigned(t44);
+t46 = (i64(t43) == i64(t45));
+if (t46) {
+t47 = v_type17;
+t48 = Width(t47);
+t49 = (v_n5).type;
+t50 = Width(t49);
+t46 = (t48 > t50);
+}
+t51 = t46;
+if (!t51) {
+t52 = v_type17;
+t53 = Unsigned(t52);
+t54 = !((t53 != i8(0)));
+if (t54) {
+t55 = (v_n5).type;
+t56 = Unsigned(t55);
+t54 = (i64(t56) != i64(0));
+}
+t57 = t54;
+if (t57) {
+t58 = v_type17;
+t59 = Width(t58);
+t60 = (v_n5).type;
+t61 = Width(t60);
+t57 = (t59 > t61);
+}
+t51 = t57;
+}
+if (t51) {
+t62 = i64(sizeof(Node));
+t63 = CAlloc(t62);
+v_child = cast[*Node](t63);
+t64 = cast[*u8](v_child);
+t65 = cast[*u8](v_n5);
+t66 = i64(sizeof(Node));
+t67 = MemCpy(t64, t65, t66);
+(v_child).next = null;
+(v_n5).kind = 17;
+(v_n5).a = v_child;
+(v_n5).type = v_type17;
+return;
+}
+}
+t68 = (v_n5).token;
+t69 = cast[*u8]("incompatible types; use an explicit cast for narrowing conversions");
+ErrorAt(t68, t69);
+}
+return;
+}
+

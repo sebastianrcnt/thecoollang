@@ -1,0 +1,459 @@
+fn EmitDrop(arg_v_address8: i64, arg_v_type39: i64) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_address8: i64 = arg_v_address8;
+var v_type39: i64 = arg_v_type39;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+t0 = v_type39;
+t1 = Owned(t0);
+if (!((t1 != i8(0)))) {
+return;
+}
+t2 = cast[*u8]("  call void @__cool_drop");
+IR(t2);
+t3 = v_type39;
+RI(t3);
+t4 = cast[*u8]("(i64 ");
+IR(t4);
+t5 = v_address8;
+Reg(t5);
+t6 = cast[*u8](")\n");
+IR(t6);
+}
+return;
+}
+
+
+fn DropFieldIR(arg_v_field4: *Field) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_field4: *Field = arg_v_field4;
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: i64 = i64(0);
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+t0 = cast[*u8]("  %field");
+IR(t0);
+t1 = (v_field4).tag;
+RI(t1);
+t2 = cast[*u8](" = add i64 %address, ");
+IR(t2);
+t3 = (v_field4).offset;
+RI(t3);
+t4 = cast[*u8]("\n  call void @__cool_drop");
+IR(t4);
+t5 = (v_field4).type;
+RI(t5);
+t6 = cast[*u8]("(i64 %field");
+IR(t6);
+t7 = (v_field4).tag;
+RI(t7);
+t8 = cast[*u8](")\n");
+IR(t8);
+}
+return;
+}
+
+
+fn EmitDropFunctions() {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_i19: i64 = i64(0);
+var v_type47: i64 = i64(0);
+var v_a12: *AggregateType = null;
+var v_field5: *Field = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: i8 = i8(0);
+var t8: *u8 = null;
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: i64 = i64(0);
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: *u8 = null;
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: *Field = null;
+var t21: *u8 = null;
+var t22: i64 = i64(0);
+var t23: *u8 = null;
+var t24: i64 = i64(0);
+var t25: i8 = i8(0);
+var t26: *u8 = null;
+var t27: *u8 = null;
+var t28: i64 = i64(0);
+var t29: *u8 = null;
+var t30: i64 = i64(0);
+var t31: *u8 = null;
+var t32: i64 = i64(0);
+var t33: i8 = i8(0);
+var t34: *u8 = null;
+var t35: *u8 = null;
+var t36: *Field = null;
+var t37: i64 = i64(0);
+var t38: i8 = i8(0);
+var t39: *u8 = null;
+var t40: i64 = i64(0);
+var t41: *u8 = null;
+var t42: bool = false;
+var t43: i64 = i64(0);
+var t44: i8 = i8(0);
+var t45: i64 = i64(0);
+var t46: *AggregateType = null;
+var pc: i64 = 60;
+while (true) {
+if (pc == 1) {
+pc = 5;
+continue;
+}
+if (pc == 2) {
+return;
+}
+if (pc == 3) {
+if ((v_i19 < ctx.v_naggregates)) { pc = 56; } else { pc = 2; }
+continue;
+}
+if (pc == 4) {
+t0 = v_i19;
+v_i19 = v_i19 + i64(1);
+pc = 3;
+continue;
+}
+if (pc == 5) {
+pc = 4;
+continue;
+}
+if (pc == 6) {
+t1 = cast[*u8]("}\n");
+IR(t1);
+pc = 1;
+continue;
+}
+if (pc == 7) {
+if (((v_a12).kind == 5)) { pc = 13; } else { pc = 14; }
+continue;
+}
+if (pc == 8) {
+t2 = cast[*u8]("  call void @cool_owner_free(i64 %owned)\n  br label %done\ndone:\n  ret void\n");
+IR(t2);
+pc = 6;
+continue;
+}
+if (pc == 9) {
+t6 = (v_a12).element;
+t7 = Owned(t6);
+if ((t7 != i8(0))) { pc = 12; } else { pc = 8; }
+continue;
+}
+if (pc == 10) {
+t3 = cast[*u8]("(i64 %owned)\n");
+IR(t3);
+pc = 8;
+continue;
+}
+if (pc == 11) {
+t4 = (v_a12).element;
+RI(t4);
+pc = 10;
+continue;
+}
+if (pc == 12) {
+t5 = cast[*u8]("  call void @__cool_drop");
+IR(t5);
+pc = 11;
+continue;
+}
+if (pc == 13) {
+t8 = cast[*u8]("  %owned = load i64, ptr %cell\n  %alive = icmp ne i64 %owned, 0\n  br i1 %alive, label %drop, label %done\ndrop:\n  store i64 0, ptr %cell\n");
+IR(t8);
+pc = 9;
+continue;
+}
+if (pc == 14) {
+if (((v_a12).kind == 2)) { pc = 21; } else { pc = 22; }
+continue;
+}
+if (pc == 15) {
+t9 = cast[*u8]("(i64 %element)\n  %next = add i64 %index, 1\n  br label %loop\ndone:\n  ret void\n");
+IR(t9);
+pc = 6;
+continue;
+}
+if (pc == 16) {
+t10 = (v_a12).element;
+RI(t10);
+pc = 15;
+continue;
+}
+if (pc == 17) {
+t11 = cast[*u8]("\n  %element = add i64 %address, %offset\n  call void @__cool_drop");
+IR(t11);
+pc = 16;
+continue;
+}
+if (pc == 18) {
+t12 = (v_a12).element;
+t13 = ByteSize(t12);
+t14 = t13;
+RI(t14);
+pc = 17;
+continue;
+}
+if (pc == 19) {
+t15 = cast[*u8]("\n  br i1 %more, label %body, label %done\nbody:\n  %offset = mul i64 %index, ");
+IR(t15);
+pc = 18;
+continue;
+}
+if (pc == 20) {
+t16 = (v_a12).count;
+RI(t16);
+pc = 19;
+continue;
+}
+if (pc == 21) {
+t17 = cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 [0, %entry], [%next, %body]\n  %more = icmp ult i64 %index, ");
+IR(t17);
+pc = 20;
+continue;
+}
+if (pc == 22) {
+if (((v_a12).kind == 4)) { pc = 43; } else { pc = 49; }
+continue;
+}
+if (pc == 23) {
+t18 = cast[*u8]("done:\n  ret void\n");
+IR(t18);
+pc = 6;
+continue;
+}
+if (pc == 24) {
+if ((v_field5 != null)) { pc = 26; } else { pc = 23; }
+continue;
+}
+if (pc == 25) {
+v_field5 = (v_field5).next;
+pc = 24;
+continue;
+}
+if (pc == 26) {
+t24 = (v_field5).type;
+t25 = Owned(t24);
+if ((t25 != i8(0))) { pc = 31; } else { pc = 25; }
+continue;
+}
+if (pc == 27) {
+t19 = cast[*u8]("  br label %done\n");
+IR(t19);
+pc = 25;
+continue;
+}
+if (pc == 28) {
+t20 = v_field5;
+DropFieldIR(t20);
+pc = 27;
+continue;
+}
+if (pc == 29) {
+t21 = cast[*u8](":\n");
+IR(t21);
+pc = 28;
+continue;
+}
+if (pc == 30) {
+t22 = (v_field5).tag;
+RI(t22);
+pc = 29;
+continue;
+}
+if (pc == 31) {
+t23 = cast[*u8]("variant");
+IR(t23);
+pc = 30;
+continue;
+}
+if (pc == 32) {
+v_field5 = (v_a12).fields;
+pc = 24;
+continue;
+}
+if (pc == 33) {
+t26 = cast[*u8]("  ]\n");
+IR(t26);
+pc = 32;
+continue;
+}
+if (pc == 34) {
+if ((v_field5 != null)) { pc = 36; } else { pc = 33; }
+continue;
+}
+if (pc == 35) {
+v_field5 = (v_field5).next;
+pc = 34;
+continue;
+}
+if (pc == 36) {
+t32 = (v_field5).type;
+t33 = Owned(t32);
+if ((t33 != i8(0))) { pc = 41; } else { pc = 35; }
+continue;
+}
+if (pc == 37) {
+t27 = cast[*u8]("\n");
+IR(t27);
+pc = 35;
+continue;
+}
+if (pc == 38) {
+t28 = (v_field5).tag;
+RI(t28);
+pc = 37;
+continue;
+}
+if (pc == 39) {
+t29 = cast[*u8](", label %variant");
+IR(t29);
+pc = 38;
+continue;
+}
+if (pc == 40) {
+t30 = (v_field5).tag;
+RI(t30);
+pc = 39;
+continue;
+}
+if (pc == 41) {
+t31 = cast[*u8]("    i64 ");
+IR(t31);
+pc = 40;
+continue;
+}
+if (pc == 42) {
+v_field5 = (v_a12).fields;
+pc = 34;
+continue;
+}
+if (pc == 43) {
+t34 = cast[*u8]("  %tag = load i64, ptr %cell\n  switch i64 %tag, label %done [\n");
+IR(t34);
+pc = 42;
+continue;
+}
+if (pc == 44) {
+t35 = cast[*u8]("  ret void\n");
+IR(t35);
+pc = 6;
+continue;
+}
+if (pc == 45) {
+if ((v_field5 != null)) { pc = 47; } else { pc = 44; }
+continue;
+}
+if (pc == 46) {
+v_field5 = (v_field5).next;
+pc = 45;
+continue;
+}
+if (pc == 47) {
+t37 = (v_field5).type;
+t38 = Owned(t37);
+if ((t38 != i8(0))) { pc = 48; } else { pc = 46; }
+continue;
+}
+if (pc == 48) {
+t36 = v_field5;
+DropFieldIR(t36);
+pc = 46;
+continue;
+}
+if (pc == 49) {
+v_field5 = (v_a12).fields;
+pc = 45;
+continue;
+}
+if (pc == 50) {
+t39 = cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n");
+IR(t39);
+pc = 7;
+continue;
+}
+if (pc == 51) {
+t40 = v_type47;
+RI(t40);
+pc = 50;
+continue;
+}
+if (pc == 52) {
+t41 = cast[*u8]("define void @__cool_drop");
+IR(t41);
+pc = 51;
+continue;
+}
+if (pc == 53) {
+t42 = ((v_a12).generic_count != i64(0));
+if (!t42) {
+t43 = v_type47;
+t44 = Owned(t43);
+t42 = !((t44 != i8(0)));
+}
+if (t42) { pc = 54; } else { pc = 52; }
+continue;
+}
+if (pc == 54) {
+pc = 1;
+continue;
+}
+if (pc == 55) {
+t45 = v_type47;
+t46 = Shape(t45);
+v_a12 = t46;
+pc = 53;
+continue;
+}
+if (pc == 56) {
+v_type47 = (1000 + v_i19);
+pc = 55;
+continue;
+}
+if (pc == 57) {
+v_i19 = 0;
+pc = 3;
+continue;
+}
+if (pc == 58) {
+pc = 57;
+continue;
+}
+if (pc == 59) {
+pc = 58;
+continue;
+}
+if (pc == 60) {
+pc = 59;
+continue;
+}
+}
+}
+return;
+}
+

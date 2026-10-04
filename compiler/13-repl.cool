@@ -1,0 +1,918 @@
+fn ReplDropNew(arg_v_failed: i8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_failed: i8 = arg_v_failed;
+var v_d8: *DropSlot = null;
+var v_l5: *Local = null;
+var v_keep: i8 = i8(0);
+var t0: bool = false;
+var t1: i64 = i64(0);
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+v_d8 = ((ctx.v_functions)[0]).drops;
+while (true) {
+if (!((v_d8 != ((ctx.v_repl_snapshot)[0]).drops))) { break; }
+v_keep = i8(0);
+if (!((v_failed != i8(0)))) {
+v_l5 = ctx.v_locals;
+while (true) {
+if (!((v_l5 != null))) { break; }
+t0 = ((v_l5).slot == (v_d8).slot);
+if (t0) {
+t1 = (v_l5).type;
+t2 = Owned(t1);
+t0 = (i64(t2) != i64(0));
+}
+if (t0) {
+v_keep = i8(1);
+}
+v_l5 = (v_l5).next;
+}
+}
+if (!((v_keep != i8(0)))) {
+t3 = i64(cast[i64](&((ctx.v_repl_values)[(v_d8).slot])));
+t4 = (v_d8).type;
+DropValue(t3, t4);
+}
+v_d8 = (v_d8).next;
+}
+}
+return;
+}
+
+
+fn Submission() -> *Text {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_text4: *Text = null;
+var v_ch5: i64 = i64(0);
+var v_braces1: i64 = i64(0);
+var v_parens: i64 = i64(0);
+var v_quoted: i8 = i8(0);
+var v_escaped: i8 = i8(0);
+var v_line_comment: i8 = i8(0);
+var t0: *Text = null;
+var t1: i64 = i64(0);
+var t2: *Text = null;
+var t3: i64 = i64(0);
+var t4: bool = false;
+var t5: bool = false;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: i64 = i64(0);
+var t10: bool = false;
+var t11: bool = false;
+var t12: bool = false;
+var t13: bool = false;
+var t14: *Text = null;
+var t15: i64 = i64(0);
+t0 = TextNew();
+v_text4 = t0;
+v_braces1 = 0;
+v_parens = 0;
+v_quoted = i8(0);
+v_escaped = i8(0);
+v_line_comment = i8(0);
+while (true) {
+t1 = NativeGetChar();
+v_ch5 = t1;
+if (!((v_ch5 >= 0))) { break; }
+t2 = v_text4;
+t3 = v_ch5;
+Char(t2, t3);
+if ((v_line_comment != i8(0))) {
+if ((v_ch5 == 10)) {
+v_line_comment = i8(0);
+}
+} else {
+if ((v_quoted != i8(0))) {
+if ((v_escaped != i8(0))) {
+v_escaped = i8(0);
+} else {
+if ((v_ch5 == 92)) {
+v_escaped = i8(1);
+} else {
+if ((v_ch5 == 34)) {
+v_quoted = i8(0);
+}
+}
+}
+} else {
+if ((v_ch5 == 34)) {
+v_quoted = i8(1);
+}
+t4 = (v_ch5 == 47);
+if (t4) {
+t4 = ((v_text4).len > 1);
+}
+t5 = t4;
+if (t5) {
+t5 = (i64(((v_text4).data)[((v_text4).len - 2)]) == 47);
+}
+if (t5) {
+v_line_comment = i8(1);
+}
+if ((v_ch5 == 123)) {
+t6 = v_braces1;
+v_braces1 = v_braces1 + i64(1);
+}
+if ((v_ch5 == 125)) {
+t7 = v_braces1;
+v_braces1 = v_braces1 - i64(1);
+}
+if ((v_ch5 == 40)) {
+t8 = v_parens;
+v_parens = v_parens + i64(1);
+}
+if ((v_ch5 == 41)) {
+t9 = v_parens;
+v_parens = v_parens - i64(1);
+}
+}
+}
+t10 = (v_ch5 == 10);
+if (t10) {
+t10 = (v_braces1 <= 0);
+}
+t11 = t10;
+if (t11) {
+t11 = (v_parens <= 0);
+}
+t12 = t11;
+if (t12) {
+t12 = !((v_quoted != i8(0)));
+}
+if (t12) {
+break;
+}
+}
+t13 = !(((v_text4).len != i64(0)));
+if (t13) {
+t13 = (v_ch5 < 0);
+}
+if (t13) {
+return null;
+}
+t14 = v_text4;
+t15 = 0;
+Reserve(t14, t15);
+return v_text4;
+}
+return null;
+}
+
+
+fn ReplRestore() {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_retained_slots: i64 = i64(0);
+var v_frame4: *Frame = null;
+var v_d9: *DropSlot = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i8 = i8(0);
+var t5: *MoveState = null;
+var t6: *u8 = null;
+var t7: *u8 = null;
+var t8: i64 = i64(0);
+var t9: *u8 = null;
+var t10: bool = false;
+v_retained_slots = ((ctx.v_functions)[0]).slots;
+if ((ctx.v_repl_executing != i8(0))) {
+while (true) {
+if (!((ctx.v_active_frame != null))) { break; }
+v_frame4 = ctx.v_active_frame;
+v_d9 = ((v_frame4).function).drops;
+while (true) {
+if (!((v_d9 != null))) { break; }
+t0 = i64(cast[i64](&(((v_frame4).values)[(v_d9).slot])));
+t1 = (v_d9).type;
+DropValue(t0, t1);
+v_d9 = (v_d9).next;
+}
+ctx.v_active_frame = (v_frame4).parent;
+t2 = cast[*u8]((v_frame4).values);
+Free(t2);
+t3 = cast[*u8](v_frame4);
+Free(t3);
+}
+t4 = i8(1);
+ReplDropNew(t4);
+} else {
+t5 = ctx.v_repl_moves;
+MoveRestore(t5);
+}
+t6 = cast[*u8](ctx.v_functions);
+t7 = cast[*u8](ctx.v_repl_snapshot);
+t8 = i64((u64(4096) * sizeof(Function)));
+t9 = MemCpy(t6, t7, t8);
+t10 = (i64(ctx.v_repl_executing) != i64(0));
+if (t10) {
+t10 = (v_retained_slots > ((ctx.v_functions)[0]).slots);
+}
+if (t10) {
+((ctx.v_functions)[0]).slots = v_retained_slots;
+}
+ctx.v_nfun = ctx.v_repl_saved_nfun;
+ctx.v_ntok = ctx.v_repl_saved_ntok;
+ctx.v_naggregates = ctx.v_repl_saved_types;
+ctx.v_aliases = ctx.v_repl_aliases;
+ctx.v_locals = ctx.v_repl_locals;
+ctx.v_call_depth = 0;
+ctx.v_type_bindings = null;
+ctx.v_specialization_depth = 0;
+}
+return;
+}
+
+
+fn ReplStep(arg_v_text5: *Text) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_text5: *Text = arg_v_text5;
+var v_start3: i64 = i64(0);
+var v_result6: i64 = i64(0);
+var v_register_id3: i64 = i64(0);
+var v_i26: i64 = i64(0);
+var v_statement1: *Node = null;
+var v_call2: *Node = null;
+var v_arg2: *Node = null;
+var v_f19: *Function = null;
+var v_grown1: *i64 = null;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: *Token = null;
+var t3: *u8 = null;
+var t4: i8 = i8(0);
+var t5: bool = false;
+var t6: *u8 = null;
+var t7: i8 = i8(0);
+var t8: bool = false;
+var t9: *u8 = null;
+var t10: i8 = i8(0);
+var t11: bool = false;
+var t12: *u8 = null;
+var t13: i8 = i8(0);
+var t14: bool = false;
+var t15: *u8 = null;
+var t16: i8 = i8(0);
+var t17: bool = false;
+var t18: *u8 = null;
+var t19: i8 = i8(0);
+var t20: bool = false;
+var t21: *u8 = null;
+var t22: i8 = i8(0);
+var t23: bool = false;
+var t24: bool = false;
+var t25: i64 = i64(0);
+var t26: *u8 = null;
+var t27: i8 = i8(0);
+var t28: bool = false;
+var t29: *u8 = null;
+var t30: i8 = i8(0);
+var t31: *u8 = null;
+var t32: *Node = null;
+var t33: *Token = null;
+var t34: *u8 = null;
+var t35: bool = false;
+var t36: bool = false;
+var t37: i64 = i64(0);
+var t38: i8 = i8(0);
+var t39: i64 = i64(0);
+var t40: *Token = null;
+var t41: *Node = null;
+var t42: *Node = null;
+var t43: i64 = i64(0);
+var t44: i64 = i64(0);
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: *Node = null;
+var t49: i64 = i64(0);
+var t50: i64 = i64(0);
+var t51: i64 = i64(0);
+var t52: i64 = i64(0);
+var t53: i64 = i64(0);
+var t54: *Node = null;
+var t55: i64 = i64(0);
+var t56: *u8 = null;
+var t57: i64 = i64(0);
+var t58: *u8 = null;
+var t59: i64 = i64(0);
+var t60: *u8 = null;
+var t61: i64 = i64(0);
+var t62: *Function = null;
+var t63: *i64 = null;
+var t64: i64 = i64(0);
+var t65: i8 = i8(0);
+v_start3 = ctx.v_ntok;
+ctx.v_repl_executing = i8(0);
+t0 = (v_text5).data;
+t1 = cast[*u8]("<repl>");
+LexSource(t0, t1);
+ctx.v_pos = v_start3;
+t2 = At();
+if (!(((t2).kind != i64(0)))) {
+return;
+}
+t3 = cast[*u8]("fn");
+t4 = Is(t3);
+t5 = (i64(t4) != i64(0));
+if (!t5) {
+t6 = cast[*u8]("pub");
+t7 = Is(t6);
+t5 = (i64(t7) != i64(0));
+}
+t8 = t5;
+if (!t8) {
+t9 = cast[*u8]("import");
+t10 = Is(t9);
+t8 = (i64(t10) != i64(0));
+}
+t11 = t8;
+if (!t11) {
+t12 = cast[*u8]("extern");
+t13 = Is(t12);
+t11 = (i64(t13) != i64(0));
+}
+t14 = t11;
+if (!t14) {
+t15 = cast[*u8]("export");
+t16 = Is(t15);
+t14 = (i64(t16) != i64(0));
+}
+t17 = t14;
+if (!t17) {
+t18 = cast[*u8]("struct");
+t19 = Is(t18);
+t17 = (i64(t19) != i64(0));
+}
+t20 = t17;
+if (!t20) {
+t21 = cast[*u8]("enum");
+t22 = Is(t21);
+t20 = (i64(t22) != i64(0));
+}
+if (t20) {
+ParseProgram();
+return;
+}
+ctx.v_current_fun = 0;
+v_f19 = &((ctx.v_functions)[0]);
+ctx.v_locals = ctx.v_repl_locals;
+ctx.v_depth = 0;
+ctx.v_loop_depth = 0;
+ctx.v_unsafe_depth = 0;
+t23 = (ctx.v_ntok > v_start3);
+if (t23) {
+t23 = (((ctx.v_tokens)[(ctx.v_ntok - 1)]).kind != 59);
+}
+t24 = t23;
+if (t24) {
+t24 = (((ctx.v_tokens)[(ctx.v_ntok - 1)]).kind != 125);
+}
+if (t24) {
+(ctx.v_tokens)[ctx.v_ntok] = (ctx.v_tokens)[(ctx.v_ntok - 1)];
+t25 = ctx.v_ntok;
+ctx.v_ntok = ctx.v_ntok + i64(1);
+((ctx.v_tokens)[t25]).kind = 59;
+((ctx.v_tokens)[ctx.v_ntok]).kind = 0;
+}
+t26 = cast[*u8]("return");
+t27 = Is(t26);
+t28 = (i64(t27) != i64(0));
+if (!t28) {
+t29 = cast[*u8]("defer");
+t30 = Is(t29);
+t28 = (i64(t30) != i64(0));
+}
+if (t28) {
+t31 = cast[*u8]("top-level return/defer requires an explicit function or block");
+Error(t31);
+}
+t32 = Statement();
+v_statement1 = t32;
+t33 = At();
+if (((t33).kind != i64(0))) {
+t34 = cast[*u8]("one statement per submission; use a block for multiple statements");
+Error(t34);
+}
+t35 = ((v_statement1).kind == 16);
+if (t35) {
+t35 = (((v_statement1).a).type != 0);
+}
+t36 = t35;
+if (t36) {
+t37 = ((v_statement1).a).type;
+t38 = Aggregate(t37);
+t36 = !((t38 != i8(0)));
+}
+if (t36) {
+v_arg2 = (v_statement1).a;
+t39 = 4;
+t40 = (v_arg2).token;
+t41 = NewNode(t39, t40);
+v_call2 = t41;
+(v_call2).name = cast[*u8]("println");
+(v_call2).slot = (-1);
+(v_call2).value = 1;
+(v_call2).type = 0;
+(v_call2).a = v_arg2;
+(v_statement1).a = v_call2;
+}
+(v_f19).bytecode = null;
+(v_f19).machine = null;
+(v_f19).code_capacity = 0;
+(v_f19).code_count = (v_f19).code_capacity;
+ctx.v_bc_fun = v_f19;
+(v_f19).registers = (v_f19).slots;
+ctx.v_bc_scope = null;
+ctx.v_bc_done = i8(0);
+t42 = v_statement1;
+ByteStmt(t42);
+t43 = Slot();
+v_register_id3 = t43;
+t44 = 1;
+t45 = v_register_id3;
+t46 = 0;
+t47 = 0;
+t48 = null;
+t49 = InstructionNew(t44, t45, t46, t47, t48);
+t50 = 9;
+t51 = 0;
+t52 = v_register_id3;
+t53 = 0;
+t54 = null;
+t55 = InstructionNew(t50, t51, t52, t53, t54);
+if ((((v_f19).registers + 1) > ctx.v_repl_capacity)) {
+if (((v_f19).registers >= 65536)) {
+t56 = cast[*u8]("session register limit exceeded");
+Error(t56);
+}
+t57 = (65536 * 8);
+t58 = CAlloc(t57);
+v_grown1 = cast[*i64](t58);
+v_i26 = 0;
+while (true) {
+if (!((v_i26 < ctx.v_repl_capacity))) { break; }
+(v_grown1)[v_i26] = (ctx.v_repl_values)[v_i26];
+t59 = v_i26;
+v_i26 = v_i26 + i64(1);
+}
+t60 = cast[*u8](ctx.v_repl_values);
+Free(t60);
+ctx.v_repl_values = v_grown1;
+ctx.v_repl_capacity = 65536;
+}
+v_i26 = ((ctx.v_repl_snapshot)[0]).slots;
+while (true) {
+if (!((v_i26 < (v_f19).slots))) { break; }
+(ctx.v_repl_values)[v_i26] = 0;
+t61 = v_i26;
+v_i26 = v_i26 + i64(1);
+}
+ctx.v_repl_executing = i8(1);
+t62 = v_f19;
+t63 = ctx.v_repl_values;
+t64 = RunBytecode(t62, t63);
+v_result6 = t64;
+t65 = i8(0);
+ReplDropNew(t65);
+ctx.v_repl_locals = ctx.v_locals;
+}
+return;
+}
+
+
+fn Repl(arg_v_prompt: i8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_prompt: i8 = arg_v_prompt;
+var v_text6: *Text = null;
+var v_stats: *Text = null;
+var v_i27: i64 = i64(0);
+var v_compiled: i64 = i64(0);
+var v_d10: *DropSlot = null;
+var v_move: *MoveState = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: *MoveState = null;
+var t12: *u8 = null;
+var t13: *Text = null;
+var t14: i64 = i64(0);
+var t15: *Text = null;
+var t16: i64 = i64(0);
+var t17: *Text = null;
+var t18: *u8 = null;
+var t19: *Text = null;
+var t20: i64 = i64(0);
+var t21: *Text = null;
+var t22: *u8 = null;
+var t23: *Text = null;
+var t24: i64 = i64(0);
+var t25: *Text = null;
+var t26: *u8 = null;
+var t27: *Text = null;
+var t28: i64 = i64(0);
+var t29: *Text = null;
+var t30: *u8 = null;
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+var t33: *Text = null;
+var t34: *u8 = null;
+var t35: *u8 = null;
+var t36: i8 = i8(0);
+var t37: *u8 = null;
+var t38: *u8 = null;
+var t39: i8 = i8(0);
+var t40: bool = false;
+var t41: *u8 = null;
+var t42: *u8 = null;
+var t43: i8 = i8(0);
+var t44: *Text = null;
+var t45: *u8 = null;
+var t46: *u8 = null;
+var t47: *u8 = null;
+var t48: i64 = i64(0);
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: *u8 = null;
+var pc: i64 = 65;
+while (true) {
+if (pc == 1) {
+pc = 9;
+continue;
+}
+if (pc == 2) {
+return;
+}
+if (pc == 3) {
+if ((v_d10 != null)) { pc = 5; } else { pc = 2; }
+continue;
+}
+if (pc == 4) {
+v_d10 = (v_d10).next;
+pc = 3;
+continue;
+}
+if (pc == 5) {
+t0 = i64(cast[i64](&((ctx.v_repl_values)[(v_d10).slot])));
+t1 = (v_d10).type;
+DropValue(t0, t1);
+pc = 4;
+continue;
+}
+if (pc == 6) {
+v_d10 = ((ctx.v_functions)[0]).drops;
+pc = 3;
+continue;
+}
+if (pc == 7) {
+if ((1 != i64(0))) { pc = 50; } else { pc = 6; }
+continue;
+}
+if (pc == 8) {
+t2 = cast[*u8](v_text6);
+Free(t2);
+pc = 7;
+continue;
+}
+if (pc == 9) {
+t3 = (v_text6).data;
+Free(t3);
+pc = 8;
+continue;
+}
+if (pc == 10) {
+if ((ctx.v_repl_moves != null)) { pc = 13; } else { pc = 1; }
+continue;
+}
+if (pc == 11) {
+t4 = cast[*u8](v_move);
+Free(t4);
+pc = 10;
+continue;
+}
+if (pc == 12) {
+ctx.v_repl_moves = (v_move).next;
+pc = 11;
+continue;
+}
+if (pc == 13) {
+v_move = ctx.v_repl_moves;
+pc = 12;
+continue;
+}
+if (pc == 14) {
+ctx.v_recovery_context = null;
+pc = 10;
+continue;
+}
+if (pc == 15) {
+t5 = cast[*u8](v_text6);
+t6 = NativeRecover(t5);
+if ((t6 != i64(0))) { pc = 16; } else { pc = 14; }
+continue;
+}
+if (pc == 16) {
+ReplRestore();
+pc = 14;
+continue;
+}
+if (pc == 17) {
+ctx.v_recovery_context = ctx.v_repl_context;
+pc = 15;
+continue;
+}
+if (pc == 18) {
+ctx.v_repl_aliases = ctx.v_aliases;
+pc = 17;
+continue;
+}
+if (pc == 19) {
+ctx.v_repl_saved_ntok = ctx.v_ntok;
+pc = 18;
+continue;
+}
+if (pc == 20) {
+ctx.v_repl_saved_nfun = ctx.v_nfun;
+pc = 19;
+continue;
+}
+if (pc == 21) {
+ctx.v_repl_saved_types = ctx.v_naggregates;
+pc = 20;
+continue;
+}
+if (pc == 22) {
+t7 = cast[*u8](ctx.v_repl_snapshot);
+t8 = cast[*u8](ctx.v_functions);
+t9 = i64((u64(4096) * sizeof(Function)));
+t10 = MemCpy(t7, t8, t9);
+pc = 21;
+continue;
+}
+if (pc == 23) {
+ctx.v_repl_executing = i8(0);
+pc = 22;
+continue;
+}
+if (pc == 24) {
+t11 = MoveSnapshot();
+ctx.v_repl_moves = t11;
+pc = 23;
+continue;
+}
+if (pc == 25) {
+ctx.v_locals = ctx.v_repl_locals;
+pc = 24;
+continue;
+}
+if (pc == 26) {
+t34 = (v_text6).data;
+t35 = cast[*u8](":stats\n");
+t36 = Eq(t34, t35);
+if ((t36 != i8(0))) { pc = 44; } else { pc = 25; }
+continue;
+}
+if (pc == 27) {
+pc = 1;
+continue;
+}
+if (pc == 28) {
+t12 = (v_stats).data;
+Out(t12);
+pc = 27;
+continue;
+}
+if (pc == 29) {
+t13 = v_stats;
+t14 = 10;
+Char(t13, t14);
+pc = 28;
+continue;
+}
+if (pc == 30) {
+t15 = v_stats;
+t16 = ctx.v_jit_compilations;
+Number(t15, t16);
+pc = 29;
+continue;
+}
+if (pc == 31) {
+t17 = v_stats;
+t18 = cast[*u8](" jit_compilations=");
+Append(t17, t18);
+pc = 30;
+continue;
+}
+if (pc == 32) {
+t19 = v_stats;
+t20 = ctx.v_bytecode_compilations;
+Number(t19, t20);
+pc = 31;
+continue;
+}
+if (pc == 33) {
+t21 = v_stats;
+t22 = cast[*u8](" bytecode_compilations=");
+Append(t21, t22);
+pc = 32;
+continue;
+}
+if (pc == 34) {
+t23 = v_stats;
+t24 = v_compiled;
+Number(t23, t24);
+pc = 33;
+continue;
+}
+if (pc == 35) {
+t25 = v_stats;
+t26 = cast[*u8](" compiled=");
+Append(t25, t26);
+pc = 34;
+continue;
+}
+if (pc == 36) {
+t27 = v_stats;
+t28 = (ctx.v_nfun - 1);
+Number(t27, t28);
+pc = 35;
+continue;
+}
+if (pc == 37) {
+t29 = v_stats;
+t30 = cast[*u8]("functions=");
+Append(t29, t30);
+pc = 36;
+continue;
+}
+if (pc == 38) {
+if ((v_i27 < ctx.v_nfun)) { pc = 40; } else { pc = 37; }
+continue;
+}
+if (pc == 39) {
+t31 = v_i27;
+v_i27 = v_i27 + i64(1);
+pc = 38;
+continue;
+}
+if (pc == 40) {
+if ((((ctx.v_functions)[v_i27]).bytecode != null)) { pc = 41; } else { pc = 39; }
+continue;
+}
+if (pc == 41) {
+t32 = v_compiled;
+v_compiled = v_compiled + i64(1);
+pc = 39;
+continue;
+}
+if (pc == 42) {
+v_i27 = 1;
+pc = 38;
+continue;
+}
+if (pc == 43) {
+v_compiled = 0;
+pc = 42;
+continue;
+}
+if (pc == 44) {
+t33 = TextNew();
+v_stats = t33;
+pc = 43;
+continue;
+}
+if (pc == 45) {
+t37 = (v_text6).data;
+t38 = cast[*u8](":quit\n");
+t39 = Eq(t37, t38);
+t40 = (i64(t39) != i64(0));
+if (!t40) {
+t41 = (v_text6).data;
+t42 = cast[*u8](":quit");
+t43 = Eq(t41, t42);
+t40 = (i64(t43) != i64(0));
+}
+if (t40) { pc = 46; } else { pc = 26; }
+continue;
+}
+if (pc == 46) {
+pc = 6;
+continue;
+}
+if (pc == 47) {
+if (!((v_text6 != null))) { pc = 48; } else { pc = 45; }
+continue;
+}
+if (pc == 48) {
+pc = 6;
+continue;
+}
+if (pc == 49) {
+t44 = Submission();
+v_text6 = t44;
+pc = 47;
+continue;
+}
+if (pc == 50) {
+if ((v_prompt != i8(0))) { pc = 51; } else { pc = 49; }
+continue;
+}
+if (pc == 51) {
+t45 = cast[*u8]("cool> ");
+Out(t45);
+pc = 49;
+continue;
+}
+if (pc == 52) {
+ParseProgram();
+pc = 7;
+continue;
+}
+if (pc == 53) {
+t46 = cast[*u8]("import \"std/io\";");
+t47 = cast[*u8]("<repl>");
+LexSource(t46, t47);
+pc = 52;
+continue;
+}
+if (pc == 54) {
+ctx.v_execution_mode = 3;
+pc = 53;
+continue;
+}
+if (pc == 55) {
+ctx.v_lex_package = cast[*u8]("__main");
+pc = 54;
+continue;
+}
+if (pc == 56) {
+ctx.v_allow_redefinition = i8(1);
+pc = 55;
+continue;
+}
+if (pc == 57) {
+t48 = i64((u64(4096) * sizeof(Function)));
+t49 = CAlloc(t48);
+ctx.v_repl_snapshot = cast[*Function](t49);
+pc = 56;
+continue;
+}
+if (pc == 58) {
+((ctx.v_functions)[0]).package = cast[*u8]("__main");
+pc = 57;
+continue;
+}
+if (pc == 59) {
+((ctx.v_functions)[0]).name = cast[*u8]("__session");
+pc = 58;
+continue;
+}
+if (pc == 60) {
+ctx.v_nfun = 1;
+pc = 59;
+continue;
+}
+if (pc == 61) {
+t50 = i64((u64(4096) * sizeof(Function)));
+t51 = CAlloc(t50);
+ctx.v_functions = cast[*Function](t51);
+pc = 60;
+continue;
+}
+if (pc == 62) {
+pc = 61;
+continue;
+}
+if (pc == 63) {
+pc = 62;
+continue;
+}
+if (pc == 64) {
+pc = 63;
+continue;
+}
+if (pc == 65) {
+pc = 64;
+continue;
+}
+}
+}
+return;
+}
+

@@ -1,0 +1,6220 @@
+fn ParseType() -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t9: i64 = i64(0);
+var v_count3: i64 = i64(0);
+var v_kind3: i64 = i64(0);
+var v_token2: *Token = null;
+var v_name9: *u8 = null;
+var v_package2: *u8 = null;
+var t0: *Token = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: *Token = null;
+var t13: i64 = i64(0);
+var t14: i64 = i64(0);
+var t15: i8 = i8(0);
+var t16: i64 = i64(0);
+var t17: *u8 = null;
+var t18: i64 = i64(0);
+var t19: i8 = i8(0);
+var t20: i64 = i64(0);
+var t21: i8 = i8(0);
+var t22: *Token = null;
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *u8 = null;
+var t27: i64 = i64(0);
+var t28: i64 = i64(0);
+var t29: i64 = i64(0);
+var t30: i64 = i64(0);
+var t31: *Token = null;
+var t32: i64 = i64(0);
+var t33: *u8 = null;
+var t34: *u8 = null;
+var t35: i64 = i64(0);
+var t36: *u8 = null;
+var t37: i64 = i64(0);
+var t38: *u8 = null;
+var t39: *u8 = null;
+var t40: i64 = i64(0);
+var t41: bool = false;
+var t42: i64 = i64(0);
+var t43: i8 = i8(0);
+var t44: *Token = null;
+var t45: *u8 = null;
+var t46: *u8 = null;
+var t47: *u8 = null;
+var t48: *u8 = null;
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: *Token = null;
+var t52: *u8 = null;
+var t53: *u8 = null;
+var t54: *u8 = null;
+var t55: i8 = i8(0);
+var t56: bool = false;
+var t57: i64 = i64(0);
+var t58: *AggregateType = null;
+var t59: *Token = null;
+var t60: *u8 = null;
+var t61: i64 = i64(0);
+var t62: *AggregateType = null;
+var t63: i64 = i64(0);
+var t64: i64 = i64(0);
+t0 = At();
+v_token2 = t0;
+v_package2 = (v_token2).package;
+t1 = cast[*u8]("own");
+t2 = Is(t1);
+if ((t2 != i8(0))) {
+t3 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t4 = 91;
+t5 = cast[*u8]("expected '[' after own");
+Need(t4, t5);
+t6 = ParseType();
+v_t9 = t6;
+t7 = 93;
+t8 = cast[*u8]("expected ']' after owned type");
+Need(t7, t8);
+t9 = 5;
+t10 = v_t9;
+t11 = 0;
+t12 = v_token2;
+t13 = SequenceType(t9, t10, t11, t12);
+return t13;
+}
+t14 = 42;
+t15 = Take(t14);
+if ((t15 != i8(0))) {
+t16 = ParseType();
+v_t9 = t16;
+if ((v_t9 >= (100 * 100000))) {
+t17 = cast[*u8]("pointer nesting limit exceeded");
+Error(t17);
+}
+return (100000 + v_t9);
+}
+t18 = 91;
+t19 = Take(t18);
+if ((t19 != i8(0))) {
+v_kind3 = 2;
+v_count3 = 0;
+t20 = 93;
+t21 = Take(t20);
+if ((t21 != i8(0))) {
+v_kind3 = 3;
+} else {
+t22 = At();
+v_count3 = (t22).val;
+t23 = 257;
+t24 = cast[*u8]("array length must be an integer literal");
+Need(t23, t24);
+t25 = 93;
+t26 = cast[*u8]("expected ']'");
+Need(t25, t26);
+}
+t27 = v_kind3;
+t28 = ParseType();
+t29 = t28;
+t30 = v_count3;
+t31 = v_token2;
+t32 = SequenceType(t27, t29, t30, t31);
+return t32;
+}
+t33 = Ident();
+v_name9 = t33;
+t34 = v_name9;
+t35 = BindingType(t34);
+v_t9 = t35;
+if ((v_t9 >= 0)) {
+return v_t9;
+}
+t36 = v_name9;
+t37 = TypeName(t36);
+v_t9 = t37;
+if ((v_t9 >= 0)) {
+return v_t9;
+}
+t38 = v_package2;
+t39 = v_name9;
+t40 = FindType(t38, t39);
+t41 = (t40 < 0);
+if (t41) {
+t42 = 46;
+t43 = Take(t42);
+t41 = (i64(t43) != i64(0));
+}
+if (t41) {
+t44 = v_token2;
+t45 = v_name9;
+t46 = ResolveAlias(t44, t45);
+v_package2 = t46;
+t47 = Ident();
+v_name9 = t47;
+}
+t48 = v_package2;
+t49 = v_name9;
+t50 = FindType(t48, t49);
+v_t9 = t50;
+if ((v_t9 < 0)) {
+t51 = v_token2;
+t52 = cast[*u8]("unsupported or unknown type");
+ErrorAt(t51, t52);
+}
+t53 = v_package2;
+t54 = (v_token2).package;
+t55 = Eq(t53, t54);
+t56 = !((t55 != i8(0)));
+if (t56) {
+t57 = v_t9;
+t58 = Shape(t57);
+t56 = !(((t58).public != i64(0)));
+}
+if (t56) {
+t59 = v_token2;
+t60 = cast[*u8]("type is private to its package");
+ErrorAt(t59, t60);
+}
+t61 = v_t9;
+t62 = Shape(t61);
+if (((t62).generic_count != i64(0))) {
+t63 = v_t9;
+t64 = InstantiateType(t63);
+v_t9 = t64;
+}
+return v_t9;
+}
+return i64(0);
+}
+
+
+fn TypeName(arg_v_s6: *u8) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s6: *u8 = arg_v_s6;
+var t0: *u8 = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: i8 = i8(0);
+var t6: *u8 = null;
+var t7: *u8 = null;
+var t8: i8 = i8(0);
+var t9: *u8 = null;
+var t10: *u8 = null;
+var t11: i8 = i8(0);
+var t12: *u8 = null;
+var t13: *u8 = null;
+var t14: i8 = i8(0);
+var t15: *u8 = null;
+var t16: *u8 = null;
+var t17: i8 = i8(0);
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: i8 = i8(0);
+var t21: *u8 = null;
+var t22: *u8 = null;
+var t23: i8 = i8(0);
+var t24: *u8 = null;
+var t25: *u8 = null;
+var t26: i8 = i8(0);
+var t27: bool = false;
+var t28: *u8 = null;
+var t29: *u8 = null;
+var t30: i8 = i8(0);
+var t31: *u8 = null;
+var t32: *u8 = null;
+var t33: i8 = i8(0);
+var t34: *u8 = null;
+var t35: *u8 = null;
+var t36: i8 = i8(0);
+var t37: *u8 = null;
+var t38: *u8 = null;
+var t39: i8 = i8(0);
+var t40: *u8 = null;
+var t41: *u8 = null;
+var t42: i8 = i8(0);
+var t43: *u8 = null;
+var t44: *u8 = null;
+var t45: i8 = i8(0);
+t0 = v_s6;
+t1 = cast[*u8]("void");
+t2 = Eq(t0, t1);
+if ((t2 != i8(0))) {
+return 0;
+}
+t3 = v_s6;
+t4 = cast[*u8]("i64");
+t5 = Eq(t3, t4);
+if ((t5 != i8(0))) {
+return 1;
+}
+t6 = v_s6;
+t7 = cast[*u8]("i32");
+t8 = Eq(t6, t7);
+if ((t8 != i8(0))) {
+return 4;
+}
+t9 = v_s6;
+t10 = cast[*u8]("u8");
+t11 = Eq(t9, t10);
+if ((t11 != i8(0))) {
+return 5;
+}
+t12 = v_s6;
+t13 = cast[*u8]("i8");
+t14 = Eq(t12, t13);
+if ((t14 != i8(0))) {
+return 6;
+}
+t15 = v_s6;
+t16 = cast[*u8]("i16");
+t17 = Eq(t15, t16);
+if ((t17 != i8(0))) {
+return 7;
+}
+t18 = v_s6;
+t19 = cast[*u8]("u16");
+t20 = Eq(t18, t19);
+if ((t20 != i8(0))) {
+return 8;
+}
+t21 = v_s6;
+t22 = cast[*u8]("u32");
+t23 = Eq(t21, t22);
+if ((t23 != i8(0))) {
+return 9;
+}
+t24 = v_s6;
+t25 = cast[*u8]("u64");
+t26 = Eq(t24, t25);
+t27 = (i64(t26) != i64(0));
+if (!t27) {
+t28 = v_s6;
+t29 = cast[*u8]("usize");
+t30 = Eq(t28, t29);
+t27 = (i64(t30) != i64(0));
+}
+if (t27) {
+return 10;
+}
+t31 = v_s6;
+t32 = cast[*u8]("isize");
+t33 = Eq(t31, t32);
+if ((t33 != i8(0))) {
+return 1;
+}
+t34 = v_s6;
+t35 = cast[*u8]("f64");
+t36 = Eq(t34, t35);
+if ((t36 != i8(0))) {
+return 11;
+}
+t37 = v_s6;
+t38 = cast[*u8]("f32");
+t39 = Eq(t37, t38);
+if ((t39 != i8(0))) {
+return 12;
+}
+t40 = v_s6;
+t41 = cast[*u8]("bool");
+t42 = Eq(t40, t41);
+if ((t42 != i8(0))) {
+return 2;
+}
+t43 = v_s6;
+t44 = cast[*u8]("string");
+t45 = Eq(t43, t44);
+if ((t45 != i8(0))) {
+return 3;
+}
+return (-1);
+}
+return i64(0);
+}
+
+
+fn Prec(arg_v_k2: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_k2: i64 = arg_v_k2;
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+var t3: bool = false;
+var t4: bool = false;
+var t5: bool = false;
+var t6: bool = false;
+var t7: bool = false;
+if ((v_k2 == 264)) {
+return 1;
+}
+if ((v_k2 == 263)) {
+return 2;
+}
+if ((v_k2 == 124)) {
+return 3;
+}
+if ((v_k2 == 94)) {
+return 4;
+}
+if ((v_k2 == 38)) {
+return 5;
+}
+t0 = (v_k2 == 259);
+if (!t0) {
+t0 = (v_k2 == 260);
+}
+if (t0) {
+return 6;
+}
+t1 = (v_k2 == 60);
+if (!t1) {
+t1 = (v_k2 == 62);
+}
+t2 = t1;
+if (!t2) {
+t2 = (v_k2 == 261);
+}
+t3 = t2;
+if (!t3) {
+t3 = (v_k2 == 262);
+}
+if (t3) {
+return 7;
+}
+t4 = (v_k2 == 266);
+if (!t4) {
+t4 = (v_k2 == 267);
+}
+if (t4) {
+return 8;
+}
+t5 = (v_k2 == 43);
+if (!t5) {
+t5 = (v_k2 == 45);
+}
+if (t5) {
+return 9;
+}
+t6 = (v_k2 == 42);
+if (!t6) {
+t6 = (v_k2 == 47);
+}
+t7 = t6;
+if (!t7) {
+t7 = (v_k2 == 37);
+}
+if (t7) {
+return 10;
+}
+return 0;
+}
+return i64(0);
+}
+
+
+fn Expr(arg_v_min: i64) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_min: i64 = arg_v_min;
+var v_a6: *Node = null;
+var v_n13: *Node = null;
+var v_t11: *Token = null;
+var v_p2: i64 = i64(0);
+var v_op: i64 = i64(0);
+var t0: *Token = null;
+var t1: *u8 = null;
+var t2: bool = false;
+var t3: bool = false;
+var t4: bool = false;
+var t5: bool = false;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: *Token = null;
+var t9: *u8 = null;
+var t10: i64 = i64(0);
+var t11: i8 = i8(0);
+var t12: bool = false;
+var t13: bool = false;
+var t14: bool = false;
+var t15: bool = false;
+var t16: *Token = null;
+var t17: *u8 = null;
+var t18: bool = false;
+var t19: *Token = null;
+var t20: *u8 = null;
+var t21: bool = false;
+var t22: bool = false;
+var t23: i64 = i64(0);
+var t24: i8 = i8(0);
+var t25: bool = false;
+var t26: bool = false;
+var t27: bool = false;
+var t28: *Token = null;
+var t29: *u8 = null;
+var t30: i64 = i64(0);
+var t31: i8 = i8(0);
+var t32: bool = false;
+var t33: bool = false;
+var t34: bool = false;
+var t35: bool = false;
+var t36: bool = false;
+var t37: bool = false;
+var t38: *Token = null;
+var t39: *u8 = null;
+var t40: i64 = i64(0);
+var t41: i8 = i8(0);
+var t42: bool = false;
+var t43: *Node = null;
+var t44: i64 = i64(0);
+var t45: *Node = null;
+var t46: i64 = i64(0);
+var t47: *Token = null;
+var t48: *u8 = null;
+var t49: *Token = null;
+var t50: *u8 = null;
+var t51: bool = false;
+var t52: bool = false;
+var t53: i64 = i64(0);
+var t54: i8 = i8(0);
+var t55: bool = false;
+var t56: i64 = i64(0);
+var t57: i8 = i8(0);
+var t58: bool = false;
+var t59: i64 = i64(0);
+var t60: *Node = null;
+var t61: i64 = i64(0);
+var t62: *Token = null;
+var t63: *Node = null;
+var t64: i64 = i64(0);
+var t65: i64 = i64(0);
+var t66: i64 = i64(0);
+var t67: *Token = null;
+var t68: *Token = null;
+var t69: i64 = i64(0);
+var t70: i64 = i64(0);
+var t71: *Node = null;
+var pc: i64 = 49;
+while (true) {
+if (pc == 1) {
+pc = 5;
+continue;
+}
+if (pc == 2) {
+return null;
+}
+if (pc == 3) {
+return v_a6;
+}
+if (pc == 4) {
+t68 = At();
+t69 = (t68).kind;
+t70 = Prec(t69);
+if ((t70 >= v_min)) { pc = 46; } else { pc = 3; }
+continue;
+}
+if (pc == 5) {
+pc = 4;
+continue;
+}
+if (pc == 6) {
+v_a6 = v_n13;
+pc = 1;
+continue;
+}
+if (pc == 7) {
+t2 = (v_op == 266);
+if (!t2) {
+t2 = (v_op == 267);
+}
+t3 = t2;
+if (t3) {
+t3 = (((v_n13).b).kind == 1);
+}
+t4 = t3;
+if (t4) {
+t5 = (((v_n13).b).value < 0);
+if (!t5) {
+t6 = ((v_n13).a).type;
+t7 = Width(t6);
+t5 = (((v_n13).b).value >= t7);
+}
+t4 = t5;
+}
+if (t4) { pc = 8; } else { pc = 6; }
+continue;
+}
+if (pc == 8) {
+t0 = v_t11;
+t1 = cast[*u8]("shift count must be below operand width");
+ErrorAt(t0, t1);
+pc = 6;
+continue;
+}
+if (pc == 9) {
+t10 = (v_a6).type;
+t11 = Floating(t10);
+t12 = !((t11 != i8(0)));
+if (t12) {
+t13 = (v_op == 47);
+if (!t13) {
+t13 = (v_op == 37);
+}
+t12 = t13;
+}
+t14 = t12;
+if (t14) {
+t14 = (((v_n13).b).kind == 1);
+}
+t15 = t14;
+if (t15) {
+t15 = !((((v_n13).b).value != i64(0)));
+}
+if (t15) { pc = 10; } else { pc = 7; }
+continue;
+}
+if (pc == 10) {
+t8 = v_t11;
+t9 = cast[*u8]("division by zero");
+ErrorAt(t8, t9);
+pc = 7;
+continue;
+}
+if (pc == 11) {
+t58 = (v_op == 263);
+if (!t58) {
+t58 = (v_op == 264);
+}
+if (t58) { pc = 13; } else { pc = 30; }
+continue;
+}
+if (pc == 12) {
+(v_n13).type = 2;
+pc = 9;
+continue;
+}
+if (pc == 13) {
+t18 = ((v_a6).type != 2);
+if (!t18) {
+t18 = (((v_n13).b).type != 2);
+}
+if (t18) { pc = 14; } else { pc = 12; }
+continue;
+}
+if (pc == 14) {
+t16 = v_t11;
+t17 = cast[*u8]("logical operators require bool operands");
+ErrorAt(t16, t17);
+pc = 12;
+continue;
+}
+if (pc == 15) {
+t42 = (v_op == 259);
+if (!t42) {
+t42 = (v_op == 260);
+}
+if (t42) { pc = 17; } else { pc = 24; }
+continue;
+}
+if (pc == 16) {
+(v_n13).type = 2;
+pc = 9;
+continue;
+}
+if (pc == 17) {
+t21 = ((v_a6).type == 0);
+if (!t21) {
+t21 = ((v_a6).type == 3);
+}
+t22 = t21;
+if (!t22) {
+t23 = (v_a6).type;
+t24 = Aggregate(t23);
+t22 = (i64(t24) != i64(0));
+}
+if (t22) { pc = 18; } else { pc = 16; }
+continue;
+}
+if (pc == 18) {
+t19 = v_t11;
+t20 = cast[*u8]("equality requires integers or bool");
+ErrorAt(t19, t20);
+pc = 16;
+continue;
+}
+if (pc == 19) {
+t25 = (v_op == 60);
+if (!t25) {
+t25 = (v_op == 62);
+}
+t26 = t25;
+if (!t26) {
+t26 = (v_op == 261);
+}
+t27 = t26;
+if (!t27) {
+t27 = (v_op == 262);
+}
+if (t27) { pc = 20; } else { pc = 9; }
+continue;
+}
+if (pc == 20) {
+(v_n13).type = 2;
+pc = 9;
+continue;
+}
+if (pc == 21) {
+(v_n13).type = (v_a6).type;
+pc = 19;
+continue;
+}
+if (pc == 22) {
+t30 = (v_a6).type;
+t31 = Floating(t30);
+t32 = (i64(t31) != i64(0));
+if (t32) {
+t33 = (v_op == 37);
+if (!t33) {
+t33 = (v_op == 38);
+}
+t34 = t33;
+if (!t34) {
+t34 = (v_op == 124);
+}
+t35 = t34;
+if (!t35) {
+t35 = (v_op == 94);
+}
+t36 = t35;
+if (!t36) {
+t36 = (v_op == 266);
+}
+t37 = t36;
+if (!t37) {
+t37 = (v_op == 267);
+}
+t32 = t37;
+}
+if (t32) { pc = 23; } else { pc = 21; }
+continue;
+}
+if (pc == 23) {
+t28 = v_t11;
+t29 = cast[*u8]("operator requires integer operands");
+ErrorAt(t28, t29);
+pc = 21;
+continue;
+}
+if (pc == 24) {
+t40 = (v_a6).type;
+t41 = Numeric(t40);
+if (!((t41 != i8(0)))) { pc = 25; } else { pc = 22; }
+continue;
+}
+if (pc == 25) {
+t38 = v_t11;
+t39 = cast[*u8]("operator requires numeric operands");
+ErrorAt(t38, t39);
+pc = 22;
+continue;
+}
+if (pc == 26) {
+if (((v_a6).type != ((v_n13).b).type)) { pc = 27; } else { pc = 15; }
+continue;
+}
+if (pc == 27) {
+if (((v_a6).kind == 1)) { pc = 28; } else { pc = 29; }
+continue;
+}
+if (pc == 28) {
+t43 = v_a6;
+t44 = ((v_n13).b).type;
+Coerce(t43, t44);
+pc = 15;
+continue;
+}
+if (pc == 29) {
+t45 = (v_n13).b;
+t46 = (v_a6).type;
+Coerce(t45, t46);
+pc = 15;
+continue;
+}
+if (pc == 30) {
+t51 = (v_op == 43);
+if (!t51) {
+t51 = (v_op == 45);
+}
+t52 = t51;
+if (t52) {
+t53 = (v_a6).type;
+t54 = Pointer(t53);
+t52 = (i64(t54) != i64(0));
+}
+t55 = t52;
+if (t55) {
+t56 = ((v_n13).b).type;
+t57 = Integer(t56);
+t55 = (i64(t57) != i64(0));
+}
+if (t55) { pc = 37; } else { pc = 26; }
+continue;
+}
+if (pc == 31) {
+pc = 1;
+continue;
+}
+if (pc == 32) {
+v_a6 = v_n13;
+pc = 31;
+continue;
+}
+if (pc == 33) {
+(v_n13).type = (v_a6).type;
+pc = 32;
+continue;
+}
+if (pc == 34) {
+(v_n13).kind = 20;
+pc = 33;
+continue;
+}
+if (pc == 35) {
+if (((v_a6).type == 100000)) { pc = 36; } else { pc = 34; }
+continue;
+}
+if (pc == 36) {
+t47 = v_t11;
+t48 = cast[*u8]("void pointer arithmetic is not defined");
+ErrorAt(t47, t48);
+pc = 34;
+continue;
+}
+if (pc == 37) {
+if (!((ctx.v_unsafe_depth != i64(0)))) { pc = 38; } else { pc = 35; }
+continue;
+}
+if (pc == 38) {
+t49 = v_t11;
+t50 = cast[*u8]("pointer arithmetic requires unsafe");
+ErrorAt(t49, t50);
+pc = 35;
+continue;
+}
+if (pc == 39) {
+t59 = (v_p2 + 1);
+t60 = Expr(t59);
+(v_n13).b = t60;
+pc = 11;
+continue;
+}
+if (pc == 40) {
+(v_n13).a = v_a6;
+pc = 39;
+continue;
+}
+if (pc == 41) {
+(v_n13).op = v_op;
+pc = 40;
+continue;
+}
+if (pc == 42) {
+t61 = 5;
+t62 = v_t11;
+t63 = NewNode(t61, t62);
+v_n13 = t63;
+pc = 41;
+continue;
+}
+if (pc == 43) {
+t64 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 42;
+continue;
+}
+if (pc == 44) {
+t65 = v_op;
+t66 = Prec(t65);
+v_p2 = t66;
+pc = 43;
+continue;
+}
+if (pc == 45) {
+v_op = (v_t11).kind;
+pc = 44;
+continue;
+}
+if (pc == 46) {
+t67 = At();
+v_t11 = t67;
+pc = 45;
+continue;
+}
+if (pc == 47) {
+pc = 4;
+continue;
+}
+if (pc == 48) {
+pc = 47;
+continue;
+}
+if (pc == 49) {
+t71 = Primary();
+v_a6 = t71;
+pc = 48;
+continue;
+}
+}
+}
+return null;
+}
+
+
+fn Primary() -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n14: *Node = null;
+var v_index: *Node = null;
+var v_address1: *Node = null;
+var v_load: *Node = null;
+var v_high: *Node = null;
+var v_t12: *Token = null;
+var v_kind5: i64 = i64(0);
+var v_element1: i64 = i64(0);
+var v_field1: *Field = null;
+var v_mutable1: i8 = i8(0);
+var t0: *Node = null;
+var t1: *Token = null;
+var t2: bool = false;
+var t3: *Token = null;
+var t4: *Token = null;
+var t5: i64 = i64(0);
+var t6: i8 = i8(0);
+var t7: i64 = i64(0);
+var t8: i8 = i8(0);
+var t9: *Token = null;
+var t10: *u8 = null;
+var t11: *Node = null;
+var t12: *Node = null;
+var t13: i64 = i64(0);
+var t14: i64 = i64(0);
+var t15: *Token = null;
+var t16: *u8 = null;
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: *Token = null;
+var t21: *Field = null;
+var t22: i64 = i64(0);
+var t23: *Token = null;
+var t24: *Node = null;
+var t25: i64 = i64(0);
+var t26: *Token = null;
+var t27: *Node = null;
+var t28: i64 = i64(0);
+var t29: i8 = i8(0);
+var t30: i64 = i64(0);
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: bool = false;
+var t36: bool = false;
+var t37: i64 = i64(0);
+var t38: i8 = i8(0);
+var t39: bool = false;
+var t40: *Token = null;
+var t41: *u8 = null;
+var t42: bool = false;
+var t43: *Token = null;
+var t44: *u8 = null;
+var t45: *Token = null;
+var t46: i64 = i64(0);
+var t47: *Token = null;
+var t48: *Node = null;
+var t49: i64 = i64(0);
+var t50: *Node = null;
+var t51: i64 = i64(0);
+var t52: i8 = i8(0);
+var t53: *Token = null;
+var t54: *u8 = null;
+var t55: i64 = i64(0);
+var t56: *AggregateType = null;
+var t57: i64 = i64(0);
+var t58: i8 = i8(0);
+var t59: *Token = null;
+var t60: *u8 = null;
+var t61: *Node = null;
+var t62: *Node = null;
+var t63: *Node = null;
+var t64: i8 = i8(0);
+var t65: *Token = null;
+var t66: *u8 = null;
+var t67: i64 = i64(0);
+var t68: i8 = i8(0);
+var t69: *Token = null;
+var t70: *u8 = null;
+var t71: i64 = i64(0);
+var t72: i8 = i8(0);
+var t73: *Token = null;
+var t74: *u8 = null;
+var t75: bool = false;
+var t76: *Token = null;
+var t77: *u8 = null;
+var t78: *Token = null;
+var t79: i64 = i64(0);
+var t80: *Node = null;
+var t81: i64 = i64(0);
+var t82: i8 = i8(0);
+var t83: *Token = null;
+var t84: *u8 = null;
+var t85: i64 = i64(0);
+var t86: *u8 = null;
+var t87: i64 = i64(0);
+var t88: *Token = null;
+var t89: *Node = null;
+var t90: *Node = null;
+var t91: *Node = null;
+var t92: i64 = i64(0);
+var t93: *AggregateType = null;
+var t94: i64 = i64(0);
+var t95: i64 = i64(0);
+var t96: i64 = i64(0);
+var t97: *Token = null;
+var t98: i64 = i64(0);
+var t99: i64 = i64(0);
+var t100: i64 = i64(0);
+var t101: i64 = i64(0);
+var t102: *u8 = null;
+var t103: i64 = i64(0);
+var t104: *Token = null;
+var t105: *Node = null;
+var t106: i64 = i64(0);
+var t107: *AggregateType = null;
+var t108: *Node = null;
+var t109: *Node = null;
+var t110: i64 = i64(0);
+var t111: *Token = null;
+var t112: *Node = null;
+var t113: bool = false;
+var t114: bool = false;
+var t115: i64 = i64(0);
+var t116: i8 = i8(0);
+var t117: i64 = i64(0);
+var t118: i64 = i64(0);
+t0 = Atom();
+v_n14 = t0;
+while (true) {
+t1 = At();
+t2 = ((t1).kind == 91);
+if (!t2) {
+t3 = At();
+t2 = ((t3).kind == 46);
+}
+if (!(t2)) { break; }
+t4 = At();
+v_t12 = t4;
+t5 = 46;
+t6 = Take(t5);
+if ((t6 != i8(0))) {
+v_kind5 = (v_n14).type;
+v_mutable1 = i8((v_n14).mutable);
+t7 = v_kind5;
+t8 = Pointer(t7);
+if ((t8 != i8(0))) {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t9 = v_t12;
+t10 = cast[*u8]("pointer field access requires unsafe");
+ErrorAt(t9, t10);
+}
+v_kind5 = v_kind5 - 100000;
+v_address1 = v_n14;
+v_mutable1 = i8(1);
+} else {
+t11 = v_n14;
+t12 = AggregateAddress(t11);
+v_address1 = t12;
+}
+t13 = v_kind5;
+t14 = AggregateKind(t13);
+if ((t14 != 1)) {
+t15 = v_t12;
+t16 = cast[*u8]("field access requires a struct");
+ErrorAt(t15, t16);
+}
+t17 = v_kind5;
+t18 = Ident();
+t19 = t18;
+t20 = v_t12;
+t21 = FindField(t17, t19, t20);
+v_field1 = t21;
+t22 = 24;
+t23 = v_t12;
+t24 = NewNode(t22, t23);
+v_load = t24;
+(v_load).a = v_address1;
+(v_load).value = (v_field1).offset;
+(v_load).type = (100000 + (v_field1).type);
+(v_load).origin_source = v_n14;
+t25 = 18;
+t26 = v_t12;
+t27 = NewNode(t25, t26);
+v_n14 = t27;
+(v_n14).origin_source = (v_load).origin_source;
+(v_n14).a = v_load;
+(v_n14).type = (v_field1).type;
+(v_n14).mutable = i64(v_mutable1);
+t28 = (v_n14).type;
+t29 = Aggregate(t28);
+if ((t29 != i8(0))) {
+t30 = (v_n14).type;
+t31 = Storage(t30);
+(v_n14).storage = t31;
+}
+} else {
+t32 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t33 = (v_n14).type;
+t34 = AggregateKind(t33);
+v_kind5 = t34;
+v_mutable1 = i8((v_n14).mutable);
+t35 = (v_kind5 != 2);
+if (t35) {
+t35 = (v_kind5 != 3);
+}
+t36 = t35;
+if (t36) {
+t37 = (v_n14).type;
+t38 = Pointer(t37);
+t39 = !((t38 != i8(0)));
+if (!t39) {
+t39 = ((v_n14).type == 100000);
+}
+t36 = t39;
+}
+if (t36) {
+t40 = v_t12;
+t41 = cast[*u8]("indexing requires an array, slice or typed pointer");
+ErrorAt(t40, t41);
+}
+t42 = !((v_kind5 != i64(0)));
+if (t42) {
+t42 = !((ctx.v_unsafe_depth != i64(0)));
+}
+if (t42) {
+t43 = v_t12;
+t44 = cast[*u8]("raw pointer indexing requires unsafe");
+ErrorAt(t43, t44);
+}
+t45 = At();
+if (((t45).kind == 58)) {
+t46 = 1;
+t47 = v_t12;
+t48 = NewNode(t46, t47);
+v_index = t48;
+(v_index).type = 1;
+} else {
+t49 = 1;
+t50 = Expr(t49);
+v_index = t50;
+}
+CheckLivePlace(v_n14);
+t51 = (v_index).type;
+t52 = Integer(t51);
+if (!((t52 != i8(0)))) {
+t53 = v_t12;
+t54 = cast[*u8]("index must be an integer");
+ErrorAt(t53, t54);
+}
+if ((v_kind5 != i64(0))) {
+t55 = (v_n14).type;
+t56 = Shape(t55);
+v_element1 = (t56).element;
+} else {
+v_element1 = ((v_n14).type - 100000);
+}
+t57 = 58;
+t58 = Take(t57);
+if ((t58 != i8(0))) {
+if (!((v_kind5 != i64(0)))) {
+t59 = v_t12;
+t60 = cast[*u8]("slicing requires an array or slice");
+ErrorAt(t59, t60);
+}
+t61 = v_n14;
+t62 = AggregateAddress(t61);
+t63 = t62;
+t64 = OwnerPlace(t63);
+if ((t64 != i8(0))) {
+t65 = v_t12;
+t66 = cast[*u8]("borrowing a slice from owned storage requires a scoped exclusive loan");
+ErrorAt(t65, t66);
+}
+t67 = v_element1;
+t68 = Owned(t67);
+if ((t68 != i8(0))) {
+t69 = v_t12;
+t70 = cast[*u8]("slices of owners require exclusive borrow tracking");
+ErrorAt(t69, t70);
+}
+t71 = v_element1;
+t72 = Borrowed(t71);
+if ((t72 != i8(0))) {
+t73 = v_t12;
+t74 = cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists");
+ErrorAt(t73, t74);
+}
+t75 = (v_kind5 == 2);
+if (t75) {
+t75 = !((v_mutable1 != i8(0)));
+}
+if (t75) {
+t76 = v_t12;
+t77 = cast[*u8]("mutable slice requires a var array");
+ErrorAt(t76, t77);
+}
+v_high = null;
+t78 = At();
+if (((t78).kind != 93)) {
+t79 = 1;
+t80 = Expr(t79);
+v_high = t80;
+t81 = (v_high).type;
+t82 = Integer(t81);
+if (!((t82 != i8(0)))) {
+t83 = v_t12;
+t84 = cast[*u8]("slice bound must be an integer");
+ErrorAt(t83, t84);
+}
+}
+t85 = 93;
+t86 = cast[*u8]("expected ']'");
+Need(t85, t86);
+t87 = 26;
+t88 = v_t12;
+t89 = NewNode(t87, t88);
+v_address1 = t89;
+(v_address1).a = v_n14;
+if ((v_kind5 == 2)) {
+t90 = v_n14;
+t91 = AggregateAddress(t90);
+(v_address1).a = t91;
+}
+(v_address1).origin_source = v_n14;
+(v_address1).b = v_index;
+(v_address1).c = v_high;
+(v_address1).op = v_kind5;
+t92 = (v_n14).type;
+t93 = Shape(t92);
+(v_address1).value = (t93).count;
+t94 = 3;
+t95 = v_element1;
+t96 = 0;
+t97 = v_t12;
+t98 = SequenceType(t94, t95, t96, t97);
+(v_address1).type = t98;
+t99 = (v_address1).type;
+t100 = Storage(t99);
+(v_address1).storage = t100;
+v_n14 = v_address1;
+} else {
+t101 = 93;
+t102 = cast[*u8]("expected ']'");
+Need(t101, t102);
+t103 = 20;
+t104 = v_t12;
+t105 = NewNode(t103, t104);
+v_address1 = t105;
+(v_address1).a = v_n14;
+(v_address1).b = v_index;
+(v_address1).type = (100000 + v_element1);
+if ((v_kind5 != i64(0))) {
+(v_address1).kind = 25;
+(v_address1).op = v_kind5;
+t106 = (v_n14).type;
+t107 = Shape(t106);
+(v_address1).value = (t107).count;
+if ((v_kind5 == 2)) {
+t108 = v_n14;
+t109 = AggregateAddress(t108);
+(v_address1).a = t109;
+}
+}
+t110 = 18;
+t111 = v_t12;
+t112 = NewNode(t110, t111);
+v_load = t112;
+(v_load).origin_source = v_n14;
+(v_load).a = v_address1;
+(v_load).type = v_element1;
+t113 = (i64(v_mutable1) != i64(0));
+if (!t113) {
+t113 = (v_kind5 == 3);
+}
+t114 = t113;
+if (!t114) {
+t114 = !((v_kind5 != i64(0)));
+}
+(v_load).mutable = i64(BoolInt(t114));
+t115 = v_element1;
+t116 = Aggregate(t115);
+if ((t116 != i8(0))) {
+t117 = v_element1;
+t118 = Storage(t117);
+(v_load).storage = t118;
+}
+v_n14 = v_load;
+}
+}
+}
+return v_n14;
+}
+return null;
+}
+
+
+fn SpecializeFunction(arg_v_template_id: i64, arg_v_types2: *i64, arg_v_count6: i64) -> i64 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_template_id: i64 = arg_v_template_id;
+var v_types2: *i64 = arg_v_types2;
+var v_count6: i64 = arg_v_count6;
+var v_base2: *Function = null;
+var v_f7: *Function = null;
+var v_i9: i64 = i64(0);
+var v_j3: i64 = i64(0);
+var v_id: i64 = i64(0);
+var v_saved_pos: i64 = i64(0);
+var v_saved_fun: i64 = i64(0);
+var v_saved_depth: i64 = i64(0);
+var v_saved_loop: i64 = i64(0);
+var v_saved_unsafe: i64 = i64(0);
+var v_saved_locals: *Local = null;
+var v_saved_bindings1: *TypeBinding = null;
+var v_parameter: *Local = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *u8 = null;
+var t3: bool = false;
+var t4: *Node = null;
+var t5: i8 = i8(0);
+var t6: *Function = null;
+var t7: *Function = null;
+var t8: *Node = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i8 = i8(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+var t15: *Local = null;
+var t16: *Function = null;
+var t17: **u8 = null;
+var t18: *i64 = null;
+var t19: i64 = i64(0);
+var t20: i64 = i64(0);
+var t21: *u8 = null;
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *u8 = null;
+var t27: bool = false;
+var t28: i64 = i64(0);
+var t29: i64 = i64(0);
+var t30: *u8 = null;
+var pc: i64 = 63;
+while (true) {
+if (pc == 1) {
+pc = 48;
+continue;
+}
+if (pc == 2) {
+return i64(0);
+}
+if (pc == 3) {
+return v_id;
+}
+if (pc == 4) {
+t0 = ctx.v_specialization_depth;
+ctx.v_specialization_depth = ctx.v_specialization_depth - i64(1);
+pc = 3;
+continue;
+}
+if (pc == 5) {
+ctx.v_type_bindings = v_saved_bindings1;
+pc = 4;
+continue;
+}
+if (pc == 6) {
+ctx.v_locals = v_saved_locals;
+pc = 5;
+continue;
+}
+if (pc == 7) {
+ctx.v_unsafe_depth = v_saved_unsafe;
+pc = 6;
+continue;
+}
+if (pc == 8) {
+ctx.v_loop_depth = v_saved_loop;
+pc = 7;
+continue;
+}
+if (pc == 9) {
+ctx.v_depth = v_saved_depth;
+pc = 8;
+continue;
+}
+if (pc == 10) {
+ctx.v_current_fun = v_saved_fun;
+pc = 9;
+continue;
+}
+if (pc == 11) {
+ctx.v_pos = v_saved_pos;
+pc = 10;
+continue;
+}
+if (pc == 12) {
+t3 = ((v_f7).result != 0);
+if (t3) {
+t4 = (v_f7).body;
+t5 = Returns(t4);
+t3 = !((t5 != i8(0)));
+}
+if (t3) { pc = 13; } else { pc = 11; }
+continue;
+}
+if (pc == 13) {
+t1 = (v_f7).token;
+t2 = cast[*u8]("not every path returns a value");
+ErrorAt(t1, t2);
+pc = 11;
+continue;
+}
+if (pc == 14) {
+(v_f7).end = ctx.v_pos;
+pc = 12;
+continue;
+}
+if (pc == 15) {
+t6 = v_f7;
+InjectDrops(t6);
+pc = 14;
+continue;
+}
+if (pc == 16) {
+t7 = v_f7;
+AnalyzeBorrows(t7);
+pc = 15;
+continue;
+}
+if (pc == 17) {
+t8 = Block();
+(v_f7).body = t8;
+pc = 16;
+continue;
+}
+if (pc == 18) {
+if ((v_j3 < (v_f7).argc)) { pc = 22; } else { pc = 17; }
+continue;
+}
+if (pc == 19) {
+t9 = v_j3;
+v_j3 = v_j3 + i64(1);
+pc = 18;
+continue;
+}
+if (pc == 20) {
+t10 = (v_parameter).type;
+t11 = Borrowed(t10);
+if ((t11 != i8(0))) { pc = 21; } else { pc = 19; }
+continue;
+}
+if (pc == 21) {
+(v_parameter).region = (1 << v_j3);
+pc = 19;
+continue;
+}
+if (pc == 22) {
+t12 = (&((v_f7).arg_names)[0])[v_j3];
+t13 = (&((v_f7).arg_types)[0])[v_j3];
+t14 = i8(0);
+t15 = AddLocal(t12, t13, t14);
+v_parameter = t15;
+pc = 20;
+continue;
+}
+if (pc == 23) {
+v_j3 = 0;
+pc = 18;
+continue;
+}
+if (pc == 24) {
+ctx.v_unsafe_depth = 0;
+ctx.v_loop_depth = ctx.v_unsafe_depth;
+ctx.v_depth = ctx.v_loop_depth;
+pc = 23;
+continue;
+}
+if (pc == 25) {
+ctx.v_locals = null;
+pc = 24;
+continue;
+}
+if (pc == 26) {
+ctx.v_current_fun = v_id;
+pc = 25;
+continue;
+}
+if (pc == 27) {
+(v_f7).begin = ctx.v_pos;
+pc = 26;
+continue;
+}
+if (pc == 28) {
+t16 = v_f7;
+FunctionSignature(t16);
+pc = 27;
+continue;
+}
+if (pc == 29) {
+ctx.v_pos = (v_base2).signature;
+pc = 28;
+continue;
+}
+if (pc == 30) {
+t17 = &((v_base2).generic_names)[0];
+t18 = v_types2;
+t19 = v_count6;
+BindTypes(t17, t18, t19);
+pc = 29;
+continue;
+}
+if (pc == 31) {
+if ((v_j3 < v_count6)) { pc = 33; } else { pc = 30; }
+continue;
+}
+if (pc == 32) {
+t20 = v_j3;
+v_j3 = v_j3 + i64(1);
+pc = 31;
+continue;
+}
+if (pc == 33) {
+(&((v_f7).generic_args)[0])[v_j3] = (v_types2)[v_j3];
+pc = 32;
+continue;
+}
+if (pc == 34) {
+v_j3 = 0;
+pc = 31;
+continue;
+}
+if (pc == 35) {
+(v_f7).origin = (v_template_id + 1);
+pc = 34;
+continue;
+}
+if (pc == 36) {
+(v_f7).token = (v_base2).token;
+pc = 35;
+continue;
+}
+if (pc == 37) {
+(v_f7).public = (v_base2).public;
+pc = 36;
+continue;
+}
+if (pc == 38) {
+(v_f7).package = (v_base2).package;
+pc = 37;
+continue;
+}
+if (pc == 39) {
+(v_f7).name = (v_base2).name;
+pc = 38;
+continue;
+}
+if (pc == 40) {
+t21 = cast[*u8](v_f7);
+t22 = 0;
+t23 = i64(sizeof(Function));
+t24 = MemSet(t21, t22, t23);
+pc = 39;
+continue;
+}
+if (pc == 41) {
+v_f7 = &((ctx.v_functions)[v_id]);
+pc = 40;
+continue;
+}
+if (pc == 42) {
+t25 = ctx.v_nfun;
+ctx.v_nfun = ctx.v_nfun + i64(1);
+v_id = t25;
+pc = 41;
+continue;
+}
+if (pc == 43) {
+ctx.v_specialization_depth = ctx.v_specialization_depth + i64(1);
+t27 = (ctx.v_specialization_depth > 64);
+if (!t27) {
+t27 = (ctx.v_nfun == 4096);
+}
+if (t27) { pc = 44; } else { pc = 42; }
+continue;
+}
+if (pc == 44) {
+t26 = cast[*u8]("generic specialization limit exceeded");
+Error(t26);
+pc = 42;
+continue;
+}
+if (pc == 45) {
+if ((v_i9 < ctx.v_nfun)) { pc = 47; } else { pc = 43; }
+continue;
+}
+if (pc == 46) {
+t28 = v_i9;
+v_i9 = v_i9 + i64(1);
+pc = 45;
+continue;
+}
+if (pc == 47) {
+if ((((ctx.v_functions)[v_i9]).origin == (v_template_id + 1))) { pc = 54; } else { pc = 46; }
+continue;
+}
+if (pc == 48) {
+pc = 46;
+continue;
+}
+if (pc == 49) {
+return v_i9;
+}
+if (pc == 50) {
+if ((v_j3 < v_count6)) { pc = 52; } else { pc = 49; }
+continue;
+}
+if (pc == 51) {
+t29 = v_j3;
+v_j3 = v_j3 + i64(1);
+pc = 50;
+continue;
+}
+if (pc == 52) {
+if (((&(((ctx.v_functions)[v_i9]).generic_args)[0])[v_j3] != (v_types2)[v_j3])) { pc = 53; } else { pc = 51; }
+continue;
+}
+if (pc == 53) {
+pc = 1;
+continue;
+}
+if (pc == 54) {
+v_j3 = 0;
+pc = 50;
+continue;
+}
+if (pc == 55) {
+v_i9 = 0;
+pc = 45;
+continue;
+}
+if (pc == 56) {
+if (!((v_count6 != i64(0)))) { pc = 57; } else { pc = 55; }
+continue;
+}
+if (pc == 57) {
+return v_template_id;
+}
+if (pc == 58) {
+if ((v_count6 != (v_base2).generic_count)) { pc = 59; } else { pc = 56; }
+continue;
+}
+if (pc == 59) {
+t30 = cast[*u8]("wrong generic argument count");
+Error(t30);
+pc = 56;
+continue;
+}
+if (pc == 60) {
+v_saved_bindings1 = ctx.v_type_bindings;
+pc = 58;
+continue;
+}
+if (pc == 61) {
+v_saved_locals = ctx.v_locals;
+pc = 60;
+continue;
+}
+if (pc == 62) {
+v_saved_pos = ctx.v_pos;
+v_saved_fun = ctx.v_current_fun;
+v_saved_depth = ctx.v_depth;
+v_saved_loop = ctx.v_loop_depth;
+v_saved_unsafe = ctx.v_unsafe_depth;
+pc = 61;
+continue;
+}
+if (pc == 63) {
+v_base2 = &((ctx.v_functions)[v_template_id]);
+pc = 62;
+continue;
+}
+}
+}
+return i64(0);
+}
+
+
+fn AggregateAddress(arg_v_n15: *Node) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n15: *Node = arg_v_n15;
+var v_address2: *Node = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *Node = null;
+if (((v_n15).kind == 3)) {
+t0 = 22;
+t1 = (v_n15).token;
+t2 = NewNode(t0, t1);
+v_address2 = t2;
+(v_address2).slot = (v_n15).slot;
+(v_address2).type = (100000 + (v_n15).type);
+(v_address2).mutable = (v_n15).mutable;
+(v_address2).local_ref = (v_n15).local_ref;
+return v_address2;
+}
+if (((v_n15).kind == 18)) {
+return (v_n15).a;
+}
+return v_n15;
+}
+return null;
+}
+
+
+fn AggregateLiteral(arg_v_type28: i64, arg_v_token5: *Token) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type28: i64 = arg_v_type28;
+var v_token5: *Token = arg_v_token5;
+var v_n16: *Node = null;
+var v_item: *Node = null;
+var v_tail2: *Node = null;
+var v_prior: *Node = null;
+var v_field2: *Field = null;
+var v_count7: i64 = i64(0);
+var v_element2: i64 = i64(0);
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *Node = null;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i8 = i8(0);
+var t11: bool = false;
+var t12: *Token = null;
+var t13: i64 = i64(0);
+var t14: *AggregateType = null;
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: *AggregateType = null;
+var t18: i64 = i64(0);
+var t19: *u8 = null;
+var t20: *u8 = null;
+var t21: *Token = null;
+var t22: *Field = null;
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *AggregateType = null;
+var t27: i64 = i64(0);
+var t28: *Node = null;
+var t29: *Node = null;
+var t30: i64 = i64(0);
+var t31: *Node = null;
+var t32: i64 = i64(0);
+var t33: *AggregateType = null;
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: i64 = i64(0);
+var t37: *AggregateType = null;
+var t38: *Token = null;
+var t39: *u8 = null;
+var t40: i64 = i64(0);
+var t41: *Token = null;
+var t42: i64 = i64(0);
+var t43: *u8 = null;
+var t44: i64 = i64(0);
+var t45: *u8 = null;
+var t46: i64 = i64(0);
+var t47: *AggregateType = null;
+var t48: *Token = null;
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: *AggregateType = null;
+var t52: i64 = i64(0);
+var t53: *AggregateType = null;
+var t54: i64 = i64(0);
+var t55: *u8 = null;
+var t56: *Token = null;
+var t57: *Field = null;
+t0 = 23;
+t1 = v_token5;
+t2 = NewNode(t0, t1);
+v_n16 = t2;
+v_tail2 = null;
+v_count7 = 0;
+t3 = v_type28;
+Layout(t3);
+t4 = v_type28;
+ValidateBorrowedElements(t4);
+(v_n16).type = v_type28;
+t5 = v_type28;
+t6 = Storage(t5);
+(v_n16).storage = t6;
+t7 = 123;
+t8 = cast[*u8]("expected aggregate initializer");
+Need(t7, t8);
+t9 = 125;
+t10 = Take(t9);
+if (!((t10 != i8(0)))) {
+t11 = true;
+while (true) {
+if (!t11) {
+t12 = At();
+if (!(((t12).kind != 125))) { break; }
+}
+t11 = false;
+t13 = v_type28;
+t14 = Shape(t13);
+if (((t14).kind == 3)) {
+t15 = cast[*u8]("slice literals must be empty; borrow an array with [low:high]");
+Error(t15);
+}
+t16 = v_type28;
+t17 = Shape(t16);
+if (((t17).kind == 1)) {
+t18 = v_type28;
+t19 = Ident();
+t20 = t19;
+t21 = v_token5;
+t22 = FindField(t18, t20, t21);
+v_field2 = t22;
+t23 = 58;
+t24 = cast[*u8]("expected ':' after field name");
+Need(t23, t24);
+v_element2 = (v_field2).type;
+} else {
+t25 = v_type28;
+t26 = Shape(t25);
+v_element2 = (t26).element;
+}
+t27 = 1;
+t28 = Expr(t27);
+v_item = t28;
+t29 = v_item;
+t30 = v_element2;
+Coerce(t29, t30);
+t31 = v_item;
+Transfer(t31);
+t32 = v_type28;
+t33 = Shape(t32);
+if (((t33).kind == 1)) {
+(v_item).offset = (v_field2).offset;
+(v_item).field_key = i64(cast[i64](v_field2));
+} else {
+t34 = v_element2;
+t35 = ByteSize(t34);
+(v_item).offset = (v_count7 * t35);
+}
+t36 = v_type28;
+t37 = Shape(t36);
+if (((t37).kind == 1)) {
+v_prior = (v_n16).a;
+while (true) {
+if (!((v_prior != null))) { break; }
+if (((v_prior).field_key == (v_item).field_key)) {
+t38 = v_token5;
+t39 = cast[*u8]("duplicate initializer field");
+ErrorAt(t38, t39);
+}
+v_prior = (v_prior).next;
+}
+}
+if ((v_tail2 != null)) {
+(v_tail2).next = v_item;
+} else {
+(v_n16).a = v_item;
+}
+v_tail2 = v_item;
+t40 = v_count7;
+v_count7 = v_count7 + i64(1);
+t41 = At();
+if (((t41).kind == 125)) {
+break;
+}
+t42 = 44;
+t43 = cast[*u8]("expected ',' between initializers");
+Need(t42, t43);
+}
+t44 = 125;
+t45 = cast[*u8]("expected '}' after initializer");
+Need(t44, t45);
+t46 = v_type28;
+t47 = Shape(t46);
+if ((v_count7 != (t47).count)) {
+t48 = v_token5;
+t49 = cast[*u8]("aggregate initializer must supply every element");
+ErrorAt(t48, t49);
+}
+} else {
+t50 = v_type28;
+t51 = Shape(t50);
+if (((t51).kind == 1)) {
+t52 = v_type28;
+t53 = Shape(t52);
+v_field2 = (t53).fields;
+while (true) {
+if (!((v_field2 != null))) { break; }
+t54 = v_type28;
+t55 = (v_field2).name;
+t56 = v_token5;
+t57 = FindField(t54, t55, t56);
+v_field2 = (v_field2).next;
+}
+}
+}
+return v_n16;
+}
+return null;
+}
+
+
+fn EnumLiteral(arg_v_type29: i64, arg_v_token6: *Token) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_type29: i64 = arg_v_type29;
+var v_token6: *Token = arg_v_token6;
+var v_variant: *Field = null;
+var v_n17: *Node = null;
+var v_tag: *Node = null;
+var v_payload: *Node = null;
+var t0: i64 = i64(0);
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: *u8 = null;
+var t7: *Token = null;
+var t8: *Field = null;
+var t9: i64 = i64(0);
+var t10: *Token = null;
+var t11: *Node = null;
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: i64 = i64(0);
+var t15: *Token = null;
+var t16: *Node = null;
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: i64 = i64(0);
+var t20: *Node = null;
+var t21: *Node = null;
+var t22: i64 = i64(0);
+var t23: *Node = null;
+var t24: i64 = i64(0);
+var t25: *u8 = null;
+var t26: i64 = i64(0);
+var t27: i8 = i8(0);
+var t28: i64 = i64(0);
+var t29: *u8 = null;
+t0 = v_type29;
+Layout(t0);
+t1 = v_type29;
+ValidateBorrowedElements(t1);
+t2 = 46;
+t3 = cast[*u8]("enum construction requires a variant");
+Need(t2, t3);
+t4 = v_type29;
+t5 = Ident();
+t6 = t5;
+t7 = v_token6;
+t8 = FindField(t4, t6, t7);
+v_variant = t8;
+t9 = 23;
+t10 = v_token6;
+t11 = NewNode(t9, t10);
+v_n17 = t11;
+(v_n17).type = v_type29;
+t12 = v_type29;
+t13 = Storage(t12);
+(v_n17).storage = t13;
+t14 = 1;
+t15 = v_token6;
+t16 = NewNode(t14, t15);
+v_tag = t16;
+(v_tag).type = 1;
+(v_tag).value = (v_variant).tag;
+(v_n17).a = v_tag;
+if (((v_variant).type != i64(0))) {
+t17 = 40;
+t18 = cast[*u8]("variant requires a payload");
+Need(t17, t18);
+t19 = 1;
+t20 = Expr(t19);
+v_payload = t20;
+t21 = v_payload;
+t22 = (v_variant).type;
+Coerce(t21, t22);
+t23 = v_payload;
+Transfer(t23);
+t24 = 41;
+t25 = cast[*u8]("expected ')' after payload");
+Need(t24, t25);
+(v_payload).offset = 8;
+(v_tag).next = v_payload;
+} else {
+t26 = 40;
+t27 = Take(t26);
+if ((t27 != i8(0))) {
+t28 = 41;
+t29 = cast[*u8]("unit variant takes no arguments");
+Need(t28, t29);
+}
+}
+return v_n17;
+}
+return null;
+}
+
+
+fn Atom() -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t13: *Token = null;
+var v_n18: *Node = null;
+var v_tail3: *Node = null;
+var v_arg1: *Node = null;
+var v_l3: *Local = null;
+var v_id1: i64 = i64(0);
+var v_k3: i64 = i64(0);
+var v_count8: i64 = i64(0);
+var v_ty: i64 = i64(0);
+var v_type_args: [8]i64 = [8]i64{};
+var v_type_count: i64 = i64(0);
+var v_name13: *u8 = null;
+var v_package3: *u8 = null;
+var v_qualified: i8 = i8(0);
+var t0: *Token = null;
+var t1: *u8 = null;
+var t2: i8 = i8(0);
+var t3: i64 = i64(0);
+var t4: *Node = null;
+var t5: i64 = i64(0);
+var t6: i8 = i8(0);
+var t7: bool = false;
+var t8: bool = false;
+var t9: bool = false;
+var t10: *Node = null;
+var t11: *Local = null;
+var t12: bool = false;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+var t15: *Token = null;
+var t16: *u8 = null;
+var t17: *Token = null;
+var t18: *u8 = null;
+var t19: i64 = i64(0);
+var t20: *Token = null;
+var t21: *Node = null;
+var t22: *Token = null;
+var t23: *u8 = null;
+var t24: i64 = i64(0);
+var t25: *Token = null;
+var t26: *Node = null;
+var t27: i64 = i64(0);
+var t28: i64 = i64(0);
+var t29: *u8 = null;
+var t30: i8 = i8(0);
+var t31: i64 = i64(0);
+var t32: i64 = i64(0);
+var t33: *u8 = null;
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: *u8 = null;
+var t37: i64 = i64(0);
+var t38: i64 = i64(0);
+var t39: i8 = i8(0);
+var t40: *Token = null;
+var t41: *u8 = null;
+var t42: i64 = i64(0);
+var t43: *Token = null;
+var t44: *Node = null;
+var t45: i64 = i64(0);
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: *Token = null;
+var t49: i64 = i64(0);
+var t50: i64 = i64(0);
+var t51: i64 = i64(0);
+var t52: i64 = i64(0);
+var t53: *u8 = null;
+var t54: i64 = i64(0);
+var t55: i8 = i8(0);
+var t56: i64 = i64(0);
+var t57: *Node = null;
+var t58: *Node = null;
+var t59: i64 = i64(0);
+var t60: *Node = null;
+var t61: i64 = i64(0);
+var t62: *u8 = null;
+var t63: *Token = null;
+var t64: i64 = i64(0);
+var t65: i64 = i64(0);
+var t66: *Token = null;
+var t67: *Node = null;
+var t68: *u8 = null;
+var t69: i8 = i8(0);
+var t70: i64 = i64(0);
+var t71: i64 = i64(0);
+var t72: *u8 = null;
+var t73: i64 = i64(0);
+var t74: i64 = i64(0);
+var t75: *u8 = null;
+var t76: i64 = i64(0);
+var t77: *Token = null;
+var t78: *Node = null;
+var t79: i64 = i64(0);
+var t80: i64 = i64(0);
+var t81: *u8 = null;
+var t82: i8 = i8(0);
+var t83: i64 = i64(0);
+var t84: i64 = i64(0);
+var t85: *Token = null;
+var t86: *Node = null;
+var t87: *u8 = null;
+var t88: i8 = i8(0);
+var t89: bool = false;
+var t90: i64 = i64(0);
+var t91: i64 = i64(0);
+var t92: *u8 = null;
+var t93: i64 = i64(0);
+var t94: *u8 = null;
+var t95: i64 = i64(0);
+var t96: *Token = null;
+var t97: *Node = null;
+var t98: i64 = i64(0);
+var t99: *Node = null;
+var t100: i64 = i64(0);
+var t101: *u8 = null;
+var t102: i64 = i64(0);
+var t103: i8 = i8(0);
+var t104: bool = false;
+var t105: i64 = i64(0);
+var t106: i8 = i8(0);
+var t107: *Token = null;
+var t108: *u8 = null;
+var t109: i64 = i64(0);
+var t110: i8 = i8(0);
+var t111: bool = false;
+var t112: bool = false;
+var t113: bool = false;
+var t114: bool = false;
+var t115: i64 = i64(0);
+var t116: i8 = i8(0);
+var t117: bool = false;
+var t118: i64 = i64(0);
+var t119: i8 = i8(0);
+var t120: bool = false;
+var t121: bool = false;
+var t122: *Token = null;
+var t123: *u8 = null;
+var t124: i64 = i64(0);
+var t125: i8 = i8(0);
+var t126: bool = false;
+var t127: i64 = i64(0);
+var t128: i8 = i8(0);
+var t129: *Token = null;
+var t130: *u8 = null;
+var t131: i64 = i64(0);
+var t132: i8 = i8(0);
+var t133: *Token = null;
+var t134: *u8 = null;
+var t135: i64 = i64(0);
+var t136: *Token = null;
+var t137: *Node = null;
+var t138: *Node = null;
+var t139: *Token = null;
+var t140: *u8 = null;
+var t141: *Token = null;
+var t142: *u8 = null;
+var t143: i64 = i64(0);
+var t144: i8 = i8(0);
+var t145: i64 = i64(0);
+var t146: *Token = null;
+var t147: *Node = null;
+var t148: *Node = null;
+var t149: i64 = i64(0);
+var t150: i64 = i64(0);
+var t151: i64 = i64(0);
+var t152: *Token = null;
+var t153: *Node = null;
+var t154: i64 = i64(0);
+var t155: *AggregateType = null;
+var t156: *Token = null;
+var t157: *u8 = null;
+var t158: i64 = i64(0);
+var t159: i8 = i8(0);
+var t160: bool = false;
+var t161: *Token = null;
+var t162: *u8 = null;
+var t163: i64 = i64(0);
+var t164: i8 = i8(0);
+var t165: i64 = i64(0);
+var t166: i64 = i64(0);
+var t167: i64 = i64(0);
+var t168: i8 = i8(0);
+var t169: i64 = i64(0);
+var t170: *Token = null;
+var t171: *Node = null;
+var t172: i64 = i64(0);
+var t173: i8 = i8(0);
+var t174: i64 = i64(0);
+var t175: *Token = null;
+var t176: *Node = null;
+var t177: i64 = i64(0);
+var t178: i8 = i8(0);
+var t179: i64 = i64(0);
+var t180: *Token = null;
+var t181: *Node = null;
+var t182: *u8 = null;
+var t183: i8 = i8(0);
+var t184: bool = false;
+var t185: *u8 = null;
+var t186: i8 = i8(0);
+var t187: i64 = i64(0);
+var t188: *Token = null;
+var t189: *Node = null;
+var t190: *u8 = null;
+var t191: i8 = i8(0);
+var t192: i64 = i64(0);
+var t193: i64 = i64(0);
+var t194: i8 = i8(0);
+var t195: i64 = i64(0);
+var t196: *Node = null;
+var t197: i64 = i64(0);
+var t198: *u8 = null;
+var t199: bool = false;
+var t200: bool = false;
+var t201: i64 = i64(0);
+var t202: i64 = i64(0);
+var t203: *Token = null;
+var t204: *Node = null;
+var t205: *Node = null;
+var t206: bool = false;
+var t207: *Token = null;
+var t208: *u8 = null;
+var t209: bool = false;
+var t210: i64 = i64(0);
+var t211: i8 = i8(0);
+var t212: bool = false;
+var t213: bool = false;
+var t214: i64 = i64(0);
+var t215: i8 = i8(0);
+var t216: *Token = null;
+var t217: *u8 = null;
+var t218: bool = false;
+var t219: bool = false;
+var t220: i64 = i64(0);
+var t221: i8 = i8(0);
+var t222: bool = false;
+var t223: *Token = null;
+var t224: *u8 = null;
+var t225: *u8 = null;
+var t226: *u8 = null;
+var t227: *Local = null;
+var t228: bool = false;
+var t229: *u8 = null;
+var t230: *u8 = null;
+var t231: i64 = i64(0);
+var t232: bool = false;
+var t233: i64 = i64(0);
+var t234: i8 = i8(0);
+var t235: *Token = null;
+var t236: *u8 = null;
+var t237: *u8 = null;
+var t238: *u8 = null;
+var t239: *u8 = null;
+var t240: *u8 = null;
+var t241: i64 = i64(0);
+var t242: bool = false;
+var t243: i64 = i64(0);
+var t244: *AggregateType = null;
+var t245: i64 = i64(0);
+var t246: i64 = i64(0);
+var t247: bool = false;
+var t248: i64 = i64(0);
+var t249: i64 = i64(0);
+var t250: bool = false;
+var t251: i64 = i64(0);
+var t252: *AggregateType = null;
+var t253: *Token = null;
+var t254: *u8 = null;
+var t255: i64 = i64(0);
+var t256: *Token = null;
+var t257: *Node = null;
+var t258: bool = false;
+var t259: *u8 = null;
+var t260: *Local = null;
+var t261: bool = false;
+var t262: *Token = null;
+var t263: *i64 = null;
+var t264: i64 = i64(0);
+var t265: bool = false;
+var t266: *Token = null;
+var t267: bool = false;
+var t268: i64 = i64(0);
+var t269: *AggregateType = null;
+var t270: *Token = null;
+var t271: *u8 = null;
+var t272: i64 = i64(0);
+var t273: *Token = null;
+var t274: *Node = null;
+var t275: i64 = i64(0);
+var t276: i8 = i8(0);
+var t277: i64 = i64(0);
+var t278: *Token = null;
+var t279: *Node = null;
+var t280: i64 = i64(0);
+var t281: i8 = i8(0);
+var t282: bool = false;
+var t283: i64 = i64(0);
+var t284: i8 = i8(0);
+var t285: i64 = i64(0);
+var t286: *Node = null;
+var t287: i64 = i64(0);
+var t288: i64 = i64(0);
+var t289: *u8 = null;
+var t290: bool = false;
+var t291: *u8 = null;
+var t292: *u8 = null;
+var t293: i8 = i8(0);
+var t294: bool = false;
+var t295: i64 = i64(0);
+var t296: i64 = i64(0);
+var t297: bool = false;
+var t298: i64 = i64(0);
+var t299: i64 = i64(0);
+var t300: *Token = null;
+var t301: *u8 = null;
+var t302: *u8 = null;
+var t303: i64 = i64(0);
+var t304: bool = false;
+var t305: bool = false;
+var t306: bool = false;
+var t307: i64 = i64(0);
+var t308: i8 = i8(0);
+var t309: bool = false;
+var t310: i64 = i64(0);
+var t311: i8 = i8(0);
+var t312: *Token = null;
+var t313: *u8 = null;
+var t314: bool = false;
+var t315: *u8 = null;
+var t316: *u8 = null;
+var t317: i8 = i8(0);
+var t318: bool = false;
+var t319: *u8 = null;
+var t320: *u8 = null;
+var t321: i8 = i8(0);
+var t322: bool = false;
+var t323: *u8 = null;
+var t324: *u8 = null;
+var t325: i8 = i8(0);
+var t326: bool = false;
+var t327: bool = false;
+var t328: i64 = i64(0);
+var t329: i8 = i8(0);
+var t330: *Token = null;
+var t331: *u8 = null;
+var t332: bool = false;
+var t333: *u8 = null;
+var t334: *u8 = null;
+var t335: i8 = i8(0);
+var t336: *u8 = null;
+var t337: *u8 = null;
+var t338: i8 = i8(0);
+var t339: *u8 = null;
+var t340: *u8 = null;
+var t341: *u8 = null;
+var t342: i8 = i8(0);
+var t343: *Token = null;
+var t344: *u8 = null;
+var t345: *Node = null;
+var t346: i64 = i64(0);
+var t347: *u8 = null;
+var t348: *u8 = null;
+var t349: i8 = i8(0);
+var t350: *Token = null;
+var t351: *u8 = null;
+var t352: bool = false;
+var t353: i64 = i64(0);
+var t354: i8 = i8(0);
+var t355: *Token = null;
+var t356: *u8 = null;
+var t357: *u8 = null;
+var t358: *u8 = null;
+var t359: i8 = i8(0);
+var t360: *Token = null;
+var t361: *u8 = null;
+var t362: bool = false;
+var t363: i64 = i64(0);
+var t364: i8 = i8(0);
+var t365: bool = false;
+var t366: i64 = i64(0);
+var t367: i8 = i8(0);
+var t368: *Token = null;
+var t369: *u8 = null;
+var t370: *Node = null;
+var t371: i64 = i64(0);
+var t372: *Token = null;
+var t373: *u8 = null;
+var t374: bool = false;
+var t375: *u8 = null;
+var t376: *u8 = null;
+var t377: i8 = i8(0);
+var t378: bool = false;
+var t379: *Token = null;
+var t380: *u8 = null;
+var t381: *u8 = null;
+var t382: *u8 = null;
+var t383: i64 = i64(0);
+var t384: *Token = null;
+var t385: *u8 = null;
+var t386: bool = false;
+var t387: *Token = null;
+var t388: *u8 = null;
+var t389: bool = false;
+var t390: *Token = null;
+var t391: *u8 = null;
+var t392: i64 = i64(0);
+var t393: *i64 = null;
+var t394: i64 = i64(0);
+var t395: i64 = i64(0);
+var t396: *Token = null;
+var t397: *u8 = null;
+var t398: *Node = null;
+var t399: i64 = i64(0);
+var t400: *Node = null;
+var t401: i64 = i64(0);
+var t402: i64 = i64(0);
+var t403: i8 = i8(0);
+var t404: i64 = i64(0);
+var t405: i64 = i64(0);
+var t406: *u8 = null;
+var t407: *Local = null;
+var t408: *Token = null;
+var t409: *u8 = null;
+var t410: *Token = null;
+var t411: *u8 = null;
+var t412: i64 = i64(0);
+var t413: *Token = null;
+var t414: *Node = null;
+var t415: i64 = i64(0);
+var t416: i8 = i8(0);
+var t417: i64 = i64(0);
+var t418: i64 = i64(0);
+t0 = At();
+v_t13 = t0;
+v_tail3 = null;
+v_count8 = 0;
+v_type_count = 0;
+v_qualified = i8(0);
+v_package3 = (v_t13).package;
+t1 = cast[*u8]("move");
+t2 = Is(t1);
+if ((t2 != i8(0))) {
+t3 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t4 = Primary();
+v_n18 = t4;
+t5 = (v_n18).type;
+t6 = Owned(t5);
+if (!((t6 != i8(0)))) {
+return v_n18;
+}
+t7 = ((v_n18).kind == 4);
+if (!t7) {
+t7 = ((v_n18).kind == 28);
+}
+t8 = t7;
+if (!t8) {
+t8 = ((v_n18).kind == 23);
+}
+t9 = t8;
+if (!t9) {
+t9 = ((v_n18).kind == 29);
+}
+if (t9) {
+return v_n18;
+}
+t10 = v_n18;
+t11 = BorrowRoot(t10);
+v_l3 = t11;
+t12 = (v_l3 != null);
+if (t12) {
+t13 = (v_l3).type;
+t14 = Owned(t13);
+t12 = (i64(t14) != i64(0));
+}
+if (t12) {
+if (((v_l3).moved != i64(0))) {
+t15 = v_t13;
+t16 = cast[*u8]("use of moved value");
+ErrorAt(t15, t16);
+}
+if (((v_l3).loop_level < ctx.v_loop_depth)) {
+t17 = v_t13;
+t18 = cast[*u8]("cannot move an outer owner inside a loop");
+ErrorAt(t17, t18);
+}
+(v_l3).moved = 1;
+}
+if (((v_n18).kind == 3)) {
+t19 = 22;
+t20 = v_t13;
+t21 = NewNode(t19, t20);
+v_arg1 = t21;
+(v_arg1).slot = (v_n18).slot;
+(v_arg1).type = (100000 + (v_n18).type);
+(v_arg1).local_ref = (v_n18).local_ref;
+} else {
+if (((v_n18).kind == 18)) {
+v_arg1 = (v_n18).a;
+} else {
+t22 = v_t13;
+t23 = cast[*u8]("move requires a place or a fresh value");
+ErrorAt(t22, t23);
+}
+}
+t24 = 29;
+t25 = v_t13;
+t26 = NewNode(t24, t25);
+v_tail3 = t26;
+(v_tail3).a = v_arg1;
+(v_tail3).type = (v_n18).type;
+t27 = (v_n18).type;
+t28 = Storage(t27);
+(v_tail3).storage = t28;
+return v_tail3;
+}
+t29 = cast[*u8]("new");
+t30 = Is(t29);
+if ((t30 != i8(0))) {
+t31 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t32 = 91;
+t33 = cast[*u8]("expected '[' after new");
+Need(t32, t33);
+t34 = ParseType();
+v_ty = t34;
+t35 = 93;
+t36 = cast[*u8]("expected ']'");
+Need(t35, t36);
+t37 = v_ty;
+ValidateBorrowedElements(t37);
+t38 = v_ty;
+t39 = Borrowed(t38);
+if ((t39 != i8(0))) {
+t40 = v_t13;
+t41 = cast[*u8]("owned storage cannot contain borrowed references");
+ErrorAt(t40, t41);
+}
+t42 = 28;
+t43 = v_t13;
+t44 = NewNode(t42, t43);
+v_n18 = t44;
+t45 = 5;
+t46 = v_ty;
+t47 = 0;
+t48 = v_t13;
+t49 = SequenceType(t45, t46, t47, t48);
+(v_n18).type = t49;
+t50 = (v_n18).type;
+t51 = Storage(t50);
+(v_n18).storage = t51;
+t52 = 40;
+t53 = cast[*u8]("expected '(' after new type");
+Need(t52, t53);
+t54 = 41;
+t55 = Take(t54);
+if (!((t55 != i8(0)))) {
+t56 = 1;
+t57 = Expr(t56);
+(v_n18).a = t57;
+t58 = (v_n18).a;
+t59 = v_ty;
+Coerce(t58, t59);
+t60 = (v_n18).a;
+Transfer(t60);
+t61 = 41;
+t62 = cast[*u8]("expected ')' after new initializer");
+Need(t61, t62);
+}
+return v_n18;
+}
+t63 = At();
+if (((t63).kind == 91)) {
+t64 = ParseType();
+v_ty = t64;
+t65 = v_ty;
+t66 = v_t13;
+t67 = AggregateLiteral(t65, t66);
+return t67;
+}
+t68 = cast[*u8]("sizeof");
+t69 = Is(t68);
+if ((t69 != i8(0))) {
+t70 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t71 = 40;
+t72 = cast[*u8]("expected '('");
+Need(t71, t72);
+t73 = ParseType();
+v_ty = t73;
+t74 = 41;
+t75 = cast[*u8]("expected ')'");
+Need(t74, t75);
+t76 = 1;
+t77 = v_t13;
+t78 = NewNode(t76, t77);
+v_n18 = t78;
+(v_n18).type = 10;
+t79 = v_ty;
+t80 = ByteSize(t79);
+(v_n18).value = t80;
+return v_n18;
+}
+t81 = cast[*u8]("null");
+t82 = Is(t81);
+if ((t82 != i8(0))) {
+t83 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t84 = 1;
+t85 = v_t13;
+t86 = NewNode(t84, t85);
+v_n18 = t86;
+(v_n18).type = 13;
+return v_n18;
+}
+t87 = cast[*u8]("cast");
+t88 = Is(t87);
+t89 = (i64(t88) != i64(0));
+if (t89) {
+t89 = (((ctx.v_tokens)[(ctx.v_pos + 1)]).kind == 91);
+}
+if (t89) {
+ctx.v_pos = ctx.v_pos + 2;
+t90 = ParseType();
+v_ty = t90;
+t91 = 93;
+t92 = cast[*u8]("expected ']' after cast type");
+Need(t91, t92);
+t93 = 40;
+t94 = cast[*u8]("expected '(' after cast type");
+Need(t93, t94);
+t95 = 17;
+t96 = v_t13;
+t97 = NewNode(t95, t96);
+v_n18 = t97;
+t98 = 1;
+t99 = Expr(t98);
+(v_n18).a = t99;
+(v_n18).type = v_ty;
+t100 = 41;
+t101 = cast[*u8]("expected ')' after cast operand");
+Need(t100, t101);
+t102 = v_ty;
+t103 = Pointer(t102);
+t104 = (i64(t103) != i64(0));
+if (!t104) {
+t105 = ((v_n18).a).type;
+t106 = Pointer(t105);
+t104 = (i64(t106) != i64(0));
+}
+if (t104) {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t107 = v_t13;
+t108 = cast[*u8]("pointer casts require unsafe");
+ErrorAt(t107, t108);
+}
+t109 = v_ty;
+t110 = Pointer(t109);
+t111 = (i64(t110) != i64(0));
+if (!t111) {
+t111 = (v_ty == 10);
+}
+t112 = t111;
+if (!t112) {
+t112 = (v_ty == 1);
+}
+t113 = t112;
+if (!t113) {
+t113 = (v_ty == 3);
+}
+t114 = !(t113);
+if (!t114) {
+t115 = ((v_n18).a).type;
+t116 = Pointer(t115);
+t117 = (i64(t116) != i64(0));
+if (!t117) {
+t118 = ((v_n18).a).type;
+t119 = Integer(t118);
+t117 = (i64(t119) != i64(0));
+}
+t120 = t117;
+if (!t120) {
+t120 = (((v_n18).a).type == 13);
+}
+t121 = t120;
+if (!t121) {
+t121 = (((v_n18).a).type == 3);
+}
+t114 = !(t121);
+}
+if (t114) {
+t122 = v_t13;
+t123 = cast[*u8]("invalid pointer cast");
+ErrorAt(t122, t123);
+}
+} else {
+t124 = v_ty;
+t125 = Numeric(t124);
+t126 = !((t125 != i8(0)));
+if (!t126) {
+t127 = ((v_n18).a).type;
+t128 = Numeric(t127);
+t126 = !((t128 != i8(0)));
+}
+if (t126) {
+t129 = v_t13;
+t130 = cast[*u8]("invalid cast");
+ErrorAt(t129, t130);
+}
+}
+return v_n18;
+}
+t131 = 38;
+t132 = Take(t131);
+if ((t132 != i8(0))) {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t133 = v_t13;
+t134 = cast[*u8]("taking an address requires unsafe");
+ErrorAt(t133, t134);
+}
+t135 = 22;
+t136 = v_t13;
+t137 = NewNode(t135, t136);
+v_n18 = t137;
+t138 = Primary();
+(v_n18).a = t138;
+if (!((((v_n18).a).mutable != i64(0)))) {
+t139 = v_t13;
+t140 = cast[*u8]("cannot take a mutable address of let binding or parameter");
+ErrorAt(t139, t140);
+}
+if ((((v_n18).a).kind == 18)) {
+return ((v_n18).a).a;
+}
+if ((((v_n18).a).kind != 3)) {
+t141 = v_t13;
+t142 = cast[*u8]("address operand must be a local variable or projection");
+ErrorAt(t141, t142);
+}
+(v_n18).slot = ((v_n18).a).slot;
+(v_n18).type = (100000 + ((v_n18).a).type);
+return v_n18;
+}
+t143 = 42;
+t144 = Take(t143);
+if ((t144 != i8(0))) {
+t145 = 18;
+t146 = v_t13;
+t147 = NewNode(t145, t146);
+v_n18 = t147;
+t148 = Primary();
+(v_n18).a = t148;
+t149 = ((v_n18).a).type;
+t150 = AggregateKind(t149);
+if ((t150 == 5)) {
+t151 = 30;
+t152 = v_t13;
+t153 = NewNode(t151, t152);
+v_arg1 = t153;
+(v_arg1).a = (v_n18).a;
+t154 = ((v_n18).a).type;
+t155 = Shape(t154);
+(v_arg1).type = (100000 + (t155).element);
+(v_n18).a = v_arg1;
+} else {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t156 = v_t13;
+t157 = cast[*u8]("pointer dereference requires unsafe");
+ErrorAt(t156, t157);
+}
+t158 = ((v_n18).a).type;
+t159 = Pointer(t158);
+t160 = !((t159 != i8(0)));
+if (!t160) {
+t160 = (((v_n18).a).type == 100000);
+}
+if (t160) {
+t161 = v_t13;
+t162 = cast[*u8]("dereference requires a typed pointer");
+ErrorAt(t161, t162);
+}
+}
+(v_n18).type = (((v_n18).a).type - 100000);
+(v_n18).mutable = 1;
+t163 = (v_n18).type;
+t164 = Aggregate(t163);
+if ((t164 != i8(0))) {
+t165 = (v_n18).type;
+t166 = Storage(t165);
+(v_n18).storage = t166;
+}
+return v_n18;
+}
+t167 = 257;
+t168 = Take(t167);
+if ((t168 != i8(0))) {
+t169 = 1;
+t170 = v_t13;
+t171 = NewNode(t169, t170);
+v_n18 = t171;
+(v_n18).value = (v_t13).val;
+(v_n18).type = 1;
+if (((v_t13).val < 0)) {
+(v_n18).type = 10;
+}
+return v_n18;
+}
+t172 = 268;
+t173 = Take(t172);
+if ((t173 != i8(0))) {
+t174 = 1;
+t175 = v_t13;
+t176 = NewNode(t174, t175);
+v_n18 = t176;
+(v_n18).value = (v_t13).val;
+(v_n18).type = 11;
+return v_n18;
+}
+t177 = 258;
+t178 = Take(t177);
+if ((t178 != i8(0))) {
+t179 = 2;
+t180 = v_t13;
+t181 = NewNode(t179, t180);
+v_n18 = t181;
+(v_n18).name = (v_t13).text;
+(v_n18).type = 3;
+return v_n18;
+}
+t182 = cast[*u8]("true");
+t183 = Is(t182);
+t184 = (i64(t183) != i64(0));
+if (!t184) {
+t185 = cast[*u8]("false");
+t186 = Is(t185);
+t184 = (i64(t186) != i64(0));
+}
+if (t184) {
+t187 = 1;
+t188 = v_t13;
+t189 = NewNode(t187, t188);
+v_n18 = t189;
+(v_n18).type = 2;
+t190 = cast[*u8]("true");
+t191 = Is(t190);
+(v_n18).value = i64(t191);
+t192 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+return v_n18;
+}
+t193 = 40;
+t194 = Take(t193);
+if ((t194 != i8(0))) {
+t195 = 1;
+t196 = Expr(t195);
+v_n18 = t196;
+t197 = 41;
+t198 = cast[*u8]("expected ')'");
+Need(t197, t198);
+return v_n18;
+}
+t199 = ((v_t13).kind == 45);
+if (!t199) {
+t199 = ((v_t13).kind == 33);
+}
+t200 = t199;
+if (!t200) {
+t200 = ((v_t13).kind == 126);
+}
+if (t200) {
+v_k3 = (v_t13).kind;
+t201 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t202 = 6;
+t203 = v_t13;
+t204 = NewNode(t202, t203);
+v_n18 = t204;
+(v_n18).op = v_k3;
+t205 = Primary();
+(v_n18).a = t205;
+(v_n18).type = ((v_n18).a).type;
+t206 = (v_k3 == 33);
+if (t206) {
+t206 = ((v_n18).type != 2);
+}
+if (t206) {
+t207 = v_t13;
+t208 = cast[*u8]("logical negation requires bool");
+ErrorAt(t207, t208);
+}
+t209 = (v_k3 == 126);
+if (t209) {
+t210 = (v_n18).type;
+t211 = Integer(t210);
+t209 = !((t211 != i8(0)));
+}
+t212 = t209;
+if (!t212) {
+t213 = (v_k3 == 45);
+if (t213) {
+t214 = (v_n18).type;
+t215 = Numeric(t214);
+t213 = !((t215 != i8(0)));
+}
+t212 = t213;
+}
+if (t212) {
+t216 = v_t13;
+t217 = cast[*u8]("integer operand required");
+ErrorAt(t216, t217);
+}
+t218 = (v_k3 == 45);
+if (t218) {
+t218 = (((v_n18).a).kind == 1);
+}
+t219 = t218;
+if (t219) {
+t220 = (v_n18).type;
+t221 = Floating(t220);
+t219 = !((t221 != i8(0)));
+}
+if (t219) {
+t222 = (((v_n18).a).type == 10);
+if (t222) {
+t222 = (((v_n18).a).value != ((-9223372036854775807) - 1));
+}
+if (t222) {
+t223 = v_t13;
+t224 = cast[*u8]("negative literal exceeds i64 range");
+ErrorAt(t223, t224);
+}
+(v_n18).kind = 1;
+(v_n18).value = (-((v_n18).a).value);
+if ((((v_n18).a).type == 10)) {
+(v_n18).type = 1;
+}
+}
+return v_n18;
+}
+t225 = Ident();
+v_name13 = t225;
+t226 = v_name13;
+t227 = FindLocal(t226);
+t228 = !((t227 != null));
+if (t228) {
+t229 = v_package3;
+t230 = v_name13;
+t231 = FindType(t229, t230);
+t228 = (t231 < 0);
+}
+t232 = t228;
+if (t232) {
+t233 = 46;
+t234 = Take(t233);
+t232 = (i64(t234) != i64(0));
+}
+if (t232) {
+t235 = v_t13;
+t236 = v_name13;
+t237 = ResolveAlias(t235, t236);
+v_package3 = t237;
+t238 = Ident();
+v_name13 = t238;
+v_qualified = i8(1);
+}
+t239 = v_package3;
+t240 = v_name13;
+t241 = FindType(t239, t240);
+v_ty = t241;
+t242 = (v_ty >= 0);
+if (t242) {
+t243 = v_ty;
+t244 = Shape(t243);
+t242 = ((t244).generic_count != i64(0));
+}
+if (t242) {
+t245 = v_ty;
+t246 = InstantiateType(t245);
+v_ty = t246;
+}
+t247 = (v_ty >= 0);
+if (t247) {
+t248 = v_ty;
+t249 = AggregateKind(t248);
+t247 = (t249 == 4);
+}
+if (t247) {
+t250 = (i64(v_qualified) != i64(0));
+if (t250) {
+t251 = v_ty;
+t252 = Shape(t251);
+t250 = !(((t252).public != i64(0)));
+}
+if (t250) {
+t253 = v_t13;
+t254 = cast[*u8]("type is private to its package");
+ErrorAt(t253, t254);
+}
+t255 = v_ty;
+t256 = v_t13;
+t257 = EnumLiteral(t255, t256);
+return t257;
+}
+t258 = (v_ty < 0);
+if (t258) {
+t259 = v_name13;
+t260 = FindLocal(t259);
+t258 = !((t260 != null));
+}
+t261 = t258;
+if (t261) {
+t262 = At();
+t261 = ((t262).kind == 91);
+}
+if (t261) {
+t263 = &(v_type_args)[0];
+t264 = TypeArguments(t263);
+v_type_count = t264;
+}
+t265 = (v_ty >= 0);
+if (t265) {
+t266 = At();
+t265 = ((t266).kind == 123);
+}
+if (t265) {
+t267 = (i64(v_qualified) != i64(0));
+if (t267) {
+t268 = v_ty;
+t269 = Shape(t268);
+t267 = !(((t269).public != i64(0)));
+}
+if (t267) {
+t270 = v_t13;
+t271 = cast[*u8]("type is private to its package");
+ErrorAt(t270, t271);
+}
+t272 = v_ty;
+t273 = v_t13;
+t274 = AggregateLiteral(t272, t273);
+return t274;
+}
+t275 = 40;
+t276 = Take(t275);
+if ((t276 != i8(0))) {
+t277 = 4;
+t278 = v_t13;
+t279 = NewNode(t277, t278);
+v_n18 = t279;
+(v_n18).name = v_name13;
+t280 = 41;
+t281 = Take(t280);
+if (!((t281 != i8(0)))) {
+t282 = true;
+while (true) {
+if (!t282) {
+t283 = 44;
+t284 = Take(t283);
+if (!((t284 != i8(0)))) { break; }
+}
+t282 = false;
+t285 = 1;
+t286 = Expr(t285);
+v_arg1 = t286;
+if ((v_tail3 != null)) {
+(v_tail3).next = v_arg1;
+} else {
+(v_n18).a = v_arg1;
+}
+v_tail3 = v_arg1;
+t287 = v_count8;
+v_count8 = v_count8 + i64(1);
+}
+t288 = 41;
+t289 = cast[*u8]("expected ')' after arguments");
+Need(t288, t289);
+}
+(v_n18).value = v_count8;
+t290 = !((v_qualified != i8(0)));
+if (t290) {
+t291 = v_name13;
+t292 = cast[*u8]("len");
+t293 = Eq(t291, t292);
+t290 = (i64(t293) != i64(0));
+}
+if (t290) {
+t294 = (v_count8 != 1);
+if (!t294) {
+t295 = ((v_n18).a).type;
+t296 = AggregateKind(t295);
+t297 = (t296 != 2);
+if (t297) {
+t298 = ((v_n18).a).type;
+t299 = AggregateKind(t298);
+t297 = (t299 != 3);
+}
+t294 = t297;
+}
+if (t294) {
+t300 = v_t13;
+t301 = cast[*u8]("len expects an array or slice");
+ErrorAt(t300, t301);
+}
+(v_n18).kind = 27;
+(v_n18).type = 10;
+return v_n18;
+}
+v_ty = (-1);
+if (!((v_qualified != i8(0)))) {
+t302 = v_name13;
+t303 = TypeName(t302);
+v_ty = t303;
+}
+if ((v_ty >= 0)) {
+t304 = (v_count8 != 1);
+if (!t304) {
+t304 = (v_ty == 0);
+}
+t305 = t304;
+if (!t305) {
+t305 = (v_ty == 3);
+}
+t306 = t305;
+if (!t306) {
+t307 = ((v_n18).a).type;
+t308 = Numeric(t307);
+t306 = !((t308 != i8(0)));
+}
+t309 = t306;
+if (!t309) {
+t310 = v_ty;
+t311 = Numeric(t310);
+t309 = !((t311 != i8(0)));
+}
+if (t309) {
+t312 = v_t13;
+t313 = cast[*u8]("cast expects one numeric operand and a numeric target");
+ErrorAt(t312, t313);
+}
+(v_n18).kind = 17;
+(v_n18).type = v_ty;
+return v_n18;
+}
+t314 = (i64(v_qualified) != i64(0));
+if (t314) {
+t315 = v_package3;
+t316 = cast[*u8]("std/io");
+t317 = Eq(t315, t316);
+t314 = (i64(t317) != i64(0));
+}
+t318 = t314;
+if (t318) {
+t319 = v_name13;
+t320 = cast[*u8]("print");
+t321 = Eq(t319, t320);
+t322 = (i64(t321) != i64(0));
+if (!t322) {
+t323 = v_name13;
+t324 = cast[*u8]("println");
+t325 = Eq(t323, t324);
+t322 = (i64(t325) != i64(0));
+}
+t318 = t322;
+}
+if (t318) {
+t326 = (v_count8 != 1);
+if (!t326) {
+t326 = (((v_n18).a).type == 0);
+}
+t327 = t326;
+if (!t327) {
+t328 = ((v_n18).a).type;
+t329 = Aggregate(t328);
+t327 = (i64(t329) != i64(0));
+}
+if (t327) {
+t330 = v_t13;
+t331 = cast[*u8]("print/println expects one scalar value");
+ErrorAt(t330, t331);
+}
+(v_n18).slot = (-1);
+(v_n18).type = 0;
+return v_n18;
+}
+t332 = (i64(v_qualified) != i64(0));
+if (t332) {
+t333 = v_package3;
+t334 = cast[*u8]("std/mem");
+t335 = Eq(t333, t334);
+t332 = (i64(t335) != i64(0));
+}
+if (t332) {
+t336 = v_name13;
+t337 = cast[*u8]("owner_count");
+t338 = Eq(t336, t337);
+if ((t338 != i8(0))) {
+if ((v_count8 != i64(0))) {
+t339 = cast[*u8]("owner_count takes no arguments");
+Error(t339);
+}
+(v_n18).slot = (-6);
+(v_n18).type = 10;
+return v_n18;
+}
+t340 = v_name13;
+t341 = cast[*u8]("alloc");
+t342 = Eq(t340, t341);
+if ((t342 != i8(0))) {
+if ((v_count8 != 1)) {
+t343 = v_t13;
+t344 = cast[*u8]("mem.alloc requires a byte count");
+ErrorAt(t343, t344);
+}
+t345 = (v_n18).a;
+t346 = 10;
+Coerce(t345, t346);
+(v_n18).slot = (-3);
+(v_n18).type = (100000 + 5);
+return v_n18;
+}
+t347 = v_name13;
+t348 = cast[*u8]("free");
+t349 = Eq(t347, t348);
+if ((t349 != i8(0))) {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t350 = v_t13;
+t351 = cast[*u8]("manual free requires unsafe");
+ErrorAt(t350, t351);
+}
+t352 = (v_count8 != 1);
+if (!t352) {
+t353 = ((v_n18).a).type;
+t354 = Pointer(t353);
+t352 = !((t354 != i8(0)));
+}
+if (t352) {
+t355 = v_t13;
+t356 = cast[*u8]("mem.free requires a pointer");
+ErrorAt(t355, t356);
+}
+(v_n18).slot = (-4);
+(v_n18).type = 0;
+return v_n18;
+}
+t357 = v_name13;
+t358 = cast[*u8]("copy");
+t359 = Eq(t357, t358);
+if ((t359 != i8(0))) {
+if (!((ctx.v_unsafe_depth != i64(0)))) {
+t360 = v_t13;
+t361 = cast[*u8]("raw memory copy requires unsafe");
+ErrorAt(t360, t361);
+}
+t362 = (v_count8 != 3);
+if (!t362) {
+t363 = ((v_n18).a).type;
+t364 = Pointer(t363);
+t362 = !((t364 != i8(0)));
+}
+t365 = t362;
+if (!t365) {
+t366 = (((v_n18).a).next).type;
+t367 = Pointer(t366);
+t365 = !((t367 != i8(0)));
+}
+if (t365) {
+t368 = v_t13;
+t369 = cast[*u8]("mem.copy requires destination, source, byte count");
+ErrorAt(t368, t369);
+}
+t370 = (((v_n18).a).next).next;
+t371 = 10;
+Coerce(t370, t371);
+(v_n18).slot = (-5);
+(v_n18).type = 0;
+return v_n18;
+}
+t372 = v_t13;
+t373 = cast[*u8]("unknown std/mem function");
+ErrorAt(t372, t373);
+}
+t374 = !((v_qualified != i8(0)));
+if (t374) {
+t375 = v_name13;
+t376 = cast[*u8]("assert");
+t377 = Eq(t375, t376);
+t374 = (i64(t377) != i64(0));
+}
+if (t374) {
+t378 = (v_count8 != 1);
+if (!t378) {
+t378 = (((v_n18).a).type != 2);
+}
+if (t378) {
+t379 = v_t13;
+t380 = cast[*u8]("assert expects one bool");
+ErrorAt(t379, t380);
+}
+(v_n18).slot = (-2);
+(v_n18).type = 0;
+return v_n18;
+}
+t381 = v_package3;
+t382 = v_name13;
+t383 = FindFunIn(t381, t382);
+v_id1 = t383;
+if ((v_id1 < 0)) {
+t384 = v_t13;
+t385 = cast[*u8]("unknown function");
+ErrorAt(t384, t385);
+}
+t386 = (((ctx.v_functions)[v_id1]).foreign != i64(0));
+if (t386) {
+t386 = !((ctx.v_unsafe_depth != i64(0)));
+}
+if (t386) {
+t387 = v_t13;
+t388 = cast[*u8]("foreign calls require unsafe");
+ErrorAt(t387, t388);
+}
+t389 = (i64(v_qualified) != i64(0));
+if (t389) {
+t389 = !((((ctx.v_functions)[v_id1]).public != i64(0)));
+}
+if (t389) {
+t390 = v_t13;
+t391 = cast[*u8]("function is private to its package");
+ErrorAt(t390, t391);
+}
+t392 = v_id1;
+t393 = &(v_type_args)[0];
+t394 = v_type_count;
+t395 = SpecializeFunction(t392, t393, t394);
+v_id1 = t395;
+if ((v_count8 != ((ctx.v_functions)[v_id1]).argc)) {
+t396 = v_t13;
+t397 = cast[*u8]("wrong argument count");
+ErrorAt(t396, t397);
+}
+v_arg1 = (v_n18).a;
+v_k3 = 0;
+while (true) {
+if (!((v_k3 < v_count8))) { break; }
+t398 = v_arg1;
+t399 = (&(((ctx.v_functions)[v_id1]).arg_types)[0])[v_k3];
+Coerce(t398, t399);
+t400 = v_arg1;
+Transfer(t400);
+v_arg1 = (v_arg1).next;
+t401 = v_k3;
+v_k3 = v_k3 + i64(1);
+}
+(v_n18).slot = v_id1;
+(v_n18).type = ((ctx.v_functions)[v_id1]).result;
+t402 = (v_n18).type;
+t403 = Aggregate(t402);
+if ((t403 != i8(0))) {
+t404 = (v_n18).type;
+t405 = Storage(t404);
+(v_n18).storage = t405;
+}
+return v_n18;
+}
+t406 = v_name13;
+t407 = FindLocal(t406);
+v_l3 = t407;
+if (!((v_l3 != null))) {
+t408 = v_t13;
+t409 = cast[*u8]("unknown variable (functions require explicit calls)");
+ErrorAt(t408, t409);
+}
+if (((v_l3).moved != i64(0))) {
+t410 = v_t13;
+t411 = cast[*u8]("use of moved value");
+ErrorAt(t410, t411);
+}
+t412 = 3;
+t413 = v_t13;
+t414 = NewNode(t412, t413);
+v_n18 = t414;
+(v_n18).name = v_name13;
+(v_n18).slot = (v_l3).slot;
+(v_n18).type = (v_l3).type;
+(v_n18).local_ref = v_l3;
+(v_n18).mutable = (v_l3).mutable;
+t415 = (v_n18).type;
+t416 = Aggregate(t415);
+if ((t416 != i8(0))) {
+t417 = (v_n18).type;
+t418 = Storage(t417);
+(v_n18).storage = t418;
+}
+return v_n18;
+}
+return null;
+}
+
+
+fn Statement() -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_t14: *Token = null;
+var v_n19: *Node = null;
+var v_initial: *Node = null;
+var v_post: *Node = null;
+var v_block1: *Node = null;
+var v_l4: *Local = null;
+var v_saved2: *Local = null;
+var v_name14: *u8 = null;
+var v_ty1: i64 = i64(0);
+var v_mutable2: i8 = i8(0);
+var v_moves: *MoveState = null;
+var t0: *Token = null;
+var t1: *Node = null;
+var t2: *u8 = null;
+var t3: i8 = i8(0);
+var t4: *Node = null;
+var t5: *u8 = null;
+var t6: i8 = i8(0);
+var t7: i64 = i64(0);
+var t8: i64 = i64(0);
+var t9: *Node = null;
+var t10: i64 = i64(0);
+var t11: *u8 = null;
+var t12: i8 = i8(0);
+var t13: bool = false;
+var t14: *u8 = null;
+var t15: i8 = i8(0);
+var t16: *u8 = null;
+var t17: i8 = i8(0);
+var t18: i64 = i64(0);
+var t19: *u8 = null;
+var t20: i64 = i64(0);
+var t21: i8 = i8(0);
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *Token = null;
+var t27: *Node = null;
+var t28: i64 = i64(0);
+var t29: *Node = null;
+var t30: *Token = null;
+var t31: *u8 = null;
+var t32: *Node = null;
+var t33: i64 = i64(0);
+var t34: *Node = null;
+var t35: *u8 = null;
+var t36: i64 = i64(0);
+var t37: i8 = i8(0);
+var t38: *Local = null;
+var t39: i64 = i64(0);
+var t40: *u8 = null;
+var t41: *u8 = null;
+var t42: i8 = i8(0);
+var t43: i64 = i64(0);
+var t44: i64 = i64(0);
+var t45: *Token = null;
+var t46: *Node = null;
+var t47: *Token = null;
+var t48: i64 = i64(0);
+var t49: *Node = null;
+var t50: *Node = null;
+var t51: i64 = i64(0);
+var t52: *Node = null;
+var t53: *Token = null;
+var t54: *u8 = null;
+var t55: i64 = i64(0);
+var t56: *u8 = null;
+var t57: *u8 = null;
+var t58: i8 = i8(0);
+var t59: i64 = i64(0);
+var t60: i64 = i64(0);
+var t61: *u8 = null;
+var t62: i64 = i64(0);
+var t63: i64 = i64(0);
+var t64: *Token = null;
+var t65: *Node = null;
+var t66: i64 = i64(0);
+var t67: i8 = i8(0);
+var t68: *Node = null;
+var t69: bool = false;
+var t70: bool = false;
+var t71: *Token = null;
+var t72: *u8 = null;
+var t73: i64 = i64(0);
+var t74: i64 = i64(0);
+var t75: *Token = null;
+var t76: *Node = null;
+var t77: i64 = i64(0);
+var t78: i8 = i8(0);
+var t79: i64 = i64(0);
+var t80: *Token = null;
+var t81: *Node = null;
+var t82: i64 = i64(0);
+var t83: *Node = null;
+var t84: i64 = i64(0);
+var t85: *u8 = null;
+var t86: *Token = null;
+var t87: *u8 = null;
+var t88: i64 = i64(0);
+var t89: i8 = i8(0);
+var t90: i64 = i64(0);
+var t91: *Token = null;
+var t92: *Token = null;
+var t93: *Node = null;
+var t94: i64 = i64(0);
+var t95: *Node = null;
+var t96: i64 = i64(0);
+var t97: i8 = i8(0);
+var t98: *Token = null;
+var t99: *u8 = null;
+var t100: *u8 = null;
+var t101: *Local = null;
+var t102: *Token = null;
+var t103: *u8 = null;
+var t104: i64 = i64(0);
+var t105: *Node = null;
+var t106: *Node = null;
+var t107: i64 = i64(0);
+var t108: *Node = null;
+var t109: i64 = i64(0);
+var t110: *Node = null;
+var t111: *Node = null;
+var t112: i64 = i64(0);
+var t113: *Node = null;
+var t114: *Token = null;
+var t115: *u8 = null;
+var t116: i64 = i64(0);
+var t117: *u8 = null;
+var t118: *Node = null;
+var t119: i64 = i64(0);
+var t120: i64 = i64(0);
+var t121: bool = false;
+var t122: i64 = i64(0);
+var t123: i8 = i8(0);
+var t124: i64 = i64(0);
+var t125: i64 = i64(0);
+var t126: *Token = null;
+var t127: *Node = null;
+var t128: *u8 = null;
+var t129: i8 = i8(0);
+var t130: bool = false;
+var t131: *u8 = null;
+var t132: i8 = i8(0);
+var t133: *u8 = null;
+var t134: i8 = i8(0);
+var t135: i64 = i64(0);
+var t136: i64 = i64(0);
+var t137: *Token = null;
+var t138: *Node = null;
+var t139: i64 = i64(0);
+var t140: i64 = i64(0);
+var t141: *u8 = null;
+var t142: i64 = i64(0);
+var t143: *Node = null;
+var t144: i64 = i64(0);
+var t145: *u8 = null;
+var t146: *Token = null;
+var t147: *u8 = null;
+var t148: *MoveState = null;
+var t149: *Node = null;
+var t150: *MoveState = null;
+var t151: *MoveState = null;
+var t152: i64 = i64(0);
+var t153: *u8 = null;
+var t154: i8 = i8(0);
+var t155: i64 = i64(0);
+var t156: *u8 = null;
+var t157: i8 = i8(0);
+var t158: *Node = null;
+var t159: *Node = null;
+var t160: *MoveState = null;
+var t161: *MoveState = null;
+var t162: *u8 = null;
+var t163: i8 = i8(0);
+var t164: bool = false;
+var t165: *u8 = null;
+var t166: i8 = i8(0);
+var t167: *u8 = null;
+var t168: i64 = i64(0);
+var t169: *Token = null;
+var t170: *Node = null;
+var t171: *u8 = null;
+var t172: i8 = i8(0);
+var t173: i64 = i64(0);
+var t174: i64 = i64(0);
+var t175: *u8 = null;
+var t176: *u8 = null;
+var t177: i8 = i8(0);
+var t178: i64 = i64(0);
+var t179: i64 = i64(0);
+var t180: *Token = null;
+var t181: *Node = null;
+var t182: i64 = i64(0);
+var t183: *Node = null;
+var t184: bool = false;
+var t185: *Token = null;
+var t186: *u8 = null;
+var t187: i64 = i64(0);
+var t188: *u8 = null;
+var t189: bool = false;
+var t190: *u8 = null;
+var t191: i64 = i64(0);
+var t192: *u8 = null;
+var t193: *Local = null;
+var t194: *Token = null;
+var t195: *u8 = null;
+var t196: *Token = null;
+var t197: *u8 = null;
+var t198: i64 = i64(0);
+var t199: *Token = null;
+var t200: *Node = null;
+var t201: i64 = i64(0);
+var t202: *Node = null;
+var t203: *Node = null;
+var t204: i64 = i64(0);
+var t205: *Node = null;
+var t206: i64 = i64(0);
+var t207: *u8 = null;
+var t208: i64 = i64(0);
+var t209: *Token = null;
+var t210: *Node = null;
+var t211: i64 = i64(0);
+var t212: *Node = null;
+var t213: i64 = i64(0);
+var t214: i8 = i8(0);
+var t215: *Token = null;
+var t216: *u8 = null;
+var t217: *Token = null;
+var t218: *u8 = null;
+var t219: i64 = i64(0);
+var t220: *Node = null;
+var t221: *Node = null;
+var t222: i64 = i64(0);
+var t223: *Node = null;
+var t224: i64 = i64(0);
+var t225: *u8 = null;
+t0 = At();
+v_t14 = t0;
+v_ty1 = (-1);
+if (((v_t14).kind == 123)) {
+t1 = Block();
+return t1;
+}
+t2 = cast[*u8]("match");
+t3 = Is(t2);
+if ((t3 != i8(0))) {
+t4 = MatchStatement();
+return t4;
+}
+t5 = cast[*u8]("unsafe");
+t6 = Is(t5);
+if ((t6 != i8(0))) {
+t7 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t8 = ctx.v_unsafe_depth;
+ctx.v_unsafe_depth = ctx.v_unsafe_depth + i64(1);
+t9 = Block();
+v_n19 = t9;
+t10 = ctx.v_unsafe_depth;
+ctx.v_unsafe_depth = ctx.v_unsafe_depth - i64(1);
+return v_n19;
+}
+t11 = cast[*u8]("let");
+t12 = Is(t11);
+t13 = (i64(t12) != i64(0));
+if (!t13) {
+t14 = cast[*u8]("var");
+t15 = Is(t14);
+t13 = (i64(t15) != i64(0));
+}
+if (t13) {
+t16 = cast[*u8]("var");
+t17 = Is(t16);
+v_mutable2 = t17;
+t18 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t19 = Ident();
+v_name14 = t19;
+t20 = 58;
+t21 = Take(t20);
+if ((t21 != i8(0))) {
+t22 = ParseType();
+v_ty1 = t22;
+}
+t23 = 61;
+t24 = cast[*u8]("variables must have an initializer");
+Need(t23, t24);
+t25 = 7;
+t26 = v_t14;
+t27 = NewNode(t25, t26);
+v_n19 = t27;
+t28 = 1;
+t29 = Expr(t28);
+(v_n19).a = t29;
+if ((v_ty1 < 0)) {
+v_ty1 = ((v_n19).a).type;
+}
+if ((v_ty1 == 0)) {
+t30 = v_t14;
+t31 = cast[*u8]("cannot bind a void value");
+ErrorAt(t30, t31);
+}
+t32 = (v_n19).a;
+t33 = v_ty1;
+Coerce(t32, t33);
+t34 = (v_n19).a;
+Transfer(t34);
+t35 = v_name14;
+t36 = v_ty1;
+t37 = v_mutable2;
+t38 = AddLocal(t35, t36, t37);
+v_l4 = t38;
+(v_n19).slot = (v_l4).slot;
+(v_n19).local_ref = v_l4;
+(v_n19).type = v_ty1;
+t39 = 59;
+t40 = cast[*u8]("expected ';'");
+Need(t39, t40);
+return v_n19;
+}
+t41 = cast[*u8]("return");
+t42 = Is(t41);
+if ((t42 != i8(0))) {
+t43 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t44 = 9;
+t45 = v_t14;
+t46 = NewNode(t44, t45);
+v_n19 = t46;
+v_ty1 = ((ctx.v_functions)[ctx.v_current_fun]).result;
+t47 = At();
+if (((t47).kind != 59)) {
+t48 = 1;
+t49 = Expr(t48);
+(v_n19).a = t49;
+t50 = (v_n19).a;
+t51 = v_ty1;
+Coerce(t50, t51);
+t52 = (v_n19).a;
+Transfer(t52);
+} else {
+if ((v_ty1 != 0)) {
+t53 = v_t14;
+t54 = cast[*u8]("return value required");
+ErrorAt(t53, t54);
+}
+}
+t55 = 59;
+t56 = cast[*u8]("expected ';'");
+Need(t55, t56);
+return v_n19;
+}
+t57 = cast[*u8]("for");
+t58 = Is(t57);
+if ((t58 != i8(0))) {
+t59 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t60 = 40;
+t61 = cast[*u8]("expected '(' after for");
+Need(t60, t61);
+v_saved2 = ctx.v_locals;
+t62 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth + i64(1);
+t63 = 12;
+t64 = v_t14;
+t65 = NewNode(t63, t64);
+v_block1 = t65;
+v_initial = null;
+t66 = 59;
+t67 = Take(t66);
+if (!((t67 != i8(0)))) {
+t68 = Statement();
+v_initial = t68;
+t69 = ((v_initial).kind != 7);
+if (t69) {
+t69 = ((v_initial).kind != 8);
+}
+t70 = t69;
+if (t70) {
+t70 = ((v_initial).kind != 16);
+}
+if (t70) {
+t71 = v_t14;
+t72 = cast[*u8]("invalid for initializer");
+ErrorAt(t71, t72);
+}
+}
+t73 = ctx.v_loop_depth;
+ctx.v_loop_depth = ctx.v_loop_depth + i64(1);
+t74 = 21;
+t75 = v_t14;
+t76 = NewNode(t74, t75);
+v_n19 = t76;
+t77 = 59;
+t78 = Take(t77);
+if ((t78 != i8(0))) {
+t79 = 1;
+t80 = v_t14;
+t81 = NewNode(t79, t80);
+(v_n19).a = t81;
+((v_n19).a).type = 2;
+((v_n19).a).value = 1;
+} else {
+t82 = 1;
+t83 = Expr(t82);
+(v_n19).a = t83;
+t84 = 59;
+t85 = cast[*u8]("expected ';' after for condition");
+Need(t84, t85);
+}
+if ((((v_n19).a).type != 2)) {
+t86 = v_t14;
+t87 = cast[*u8]("for condition must be bool");
+ErrorAt(t86, t87);
+}
+t88 = 41;
+t89 = Take(t88);
+if (!((t89 != i8(0)))) {
+t90 = 16;
+t91 = At();
+t92 = t91;
+t93 = NewNode(t90, t92);
+v_post = t93;
+t94 = 1;
+t95 = Expr(t94);
+(v_post).a = t95;
+t96 = 61;
+t97 = Take(t96);
+if ((t97 != i8(0))) {
+if (!((((v_post).a).mutable != i64(0)))) {
+t98 = v_t14;
+t99 = cast[*u8]("cannot assign through an immutable value");
+ErrorAt(t98, t99);
+}
+if ((((v_post).a).kind == 3)) {
+t100 = ((v_post).a).name;
+t101 = FindLocal(t100);
+v_l4 = t101;
+if (!(((v_l4).mutable != i64(0)))) {
+t102 = v_t14;
+t103 = cast[*u8]("cannot assign to let binding or parameter");
+ErrorAt(t102, t103);
+}
+(v_post).kind = 8;
+(v_post).local_ref = v_l4;
+(v_post).slot = (v_l4).slot;
+(v_post).type = (v_l4).type;
+t104 = 1;
+t105 = Expr(t104);
+(v_post).a = t105;
+t106 = (v_post).a;
+t107 = (v_post).type;
+Coerce(t106, t107);
+t108 = (v_post).a;
+Transfer(t108);
+(v_l4).moved = 0;
+} else {
+if ((((v_post).a).kind == 18)) {
+(v_post).kind = 19;
+(v_post).type = ((v_post).a).type;
+(v_post).a = ((v_post).a).a;
+t109 = 1;
+t110 = Expr(t109);
+(v_post).b = t110;
+t111 = (v_post).b;
+t112 = (v_post).type;
+Coerce(t111, t112);
+t113 = (v_post).b;
+Transfer(t113);
+CheckLivePlace((v_post).a);
+} else {
+t114 = v_t14;
+t115 = cast[*u8]("invalid for update assignment");
+ErrorAt(t114, t115);
+}
+}
+}
+(v_n19).c = v_post;
+t116 = 41;
+t117 = cast[*u8]("expected ')' after for update");
+Need(t116, t117);
+}
+t118 = Block();
+(v_n19).b = t118;
+t119 = ctx.v_loop_depth;
+ctx.v_loop_depth = ctx.v_loop_depth - i64(1);
+t120 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth - i64(1);
+ctx.v_locals = v_saved2;
+if ((v_initial != null)) {
+(v_block1).a = v_initial;
+t121 = ((v_initial).kind == 7);
+if (t121) {
+t122 = (v_initial).type;
+t123 = Owned(t122);
+t121 = (i64(t123) != i64(0));
+}
+if (t121) {
+t124 = (v_initial).slot;
+t125 = (v_initial).type;
+t126 = (v_initial).token;
+t127 = OwnerDefer(t124, t125, t126);
+(v_initial).next = t127;
+((v_initial).next).next = v_n19;
+} else {
+(v_initial).next = v_n19;
+}
+} else {
+(v_block1).a = v_n19;
+}
+return v_block1;
+}
+t128 = cast[*u8]("if");
+t129 = Is(t128);
+t130 = (i64(t129) != i64(0));
+if (!t130) {
+t131 = cast[*u8]("while");
+t132 = Is(t131);
+t130 = (i64(t132) != i64(0));
+}
+if (t130) {
+t133 = cast[*u8]("while");
+t134 = Is(t133);
+v_mutable2 = t134;
+t135 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t136 = 10;
+t137 = v_t14;
+t138 = NewNode(t136, t137);
+v_n19 = t138;
+if ((v_mutable2 != i8(0))) {
+(v_n19).kind = 11;
+}
+if ((v_mutable2 != i8(0))) {
+t139 = ctx.v_loop_depth;
+ctx.v_loop_depth = ctx.v_loop_depth + i64(1);
+}
+t140 = 40;
+t141 = cast[*u8]("expected '(' before condition");
+Need(t140, t141);
+t142 = 1;
+t143 = Expr(t142);
+(v_n19).a = t143;
+t144 = 41;
+t145 = cast[*u8]("expected ')' after condition");
+Need(t144, t145);
+if ((((v_n19).a).type != 2)) {
+t146 = v_t14;
+t147 = cast[*u8]("condition must have type bool");
+ErrorAt(t146, t147);
+}
+t148 = MoveSnapshot();
+v_moves = t148;
+t149 = Block();
+(v_n19).b = t149;
+t150 = v_moves;
+MoveJoin(t150);
+if (!((v_mutable2 != i8(0)))) {
+t151 = v_moves;
+MoveRestore(t151);
+}
+if ((v_mutable2 != i8(0))) {
+t152 = ctx.v_loop_depth;
+ctx.v_loop_depth = ctx.v_loop_depth - i64(1);
+} else {
+t153 = cast[*u8]("else");
+t154 = Is(t153);
+if ((t154 != i8(0))) {
+t155 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t156 = cast[*u8]("if");
+t157 = Is(t156);
+if ((t157 != i8(0))) {
+t158 = Statement();
+(v_n19).c = t158;
+} else {
+t159 = Block();
+(v_n19).c = t159;
+}
+}
+}
+t160 = v_moves;
+MoveJoin(t160);
+t161 = v_moves;
+MoveFinish(t161);
+return v_n19;
+}
+t162 = cast[*u8]("break");
+t163 = Is(t162);
+t164 = (i64(t163) != i64(0));
+if (!t164) {
+t165 = cast[*u8]("continue");
+t166 = Is(t165);
+t164 = (i64(t166) != i64(0));
+}
+if (t164) {
+if (!((ctx.v_loop_depth != i64(0)))) {
+t167 = cast[*u8]("loop control outside a loop");
+Error(t167);
+}
+t168 = 13;
+t169 = v_t14;
+t170 = NewNode(t168, t169);
+v_n19 = t170;
+t171 = cast[*u8]("continue");
+t172 = Is(t171);
+if ((t172 != i8(0))) {
+(v_n19).kind = 14;
+}
+t173 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t174 = 59;
+t175 = cast[*u8]("expected ';'");
+Need(t174, t175);
+return v_n19;
+}
+t176 = cast[*u8]("defer");
+t177 = Is(t176);
+if ((t177 != i8(0))) {
+t178 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t179 = 15;
+t180 = v_t14;
+t181 = NewNode(t179, t180);
+v_n19 = t181;
+t182 = 1;
+t183 = Expr(t182);
+(v_n19).a = t183;
+t184 = (((v_n19).a).kind != 4);
+if (!t184) {
+t184 = (((v_n19).a).type != 0);
+}
+if (t184) {
+t185 = v_t14;
+t186 = cast[*u8]("defer requires a void function call");
+ErrorAt(t185, t186);
+}
+t187 = 59;
+t188 = cast[*u8]("expected ';'");
+Need(t187, t188);
+return v_n19;
+}
+t189 = ((v_t14).kind == 256);
+if (t189) {
+t189 = (((ctx.v_tokens)[(ctx.v_pos + 1)]).kind == 61);
+}
+if (t189) {
+t190 = Ident();
+v_name14 = t190;
+t191 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t192 = v_name14;
+t193 = FindLocal(t192);
+v_l4 = t193;
+if (!((v_l4 != null))) {
+t194 = v_t14;
+t195 = cast[*u8]("unknown assignment target");
+ErrorAt(t194, t195);
+}
+if (!(((v_l4).mutable != i64(0)))) {
+t196 = v_t14;
+t197 = cast[*u8]("cannot assign to let binding or parameter");
+ErrorAt(t196, t197);
+}
+t198 = 8;
+t199 = v_t14;
+t200 = NewNode(t198, t199);
+v_n19 = t200;
+(v_n19).local_ref = v_l4;
+(v_n19).slot = (v_l4).slot;
+(v_n19).type = (v_l4).type;
+t201 = 1;
+t202 = Expr(t201);
+(v_n19).a = t202;
+t203 = (v_n19).a;
+t204 = (v_l4).type;
+Coerce(t203, t204);
+t205 = (v_n19).a;
+Transfer(t205);
+(v_l4).moved = 0;
+t206 = 59;
+t207 = cast[*u8]("expected ';'");
+Need(t206, t207);
+return v_n19;
+}
+t208 = 16;
+t209 = v_t14;
+t210 = NewNode(t208, t209);
+v_n19 = t210;
+t211 = 1;
+t212 = Expr(t211);
+(v_n19).a = t212;
+t213 = 61;
+t214 = Take(t213);
+if ((t214 != i8(0))) {
+if ((((v_n19).a).kind != 18)) {
+t215 = v_t14;
+t216 = cast[*u8]("invalid assignment target");
+ErrorAt(t215, t216);
+}
+if (!((((v_n19).a).mutable != i64(0)))) {
+t217 = v_t14;
+t218 = cast[*u8]("cannot assign through an immutable value");
+ErrorAt(t217, t218);
+}
+(v_n19).kind = 19;
+(v_n19).type = ((v_n19).a).type;
+(v_n19).a = ((v_n19).a).a;
+t219 = 1;
+t220 = Expr(t219);
+(v_n19).b = t220;
+t221 = (v_n19).b;
+t222 = (v_n19).type;
+Coerce(t221, t222);
+t223 = (v_n19).b;
+Transfer(t223);
+CheckLivePlace((v_n19).a);
+}
+t224 = 59;
+t225 = cast[*u8]("expected ';'");
+Need(t224, t225);
+return v_n19;
+}
+return null;
+}
+
+
+fn Block() -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n20: *Node = null;
+var v_tail4: *Node = null;
+var v_s11: *Node = null;
+var v_saved3: *Local = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *Token = null;
+var t3: *Node = null;
+var t4: i64 = i64(0);
+var t5: *u8 = null;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: i8 = i8(0);
+var t9: *Token = null;
+var t10: *u8 = null;
+var t11: *Node = null;
+var t12: bool = false;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+var t15: i64 = i64(0);
+var t16: i64 = i64(0);
+var t17: *Token = null;
+var t18: *Node = null;
+var t19: i64 = i64(0);
+t0 = 12;
+t1 = At();
+t2 = t1;
+t3 = NewNode(t0, t2);
+v_n20 = t3;
+v_tail4 = null;
+v_saved3 = ctx.v_locals;
+t4 = 123;
+t5 = cast[*u8]("expected '{'");
+Need(t4, t5);
+t6 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth + i64(1);
+while (true) {
+t7 = 125;
+t8 = Take(t7);
+if (!(!((t8 != i8(0))))) { break; }
+t9 = At();
+if (!(((t9).kind != i64(0)))) {
+t10 = cast[*u8]("unterminated block");
+Error(t10);
+}
+t11 = Statement();
+v_s11 = t11;
+if ((v_tail4 != null)) {
+(v_tail4).next = v_s11;
+} else {
+(v_n20).a = v_s11;
+}
+v_tail4 = v_s11;
+t12 = ((v_s11).kind == 7);
+if (t12) {
+t13 = (v_s11).type;
+t14 = Owned(t13);
+t12 = (i64(t14) != i64(0));
+}
+if (t12) {
+t15 = (v_s11).slot;
+t16 = (v_s11).type;
+t17 = (v_s11).token;
+t18 = OwnerDefer(t15, t16, t17);
+(v_tail4).next = t18;
+v_tail4 = (v_tail4).next;
+}
+}
+t19 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth - i64(1);
+ctx.v_locals = v_saved3;
+return v_n20;
+}
+return null;
+}
+
+
+fn MatchStatement() -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_token7: *Token = null;
+var v_block2: *Node = null;
+var v_value1: *Node = null;
+var v_binding: *Node = null;
+var v_branch: *Node = null;
+var v_last: *Node = null;
+var v_previous: *Node = null;
+var v_address3: *Node = null;
+var v_load1: *Node = null;
+var v_constant: *Node = null;
+var v_test: *Node = null;
+var v_arm: *Node = null;
+var v_payload_bind: *Node = null;
+var v_type30: i64 = i64(0);
+var v_pattern: i64 = i64(0);
+var v_slot3: i64 = i64(0);
+var v_count9: i64 = i64(0);
+var v_seen: *i64 = null;
+var v_variant1: *Field = null;
+var v_saved4: *Local = null;
+var v_local2: *Local = null;
+var v_name15: *u8 = null;
+var v_wildcard: i8 = i8(0);
+var v_moves1: *MoveState = null;
+var t0: *Token = null;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: *Node = null;
+var t6: *Node = null;
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: *Token = null;
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: i64 = i64(0);
+var t15: *Token = null;
+var t16: *Node = null;
+var t17: i64 = i64(0);
+var t18: *Token = null;
+var t19: *Node = null;
+var t20: i64 = i64(0);
+var t21: i64 = i64(0);
+var t22: *MoveState = null;
+var t23: i64 = i64(0);
+var t24: *AggregateType = null;
+var t25: i64 = i64(0);
+var t26: *u8 = null;
+var t27: i64 = i64(0);
+var t28: *u8 = null;
+var t29: i64 = i64(0);
+var t30: i8 = i8(0);
+var t31: *u8 = null;
+var t32: *MoveState = null;
+var t33: i64 = i64(0);
+var t34: *u8 = null;
+var t35: i8 = i8(0);
+var t36: i64 = i64(0);
+var t37: i64 = i64(0);
+var t38: *u8 = null;
+var t39: i64 = i64(0);
+var t40: *u8 = null;
+var t41: i64 = i64(0);
+var t42: *u8 = null;
+var t43: *u8 = null;
+var t44: *Token = null;
+var t45: *Field = null;
+var t46: *u8 = null;
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: *Token = null;
+var t50: *Node = null;
+var t51: i64 = i64(0);
+var t52: *Token = null;
+var t53: *Node = null;
+var t54: i64 = i64(0);
+var t55: *Token = null;
+var t56: *Node = null;
+var t57: i64 = i64(0);
+var t58: *Token = null;
+var t59: *Node = null;
+var t60: i64 = i64(0);
+var t61: *u8 = null;
+var t62: *u8 = null;
+var t63: i64 = i64(0);
+var t64: *u8 = null;
+var t65: *u8 = null;
+var t66: *u8 = null;
+var t67: i8 = i8(0);
+var t68: i64 = i64(0);
+var t69: *Token = null;
+var t70: *Node = null;
+var t71: i64 = i64(0);
+var t72: *Token = null;
+var t73: *Node = null;
+var t74: i64 = i64(0);
+var t75: i8 = i8(0);
+var t76: i64 = i64(0);
+var t77: i64 = i64(0);
+var t78: *u8 = null;
+var t79: i64 = i64(0);
+var t80: i8 = i8(0);
+var t81: *Local = null;
+var t82: i64 = i64(0);
+var t83: *Token = null;
+var t84: *Node = null;
+var t85: i64 = i64(0);
+var t86: i8 = i8(0);
+var t87: i64 = i64(0);
+var t88: *Token = null;
+var t89: *Node = null;
+var t90: i64 = i64(0);
+var t91: i64 = i64(0);
+var t92: i64 = i64(0);
+var t93: i8 = i8(0);
+var t94: i64 = i64(0);
+var t95: *u8 = null;
+var t96: i64 = i64(0);
+var t97: *u8 = null;
+var t98: *Node = null;
+var t99: i64 = i64(0);
+var t100: *Token = null;
+var t101: *Node = null;
+var t102: i64 = i64(0);
+var t103: i8 = i8(0);
+var t104: i64 = i64(0);
+var t105: i64 = i64(0);
+var t106: *Token = null;
+var t107: *Node = null;
+var t108: *MoveState = null;
+var t109: i64 = i64(0);
+var t110: i64 = i64(0);
+var t111: i8 = i8(0);
+var t112: i64 = i64(0);
+var t113: *Token = null;
+var t114: *Node = null;
+var t115: i64 = i64(0);
+var t116: *AggregateType = null;
+var t117: *Token = null;
+var t118: *u8 = null;
+var t119: i64 = i64(0);
+var t120: i8 = i8(0);
+var t121: i64 = i64(0);
+var t122: i64 = i64(0);
+var t123: *Token = null;
+var t124: *Node = null;
+var t125: *MoveState = null;
+var t126: *u8 = null;
+t0 = At();
+v_token7 = t0;
+v_last = null;
+v_previous = null;
+v_payload_bind = null;
+v_count9 = 0;
+v_wildcard = i8(0);
+t1 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+t2 = 40;
+t3 = cast[*u8]("expected '(' after match");
+Need(t2, t3);
+t4 = 1;
+t5 = Expr(t4);
+v_value1 = t5;
+t6 = v_value1;
+Transfer(t6);
+t7 = 41;
+t8 = cast[*u8]("expected ')' after match value");
+Need(t7, t8);
+v_type30 = (v_value1).type;
+t9 = v_type30;
+t10 = AggregateKind(t9);
+if ((t10 != 4)) {
+t11 = v_token7;
+t12 = cast[*u8]("match requires an enum");
+ErrorAt(t11, t12);
+}
+t13 = v_type30;
+Layout(t13);
+t14 = 12;
+t15 = v_token7;
+t16 = NewNode(t14, t15);
+v_block2 = t16;
+t17 = 7;
+t18 = v_token7;
+t19 = NewNode(t17, t18);
+v_binding = t19;
+(v_binding).type = v_type30;
+(v_binding).a = v_value1;
+t20 = v_type30;
+t21 = Storage(t20);
+v_slot3 = t21;
+(v_binding).slot = v_slot3;
+(v_block2).a = v_binding;
+t22 = MoveSnapshot();
+v_moves1 = t22;
+t23 = v_type30;
+t24 = Shape(t23);
+t25 = ((t24).count * 8);
+t26 = CAlloc(t25);
+v_seen = cast[*i64](t26);
+t27 = 123;
+t28 = cast[*u8]("expected match arms");
+Need(t27, t28);
+while (true) {
+t29 = 125;
+t30 = Take(t29);
+if (!(!((t30 != i8(0))))) { break; }
+if ((v_wildcard != i8(0))) {
+t31 = cast[*u8]("wildcard must be the last match arm");
+Error(t31);
+}
+t32 = v_moves1;
+MoveRestore(t32);
+v_saved4 = ctx.v_locals;
+t33 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth + i64(1);
+v_payload_bind = null;
+t34 = cast[*u8]("_");
+t35 = Is(t34);
+if ((t35 != i8(0))) {
+t36 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+v_wildcard = i8(1);
+} else {
+t37 = ParseType();
+v_pattern = t37;
+if ((v_pattern != v_type30)) {
+t38 = cast[*u8]("match pattern has a different enum type");
+Error(t38);
+}
+t39 = 46;
+t40 = cast[*u8]("expected enum variant");
+Need(t39, t40);
+t41 = v_type30;
+t42 = Ident();
+t43 = t42;
+t44 = v_token7;
+t45 = FindField(t41, t43, t44);
+v_variant1 = t45;
+if (((v_seen)[(v_variant1).tag] != i64(0))) {
+t46 = cast[*u8]("duplicate match arm");
+Error(t46);
+}
+(v_seen)[(v_variant1).tag] = 1;
+t47 = v_count9;
+v_count9 = v_count9 + i64(1);
+t48 = 22;
+t49 = v_token7;
+t50 = NewNode(t48, t49);
+v_address3 = t50;
+(v_address3).slot = v_slot3;
+(v_address3).type = (100000 + v_type30);
+t51 = 18;
+t52 = v_token7;
+t53 = NewNode(t51, t52);
+v_load1 = t53;
+(v_load1).a = v_address3;
+(v_load1).type = 1;
+t54 = 1;
+t55 = v_token7;
+t56 = NewNode(t54, t55);
+v_constant = t56;
+(v_constant).type = 1;
+(v_constant).value = (v_variant1).tag;
+t57 = 5;
+t58 = v_token7;
+t59 = NewNode(t57, t58);
+v_test = t59;
+(v_test).op = 259;
+(v_test).a = v_load1;
+(v_test).b = v_constant;
+(v_test).type = 2;
+if (((v_variant1).type != i64(0))) {
+t60 = 40;
+t61 = cast[*u8]("payload variant requires a binding");
+Need(t60, t61);
+t62 = Ident();
+v_name15 = t62;
+t63 = 41;
+t64 = cast[*u8]("expected ')' after pattern binding");
+Need(t63, t64);
+t65 = v_name15;
+t66 = cast[*u8]("_");
+t67 = Eq(t65, t66);
+if (!((t67 != i8(0)))) {
+t68 = 24;
+t69 = v_token7;
+t70 = NewNode(t68, t69);
+v_branch = t70;
+(v_branch).a = v_address3;
+(v_branch).value = 8;
+(v_branch).type = (100000 + (v_variant1).type);
+t71 = 18;
+t72 = v_token7;
+t73 = NewNode(t71, t72);
+v_load1 = t73;
+(v_load1).a = v_branch;
+(v_load1).origin_source = v_value1;
+(v_load1).type = (v_variant1).type;
+t74 = (v_load1).type;
+t75 = Aggregate(t74);
+if ((t75 != i8(0))) {
+t76 = (v_load1).type;
+t77 = Storage(t76);
+(v_load1).storage = t77;
+}
+t78 = v_name15;
+t79 = (v_variant1).type;
+t80 = i8(0);
+t81 = AddLocal(t78, t79, t80);
+v_local2 = t81;
+t82 = 7;
+t83 = v_token7;
+t84 = NewNode(t82, t83);
+v_payload_bind = t84;
+t85 = (v_load1).type;
+t86 = Owned(t85);
+if ((t86 != i8(0))) {
+t87 = 29;
+t88 = v_token7;
+t89 = NewNode(t87, t88);
+v_constant = t89;
+(v_constant).a = v_branch;
+(v_constant).type = (v_load1).type;
+t90 = (v_load1).type;
+t91 = Storage(t90);
+(v_constant).storage = t91;
+v_load1 = v_constant;
+}
+(v_payload_bind).a = v_load1;
+(v_payload_bind).local_ref = v_local2;
+(v_payload_bind).type = (v_variant1).type;
+(v_payload_bind).slot = (v_local2).slot;
+}
+} else {
+t92 = 40;
+t93 = Take(t92);
+if ((t93 != i8(0))) {
+t94 = 41;
+t95 = cast[*u8]("unit variant takes no binding");
+Need(t94, t95);
+}
+}
+}
+t96 = 269;
+t97 = cast[*u8]("expected '=>' after match pattern");
+Need(t96, t97);
+t98 = Block();
+v_arm = t98;
+if ((v_payload_bind != null)) {
+t99 = 12;
+t100 = v_token7;
+t101 = NewNode(t99, t100);
+v_branch = t101;
+(v_branch).a = v_payload_bind;
+t102 = (v_payload_bind).type;
+t103 = Owned(t102);
+if ((t103 != i8(0))) {
+t104 = (v_payload_bind).slot;
+t105 = (v_payload_bind).type;
+t106 = v_token7;
+t107 = OwnerDefer(t104, t105, t106);
+(v_payload_bind).next = t107;
+((v_payload_bind).next).next = v_arm;
+} else {
+(v_payload_bind).next = v_arm;
+}
+v_arm = v_branch;
+}
+t108 = v_moves1;
+MoveJoin(t108);
+ctx.v_locals = v_saved4;
+t109 = ctx.v_depth;
+ctx.v_depth = ctx.v_depth - i64(1);
+t110 = 44;
+t111 = Take(t110);
+if ((v_wildcard != i8(0))) {
+if ((v_last != null)) {
+(v_last).c = v_arm;
+} else {
+(v_binding).next = v_arm;
+}
+} else {
+t112 = 10;
+t113 = v_token7;
+t114 = NewNode(t112, t113);
+v_branch = t114;
+(v_branch).a = v_test;
+(v_branch).b = v_arm;
+if ((v_last != null)) {
+(v_last).c = v_branch;
+} else {
+(v_binding).next = v_branch;
+}
+v_previous = v_last;
+v_last = v_branch;
+}
+}
+if (!((v_wildcard != i8(0)))) {
+t115 = v_type30;
+t116 = Shape(t115);
+if ((v_count9 != (t116).count)) {
+t117 = v_token7;
+t118 = cast[*u8]("non-exhaustive match");
+ErrorAt(t117, t118);
+}
+if ((v_previous != null)) {
+(v_previous).c = (v_last).b;
+} else {
+(v_binding).next = (v_last).b;
+}
+}
+t119 = v_type30;
+t120 = Owned(t119);
+if ((t120 != i8(0))) {
+t121 = v_slot3;
+t122 = v_type30;
+t123 = v_token7;
+t124 = OwnerDefer(t121, t122, t123);
+v_branch = t124;
+(v_branch).next = (v_binding).next;
+(v_binding).next = v_branch;
+}
+t125 = v_moves1;
+MoveFinish(t125);
+t126 = cast[*u8](v_seen);
+Free(t126);
+return v_block2;
+}
+return null;
+}
+
+
+fn Returns(arg_v_n21: *Node) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n21: *Node = arg_v_n21;
+var t0: *Node = null;
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: *Node = null;
+var t4: i8 = i8(0);
+var t5: *Node = null;
+var t6: i8 = i8(0);
+if (!((v_n21 != null))) {
+return i8(0);
+}
+if (((v_n21).kind == 9)) {
+return i8(1);
+}
+if (((v_n21).kind == 10)) {
+t0 = (v_n21).b;
+t1 = Returns(t0);
+t2 = (i64(t1) != i64(0));
+if (t2) {
+t3 = (v_n21).c;
+t4 = Returns(t3);
+t2 = (i64(t4) != i64(0));
+}
+return i8(BoolInt(t2));
+}
+if (((v_n21).kind == 12)) {
+v_n21 = (v_n21).a;
+while (true) {
+if (!((v_n21 != null))) { break; }
+t5 = v_n21;
+t6 = Returns(t5);
+if ((t6 != i8(0))) {
+return i8(1);
+}
+v_n21 = (v_n21).next;
+}
+}
+return i8(0);
+}
+return i8(0);
+}
+
+
+fn FunctionSignature(arg_v_f8: *Function) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_f8: *Function = arg_v_f8;
+var v_i10: i64 = i64(0);
+var v_name16: *u8 = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: i64 = i64(0);
+var t3: i8 = i8(0);
+var t4: bool = false;
+var t5: i64 = i64(0);
+var t6: i8 = i8(0);
+var t7: *u8 = null;
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: i64 = i64(0);
+var t12: i64 = i64(0);
+var t13: *u8 = null;
+var t14: i64 = i64(0);
+var t15: i64 = i64(0);
+var t16: *u8 = null;
+var t17: i64 = i64(0);
+var t18: i8 = i8(0);
+var t19: i64 = i64(0);
+var t20: i64 = i64(0);
+var t21: *u8 = null;
+var t22: i8 = i8(0);
+var t23: i64 = i64(0);
+var t24: i64 = i64(0);
+var t25: *u8 = null;
+var t26: i64 = i64(0);
+var t27: i8 = i8(0);
+var t28: bool = false;
+var t29: i64 = i64(0);
+var t30: i8 = i8(0);
+var t31: *u8 = null;
+var t32: *u8 = null;
+var t33: *u8 = null;
+var t34: i8 = i8(0);
+var t35: i64 = i64(0);
+var t36: *u8 = null;
+var t37: i64 = i64(0);
+var t38: i8 = i8(0);
+var t39: bool = false;
+var t40: i64 = i64(0);
+var t41: i8 = i8(0);
+var t42: *u8 = null;
+var t43: i64 = i64(0);
+var t44: *u8 = null;
+var t45: i64 = i64(0);
+var t46: i8 = i8(0);
+var t47: bool = false;
+var t48: *Token = null;
+var t49: *u8 = null;
+(v_f8).has_contract = 0;
+(v_f8).borrow_contract = (v_f8).has_contract;
+t0 = 40;
+t1 = cast[*u8]("expected '(' after function name");
+Need(t0, t1);
+t2 = 41;
+t3 = Take(t2);
+if (!((t3 != i8(0)))) {
+t4 = true;
+while (true) {
+if (!t4) {
+t5 = 44;
+t6 = Take(t5);
+if (!((t6 != i8(0)))) { break; }
+}
+t4 = false;
+if (((v_f8).argc == 32)) {
+t7 = cast[*u8]("function argument limit exceeded");
+Error(t7);
+}
+t8 = Ident();
+(&((v_f8).arg_names)[0])[(v_f8).argc] = t8;
+t9 = 58;
+t10 = cast[*u8]("expected ':' after parameter");
+Need(t9, t10);
+t11 = ParseType();
+(&((v_f8).arg_types)[0])[(v_f8).argc] = t11;
+t12 = (&((v_f8).arg_types)[0])[(v_f8).argc];
+ValidateBorrowedElements(t12);
+if (!(((&((v_f8).arg_types)[0])[(v_f8).argc] != i64(0)))) {
+t13 = cast[*u8]("parameter cannot be void");
+Error(t13);
+}
+t14 = (v_f8).argc;
+(v_f8).argc = (v_f8).argc + i64(1);
+}
+t15 = 41;
+t16 = cast[*u8]("expected ')'");
+Need(t15, t16);
+}
+t17 = 265;
+t18 = Take(t17);
+if ((t18 != i8(0))) {
+t19 = ParseType();
+(v_f8).result = t19;
+t20 = (v_f8).result;
+ValidateBorrowedElements(t20);
+}
+t21 = cast[*u8]("borrows");
+t22 = Is(t21);
+if ((t22 != i8(0))) {
+t23 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+(v_f8).has_contract = 1;
+t24 = 40;
+t25 = cast[*u8]("expected '(' after borrows");
+Need(t24, t25);
+t26 = 41;
+t27 = Take(t26);
+if (!((t27 != i8(0)))) {
+t28 = true;
+while (true) {
+if (!t28) {
+t29 = 44;
+t30 = Take(t29);
+if (!((t30 != i8(0)))) { break; }
+}
+t28 = false;
+t31 = Ident();
+v_name16 = t31;
+v_i10 = 0;
+while (true) {
+if (!((v_i10 < (v_f8).argc))) { break; }
+t32 = v_name16;
+t33 = (&((v_f8).arg_names)[0])[v_i10];
+t34 = Eq(t32, t33);
+if ((t34 != i8(0))) {
+break;
+}
+t35 = v_i10;
+v_i10 = v_i10 + i64(1);
+}
+if ((v_i10 == (v_f8).argc)) {
+t36 = cast[*u8]("unknown parameter in borrows contract");
+Error(t36);
+}
+t37 = (v_f8).result;
+t38 = Borrowed(t37);
+t39 = (i64(t38) != i64(0));
+if (t39) {
+t40 = (&((v_f8).arg_types)[0])[v_i10];
+t41 = Borrowed(t40);
+t39 = !((t41 != i8(0)));
+}
+if (t39) {
+t42 = cast[*u8]("borrows source must contain borrowed references");
+Error(t42);
+}
+(v_f8).borrow_contract = (v_f8).borrow_contract | (1 << v_i10);
+}
+t43 = 41;
+t44 = cast[*u8]("expected ')' after borrows contract");
+Need(t43, t44);
+}
+}
+t45 = (v_f8).result;
+t46 = Borrowed(t45);
+t47 = (i64(t46) != i64(0));
+if (t47) {
+t47 = !(((v_f8).has_contract != i64(0)));
+}
+if (t47) {
+t48 = (v_f8).token;
+t49 = cast[*u8]("returning borrowed slices requires a borrows(parameter) contract");
+ErrorAt(t48, t49);
+}
+}
+return;
+}
+
+
+fn ParseProgram() {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_f9: *Function = null;
+var v_old: *Function = null;
+var v_name17: *u8 = null;
+var v_alias1: *u8 = null;
+var v_path2: *u8 = null;
+var v_braces: i64 = i64(0);
+var v_i11: i64 = i64(0);
+var v_j4: i64 = i64(0);
+var v_k4: i64 = i64(0);
+var v_id2: i64 = i64(0);
+var v_parsed: [4096]i64 = [4096]i64{};
+var v_count10: i64 = i64(0);
+var v_public2: i8 = i8(0);
+var v_foreign: i8 = i8(0);
+var v_exported: i8 = i8(0);
+var v_t15: *Token = null;
+var v_parameter1: *Local = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *u8 = null;
+var t3: bool = false;
+var t4: *Node = null;
+var t5: i8 = i8(0);
+var t6: *Function = null;
+var t7: *Function = null;
+var t8: *Node = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i8 = i8(0);
+var t12: *u8 = null;
+var t13: i64 = i64(0);
+var t14: i8 = i8(0);
+var t15: *Local = null;
+var t16: bool = false;
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: i64 = i64(0);
+var t21: i64 = i64(0);
+var t22: *u8 = null;
+var t23: i64 = i64(0);
+var t24: *u8 = null;
+var t25: i64 = i64(0);
+var t26: *Token = null;
+var t27: *u8 = null;
+var t28: *Token = null;
+var t29: *u8 = null;
+var t30: *Token = null;
+var t31: i64 = i64(0);
+var t32: *Token = null;
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: i64 = i64(0);
+var t36: i64 = i64(0);
+var t37: i8 = i8(0);
+var t38: i64 = i64(0);
+var t39: i8 = i8(0);
+var t40: *u8 = null;
+var t41: *Token = null;
+var t42: i64 = i64(0);
+var t43: *u8 = null;
+var t44: i64 = i64(0);
+var t45: *u8 = null;
+var t46: i64 = i64(0);
+var t47: *u8 = null;
+var t48: *u8 = null;
+var t49: i64 = i64(0);
+var t50: *u8 = null;
+var t51: i64 = i64(0);
+var t52: i8 = i8(0);
+var t53: *u8 = null;
+var t54: i64 = i64(0);
+var t55: i8 = i8(0);
+var t56: i64 = i64(0);
+var t57: i64 = i64(0);
+var t58: *u8 = null;
+var t59: *u8 = null;
+var t60: bool = false;
+var t61: *u8 = null;
+var t62: bool = false;
+var t63: bool = false;
+var t64: bool = false;
+var t65: bool = false;
+var t66: *u8 = null;
+var t67: *u8 = null;
+var t68: i8 = i8(0);
+var t69: *u8 = null;
+var t70: *u8 = null;
+var t71: *u8 = null;
+var t72: i8 = i8(0);
+var t73: bool = false;
+var t74: *u8 = null;
+var t75: i64 = i64(0);
+var t76: bool = false;
+var t77: bool = false;
+var t78: bool = false;
+var t79: bool = false;
+var t80: bool = false;
+var t81: bool = false;
+var t82: bool = false;
+var t83: bool = false;
+var t84: *u8 = null;
+var t85: i64 = i64(0);
+var t86: bool = false;
+var t87: bool = false;
+var t88: bool = false;
+var t89: bool = false;
+var t90: bool = false;
+var t91: bool = false;
+var t92: i64 = i64(0);
+var t93: *Token = null;
+var t94: *u8 = null;
+var t95: *Token = null;
+var t96: *u8 = null;
+var t97: bool = false;
+var t98: bool = false;
+var t99: i64 = i64(0);
+var t100: *Token = null;
+var t101: bool = false;
+var t102: *Token = null;
+var t103: *u8 = null;
+var t104: bool = false;
+var t105: *Function = null;
+var t106: **u8 = null;
+var t107: i64 = i64(0);
+var t108: *u8 = null;
+var t109: bool = false;
+var t110: bool = false;
+var t111: *Token = null;
+var t112: *Token = null;
+var t113: *Token = null;
+var t114: i64 = i64(0);
+var t115: *u8 = null;
+var t116: *u8 = null;
+var t117: i64 = i64(0);
+var t118: *u8 = null;
+var t119: i64 = i64(0);
+var t120: *u8 = null;
+var t121: i64 = i64(0);
+var t122: *u8 = null;
+var t123: *u8 = null;
+var t124: i64 = i64(0);
+var t125: *u8 = null;
+var t126: *Token = null;
+var t127: *u8 = null;
+var t128: *u8 = null;
+var t129: i64 = i64(0);
+var t130: *u8 = null;
+var t131: *Token = null;
+var t132: *u8 = null;
+var t133: *u8 = null;
+var t134: i64 = i64(0);
+var t135: *u8 = null;
+var t136: i64 = i64(0);
+var t137: *u8 = null;
+var t138: *u8 = null;
+var t139: i8 = i8(0);
+var t140: i64 = i64(0);
+var t141: *u8 = null;
+var t142: *Token = null;
+var t143: bool = false;
+var t144: *Token = null;
+var t145: *u8 = null;
+var t146: *u8 = null;
+var t147: i8 = i8(0);
+var t148: i64 = i64(0);
+var t149: *u8 = null;
+var t150: i8 = i8(0);
+var t151: *u8 = null;
+var t152: i8 = i8(0);
+var t153: bool = false;
+var t154: *u8 = null;
+var t155: i8 = i8(0);
+var t156: i64 = i64(0);
+var t157: i8 = i8(0);
+var t158: i64 = i64(0);
+var t159: *AggregateType = null;
+var t160: i64 = i64(0);
+var t161: i64 = i64(0);
+var t162: i64 = i64(0);
+var t163: *AggregateType = null;
+var t164: *Token = null;
+var t165: *u8 = null;
+var t166: *u8 = null;
+var t167: i64 = i64(0);
+var t168: *u8 = null;
+var t169: i64 = i64(0);
+var t170: *u8 = null;
+var t171: i8 = i8(0);
+var t172: bool = false;
+var t173: *u8 = null;
+var t174: i8 = i8(0);
+var t175: i64 = i64(0);
+var t176: *u8 = null;
+var t177: i8 = i8(0);
+var t178: *u8 = null;
+var t179: i8 = i8(0);
+var t180: *u8 = null;
+var t181: i8 = i8(0);
+var t182: *Token = null;
+var t183: i64 = i64(0);
+var t184: *u8 = null;
+var pc: i64 = 181;
+while (true) {
+if (pc == 1) {
+pc = 52;
+continue;
+}
+if (pc == 2) {
+pc = 6;
+continue;
+}
+if (pc == 3) {
+return;
+}
+if (pc == 4) {
+if ((v_i11 < v_count10)) { pc = 25; } else { pc = 3; }
+continue;
+}
+if (pc == 5) {
+t0 = v_i11;
+v_i11 = v_i11 + i64(1);
+pc = 4;
+continue;
+}
+if (pc == 6) {
+pc = 5;
+continue;
+}
+if (pc == 7) {
+t3 = ((v_f9).result != 0);
+if (t3) {
+t4 = (v_f9).body;
+t5 = Returns(t4);
+t3 = !((t5 != i8(0)));
+}
+if (t3) { pc = 8; } else { pc = 2; }
+continue;
+}
+if (pc == 8) {
+t1 = (v_f9).token;
+t2 = cast[*u8]("not every path returns a value");
+ErrorAt(t1, t2);
+pc = 2;
+continue;
+}
+if (pc == 9) {
+t6 = v_f9;
+InjectDrops(t6);
+pc = 7;
+continue;
+}
+if (pc == 10) {
+t7 = v_f9;
+AnalyzeBorrows(t7);
+pc = 9;
+continue;
+}
+if (pc == 11) {
+t8 = Block();
+(v_f9).body = t8;
+pc = 10;
+continue;
+}
+if (pc == 12) {
+if ((v_j4 < (v_f9).argc)) { pc = 16; } else { pc = 11; }
+continue;
+}
+if (pc == 13) {
+t9 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 12;
+continue;
+}
+if (pc == 14) {
+t10 = (v_parameter1).type;
+t11 = Borrowed(t10);
+if ((t11 != i8(0))) { pc = 15; } else { pc = 13; }
+continue;
+}
+if (pc == 15) {
+(v_parameter1).region = (1 << v_j4);
+pc = 13;
+continue;
+}
+if (pc == 16) {
+t12 = (&((v_f9).arg_names)[0])[v_j4];
+t13 = (&((v_f9).arg_types)[0])[v_j4];
+t14 = i8(0);
+t15 = AddLocal(t12, t13, t14);
+v_parameter1 = t15;
+pc = 14;
+continue;
+}
+if (pc == 17) {
+v_j4 = 0;
+pc = 12;
+continue;
+}
+if (pc == 18) {
+ctx.v_unsafe_depth = 0;
+pc = 17;
+continue;
+}
+if (pc == 19) {
+ctx.v_depth = 0;
+pc = 18;
+continue;
+}
+if (pc == 20) {
+ctx.v_locals = null;
+pc = 19;
+continue;
+}
+if (pc == 21) {
+ctx.v_pos = (v_f9).begin;
+pc = 20;
+continue;
+}
+if (pc == 22) {
+t16 = ((v_f9).foreign != i64(0));
+if (!t16) {
+t16 = ((v_f9).generic_count != i64(0));
+}
+if (t16) { pc = 23; } else { pc = 21; }
+continue;
+}
+if (pc == 23) {
+pc = 2;
+continue;
+}
+if (pc == 24) {
+v_f9 = &((ctx.v_functions)[ctx.v_current_fun]);
+pc = 22;
+continue;
+}
+if (pc == 25) {
+ctx.v_current_fun = (&(v_parsed)[0])[v_i11];
+pc = 24;
+continue;
+}
+if (pc == 26) {
+v_i11 = 0;
+pc = 4;
+continue;
+}
+if (pc == 27) {
+t182 = At();
+if (((t182).kind != i64(0))) { pc = 28; } else { pc = 26; }
+continue;
+}
+if (pc == 28) {
+t180 = cast[*u8]("package");
+t181 = Is(t180);
+if ((t181 != i8(0))) { pc = 31; } else { pc = 32; }
+continue;
+}
+if (pc == 29) {
+t17 = 59;
+t18 = cast[*u8]("expected ';' after package");
+Need(t17, t18);
+pc = 27;
+continue;
+}
+if (pc == 30) {
+t19 = Ident();
+pc = 29;
+continue;
+}
+if (pc == 31) {
+t20 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 30;
+continue;
+}
+if (pc == 32) {
+t178 = cast[*u8]("import");
+t179 = Is(t178);
+if ((t179 != i8(0))) { pc = 51; } else { pc = 173; }
+continue;
+}
+if (pc == 33) {
+t21 = 59;
+t22 = cast[*u8]("expected ';' after import");
+Need(t21, t22);
+pc = 27;
+continue;
+}
+if (pc == 34) {
+t23 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 33;
+continue;
+}
+if (pc == 35) {
+if (!((*(v_alias1) != u8(0)))) { pc = 36; } else { pc = 34; }
+continue;
+}
+if (pc == 36) {
+t24 = cast[*u8]("empty import name");
+Error(t24);
+pc = 34;
+continue;
+}
+if (pc == 37) {
+if (!((v_alias1 != null))) { pc = 43; } else { pc = 35; }
+continue;
+}
+if (pc == 38) {
+if (((v_path2)[v_j4] != u8(0))) { pc = 40; } else { pc = 35; }
+continue;
+}
+if (pc == 39) {
+t25 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 38;
+continue;
+}
+if (pc == 40) {
+if ((i64((v_path2)[v_j4]) == 47)) { pc = 41; } else { pc = 39; }
+continue;
+}
+if (pc == 41) {
+v_alias1 = ((v_path2 + v_j4) + 1);
+pc = 39;
+continue;
+}
+if (pc == 42) {
+v_j4 = 0;
+pc = 38;
+continue;
+}
+if (pc == 43) {
+v_alias1 = v_path2;
+pc = 42;
+continue;
+}
+if (pc == 44) {
+t26 = At();
+v_path2 = (t26).text;
+pc = 37;
+continue;
+}
+if (pc == 45) {
+t28 = At();
+if (((t28).kind != 258)) { pc = 46; } else { pc = 44; }
+continue;
+}
+if (pc == 46) {
+t27 = cast[*u8]("expected import path string");
+Error(t27);
+pc = 44;
+continue;
+}
+if (pc == 47) {
+t30 = At();
+if (((t30).kind == 256)) { pc = 48; } else { pc = 45; }
+continue;
+}
+if (pc == 48) {
+t29 = Ident();
+v_alias1 = t29;
+pc = 45;
+continue;
+}
+if (pc == 49) {
+v_alias1 = null;
+pc = 47;
+continue;
+}
+if (pc == 50) {
+t31 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 49;
+continue;
+}
+if (pc == 51) {
+t32 = At();
+v_t15 = t32;
+pc = 50;
+continue;
+}
+if (pc == 52) {
+pc = 27;
+continue;
+}
+if (pc == 53) {
+(v_f9).end = ctx.v_pos;
+pc = 1;
+continue;
+}
+if (pc == 54) {
+if ((v_braces != i64(0))) { pc = 60; } else { pc = 53; }
+continue;
+}
+if (pc == 55) {
+t38 = 123;
+t39 = Take(t38);
+if ((t39 != i8(0))) { pc = 56; } else { pc = 57; }
+continue;
+}
+if (pc == 56) {
+t33 = v_braces;
+v_braces = v_braces + i64(1);
+pc = 54;
+continue;
+}
+if (pc == 57) {
+t36 = 125;
+t37 = Take(t36);
+if ((t37 != i8(0))) { pc = 58; } else { pc = 59; }
+continue;
+}
+if (pc == 58) {
+t34 = v_braces;
+v_braces = v_braces - i64(1);
+pc = 54;
+continue;
+}
+if (pc == 59) {
+t35 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 54;
+continue;
+}
+if (pc == 60) {
+t41 = At();
+if (!(((t41).kind != i64(0)))) { pc = 61; } else { pc = 55; }
+continue;
+}
+if (pc == 61) {
+t40 = cast[*u8]("unterminated function body");
+Error(t40);
+pc = 55;
+continue;
+}
+if (pc == 62) {
+v_braces = 1;
+pc = 54;
+continue;
+}
+if (pc == 63) {
+t42 = 123;
+t43 = cast[*u8]("expected function body");
+Need(t42, t43);
+pc = 62;
+continue;
+}
+if (pc == 64) {
+(v_f9).begin = ctx.v_pos;
+pc = 63;
+continue;
+}
+if (pc == 65) {
+t91 = (i64(v_foreign) != i64(0));
+if (!t91) {
+t91 = (i64(v_exported) != i64(0));
+}
+if (t91) { pc = 97; } else { pc = 64; }
+continue;
+}
+if (pc == 66) {
+if ((v_foreign != i8(0))) { pc = 69; } else { pc = 64; }
+continue;
+}
+if (pc == 67) {
+pc = 1;
+continue;
+}
+if (pc == 68) {
+(v_f9).body = null;
+pc = 67;
+continue;
+}
+if (pc == 69) {
+t44 = 59;
+t45 = cast[*u8]("expected ';' after extern declaration");
+Need(t44, t45);
+pc = 68;
+continue;
+}
+if (pc == 70) {
+if ((v_j4 < (v_f9).argc)) { pc = 72; } else { pc = 66; }
+continue;
+}
+if (pc == 71) {
+t46 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 70;
+continue;
+}
+if (pc == 72) {
+if (((&((v_f9).arg_types)[0])[v_j4] == 3)) { pc = 73; } else { pc = 71; }
+continue;
+}
+if (pc == 73) {
+t47 = cast[*u8]("C ABI strings must use an explicit pointer");
+Error(t47);
+pc = 71;
+continue;
+}
+if (pc == 74) {
+v_j4 = 0;
+pc = 70;
+continue;
+}
+if (pc == 75) {
+if (((v_f9).result == 3)) { pc = 76; } else { pc = 74; }
+continue;
+}
+if (pc == 76) {
+t48 = cast[*u8]("C ABI strings must use an explicit pointer");
+Error(t48);
+pc = 74;
+continue;
+}
+if (pc == 77) {
+if ((v_j4 < (v_f9).argc)) { pc = 79; } else { pc = 75; }
+continue;
+}
+if (pc == 78) {
+t49 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 77;
+continue;
+}
+if (pc == 79) {
+t51 = (&((v_f9).arg_types)[0])[v_j4];
+t52 = Aggregate(t51);
+if ((t52 != i8(0))) { pc = 80; } else { pc = 78; }
+continue;
+}
+if (pc == 80) {
+t50 = cast[*u8]("C ABI aggregate values are not supported; use a pointer");
+Error(t50);
+pc = 78;
+continue;
+}
+if (pc == 81) {
+v_j4 = 0;
+pc = 77;
+continue;
+}
+if (pc == 82) {
+t54 = (v_f9).result;
+t55 = Aggregate(t54);
+if ((t55 != i8(0))) { pc = 83; } else { pc = 81; }
+continue;
+}
+if (pc == 83) {
+t53 = cast[*u8]("C ABI aggregate values are not supported; use a pointer");
+Error(t53);
+pc = 81;
+continue;
+}
+if (pc == 84) {
+if ((v_k4 < ctx.v_nfun)) { pc = 86; } else { pc = 82; }
+continue;
+}
+if (pc == 85) {
+t56 = v_k4;
+v_k4 = v_k4 + i64(1);
+pc = 84;
+continue;
+}
+if (pc == 86) {
+t63 = (v_k4 != v_id2);
+if (t63) {
+t64 = (((ctx.v_functions)[v_k4]).foreign != i64(0));
+if (!t64) {
+t64 = (((ctx.v_functions)[v_k4]).exported != i64(0));
+}
+t63 = t64;
+}
+t65 = t63;
+if (t65) {
+t66 = ((ctx.v_functions)[v_k4]).name;
+t67 = v_name17;
+t68 = Eq(t66, t67);
+t65 = (i64(t68) != i64(0));
+}
+if (t65) { pc = 94; } else { pc = 85; }
+continue;
+}
+if (pc == 87) {
+if ((v_j4 < (v_f9).argc)) { pc = 89; } else { pc = 85; }
+continue;
+}
+if (pc == 88) {
+t57 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 87;
+continue;
+}
+if (pc == 89) {
+if (((&(((ctx.v_functions)[v_k4]).arg_types)[0])[v_j4] != (&((v_f9).arg_types)[0])[v_j4])) { pc = 90; } else { pc = 88; }
+continue;
+}
+if (pc == 90) {
+t58 = cast[*u8]("conflicting C function signature");
+Error(t58);
+pc = 88;
+continue;
+}
+if (pc == 91) {
+v_j4 = 0;
+pc = 87;
+continue;
+}
+if (pc == 92) {
+t60 = (((ctx.v_functions)[v_k4]).argc != (v_f9).argc);
+if (!t60) {
+t60 = (((ctx.v_functions)[v_k4]).result != (v_f9).result);
+}
+if (t60) { pc = 93; } else { pc = 91; }
+continue;
+}
+if (pc == 93) {
+t59 = cast[*u8]("conflicting C function signature");
+Error(t59);
+pc = 91;
+continue;
+}
+if (pc == 94) {
+t62 = (i64(v_exported) != i64(0));
+if (!t62) {
+t62 = (((ctx.v_functions)[v_k4]).exported != i64(0));
+}
+if (t62) { pc = 95; } else { pc = 92; }
+continue;
+}
+if (pc == 95) {
+t61 = cast[*u8]("duplicate exported C symbol");
+Error(t61);
+pc = 92;
+continue;
+}
+if (pc == 96) {
+v_k4 = 0;
+pc = 84;
+continue;
+}
+if (pc == 97) {
+t70 = v_name17;
+t71 = cast[*u8]("main");
+t72 = Eq(t70, t71);
+t73 = (i64(t72) != i64(0));
+if (!t73) {
+t74 = v_name17;
+t75 = StrLen(t74);
+t76 = (t75 >= 7);
+if (t76) {
+t76 = (i64((v_name17)[0]) == 95);
+}
+t77 = t76;
+if (t77) {
+t77 = (i64((v_name17)[1]) == 95);
+}
+t78 = t77;
+if (t78) {
+t78 = (i64((v_name17)[2]) == 99);
+}
+t79 = t78;
+if (t79) {
+t79 = (i64((v_name17)[3]) == 111);
+}
+t80 = t79;
+if (t80) {
+t80 = (i64((v_name17)[4]) == 111);
+}
+t81 = t80;
+if (t81) {
+t81 = (i64((v_name17)[5]) == 108);
+}
+t82 = t81;
+if (t82) {
+t82 = (i64((v_name17)[6]) == 95);
+}
+t73 = t82;
+}
+t83 = t73;
+if (!t83) {
+t84 = v_name17;
+t85 = StrLen(t84);
+t86 = (t85 >= 5);
+if (t86) {
+t86 = (i64((v_name17)[0]) == 99);
+}
+t87 = t86;
+if (t87) {
+t87 = (i64((v_name17)[1]) == 111);
+}
+t88 = t87;
+if (t88) {
+t88 = (i64((v_name17)[2]) == 111);
+}
+t89 = t88;
+if (t89) {
+t89 = (i64((v_name17)[3]) == 108);
+}
+t90 = t89;
+if (t90) {
+t90 = (i64((v_name17)[4]) == 95);
+}
+t83 = t90;
+}
+if (t83) { pc = 98; } else { pc = 96; }
+continue;
+}
+if (pc == 98) {
+t69 = cast[*u8]("reserved C runtime symbol");
+Error(t69);
+pc = 96;
+continue;
+}
+if (pc == 99) {
+if ((v_old != null)) { pc = 105; } else { pc = 65; }
+continue;
+}
+if (pc == 100) {
+if ((v_j4 < (v_f9).argc)) { pc = 102; } else { pc = 65; }
+continue;
+}
+if (pc == 101) {
+t92 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 100;
+continue;
+}
+if (pc == 102) {
+if (((&((v_old).arg_types)[0])[v_j4] != (&((v_f9).arg_types)[0])[v_j4])) { pc = 103; } else { pc = 101; }
+continue;
+}
+if (pc == 103) {
+t93 = (v_f9).token;
+t94 = cast[*u8]("signature change requires a new session");
+ErrorAt(t93, t94);
+pc = 101;
+continue;
+}
+if (pc == 104) {
+v_j4 = 0;
+pc = 100;
+continue;
+}
+if (pc == 105) {
+t97 = ((v_old).argc != (v_f9).argc);
+if (!t97) {
+t97 = ((v_old).result != (v_f9).result);
+}
+t98 = t97;
+if (!t98) {
+t98 = ((v_old).borrow_contract != (v_f9).borrow_contract);
+}
+if (t98) { pc = 106; } else { pc = 104; }
+continue;
+}
+if (pc == 106) {
+t95 = (v_f9).token;
+t96 = cast[*u8]("signature change requires a new session");
+ErrorAt(t95, t96);
+pc = 104;
+continue;
+}
+if (pc == 107) {
+if (((v_f9).generic_count != i64(0))) { pc = 110; } else { pc = 112; }
+continue;
+}
+if (pc == 108) {
+t100 = At();
+t101 = ((t100).kind != i64(0));
+if (t101) {
+t102 = At();
+t101 = ((t102).kind != 123);
+}
+if (t101) { pc = 109; } else { pc = 99; }
+continue;
+}
+if (pc == 109) {
+t99 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 108;
+continue;
+}
+if (pc == 110) {
+t104 = (i64(v_foreign) != i64(0));
+if (!t104) {
+t104 = (i64(v_exported) != i64(0));
+}
+if (t104) { pc = 111; } else { pc = 108; }
+continue;
+}
+if (pc == 111) {
+t103 = cast[*u8]("C ABI functions cannot be generic");
+Error(t103);
+pc = 108;
+continue;
+}
+if (pc == 112) {
+t105 = v_f9;
+FunctionSignature(t105);
+pc = 99;
+continue;
+}
+if (pc == 113) {
+(v_f9).signature = ctx.v_pos;
+pc = 107;
+continue;
+}
+if (pc == 114) {
+t106 = &((v_f9).generic_names)[0];
+t107 = GenericNames(t106);
+(v_f9).generic_count = t107;
+pc = 113;
+continue;
+}
+if (pc == 115) {
+t109 = (v_old != null);
+if (t109) {
+t110 = ((v_old).generic_count != i64(0));
+if (!t110) {
+t111 = At();
+t110 = ((t111).kind == 91);
+}
+t109 = t110;
+}
+if (t109) { pc = 116; } else { pc = 114; }
+continue;
+}
+if (pc == 116) {
+t108 = cast[*u8]("generic redefinition requires a new session");
+Error(t108);
+pc = 114;
+continue;
+}
+if (pc == 117) {
+t112 = At();
+(v_f9).token = t112;
+pc = 115;
+continue;
+}
+if (pc == 118) {
+(v_f9).public = i64(v_public2);
+pc = 117;
+continue;
+}
+if (pc == 119) {
+t113 = At();
+(v_f9).package = (t113).package;
+pc = 118;
+continue;
+}
+if (pc == 120) {
+(v_f9).name = v_name17;
+pc = 119;
+continue;
+}
+if (pc == 121) {
+(v_f9).exported = i64(v_exported);
+pc = 120;
+continue;
+}
+if (pc == 122) {
+(v_f9).foreign = i64(v_foreign);
+pc = 121;
+continue;
+}
+if (pc == 123) {
+(v_f9).result = 0;
+(v_f9).argc = (v_f9).result;
+(v_f9).calls = (v_f9).argc;
+(v_f9).slots = (v_f9).calls;
+(v_f9).registers = (v_f9).slots;
+(v_f9).code_capacity = (v_f9).registers;
+(v_f9).code_count = (v_f9).code_capacity;
+pc = 122;
+continue;
+}
+if (pc == 124) {
+(v_f9).machine = null;
+pc = 123;
+continue;
+}
+if (pc == 125) {
+(v_f9).bytecode = null;
+pc = 124;
+continue;
+}
+if (pc == 126) {
+(v_f9).all_locals = null;
+pc = 125;
+continue;
+}
+if (pc == 127) {
+(v_f9).drops = null;
+pc = 126;
+continue;
+}
+if (pc == 128) {
+v_f9 = &((ctx.v_functions)[v_id2]);
+pc = 127;
+continue;
+}
+if (pc == 129) {
+t114 = v_count10;
+v_count10 = v_count10 + i64(1);
+(&(v_parsed)[0])[t114] = v_id2;
+pc = 128;
+continue;
+}
+if (pc == 130) {
+if ((v_id2 >= 0)) { pc = 138; } else { pc = 141; }
+continue;
+}
+if (pc == 131) {
+t115 = cast[*u8](v_old);
+t116 = cast[*u8](&((ctx.v_functions)[v_id2]));
+t117 = i64(sizeof(Function));
+t118 = MemCpy(t115, t116, t117);
+pc = 129;
+continue;
+}
+if (pc == 132) {
+t119 = i64(sizeof(Function));
+t120 = CAlloc(t119);
+v_old = cast[*Function](t120);
+pc = 131;
+continue;
+}
+if (pc == 133) {
+if ((v_j4 < v_count10)) { pc = 135; } else { pc = 132; }
+continue;
+}
+if (pc == 134) {
+t121 = v_j4;
+v_j4 = v_j4 + i64(1);
+pc = 133;
+continue;
+}
+if (pc == 135) {
+if (((&(v_parsed)[0])[v_j4] == v_id2)) { pc = 136; } else { pc = 134; }
+continue;
+}
+if (pc == 136) {
+t122 = cast[*u8]("duplicate declaration in submission");
+Error(t122);
+pc = 134;
+continue;
+}
+if (pc == 137) {
+v_j4 = 0;
+pc = 133;
+continue;
+}
+if (pc == 138) {
+if (!((ctx.v_allow_redefinition != i8(0)))) { pc = 139; } else { pc = 137; }
+continue;
+}
+if (pc == 139) {
+t123 = cast[*u8]("duplicate function declaration");
+Error(t123);
+pc = 137;
+continue;
+}
+if (pc == 140) {
+t124 = ctx.v_nfun;
+ctx.v_nfun = ctx.v_nfun + i64(1);
+v_id2 = t124;
+pc = 129;
+continue;
+}
+if (pc == 141) {
+if ((ctx.v_nfun >= 4096)) { pc = 142; } else { pc = 140; }
+continue;
+}
+if (pc == 142) {
+t125 = cast[*u8]("function limit exceeded");
+Error(t125);
+pc = 140;
+continue;
+}
+if (pc == 143) {
+v_old = null;
+pc = 130;
+continue;
+}
+if (pc == 144) {
+t126 = At();
+t127 = (t126).package;
+t128 = v_name17;
+t129 = FindFunIn(t127, t128);
+v_id2 = t129;
+pc = 143;
+continue;
+}
+if (pc == 145) {
+t131 = At();
+t132 = (t131).package;
+t133 = v_name17;
+t134 = FindType(t132, t133);
+if ((t134 >= 0)) { pc = 146; } else { pc = 144; }
+continue;
+}
+if (pc == 146) {
+t130 = cast[*u8]("function name conflicts with a type");
+Error(t130);
+pc = 144;
+continue;
+}
+if (pc == 147) {
+t135 = Ident();
+v_name17 = t135;
+pc = 145;
+continue;
+}
+if (pc == 148) {
+t136 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 147;
+continue;
+}
+if (pc == 149) {
+t138 = cast[*u8]("fn");
+t139 = Is(t138);
+if (!((t139 != i8(0)))) { pc = 150; } else { pc = 148; }
+continue;
+}
+if (pc == 150) {
+t137 = cast[*u8]("expected fn, package or import declaration");
+Error(t137);
+pc = 148;
+continue;
+}
+if (pc == 151) {
+t151 = cast[*u8]("extern");
+t152 = Is(t151);
+t153 = (i64(t152) != i64(0));
+if (!t153) {
+t154 = cast[*u8]("export");
+t155 = Is(t154);
+t153 = (i64(t155) != i64(0));
+}
+if (t153) { pc = 157; } else { pc = 149; }
+continue;
+}
+if (pc == 152) {
+t140 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 149;
+continue;
+}
+if (pc == 153) {
+t142 = At();
+t143 = ((t142).kind != 258);
+if (!t143) {
+t144 = At();
+t145 = (t144).text;
+t146 = cast[*u8]("C");
+t147 = Eq(t145, t146);
+t143 = !((t147 != i8(0)));
+}
+if (t143) { pc = 154; } else { pc = 152; }
+continue;
+}
+if (pc == 154) {
+t141 = cast[*u8]("only extern C is supported");
+Error(t141);
+pc = 152;
+continue;
+}
+if (pc == 155) {
+t148 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 153;
+continue;
+}
+if (pc == 156) {
+v_foreign = i8(BoolInt(!((v_exported != i8(0)))));
+pc = 155;
+continue;
+}
+if (pc == 157) {
+t149 = cast[*u8]("export");
+t150 = Is(t149);
+v_exported = t150;
+pc = 156;
+continue;
+}
+if (pc == 158) {
+v_exported = i8(0);
+pc = 151;
+continue;
+}
+if (pc == 159) {
+v_foreign = i8(0);
+pc = 158;
+continue;
+}
+if (pc == 160) {
+t170 = cast[*u8]("struct");
+t171 = Is(t170);
+t172 = (i64(t171) != i64(0));
+if (!t172) {
+t173 = cast[*u8]("enum");
+t174 = Is(t173);
+t172 = (i64(t174) != i64(0));
+}
+if (t172) { pc = 169; } else { pc = 159; }
+continue;
+}
+if (pc == 161) {
+pc = 1;
+continue;
+}
+if (pc == 162) {
+t156 = 59;
+t157 = Take(t156);
+pc = 161;
+continue;
+}
+if (pc == 163) {
+t158 = v_id2;
+t159 = Shape(t158);
+ctx.v_pos = ((t159).end + 1);
+pc = 162;
+continue;
+}
+if (pc == 164) {
+t162 = v_id2;
+t163 = Shape(t162);
+if (!(((t163).generic_count != i64(0)))) { pc = 166; } else { pc = 163; }
+continue;
+}
+if (pc == 165) {
+t160 = v_id2;
+ValidateBorrowedElements(t160);
+pc = 163;
+continue;
+}
+if (pc == 166) {
+t161 = v_id2;
+Layout(t161);
+pc = 165;
+continue;
+}
+if (pc == 167) {
+t164 = At();
+t165 = (t164).package;
+t166 = v_name17;
+t167 = FindType(t165, t166);
+v_id2 = t167;
+pc = 164;
+continue;
+}
+if (pc == 168) {
+t168 = Ident();
+v_name17 = t168;
+pc = 167;
+continue;
+}
+if (pc == 169) {
+t169 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 168;
+continue;
+}
+if (pc == 170) {
+t176 = cast[*u8]("pub");
+t177 = Is(t176);
+if ((t177 != i8(0))) { pc = 172; } else { pc = 160; }
+continue;
+}
+if (pc == 171) {
+t175 = ctx.v_pos;
+ctx.v_pos = ctx.v_pos + i64(1);
+pc = 160;
+continue;
+}
+if (pc == 172) {
+v_public2 = i8(1);
+pc = 171;
+continue;
+}
+if (pc == 173) {
+v_public2 = i8(0);
+pc = 170;
+continue;
+}
+if (pc == 174) {
+CollectTypes();
+pc = 27;
+continue;
+}
+if (pc == 175) {
+if (!((ctx.v_functions != null))) { pc = 176; } else { pc = 174; }
+continue;
+}
+if (pc == 176) {
+t183 = i64((u64(4096) * sizeof(Function)));
+t184 = CAlloc(t183);
+ctx.v_functions = cast[*Function](t184);
+pc = 174;
+continue;
+}
+if (pc == 177) {
+pc = 175;
+continue;
+}
+if (pc == 178) {
+pc = 177;
+continue;
+}
+if (pc == 179) {
+v_count10 = 0;
+pc = 178;
+continue;
+}
+if (pc == 180) {
+pc = 179;
+continue;
+}
+if (pc == 181) {
+pc = 180;
+continue;
+}
+}
+}
+return;
+}
+

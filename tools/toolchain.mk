@@ -79,12 +79,15 @@ test: ownership-test
 # New-language compiler, built by the bootstrap frontend and then by itself.
 build/compiler-host.o: compiler/host.c language/ffi.h language/memory.h language/numeric.h | build
 	clang -std=c11 -Wall -Wextra -Werror -O2 -c $< -o $@
-build/compiler-stage1.ll: compiler/main.cool build/language.BIN | build
-	build/coolc --run build/language.BIN llvm $< $@
+COMPILER_SRC := $(wildcard compiler/*.cool)
+build/compiler.sources: $(COMPILER_SRC) tools/compiler_sources.py | build
+	python3 tools/compiler_sources.py $@
+build/compiler-stage1.ll: build/compiler.sources $(COMPILER_SRC) build/language.BIN | build
+	build/coolc --run build/language.BIN llvm-bundle build/compiler.sources $@
 build/compiler-stage1: build/compiler-stage1.ll build/compiler-host.o build/language-runtime.o
 	clang -Wno-override-module -O2 $^ -lffi -o $@
-build/compiler-stage2.ll: compiler/main.cool build/compiler-stage1
-	build/compiler-stage1 llvm $< $@
+build/compiler-stage2.ll: build/compiler.sources $(COMPILER_SRC) build/compiler-stage1
+	build/compiler-stage1 llvm-bundle build/compiler.sources $@
 build/cool-compiler: build/compiler-stage2.ll build/compiler-host.o build/language-runtime.o
 	clang -Wno-override-module -O2 $^ -lffi -o $@
 all: build/cool-compiler

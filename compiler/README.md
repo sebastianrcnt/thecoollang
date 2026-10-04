@@ -1,6 +1,6 @@
 # Self-hosted Cool compiler
 
-`main.cool` is the new-syntax implementation of the full frontend, type checker,
+The `*.cool` directory package is the new-syntax implementation of the full frontend, type checker,
 ownership and borrow analysis, interpreter, bytecode compiler, ARM64 JIT, LLVM
 emitter, formatter and persistent REPL. It was ported from the bootstrap sources
 in `language/`. The initial mechanical migration is complete; this checked-in
@@ -35,3 +35,12 @@ Native comparisons use identical output basenames because macOS embeds the
 executable name in its ad-hoc code-signature identifier. No signature or code
 bytes are stripped to obtain convergence. Supported build host: Apple Silicon
 macOS with Clang and libffi; portability is a separate task.
+
+## Source organization
+
+`00-state.cool` defines shared records and platform declarations; numbered source
+files group core utilities, lexing, type layouts, borrowing, ownership, parsing,
+interpretation, LLVM/foreign ABI emission, bytecode/JIT, REPL, formatting and the
+driver. `main.cool` initializes state and enters the driver. Files share the
+ordinary directory package rules used by applications. `tools/compiler_sources.py`
+only lists source paths for bootstrapping; it does not parse or transform Cool.

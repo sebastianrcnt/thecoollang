@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(prefix='cool-selfhost-') as tmp:
     compiler=tmp/'cool-compiler'; shutil.copy2(ROOT/'build/cool-compiler', compiler)
     env=dict(os.environ, COOLC_COMPILER_BIN='/does/not/exist', COOL_FRONTEND=str(compiler))
     ir=tmp/'stage3.ll'
-    run(compiler,'llvm',ROOT/'compiler/main.cool',ir,cwd=tmp,env=env)
+    run(compiler,'llvm-bundle',ROOT/'build/compiler.sources',ir,cwd=tmp,env=env)
     first=(ROOT/'build/compiler-stage1.ll').read_bytes()
     second=(ROOT/'build/compiler-stage2.ll').read_bytes()
     assert first==second==ir.read_bytes(),'new compiler does not converge'

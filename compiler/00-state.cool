@@ -1,0 +1,586 @@
+// Compiler state and platform declarations. Implementation is ordinary Cool.
+
+extern "C" fn NativeCompilerState(size: i64) -> *u8;
+
+
+fn BoolInt(value: bool) -> i64 { if (value) { return 1; } return 0; }
+
+
+struct NumberBits {
+
+bits: i64;
+
+}
+
+
+struct Text {
+
+data: *u8;
+
+len: i64;
+
+cap: i64;
+
+}
+
+
+struct Token {
+
+kind: i64;
+
+val: i64;
+
+line: i64;
+
+col: i64;
+
+start: i64;
+
+end: i64;
+
+text: *u8;
+
+file: *u8;
+
+package: *u8;
+
+raw: *u8;
+
+}
+
+
+struct Local {
+
+name: *u8;
+
+type: i64;
+
+slot: i64;
+
+mutable: i64;
+
+depth: i64;
+
+region: i64;
+
+moved: i64;
+
+loop_level: i64;
+
+next: *Local;
+
+all_next: *Local;
+
+sources: *u8;
+
+}
+
+
+struct Node {
+
+kind: i64;
+
+type: i64;
+
+value: i64;
+
+op: i64;
+
+slot: i64;
+
+storage: i64;
+
+offset: i64;
+
+mutable: i64;
+
+field_key: i64;
+
+token: *Token;
+
+name: *u8;
+
+a: *Node;
+
+b: *Node;
+
+c: *Node;
+
+next: *Node;
+
+origin_source: *Node;
+
+local_ref: *Local;
+
+}
+
+
+struct DropSlot {
+
+slot: i64;
+
+type: i64;
+
+next: *DropSlot;
+
+}
+
+
+struct Function {
+
+name: *u8;
+
+package: *u8;
+
+result: i64;
+
+argc: i64;
+
+slots: i64;
+
+begin: i64;
+
+end: i64;
+
+public: i64;
+
+foreign: i64;
+
+exported: i64;
+
+generic_count: i64;
+
+origin: i64;
+
+signature: i64;
+
+borrow_contract: i64;
+
+has_contract: i64;
+
+all_locals: *Local;
+
+drops: *DropSlot;
+
+generic_names: [8]*u8;
+
+generic_args: [8]i64;
+
+bytecode: *u8;
+
+machine: *u8;
+
+code_count: i64;
+
+code_capacity: i64;
+
+registers: i64;
+
+calls: i64;
+
+arg_names: [32]*u8;
+
+arg_types: [32]i64;
+
+body: *Node;
+
+token: *Token;
+
+}
+
+
+struct Alias {
+
+file: *u8;
+
+name: *u8;
+
+path: *u8;
+
+next: *Alias;
+
+}
+
+
+struct Field {
+
+name: *u8;
+
+type: i64;
+
+offset: i64;
+
+public: i64;
+
+tag: i64;
+
+next: *Field;
+
+}
+
+
+struct AggregateType {
+
+name: *u8;
+
+package: *u8;
+
+kind: i64;
+
+element: i64;
+
+count: i64;
+
+size: i64;
+
+align: i64;
+
+state: i64;
+
+begin: i64;
+
+end: i64;
+
+public: i64;
+
+generic_count: i64;
+
+origin: i64;
+
+generic_names: [8]*u8;
+
+generic_args: [8]i64;
+
+token: *Token;
+
+fields: *Field;
+
+}
+
+
+struct TypeBinding {
+
+name: *u8;
+
+type: i64;
+
+next: *TypeBinding;
+
+}
+
+
+struct BorrowSource {
+
+node: *Node;
+
+next: *BorrowSource;
+
+}
+
+
+struct MoveState {
+
+local: *Local;
+
+before: i64;
+
+joined: i64;
+
+next: *MoveState;
+
+}
+
+
+struct Frame {
+
+values: *i64;
+
+flow: i64;
+
+result: i64;
+
+destination: i64;
+
+function: *Function;
+
+parent: *Frame;
+
+}
+
+
+struct Deferred {
+
+call: *Node;
+
+args: *i64;
+
+next: *Deferred;
+
+}
+
+
+struct EDeferred {
+
+call: *Node;
+
+args: *i64;
+
+next: *EDeferred;
+
+}
+
+
+struct EScope {
+
+calls: *EDeferred;
+
+parent: *EScope;
+
+}
+
+
+struct Instruction {
+
+op: i64;
+
+dst: i64;
+
+a: i64;
+
+b: i64;
+
+value: i64;
+
+target: i64;
+
+args: *i64;
+
+node: *Node;
+
+}
+
+
+struct BDefer {
+
+call: *Node;
+
+args: *i64;
+
+next: *BDefer;
+
+}
+
+
+struct BScope {
+
+calls: *BDefer;
+
+parent: *BScope;
+
+}
+
+
+struct CompilerState {
+
+v_recovery_context: *i64;
+
+v_allow_redefinition: i8;
+
+v_tokens: *Token;
+
+v_ntok: i64;
+
+v_pos: i64;
+
+v_lex_package: *u8;
+
+v_functions: *Function;
+
+v_nfun: i64;
+
+v_locals: *Local;
+
+v_depth: i64;
+
+v_loop_depth: i64;
+
+v_current_fun: i64;
+
+v_unsafe_depth: i64;
+
+v_aliases: *Alias;
+
+v_aggregate_types: *AggregateType;
+
+v_naggregates: i64;
+
+v_type_bindings: *TypeBinding;
+
+v_specialization_depth: i64;
+
+v_active_frame: *Frame;
+
+v_call_depth: i64;
+
+v_execution_mode: i64;
+
+v_owner_live: i64;
+
+v_ir: *Text;
+
+v_globals: *Text;
+
+v_reg_id: i64;
+
+v_label_id: i64;
+
+v_string_id: i64;
+
+v_loop_break: i64;
+
+v_loop_continue: i64;
+
+v_active_label: i64;
+
+v_scope: *EScope;
+
+v_loop_scope: *EScope;
+
+v_terminated: i8;
+
+v_bc_fun: *Function;
+
+v_bytecode_compilations: i64;
+
+v_bc_scope: *BScope;
+
+v_bc_loop_scope: *BScope;
+
+v_bc_break: i64;
+
+v_bc_continue: i64;
+
+v_bc_done: i8;
+
+v_machine: *Text;
+
+v_jit_compilations: i64;
+
+v_repl_context: *i64;
+
+v_repl_snapshot: *Function;
+
+v_repl_saved_nfun: i64;
+
+v_repl_saved_ntok: i64;
+
+v_repl_saved_types: i64;
+
+v_repl_locals: *Local;
+
+v_repl_aliases: *Alias;
+
+v_repl_values: *i64;
+
+v_repl_capacity: i64;
+
+v_repl_executing: i8;
+
+v_repl_moves: *MoveState;
+
+v_formatted: *Text;
+
+v_format_indent: i64;
+
+}
+
+
+extern "C" fn NativeJitCall(a0: *u8, a1: *i64) -> i64;
+
+
+extern "C" fn NativeComputeAddress() -> u64;
+
+
+extern "C" fn CAlloc(a0: i64) -> *u8;
+
+
+extern "C" fn MAlloc(a0: i64) -> *u8;
+
+
+extern "C" fn Free(a0: *u8);
+
+
+extern "C" fn MemSet(a0: *u8, a1: i64, a2: i64) -> *u8;
+
+
+extern "C" fn MemCpy(a0: *u8, a1: *u8, a2: i64) -> *u8;
+
+
+extern "C" fn StrLen(a0: *u8) -> i64;
+
+
+extern "C" fn StrCmp(a0: *u8, a1: *u8) -> i64;
+
+
+extern "C" fn StrNew(a0: *u8) -> *u8;
+
+
+extern "C" fn FileRead(a0: *u8, a1: *i64, a2: *u8) -> *u8;
+
+
+extern "C" fn FileWrite(a0: *u8, a1: *u8, a2: i64) -> i64;
+
+
+extern "C" fn NativeWrite(a0: i64, a1: *u8, a2: i64) -> i64;
+
+
+extern "C" fn NativeExit(a0: i64);
+
+
+extern "C" fn NativeArgCount() -> i64;
+
+
+extern "C" fn NativeSetProgramArgs(a0: i64);
+
+
+extern "C" fn NativeArg(a0: i64) -> *u8;
+
+
+extern "C" fn NativeGetChar() -> i64;
+
+
+extern "C" fn NativeParseFloat(a0: *u8, a1: *i64) -> i64;
+
+
+extern "C" fn NativeNumericCast(a0: i64, a1: i64, a2: i64, a3: *i64) -> i64;
+
+
+extern "C" fn NativePrintFloat(a0: i64);
+
+
+extern "C" fn NativeForeignCall(a0: *u8, a1: i64, a2: *i64, a3: *i64, a4: i64, a5: *i64) -> i64;
+
+
+extern "C" fn NativeMemoryRead(a0: i64, a1: i64) -> i64;
+
+
+extern "C" fn NativeMemoryWrite(a0: i64, a1: i64, a2: i64);
+
+
+extern "C" fn NativeRecover(a0: *u8) -> i64;
+
+
+extern "C" fn NativeRaise(a0: *i64);
+
+
+extern "C" fn NativeJitAlloc(a0: i64) -> *u8;
+
+
+extern "C" fn NativeJitCommit(a0: *u8, a1: *u8, a2: i64);
+
+
+export "C" fn CoolSubmission(text: *Text) { ReplStep(text); }
+
+
+export "C" fn CoolCompute(ins: *Instruction, values: *i64) -> i64 { return Compute(ins, values); }
+

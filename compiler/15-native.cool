@@ -1,0 +1,1619 @@
+fn ReadSource(arg_v_file1: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_file1: *u8 = arg_v_file1;
+var v_size3: i64 = i64(0);
+var v_src2: *u8 = null;
+var t0: *u8 = null;
+var t1: *i64 = null;
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: *u8 = null;
+var t5: i64 = i64(0);
+var t6: *u8 = null;
+var t7: *u8 = null;
+t0 = v_file1;
+t1 = &(v_size3);
+t2 = null;
+t3 = FileRead(t0, t1, t2);
+v_src2 = t3;
+if (!((v_src2 != null))) {
+t4 = cast[*u8]("cannot read source\n");
+Out(t4);
+t5 = 2;
+NativeExit(t5);
+}
+t6 = v_src2;
+t7 = v_file1;
+LexSource(t6, t7);
+}
+return;
+}
+
+
+fn ReadBundle(arg_v_file2: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_file2: *u8 = arg_v_file2;
+var v_size4: i64 = i64(0);
+var v_i31: i64 = i64(0);
+var v_start5: i64 = i64(0);
+var v_data: *u8 = null;
+var v_path4: *u8 = null;
+var t0: *u8 = null;
+var t1: *i64 = null;
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: bool = false;
+var t6: i64 = i64(0);
+var t7: i64 = i64(0);
+var t8: *u8 = null;
+var t9: i64 = i64(0);
+var t10: i64 = i64(0);
+var t11: i64 = i64(0);
+var t12: *u8 = null;
+var t13: bool = false;
+var t14: i64 = i64(0);
+var t15: *u8 = null;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: *u8 = null;
+var t19: i64 = i64(0);
+var t20: *u8 = null;
+v_i31 = 0;
+t0 = v_file2;
+t1 = &(v_size4);
+t2 = null;
+t3 = FileRead(t0, t1, t2);
+v_data = t3;
+if (!((v_data != null))) {
+t4 = 2;
+NativeExit(t4);
+}
+while (true) {
+if (!(((v_data)[v_i31] != u8(0)))) { break; }
+v_start5 = v_i31;
+while (true) {
+t5 = (i64((v_data)[v_i31]) != i64(0));
+if (t5) {
+t5 = (i64((v_data)[v_i31]) != 9);
+}
+if (!(t5)) { break; }
+t6 = v_i31;
+v_i31 = v_i31 + i64(1);
+}
+if (!(((v_data)[v_i31] != u8(0)))) {
+t7 = 2;
+NativeExit(t7);
+}
+t8 = v_data;
+t9 = v_start5;
+t10 = v_i31;
+v_i31 = v_i31 + i64(1);
+t11 = t10;
+t12 = Slice(t8, t9, t11);
+ctx.v_lex_package = t12;
+v_start5 = v_i31;
+while (true) {
+t13 = (i64((v_data)[v_i31]) != i64(0));
+if (t13) {
+t13 = (i64((v_data)[v_i31]) != 10);
+}
+if (!(t13)) { break; }
+t14 = v_i31;
+v_i31 = v_i31 + i64(1);
+}
+t15 = v_data;
+t16 = v_start5;
+t17 = v_i31;
+t18 = Slice(t15, t16, t17);
+v_path4 = t18;
+if (((v_data)[v_i31] != u8(0))) {
+t19 = v_i31;
+v_i31 = v_i31 + i64(1);
+}
+t20 = v_path4;
+ReadSource(t20);
+}
+}
+return;
+}
+
+
+fn LanguageMain() {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_mode: *u8 = null;
+var v_i32: i64 = i64(0);
+var v_nesting1: i64 = i64(0);
+var v_at4: i64 = i64(0);
+var v_si: i64 = i64(0);
+var v_sj: i64 = i64(0);
+var v_line1: *Text = null;
+var v_field6: *Field = null;
+var v_ti: i64 = i64(0);
+var v_tests: i64 = i64(0);
+var v_values2: [1]i64 = [1]i64{};
+var v_call3: *Node = null;
+var v_summary: *Text = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+var t2: *u8 = null;
+var t3: *u8 = null;
+var t4: i8 = i8(0);
+var t5: bool = false;
+var t6: *u8 = null;
+var t7: *u8 = null;
+var t8: i8 = i8(0);
+var t9: i64 = i64(0);
+var t10: *u8 = null;
+var t11: *u8 = null;
+var t12: i64 = i64(0);
+var t13: i64 = i64(0);
+var t14: *u8 = null;
+var t15: *u8 = null;
+var t16: i8 = i8(0);
+var t17: bool = false;
+var t18: *u8 = null;
+var t19: *u8 = null;
+var t20: i8 = i8(0);
+var t21: i64 = i64(0);
+var t22: i64 = i64(0);
+var t23: i64 = i64(0);
+var t24: bool = false;
+var t25: *u8 = null;
+var t26: *u8 = null;
+var t27: i8 = i8(0);
+var t28: bool = false;
+var t29: *u8 = null;
+var t30: *u8 = null;
+var t31: i8 = i8(0);
+var t32: *u8 = null;
+var t33: *Text = null;
+var t34: *u8 = null;
+var t35: *Text = null;
+var t36: i64 = i64(0);
+var t37: *Text = null;
+var t38: *u8 = null;
+var t39: i64 = i64(0);
+var t40: i64 = i64(0);
+var t41: *u8 = null;
+var t42: *u8 = null;
+var t43: *u8 = null;
+var t44: *Node = null;
+var t45: *i64 = null;
+var t46: i64 = i64(0);
+var t47: i64 = i64(0);
+var t48: i64 = i64(0);
+var t49: *Token = null;
+var t50: *Node = null;
+var t51: *Token = null;
+var t52: *u8 = null;
+var t53: bool = false;
+var t54: bool = false;
+var t55: bool = false;
+var t56: *u8 = null;
+var t57: *u8 = null;
+var t58: i8 = i8(0);
+var t59: bool = false;
+var t60: *u8 = null;
+var t61: i64 = i64(0);
+var t62: bool = false;
+var t63: bool = false;
+var t64: bool = false;
+var t65: bool = false;
+var t66: bool = false;
+var t67: *u8 = null;
+var t68: *u8 = null;
+var t69: i8 = i8(0);
+var t70: *u8 = null;
+var t71: *u8 = null;
+var t72: i8 = i8(0);
+var t73: bool = false;
+var t74: *u8 = null;
+var t75: *u8 = null;
+var t76: i8 = i8(0);
+var t77: i64 = i64(0);
+var t78: *u8 = null;
+var t79: *Text = null;
+var t80: i64 = i64(0);
+var t81: i64 = i64(0);
+var t82: *Text = null;
+var t83: i64 = i64(0);
+var t84: *Text = null;
+var t85: i64 = i64(0);
+var t86: *Text = null;
+var t87: *u8 = null;
+var t88: *Text = null;
+var t89: i64 = i64(0);
+var t90: *Text = null;
+var t91: i64 = i64(0);
+var t92: *Text = null;
+var t93: i64 = i64(0);
+var t94: *Text = null;
+var t95: i64 = i64(0);
+var t96: *Text = null;
+var t97: i64 = i64(0);
+var t98: *Text = null;
+var t99: i64 = i64(0);
+var t100: *Text = null;
+var t101: *u8 = null;
+var t102: *Text = null;
+var t103: i64 = i64(0);
+var t104: *Text = null;
+var t105: *u8 = null;
+var t106: *Text = null;
+var t107: *u8 = null;
+var t108: *Text = null;
+var t109: *u8 = null;
+var t110: i64 = i64(0);
+var t111: *Text = null;
+var t112: i64 = i64(0);
+var t113: *Text = null;
+var t114: *u8 = null;
+var t115: *Text = null;
+var t116: *u8 = null;
+var t117: i64 = i64(0);
+var t118: *Text = null;
+var t119: *u8 = null;
+var t120: *Text = null;
+var t121: *u8 = null;
+var t122: *Text = null;
+var t123: i64 = i64(0);
+var t124: *Text = null;
+var t125: *u8 = null;
+var t126: *Text = null;
+var t127: *u8 = null;
+var t128: *Text = null;
+var t129: *u8 = null;
+var t130: *Text = null;
+var t131: *u8 = null;
+var t132: *Text = null;
+var t133: i64 = i64(0);
+var t134: *u8 = null;
+var t135: *Text = null;
+var t136: *u8 = null;
+var t137: *Text = null;
+var t138: *u8 = null;
+var t139: *Text = null;
+var t140: i64 = i64(0);
+var t141: *Text = null;
+var t142: *u8 = null;
+var t143: *Text = null;
+var t144: *u8 = null;
+var t145: *Text = null;
+var t146: *u8 = null;
+var t147: *Text = null;
+var t148: *u8 = null;
+var t149: *Text = null;
+var t150: *u8 = null;
+var t151: *Text = null;
+var t152: *u8 = null;
+var t153: *Text = null;
+var t154: *u8 = null;
+var t155: *Text = null;
+var t156: *u8 = null;
+var t157: *Text = null;
+var t158: bool = false;
+var t159: bool = false;
+var t160: bool = false;
+var t161: *u8 = null;
+var t162: *Text = null;
+var t163: i64 = i64(0);
+var t164: *Text = null;
+var t165: i64 = i64(0);
+var t166: *Text = null;
+var t167: i64 = i64(0);
+var t168: *Text = null;
+var t169: i64 = i64(0);
+var t170: *Text = null;
+var t171: *u8 = null;
+var t172: *Text = null;
+var t173: *u8 = null;
+var t174: *u8 = null;
+var t175: i8 = i8(0);
+var t176: i64 = i64(0);
+var t177: i64 = i64(0);
+var t178: i64 = i64(0);
+var t179: *u8 = null;
+var t180: *u8 = null;
+var t181: *u8 = null;
+var t182: *Token = null;
+var t183: *u8 = null;
+var t184: i64 = i64(0);
+var t185: bool = false;
+var t186: bool = false;
+var t187: *u8 = null;
+var t188: *u8 = null;
+var t189: i8 = i8(0);
+var t190: *u8 = null;
+var t191: *u8 = null;
+var t192: *u8 = null;
+var t193: bool = false;
+var t194: bool = false;
+var t195: *u8 = null;
+var t196: *u8 = null;
+var t197: i8 = i8(0);
+var t198: bool = false;
+var t199: *u8 = null;
+var t200: *u8 = null;
+var t201: i8 = i8(0);
+var t202: i64 = i64(0);
+var t203: *u8 = null;
+var t204: *u8 = null;
+var t205: i64 = i64(0);
+var t206: *u8 = null;
+var t207: *u8 = null;
+var t208: *u8 = null;
+var t209: *u8 = null;
+var t210: i8 = i8(0);
+var t211: bool = false;
+var t212: *u8 = null;
+var t213: *u8 = null;
+var t214: i8 = i8(0);
+var t215: bool = false;
+var t216: *u8 = null;
+var t217: *u8 = null;
+var t218: i8 = i8(0);
+var t219: bool = false;
+var t220: *u8 = null;
+var t221: *u8 = null;
+var t222: i8 = i8(0);
+var t223: bool = false;
+var t224: *u8 = null;
+var t225: *u8 = null;
+var t226: i8 = i8(0);
+var t227: bool = false;
+var t228: *u8 = null;
+var t229: *u8 = null;
+var t230: i8 = i8(0);
+var t231: bool = false;
+var t232: *u8 = null;
+var t233: *u8 = null;
+var t234: i8 = i8(0);
+var t235: bool = false;
+var t236: *u8 = null;
+var t237: *u8 = null;
+var t238: i8 = i8(0);
+var t239: bool = false;
+var t240: *u8 = null;
+var t241: *u8 = null;
+var t242: i8 = i8(0);
+var t243: *u8 = null;
+var t244: *u8 = null;
+var t245: i8 = i8(0);
+var t246: bool = false;
+var t247: *u8 = null;
+var t248: *u8 = null;
+var t249: i8 = i8(0);
+var t250: *u8 = null;
+var t251: *u8 = null;
+var t252: i8 = i8(0);
+var t253: bool = false;
+var t254: *u8 = null;
+var t255: *u8 = null;
+var t256: i8 = i8(0);
+var t257: *u8 = null;
+var t258: *u8 = null;
+var t259: i8 = i8(0);
+var t260: bool = false;
+var t261: *u8 = null;
+var t262: *u8 = null;
+var t263: i8 = i8(0);
+var t264: i64 = i64(0);
+var t265: *u8 = null;
+var t266: *u8 = null;
+var t267: i64 = i64(0);
+var t268: *u8 = null;
+var t269: *u8 = null;
+var t270: i64 = i64(0);
+var t271: i64 = i64(0);
+var t272: *u8 = null;
+var t273: *u8 = null;
+var t274: i8 = i8(0);
+var t275: i64 = i64(0);
+var t276: *u8 = null;
+var t277: i64 = i64(0);
+var t278: *u8 = null;
+var t279: i64 = i64(0);
+var t280: i64 = i64(0);
+var t281: *u8 = null;
+var t282: *u8 = null;
+var t283: *u8 = null;
+var t284: i8 = i8(0);
+var t285: i8 = i8(0);
+var t286: i64 = i64(0);
+var t287: bool = false;
+var t288: i64 = i64(0);
+var t289: *u8 = null;
+var t290: *u8 = null;
+var t291: *u8 = null;
+var t292: i8 = i8(0);
+var t293: bool = false;
+var t294: i64 = i64(0);
+var t295: *u8 = null;
+var t296: *u8 = null;
+var t297: *u8 = null;
+var t298: i8 = i8(0);
+var pc: i64 = 167;
+while (true) {
+if (pc == 1) {
+pc = 45;
+continue;
+}
+if (pc == 2) {
+return;
+}
+if (pc == 3) {
+t2 = v_mode;
+t3 = cast[*u8]("check");
+t4 = Eq(t2, t3);
+t5 = !((t4 != i8(0)));
+if (t5) {
+t6 = v_mode;
+t7 = cast[*u8]("check-bundle");
+t8 = Eq(t6, t7);
+t5 = !((t8 != i8(0)));
+}
+if (t5) { pc = 5; } else { pc = 2; }
+continue;
+}
+if (pc == 4) {
+t0 = 2;
+NativeExit(t0);
+pc = 2;
+continue;
+}
+if (pc == 5) {
+t1 = cast[*u8]("unknown command\n");
+Out(t1);
+pc = 4;
+continue;
+}
+if (pc == 6) {
+t14 = v_mode;
+t15 = cast[*u8]("llvm");
+t16 = Eq(t14, t15);
+t17 = (i64(t16) != i64(0));
+if (!t17) {
+t18 = v_mode;
+t19 = cast[*u8]("llvm-bundle");
+t20 = Eq(t18, t19);
+t17 = (i64(t20) != i64(0));
+}
+if (t17) { pc = 9; } else { pc = 3; }
+continue;
+}
+if (pc == 7) {
+return;
+}
+if (pc == 8) {
+t9 = 3;
+t10 = NativeArg(t9);
+t11 = t10;
+EmitLLVM(t11);
+pc = 7;
+continue;
+}
+if (pc == 9) {
+t13 = NativeArgCount();
+if ((t13 != 4)) { pc = 10; } else { pc = 8; }
+continue;
+}
+if (pc == 10) {
+t12 = 2;
+NativeExit(t12);
+pc = 8;
+continue;
+}
+if (pc == 11) {
+t24 = (ctx.v_execution_mode != i64(0));
+if (!t24) {
+t25 = v_mode;
+t26 = cast[*u8]("run");
+t27 = Eq(t25, t26);
+t24 = (i64(t27) != i64(0));
+}
+t28 = t24;
+if (!t28) {
+t29 = v_mode;
+t30 = cast[*u8]("run-bundle");
+t31 = Eq(t29, t30);
+t28 = (i64(t31) != i64(0));
+}
+if (t28) { pc = 13; } else { pc = 6; }
+continue;
+}
+if (pc == 12) {
+t21 = RunMain();
+t22 = t21;
+NativeExit(t22);
+pc = 6;
+continue;
+}
+if (pc == 13) {
+t23 = 3;
+NativeSetProgramArgs(t23);
+pc = 12;
+continue;
+}
+if (pc == 14) {
+t70 = v_mode;
+t71 = cast[*u8]("test-bundle");
+t72 = Eq(t70, t71);
+t73 = (i64(t72) != i64(0));
+if (!t73) {
+t74 = v_mode;
+t75 = cast[*u8]("jit-test-bundle");
+t76 = Eq(t74, t75);
+t73 = (i64(t76) != i64(0));
+}
+if (t73) { pc = 40; } else { pc = 11; }
+continue;
+}
+if (pc == 15) {
+return;
+}
+if (pc == 16) {
+t32 = (v_summary).data;
+Out(t32);
+pc = 15;
+continue;
+}
+if (pc == 17) {
+t33 = v_summary;
+t34 = cast[*u8](" tests passed\n");
+Append(t33, t34);
+pc = 16;
+continue;
+}
+if (pc == 18) {
+t35 = v_summary;
+t36 = v_tests;
+Number(t35, t36);
+pc = 17;
+continue;
+}
+if (pc == 19) {
+t37 = TextNew();
+v_summary = t37;
+pc = 18;
+continue;
+}
+if (pc == 20) {
+if (!((v_tests != i64(0)))) { pc = 21; } else { pc = 19; }
+continue;
+}
+if (pc == 21) {
+t38 = cast[*u8]("no test_ functions found");
+Error(t38);
+pc = 19;
+continue;
+}
+if (pc == 22) {
+if ((v_ti < ctx.v_nfun)) { pc = 24; } else { pc = 20; }
+continue;
+}
+if (pc == 23) {
+t39 = v_ti;
+v_ti = v_ti + i64(1);
+pc = 22;
+continue;
+}
+if (pc == 24) {
+t54 = !((((ctx.v_functions)[v_ti]).generic_count != i64(0)));
+if (t54) {
+t54 = !((((ctx.v_functions)[v_ti]).origin != i64(0)));
+}
+t55 = t54;
+if (t55) {
+t56 = ((ctx.v_functions)[v_ti]).package;
+t57 = cast[*u8]("__main");
+t58 = Eq(t56, t57);
+t55 = (i64(t58) != i64(0));
+}
+t59 = t55;
+if (t59) {
+t60 = ((ctx.v_functions)[v_ti]).name;
+t61 = StrLen(t60);
+t59 = (t61 >= 5);
+}
+t62 = t59;
+if (t62) {
+t62 = (i64((((ctx.v_functions)[v_ti]).name)[0]) == 116);
+}
+t63 = t62;
+if (t63) {
+t63 = (i64((((ctx.v_functions)[v_ti]).name)[1]) == 101);
+}
+t64 = t63;
+if (t64) {
+t64 = (i64((((ctx.v_functions)[v_ti]).name)[2]) == 115);
+}
+t65 = t64;
+if (t65) {
+t65 = (i64((((ctx.v_functions)[v_ti]).name)[3]) == 116);
+}
+t66 = t65;
+if (t66) {
+t66 = (i64((((ctx.v_functions)[v_ti]).name)[4]) == 95);
+}
+if (t66) { pc = 32; } else { pc = 23; }
+continue;
+}
+if (pc == 25) {
+t40 = v_tests;
+v_tests = v_tests + i64(1);
+pc = 23;
+continue;
+}
+if (pc == 26) {
+t41 = cast[*u8]("\n");
+Out(t41);
+pc = 25;
+continue;
+}
+if (pc == 27) {
+t42 = ((ctx.v_functions)[v_ti]).name;
+Out(t42);
+pc = 26;
+continue;
+}
+if (pc == 28) {
+t43 = cast[*u8]("PASS ");
+Out(t43);
+pc = 27;
+continue;
+}
+if (pc == 29) {
+t44 = v_call3;
+t45 = &(v_values2)[0];
+t46 = 0;
+t47 = Invoke(t44, t45, t46);
+pc = 28;
+continue;
+}
+if (pc == 30) {
+(v_call3).slot = v_ti;
+pc = 29;
+continue;
+}
+if (pc == 31) {
+t48 = 4;
+t49 = ((ctx.v_functions)[v_ti]).token;
+t50 = NewNode(t48, t49);
+v_call3 = t50;
+pc = 30;
+continue;
+}
+if (pc == 32) {
+t53 = (((ctx.v_functions)[v_ti]).argc != i64(0));
+if (!t53) {
+t53 = (((ctx.v_functions)[v_ti]).result != i64(0));
+}
+if (t53) { pc = 33; } else { pc = 31; }
+continue;
+}
+if (pc == 33) {
+t51 = ((ctx.v_functions)[v_ti]).token;
+t52 = cast[*u8]("test functions must take no arguments and return void");
+ErrorAt(t51, t52);
+pc = 31;
+continue;
+}
+if (pc == 34) {
+v_ti = 0;
+pc = 22;
+continue;
+}
+if (pc == 35) {
+t67 = v_mode;
+t68 = cast[*u8]("jit-test-bundle");
+t69 = Eq(t67, t68);
+if ((t69 != i8(0))) { pc = 36; } else { pc = 34; }
+continue;
+}
+if (pc == 36) {
+ctx.v_execution_mode = 2;
+pc = 34;
+continue;
+}
+if (pc == 37) {
+ctx.v_execution_mode = 1;
+pc = 35;
+continue;
+}
+if (pc == 38) {
+pc = 37;
+continue;
+}
+if (pc == 39) {
+pc = 38;
+continue;
+}
+if (pc == 40) {
+v_tests = 0;
+pc = 39;
+continue;
+}
+if (pc == 41) {
+t173 = v_mode;
+t174 = cast[*u8]("symbols");
+t175 = Eq(t173, t174);
+if ((t175 != i8(0))) { pc = 121; } else { pc = 14; }
+continue;
+}
+if (pc == 42) {
+return;
+}
+if (pc == 43) {
+if ((v_si < ctx.v_nfun)) { pc = 88; } else { pc = 42; }
+continue;
+}
+if (pc == 44) {
+t77 = v_si;
+v_si = v_si + i64(1);
+pc = 43;
+continue;
+}
+if (pc == 45) {
+pc = 44;
+continue;
+}
+if (pc == 46) {
+t78 = (v_line1).data;
+Out(t78);
+pc = 1;
+continue;
+}
+if (pc == 47) {
+t79 = v_line1;
+t80 = 10;
+Char(t79, t80);
+pc = 46;
+continue;
+}
+if (pc == 48) {
+if ((v_sj < ((ctx.v_functions)[v_si]).argc)) { pc = 53; } else { pc = 47; }
+continue;
+}
+if (pc == 49) {
+t81 = v_sj;
+v_sj = v_sj + i64(1);
+pc = 48;
+continue;
+}
+if (pc == 50) {
+t82 = v_line1;
+t83 = (&(((ctx.v_functions)[v_si]).arg_types)[0])[v_sj];
+Number(t82, t83);
+pc = 49;
+continue;
+}
+if (pc == 51) {
+t84 = v_line1;
+t85 = 58;
+Char(t84, t85);
+pc = 50;
+continue;
+}
+if (pc == 52) {
+t86 = v_line1;
+t87 = (&(((ctx.v_functions)[v_si]).arg_names)[0])[v_sj];
+Append(t86, t87);
+pc = 51;
+continue;
+}
+if (pc == 53) {
+if ((v_sj != i64(0))) { pc = 54; } else { pc = 52; }
+continue;
+}
+if (pc == 54) {
+t88 = v_line1;
+t89 = 44;
+Char(t88, t89);
+pc = 52;
+continue;
+}
+if (pc == 55) {
+v_sj = 0;
+pc = 48;
+continue;
+}
+if (pc == 56) {
+t90 = v_line1;
+t91 = 9;
+Char(t90, t91);
+pc = 55;
+continue;
+}
+if (pc == 57) {
+t92 = v_line1;
+t93 = ((ctx.v_functions)[v_si]).result;
+Number(t92, t93);
+pc = 56;
+continue;
+}
+if (pc == 58) {
+t94 = v_line1;
+t95 = 9;
+Char(t94, t95);
+pc = 57;
+continue;
+}
+if (pc == 59) {
+t96 = v_line1;
+t97 = ((ctx.v_functions)[v_si]).public;
+Number(t96, t97);
+pc = 58;
+continue;
+}
+if (pc == 60) {
+t98 = v_line1;
+t99 = 9;
+Char(t98, t99);
+pc = 59;
+continue;
+}
+if (pc == 61) {
+t100 = v_line1;
+t101 = ((ctx.v_functions)[v_si]).name;
+Append(t100, t101);
+pc = 60;
+continue;
+}
+if (pc == 62) {
+t102 = v_line1;
+t103 = 9;
+Char(t102, t103);
+pc = 61;
+continue;
+}
+if (pc == 63) {
+t104 = v_line1;
+t105 = ((ctx.v_functions)[v_si]).package;
+Append(t104, t105);
+pc = 62;
+continue;
+}
+if (pc == 64) {
+t106 = TextNew();
+v_line1 = t106;
+pc = 63;
+continue;
+}
+if (pc == 65) {
+if ((((ctx.v_functions)[v_si]).generic_count != i64(0))) { pc = 67; } else { pc = 64; }
+continue;
+}
+if (pc == 66) {
+pc = 1;
+continue;
+}
+if (pc == 67) {
+if ((((ctx.v_functions)[v_si]).public != i64(0))) { pc = 87; } else { pc = 66; }
+continue;
+}
+if (pc == 68) {
+t107 = (v_line1).data;
+Out(t107);
+pc = 66;
+continue;
+}
+if (pc == 69) {
+t108 = v_line1;
+t109 = cast[*u8](";\n");
+Append(t108, t109);
+pc = 68;
+continue;
+}
+if (pc == 70) {
+if ((v_sj < ((ctx.v_functions)[v_si]).begin)) { pc = 73; } else { pc = 69; }
+continue;
+}
+if (pc == 71) {
+t110 = v_sj;
+v_sj = v_sj + i64(1);
+pc = 70;
+continue;
+}
+if (pc == 72) {
+t111 = v_line1;
+t112 = 32;
+Char(t111, t112);
+pc = 71;
+continue;
+}
+if (pc == 73) {
+t113 = v_line1;
+t114 = ((ctx.v_tokens)[v_sj]).raw;
+Append(t113, t114);
+pc = 72;
+continue;
+}
+if (pc == 74) {
+v_sj = ((ctx.v_functions)[v_si]).signature;
+pc = 70;
+continue;
+}
+if (pc == 75) {
+t115 = v_line1;
+t116 = cast[*u8]("] ");
+Append(t115, t116);
+pc = 74;
+continue;
+}
+if (pc == 76) {
+if ((v_sj < ((ctx.v_functions)[v_si]).generic_count)) { pc = 79; } else { pc = 75; }
+continue;
+}
+if (pc == 77) {
+t117 = v_sj;
+v_sj = v_sj + i64(1);
+pc = 76;
+continue;
+}
+if (pc == 78) {
+t118 = v_line1;
+t119 = (&(((ctx.v_functions)[v_si]).generic_names)[0])[v_sj];
+Append(t118, t119);
+pc = 77;
+continue;
+}
+if (pc == 79) {
+if ((v_sj != i64(0))) { pc = 80; } else { pc = 78; }
+continue;
+}
+if (pc == 80) {
+t120 = v_line1;
+t121 = cast[*u8](", ");
+Append(t120, t121);
+pc = 78;
+continue;
+}
+if (pc == 81) {
+v_sj = 0;
+pc = 76;
+continue;
+}
+if (pc == 82) {
+t122 = v_line1;
+t123 = 91;
+Char(t122, t123);
+pc = 81;
+continue;
+}
+if (pc == 83) {
+t124 = v_line1;
+t125 = ((ctx.v_functions)[v_si]).name;
+Append(t124, t125);
+pc = 82;
+continue;
+}
+if (pc == 84) {
+t126 = v_line1;
+t127 = cast[*u8]("\tpub fn ");
+Append(t126, t127);
+pc = 83;
+continue;
+}
+if (pc == 85) {
+t128 = v_line1;
+t129 = ((ctx.v_functions)[v_si]).package;
+Append(t128, t129);
+pc = 84;
+continue;
+}
+if (pc == 86) {
+t130 = v_line1;
+t131 = cast[*u8]("@struct\t");
+Append(t130, t131);
+pc = 85;
+continue;
+}
+if (pc == 87) {
+t132 = TextNew();
+v_line1 = t132;
+pc = 86;
+continue;
+}
+if (pc == 88) {
+if ((((ctx.v_functions)[v_si]).origin != i64(0))) { pc = 89; } else { pc = 65; }
+continue;
+}
+if (pc == 89) {
+pc = 1;
+continue;
+}
+if (pc == 90) {
+v_si = 0;
+pc = 43;
+continue;
+}
+if (pc == 91) {
+if ((v_si < ctx.v_naggregates)) { pc = 117; } else { pc = 90; }
+continue;
+}
+if (pc == 92) {
+t133 = v_si;
+v_si = v_si + i64(1);
+pc = 91;
+continue;
+}
+if (pc == 93) {
+t158 = (((ctx.v_aggregate_types)[v_si]).kind == 1);
+if (t158) {
+t158 = (((ctx.v_aggregate_types)[v_si]).public != i64(0));
+}
+t159 = t158;
+if (t159) {
+t159 = !((((ctx.v_aggregate_types)[v_si]).generic_count != i64(0)));
+}
+t160 = t159;
+if (t160) {
+t160 = !((((ctx.v_aggregate_types)[v_si]).origin != i64(0)));
+}
+if (t160) { pc = 110; } else { pc = 92; }
+continue;
+}
+if (pc == 94) {
+t134 = (v_line1).data;
+Out(t134);
+pc = 92;
+continue;
+}
+if (pc == 95) {
+t135 = v_line1;
+t136 = cast[*u8]("}\n");
+Append(t135, t136);
+pc = 94;
+continue;
+}
+if (pc == 96) {
+if ((v_field6 != null)) { pc = 98; } else { pc = 95; }
+continue;
+}
+if (pc == 97) {
+v_field6 = (v_field6).next;
+pc = 96;
+continue;
+}
+if (pc == 98) {
+if (((v_field6).public != i64(0))) { pc = 103; } else { pc = 97; }
+continue;
+}
+if (pc == 99) {
+t137 = v_line1;
+t138 = cast[*u8]("; ");
+Append(t137, t138);
+pc = 97;
+continue;
+}
+if (pc == 100) {
+t139 = v_line1;
+t140 = (v_field6).type;
+AppendType(t139, t140);
+pc = 99;
+continue;
+}
+if (pc == 101) {
+t141 = v_line1;
+t142 = cast[*u8](": ");
+Append(t141, t142);
+pc = 100;
+continue;
+}
+if (pc == 102) {
+t143 = v_line1;
+t144 = (v_field6).name;
+Append(t143, t144);
+pc = 101;
+continue;
+}
+if (pc == 103) {
+t145 = v_line1;
+t146 = cast[*u8]("pub ");
+Append(t145, t146);
+pc = 102;
+continue;
+}
+if (pc == 104) {
+v_field6 = ((ctx.v_aggregate_types)[v_si]).fields;
+pc = 96;
+continue;
+}
+if (pc == 105) {
+t147 = v_line1;
+t148 = cast[*u8](" { ");
+Append(t147, t148);
+pc = 104;
+continue;
+}
+if (pc == 106) {
+t149 = v_line1;
+t150 = ((ctx.v_aggregate_types)[v_si]).name;
+Append(t149, t150);
+pc = 105;
+continue;
+}
+if (pc == 107) {
+t151 = v_line1;
+t152 = cast[*u8]("\tpub struct ");
+Append(t151, t152);
+pc = 106;
+continue;
+}
+if (pc == 108) {
+t153 = v_line1;
+t154 = ((ctx.v_aggregate_types)[v_si]).package;
+Append(t153, t154);
+pc = 107;
+continue;
+}
+if (pc == 109) {
+t155 = v_line1;
+t156 = cast[*u8]("@struct\t");
+Append(t155, t156);
+pc = 108;
+continue;
+}
+if (pc == 110) {
+t157 = TextNew();
+v_line1 = t157;
+pc = 109;
+continue;
+}
+if (pc == 111) {
+t161 = (v_line1).data;
+Out(t161);
+pc = 93;
+continue;
+}
+if (pc == 112) {
+t162 = v_line1;
+t163 = 10;
+Char(t162, t163);
+pc = 111;
+continue;
+}
+if (pc == 113) {
+t164 = v_line1;
+t165 = (1000 + v_si);
+AppendType(t164, t165);
+pc = 112;
+continue;
+}
+if (pc == 114) {
+t166 = v_line1;
+t167 = 9;
+Char(t166, t167);
+pc = 113;
+continue;
+}
+if (pc == 115) {
+t168 = v_line1;
+t169 = (1000 + v_si);
+Number(t168, t169);
+pc = 114;
+continue;
+}
+if (pc == 116) {
+t170 = v_line1;
+t171 = cast[*u8]("@type\t");
+Append(t170, t171);
+pc = 115;
+continue;
+}
+if (pc == 117) {
+t172 = TextNew();
+v_line1 = t172;
+pc = 116;
+continue;
+}
+if (pc == 118) {
+v_si = 0;
+pc = 91;
+continue;
+}
+if (pc == 119) {
+pc = 118;
+continue;
+}
+if (pc == 120) {
+pc = 119;
+continue;
+}
+if (pc == 121) {
+pc = 120;
+continue;
+}
+if (pc == 122) {
+ParseProgram();
+pc = 41;
+continue;
+}
+if (pc == 123) {
+t199 = v_mode;
+t200 = cast[*u8]("scan");
+t201 = Eq(t199, t200);
+if ((t201 != i8(0))) { pc = 145; } else { pc = 122; }
+continue;
+}
+if (pc == 124) {
+return;
+}
+if (pc == 125) {
+if ((v_i32 < ctx.v_ntok)) { pc = 140; } else { pc = 124; }
+continue;
+}
+if (pc == 126) {
+t176 = v_i32;
+v_i32 = v_i32 + i64(1);
+pc = 125;
+continue;
+}
+if (pc == 127) {
+if ((((ctx.v_tokens)[v_i32]).kind == 125)) { pc = 128; } else { pc = 126; }
+continue;
+}
+if (pc == 128) {
+t177 = v_nesting1;
+v_nesting1 = v_nesting1 - i64(1);
+pc = 126;
+continue;
+}
+if (pc == 129) {
+if ((((ctx.v_tokens)[v_i32]).kind == 123)) { pc = 130; } else { pc = 127; }
+continue;
+}
+if (pc == 130) {
+t178 = v_nesting1;
+v_nesting1 = v_nesting1 + i64(1);
+pc = 127;
+continue;
+}
+if (pc == 131) {
+t185 = !((v_nesting1 != i64(0)));
+if (t185) {
+t185 = (((ctx.v_tokens)[v_i32]).kind == 256);
+}
+t186 = t185;
+if (t186) {
+t187 = ((ctx.v_tokens)[v_i32]).text;
+t188 = cast[*u8]("import");
+t189 = Eq(t187, t188);
+t186 = (i64(t189) != i64(0));
+}
+if (t186) { pc = 139; } else { pc = 129; }
+continue;
+}
+if (pc == 132) {
+t179 = cast[*u8]("\n");
+Out(t179);
+pc = 129;
+continue;
+}
+if (pc == 133) {
+t180 = ((ctx.v_tokens)[v_at4]).text;
+Out(t180);
+pc = 132;
+continue;
+}
+if (pc == 134) {
+t181 = cast[*u8]("import\t");
+Out(t181);
+pc = 133;
+continue;
+}
+if (pc == 135) {
+if ((((ctx.v_tokens)[v_at4]).kind != 258)) { pc = 136; } else { pc = 134; }
+continue;
+}
+if (pc == 136) {
+t182 = &((ctx.v_tokens)[v_at4]);
+t183 = cast[*u8]("expected import path string");
+ErrorAt(t182, t183);
+pc = 134;
+continue;
+}
+if (pc == 137) {
+if ((((ctx.v_tokens)[v_at4]).kind == 256)) { pc = 138; } else { pc = 135; }
+continue;
+}
+if (pc == 138) {
+t184 = v_at4;
+v_at4 = v_at4 + i64(1);
+pc = 135;
+continue;
+}
+if (pc == 139) {
+v_at4 = (v_i32 + 1);
+pc = 137;
+continue;
+}
+if (pc == 140) {
+t193 = !((v_nesting1 != i64(0)));
+if (t193) {
+t193 = (((ctx.v_tokens)[v_i32]).kind == 256);
+}
+t194 = t193;
+if (t194) {
+t195 = ((ctx.v_tokens)[v_i32]).text;
+t196 = cast[*u8]("package");
+t197 = Eq(t195, t196);
+t194 = (i64(t197) != i64(0));
+}
+t198 = t194;
+if (t198) {
+t198 = (((ctx.v_tokens)[(v_i32 + 1)]).kind == 256);
+}
+if (t198) { pc = 143; } else { pc = 131; }
+continue;
+}
+if (pc == 141) {
+t190 = cast[*u8]("\n");
+Out(t190);
+pc = 131;
+continue;
+}
+if (pc == 142) {
+t191 = ((ctx.v_tokens)[(v_i32 + 1)]).text;
+Out(t191);
+pc = 141;
+continue;
+}
+if (pc == 143) {
+t192 = cast[*u8]("package\t");
+Out(t192);
+pc = 142;
+continue;
+}
+if (pc == 144) {
+v_i32 = 0;
+pc = 125;
+continue;
+}
+if (pc == 145) {
+v_nesting1 = 0;
+pc = 144;
+continue;
+}
+if (pc == 146) {
+t208 = v_mode;
+t209 = cast[*u8]("symbols");
+t210 = Eq(t208, t209);
+t211 = (i64(t210) != i64(0));
+if (!t211) {
+t212 = v_mode;
+t213 = cast[*u8]("test-bundle");
+t214 = Eq(t212, t213);
+t211 = (i64(t214) != i64(0));
+}
+t215 = t211;
+if (!t215) {
+t216 = v_mode;
+t217 = cast[*u8]("jit-test-bundle");
+t218 = Eq(t216, t217);
+t215 = (i64(t218) != i64(0));
+}
+t219 = t215;
+if (!t219) {
+t220 = v_mode;
+t221 = cast[*u8]("auto-bundle");
+t222 = Eq(t220, t221);
+t219 = (i64(t222) != i64(0));
+}
+t223 = t219;
+if (!t223) {
+t224 = v_mode;
+t225 = cast[*u8]("jit-bundle");
+t226 = Eq(t224, t225);
+t223 = (i64(t226) != i64(0));
+}
+t227 = t223;
+if (!t227) {
+t228 = v_mode;
+t229 = cast[*u8]("bytecode-bundle");
+t230 = Eq(t228, t229);
+t227 = (i64(t230) != i64(0));
+}
+t231 = t227;
+if (!t231) {
+t232 = v_mode;
+t233 = cast[*u8]("check-bundle");
+t234 = Eq(t232, t233);
+t231 = (i64(t234) != i64(0));
+}
+t235 = t231;
+if (!t235) {
+t236 = v_mode;
+t237 = cast[*u8]("run-bundle");
+t238 = Eq(t236, t237);
+t235 = (i64(t238) != i64(0));
+}
+t239 = t235;
+if (!t239) {
+t240 = v_mode;
+t241 = cast[*u8]("llvm-bundle");
+t242 = Eq(t240, t241);
+t239 = (i64(t242) != i64(0));
+}
+if (t239) { pc = 147; } else { pc = 148; }
+continue;
+}
+if (pc == 147) {
+t202 = 2;
+t203 = NativeArg(t202);
+t204 = t203;
+ReadBundle(t204);
+pc = 123;
+continue;
+}
+if (pc == 148) {
+t205 = 2;
+t206 = NativeArg(t205);
+t207 = t206;
+ReadSource(t207);
+pc = 123;
+continue;
+}
+if (pc == 149) {
+t243 = v_mode;
+t244 = cast[*u8]("jit");
+t245 = Eq(t243, t244);
+t246 = (i64(t245) != i64(0));
+if (!t246) {
+t247 = v_mode;
+t248 = cast[*u8]("jit-bundle");
+t249 = Eq(t247, t248);
+t246 = (i64(t249) != i64(0));
+}
+if (t246) { pc = 150; } else { pc = 146; }
+continue;
+}
+if (pc == 150) {
+ctx.v_execution_mode = 2;
+pc = 146;
+continue;
+}
+if (pc == 151) {
+t250 = v_mode;
+t251 = cast[*u8]("bytecode");
+t252 = Eq(t250, t251);
+t253 = (i64(t252) != i64(0));
+if (!t253) {
+t254 = v_mode;
+t255 = cast[*u8]("bytecode-bundle");
+t256 = Eq(t254, t255);
+t253 = (i64(t256) != i64(0));
+}
+if (t253) { pc = 152; } else { pc = 149; }
+continue;
+}
+if (pc == 152) {
+ctx.v_execution_mode = 1;
+pc = 149;
+continue;
+}
+if (pc == 153) {
+t257 = v_mode;
+t258 = cast[*u8]("auto");
+t259 = Eq(t257, t258);
+t260 = (i64(t259) != i64(0));
+if (!t260) {
+t261 = v_mode;
+t262 = cast[*u8]("auto-bundle");
+t263 = Eq(t261, t262);
+t260 = (i64(t263) != i64(0));
+}
+if (t260) { pc = 154; } else { pc = 151; }
+continue;
+}
+if (pc == 154) {
+ctx.v_execution_mode = 3;
+pc = 151;
+continue;
+}
+if (pc == 155) {
+t272 = v_mode;
+t273 = cast[*u8]("fmt");
+t274 = Eq(t272, t273);
+if ((t274 != i8(0))) { pc = 158; } else { pc = 153; }
+continue;
+}
+if (pc == 156) {
+return;
+}
+if (pc == 157) {
+t264 = 2;
+t265 = NativeArg(t264);
+t266 = t265;
+t267 = 3;
+t268 = NativeArg(t267);
+t269 = t268;
+FormatFile(t266, t269);
+pc = 156;
+continue;
+}
+if (pc == 158) {
+t271 = NativeArgCount();
+if ((t271 != 4)) { pc = 159; } else { pc = 157; }
+continue;
+}
+if (pc == 159) {
+t270 = 2;
+NativeExit(t270);
+pc = 157;
+continue;
+}
+if (pc == 160) {
+t275 = 1;
+t276 = NativeArg(t275);
+v_mode = t276;
+pc = 155;
+continue;
+}
+if (pc == 161) {
+t279 = NativeArgCount();
+if ((t279 < 3)) { pc = 163; } else { pc = 160; }
+continue;
+}
+if (pc == 162) {
+t277 = 2;
+NativeExit(t277);
+pc = 160;
+continue;
+}
+if (pc == 163) {
+t278 = cast[*u8]("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n");
+Out(t278);
+pc = 162;
+continue;
+}
+if (pc == 164) {
+t286 = NativeArgCount();
+t287 = (t286 == 2);
+if (t287) {
+t288 = 1;
+t289 = NativeArg(t288);
+t290 = t289;
+t291 = cast[*u8]("repl");
+t292 = Eq(t290, t291);
+t293 = (i64(t292) != i64(0));
+if (!t293) {
+t294 = 1;
+t295 = NativeArg(t294);
+t296 = t295;
+t297 = cast[*u8]("repl-quiet");
+t298 = Eq(t296, t297);
+t293 = (i64(t298) != i64(0));
+}
+t287 = t293;
+}
+if (t287) { pc = 166; } else { pc = 161; }
+continue;
+}
+if (pc == 165) {
+return;
+}
+if (pc == 166) {
+t280 = 1;
+t281 = NativeArg(t280);
+t282 = t281;
+t283 = cast[*u8]("repl");
+t284 = Eq(t282, t283);
+t285 = t284;
+Repl(t285);
+pc = 165;
+continue;
+}
+if (pc == 167) {
+pc = 164;
+continue;
+}
+}
+}
+return;
+}
+

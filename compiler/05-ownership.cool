@@ -1,0 +1,238 @@
+fn Transfer(arg_v_n11: *Node) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n11: *Node = arg_v_n11;
+var t0: i64 = i64(0);
+var t1: i8 = i8(0);
+var t2: bool = false;
+var t3: bool = false;
+var t4: bool = false;
+var t5: *Token = null;
+var t6: *u8 = null;
+t0 = (v_n11).type;
+t1 = Owned(t0);
+if (!((t1 != i8(0)))) {
+return;
+}
+t2 = ((v_n11).kind != 29);
+if (t2) {
+t2 = ((v_n11).kind != 28);
+}
+t3 = t2;
+if (t3) {
+t3 = ((v_n11).kind != 4);
+}
+t4 = t3;
+if (t4) {
+t4 = ((v_n11).kind != 23);
+}
+if (t4) {
+t5 = (v_n11).token;
+t6 = cast[*u8]("owning values require an explicit move");
+ErrorAt(t5, t6);
+}
+}
+return;
+}
+
+
+fn OwnerPlace(arg_v_n12: *Node) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_n12: *Node = arg_v_n12;
+var t0: bool = false;
+var t1: bool = false;
+var t2: *Node = null;
+var t3: i8 = i8(0);
+if (!((v_n12 != null))) {
+return i8(0);
+}
+if (((v_n12).kind == 30)) {
+return i8(1);
+}
+t0 = ((v_n12).kind == 18);
+if (!t0) {
+t0 = ((v_n12).kind == 24);
+}
+t1 = t0;
+if (!t1) {
+t1 = ((v_n12).kind == 25);
+}
+if (t1) {
+t2 = (v_n12).a;
+t3 = OwnerPlace(t2);
+return t3;
+}
+return i8(0);
+}
+return i8(0);
+}
+
+
+fn OwnerDefer(arg_v_slot2: i64, arg_v_type27: i64, arg_v_token4: *Token) -> *Node {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_slot2: i64 = arg_v_slot2;
+var v_type27: i64 = arg_v_type27;
+var v_token4: *Token = arg_v_token4;
+var v_statement: *Node = null;
+var v_call: *Node = null;
+var v_address: *Node = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *Node = null;
+var t3: i64 = i64(0);
+var t4: *Token = null;
+var t5: *Node = null;
+var t6: i64 = i64(0);
+var t7: *Token = null;
+var t8: *Node = null;
+t0 = 15;
+t1 = v_token4;
+t2 = NewNode(t0, t1);
+v_statement = t2;
+t3 = 4;
+t4 = v_token4;
+t5 = NewNode(t3, t4);
+v_call = t5;
+t6 = 22;
+t7 = v_token4;
+t8 = NewNode(t6, t7);
+v_address = t8;
+(v_address).slot = v_slot2;
+(v_address).type = (100000 + v_type27);
+(v_call).slot = (-7);
+(v_call).value = 1;
+(v_call).op = v_type27;
+(v_call).type = 0;
+(v_call).a = v_address;
+(v_statement).a = v_call;
+return v_statement;
+}
+return null;
+}
+
+
+fn InjectDrops(arg_v_f6: *Function) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_f6: *Function = arg_v_f6;
+var v_d2: *DropSlot = null;
+var v_block: *Node = null;
+var v_tail1: *Node = null;
+var v_deferred: *Node = null;
+var t0: i64 = i64(0);
+var t1: *Token = null;
+var t2: *Node = null;
+var t3: i64 = i64(0);
+var t4: i64 = i64(0);
+var t5: *Token = null;
+var t6: *Node = null;
+v_tail1 = null;
+if (!(((v_f6).drops != null))) {
+return;
+}
+t0 = 12;
+t1 = (v_f6).token;
+t2 = NewNode(t0, t1);
+v_block = t2;
+v_d2 = (v_f6).drops;
+while (true) {
+if (!((v_d2 != null))) { break; }
+t3 = (v_d2).slot;
+t4 = (v_d2).type;
+t5 = (v_f6).token;
+t6 = OwnerDefer(t3, t4, t5);
+v_deferred = t6;
+if ((v_tail1 != null)) {
+(v_tail1).next = v_deferred;
+} else {
+(v_block).a = v_deferred;
+}
+v_tail1 = v_deferred;
+v_d2 = (v_d2).next;
+}
+(v_tail1).next = (v_f6).body;
+(v_f6).body = v_block;
+}
+return;
+}
+
+
+fn MoveSnapshot() -> *MoveState {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_head: *MoveState = null;
+var v_s7: *MoveState = null;
+var v_l2: *Local = null;
+var t0: i64 = i64(0);
+var t1: *u8 = null;
+v_head = null;
+v_l2 = ctx.v_locals;
+while (true) {
+if (!((v_l2 != null))) { break; }
+t0 = i64(sizeof(MoveState));
+t1 = CAlloc(t0);
+v_s7 = cast[*MoveState](t1);
+(v_s7).local = v_l2;
+(v_s7).before = (v_l2).moved;
+(v_s7).next = v_head;
+v_head = v_s7;
+v_l2 = (v_l2).next;
+}
+return v_head;
+}
+return null;
+}
+
+
+fn MoveRestore(arg_v_s8: *MoveState) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s8: *MoveState = arg_v_s8;
+while (true) {
+if (!((v_s8 != null))) { break; }
+((v_s8).local).moved = (v_s8).before;
+v_s8 = (v_s8).next;
+}
+}
+return;
+}
+
+
+fn MoveJoin(arg_v_s9: *MoveState) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s9: *MoveState = arg_v_s9;
+while (true) {
+if (!((v_s9 != null))) { break; }
+(v_s9).joined = (v_s9).joined | ((v_s9).local).moved;
+v_s9 = (v_s9).next;
+}
+}
+return;
+}
+
+
+fn MoveFinish(arg_v_s10: *MoveState) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_s10: *MoveState = arg_v_s10;
+while (true) {
+if (!((v_s10 != null))) { break; }
+((v_s10).local).moved = (v_s10).joined;
+v_s10 = (v_s10).next;
+}
+}
+return;
+}
+
+
+fn CheckLivePlace(place: *Node) {
+    unsafe {
+        let root = BorrowRoot(place);
+        if (root != null && Owned(root.type) != 0 && root.moved != 0) {
+            ErrorAt(place.token, cast[*u8]("owner moved while an access to its storage is pending"));
+        }
+    }
+}

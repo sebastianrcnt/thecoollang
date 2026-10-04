@@ -1,0 +1,1266 @@
+fn Alpha(arg_v_ch1: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_ch1: i64 = arg_v_ch1;
+var t0: bool = false;
+var t1: bool = false;
+var t2: bool = false;
+var t3: bool = false;
+t0 = (97 <= v_ch1);
+if (t0) {
+t0 = (v_ch1 <= 122);
+}
+t1 = t0;
+if (!t1) {
+t2 = (65 <= v_ch1);
+if (t2) {
+t2 = (v_ch1 <= 90);
+}
+t1 = t2;
+}
+t3 = t1;
+if (!t3) {
+t3 = (v_ch1 == 95);
+}
+return i8(BoolInt(t3));
+}
+return i8(0);
+}
+
+
+fn Digit(arg_v_ch2: i64) -> i8 {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_ch2: i64 = arg_v_ch2;
+var t0: bool = false;
+t0 = (48 <= v_ch2);
+if (t0) {
+t0 = (v_ch2 <= 57);
+}
+return i8(BoolInt(t0));
+}
+return i8(0);
+}
+
+
+fn LexSource(arg_v_src: *u8, arg_v_file: *u8) {
+unsafe {
+var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+var v_src: *u8 = arg_v_src;
+var v_file: *u8 = arg_v_file;
+var v_i2: i64 = i64(0);
+var v_line: i64 = i64(0);
+var v_col: i64 = i64(0);
+var v_start1: i64 = i64(0);
+var v_ch3: i64 = i64(0);
+var v_next: i64 = i64(0);
+var v_base: i64 = i64(0);
+var v_d1: i64 = i64(0);
+var v_ok: i64 = i64(0);
+var v_t8: *Token = null;
+var v_text: *Text = null;
+var v_emitted: i8 = i8(0);
+var t0: *u8 = null;
+var t1: i64 = i64(0);
+var t2: i64 = i64(0);
+var t3: *u8 = null;
+var t4: i64 = i64(0);
+var t5: i64 = i64(0);
+var t6: bool = false;
+var t7: bool = false;
+var t8: bool = false;
+var t9: bool = false;
+var t10: bool = false;
+var t11: bool = false;
+var t12: bool = false;
+var t13: bool = false;
+var t14: bool = false;
+var t15: bool = false;
+var t16: i64 = i64(0);
+var t17: i64 = i64(0);
+var t18: i64 = i64(0);
+var t19: i64 = i64(0);
+var t20: *Text = null;
+var t21: i64 = i64(0);
+var t22: *Token = null;
+var t23: *u8 = null;
+var t24: *Text = null;
+var t25: i64 = i64(0);
+var t26: *Token = null;
+var t27: *u8 = null;
+var t28: bool = false;
+var t29: i64 = i64(0);
+var t30: i64 = i64(0);
+var t31: *Token = null;
+var t32: *u8 = null;
+var t33: i64 = i64(0);
+var t34: i64 = i64(0);
+var t35: bool = false;
+var t36: i64 = i64(0);
+var t37: i64 = i64(0);
+var t38: *Text = null;
+var t39: *Token = null;
+var t40: *u8 = null;
+var t41: bool = false;
+var t42: i64 = i64(0);
+var t43: i8 = i8(0);
+var t44: bool = false;
+var t45: i64 = i64(0);
+var t46: i8 = i8(0);
+var t47: *Token = null;
+var t48: *u8 = null;
+var t49: *u8 = null;
+var t50: i64 = i64(0);
+var t51: i64 = i64(0);
+var t52: *u8 = null;
+var t53: *u8 = null;
+var t54: *i64 = null;
+var t55: i64 = i64(0);
+var t56: i64 = i64(0);
+var t57: i64 = i64(0);
+var t58: i64 = i64(0);
+var t59: i8 = i8(0);
+var t60: *Token = null;
+var t61: *u8 = null;
+var t62: i64 = i64(0);
+var t63: i8 = i8(0);
+var t64: i64 = i64(0);
+var t65: i64 = i64(0);
+var t66: bool = false;
+var t67: i64 = i64(0);
+var t68: i64 = i64(0);
+var t69: bool = false;
+var t70: i64 = i64(0);
+var t71: i64 = i64(0);
+var t72: i64 = i64(0);
+var t73: i8 = i8(0);
+var t74: i64 = i64(0);
+var t75: i64 = i64(0);
+var t76: bool = false;
+var t77: bool = false;
+var t78: i64 = i64(0);
+var t79: i8 = i8(0);
+var t80: bool = false;
+var t81: bool = false;
+var t82: i64 = i64(0);
+var t83: i64 = i64(0);
+var t84: *Token = null;
+var t85: *u8 = null;
+var t86: bool = false;
+var t87: i64 = i64(0);
+var t88: i64 = i64(0);
+var t89: bool = false;
+var t90: bool = false;
+var t91: i64 = i64(0);
+var t92: i8 = i8(0);
+var t93: bool = false;
+var t94: bool = false;
+var t95: i64 = i64(0);
+var t96: i8 = i8(0);
+var t97: *u8 = null;
+var t98: i64 = i64(0);
+var t99: i64 = i64(0);
+var t100: *u8 = null;
+var t101: i64 = i64(0);
+var t102: i64 = i64(0);
+var t103: i64 = i64(0);
+var t104: i8 = i8(0);
+var t105: bool = false;
+var t106: i64 = i64(0);
+var t107: i8 = i8(0);
+var t108: i64 = i64(0);
+var t109: i8 = i8(0);
+var t110: i64 = i64(0);
+var t111: i64 = i64(0);
+var t112: *Token = null;
+var t113: *u8 = null;
+var t114: i64 = i64(0);
+var t115: i64 = i64(0);
+var t116: i64 = i64(0);
+var t117: bool = false;
+var t118: bool = false;
+var t119: bool = false;
+var t120: i64 = i64(0);
+var t121: i64 = i64(0);
+var t122: bool = false;
+var t123: bool = false;
+var t124: i64 = i64(0);
+var t125: i64 = i64(0);
+var t126: i64 = i64(0);
+var t127: bool = false;
+var t128: bool = false;
+var t129: bool = false;
+var t130: i64 = i64(0);
+var t131: *u8 = null;
+var pc: i64 = 179;
+while (true) {
+if (pc == 1) {
+pc = 94;
+continue;
+}
+if (pc == 2) {
+pc = 9;
+continue;
+}
+if (pc == 3) {
+return;
+}
+if (pc == 4) {
+((ctx.v_tokens)[ctx.v_ntok]).col = v_col;
+pc = 3;
+continue;
+}
+if (pc == 5) {
+((ctx.v_tokens)[ctx.v_ntok]).line = v_line;
+pc = 4;
+continue;
+}
+if (pc == 6) {
+((ctx.v_tokens)[ctx.v_ntok]).file = v_file;
+pc = 5;
+continue;
+}
+if (pc == 7) {
+((ctx.v_tokens)[ctx.v_ntok]).kind = 0;
+pc = 6;
+continue;
+}
+if (pc == 8) {
+if (((v_src)[v_i2] != u8(0))) { pc = 173; } else { pc = 7; }
+continue;
+}
+if (pc == 9) {
+if ((v_emitted != i8(0))) { pc = 11; } else { pc = 8; }
+continue;
+}
+if (pc == 10) {
+t0 = v_src;
+t1 = (v_t8).start;
+t2 = v_i2;
+t3 = Slice(t0, t1, t2);
+(v_t8).raw = t3;
+pc = 8;
+continue;
+}
+if (pc == 11) {
+(v_t8).end = v_i2;
+pc = 10;
+continue;
+}
+if (pc == 12) {
+if (((v_t8).kind >= 259)) { pc = 14; } else { pc = 2; }
+continue;
+}
+if (pc == 13) {
+t4 = v_col;
+v_col = v_col + i64(1);
+pc = 2;
+continue;
+}
+if (pc == 14) {
+t5 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 13;
+continue;
+}
+if (pc == 15) {
+t6 = (v_ch3 == 62);
+if (t6) {
+t6 = (v_next == 62);
+}
+if (t6) { pc = 16; } else { pc = 12; }
+continue;
+}
+if (pc == 16) {
+(v_t8).kind = 267;
+pc = 12;
+continue;
+}
+if (pc == 17) {
+t7 = (v_ch3 == 60);
+if (t7) {
+t7 = (v_next == 60);
+}
+if (t7) { pc = 18; } else { pc = 15; }
+continue;
+}
+if (pc == 18) {
+(v_t8).kind = 266;
+pc = 15;
+continue;
+}
+if (pc == 19) {
+t8 = (v_ch3 == 45);
+if (t8) {
+t8 = (v_next == 62);
+}
+if (t8) { pc = 20; } else { pc = 17; }
+continue;
+}
+if (pc == 20) {
+(v_t8).kind = 265;
+pc = 17;
+continue;
+}
+if (pc == 21) {
+t9 = (v_ch3 == 124);
+if (t9) {
+t9 = (v_next == 124);
+}
+if (t9) { pc = 22; } else { pc = 19; }
+continue;
+}
+if (pc == 22) {
+(v_t8).kind = 264;
+pc = 19;
+continue;
+}
+if (pc == 23) {
+t10 = (v_ch3 == 38);
+if (t10) {
+t10 = (v_next == 38);
+}
+if (t10) { pc = 24; } else { pc = 21; }
+continue;
+}
+if (pc == 24) {
+(v_t8).kind = 263;
+pc = 21;
+continue;
+}
+if (pc == 25) {
+t11 = (v_ch3 == 62);
+if (t11) {
+t11 = (v_next == 61);
+}
+if (t11) { pc = 26; } else { pc = 23; }
+continue;
+}
+if (pc == 26) {
+(v_t8).kind = 262;
+pc = 23;
+continue;
+}
+if (pc == 27) {
+t12 = (v_ch3 == 60);
+if (t12) {
+t12 = (v_next == 61);
+}
+if (t12) { pc = 28; } else { pc = 25; }
+continue;
+}
+if (pc == 28) {
+(v_t8).kind = 261;
+pc = 25;
+continue;
+}
+if (pc == 29) {
+t13 = (v_ch3 == 33);
+if (t13) {
+t13 = (v_next == 61);
+}
+if (t13) { pc = 30; } else { pc = 27; }
+continue;
+}
+if (pc == 30) {
+(v_t8).kind = 260;
+pc = 27;
+continue;
+}
+if (pc == 31) {
+t14 = (v_ch3 == 61);
+if (t14) {
+t14 = (v_next == 61);
+}
+if (t14) { pc = 32; } else { pc = 29; }
+continue;
+}
+if (pc == 32) {
+(v_t8).kind = 259;
+pc = 29;
+continue;
+}
+if (pc == 33) {
+t15 = (v_ch3 == 61);
+if (t15) {
+t15 = (v_next == 62);
+}
+if (t15) { pc = 34; } else { pc = 31; }
+continue;
+}
+if (pc == 34) {
+(v_t8).kind = 269;
+pc = 31;
+continue;
+}
+if (pc == 35) {
+t16 = v_col;
+v_col = v_col + i64(1);
+pc = 33;
+continue;
+}
+if (pc == 36) {
+t17 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 35;
+continue;
+}
+if (pc == 37) {
+(v_t8).kind = v_ch3;
+pc = 36;
+continue;
+}
+if (pc == 38) {
+if ((v_ch3 == 34)) { pc = 66; } else { pc = 37; }
+continue;
+}
+if (pc == 39) {
+pc = 2;
+continue;
+}
+if (pc == 40) {
+t18 = v_col;
+v_col = v_col + i64(1);
+pc = 39;
+continue;
+}
+if (pc == 41) {
+t19 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 40;
+continue;
+}
+if (pc == 42) {
+(v_t8).kind = 258;
+pc = 41;
+continue;
+}
+if (pc == 43) {
+(v_t8).text = (v_text).data;
+pc = 42;
+continue;
+}
+if (pc == 44) {
+t20 = v_text;
+t21 = 0;
+Reserve(t20, t21);
+pc = 43;
+continue;
+}
+if (pc == 45) {
+if (!(((v_src)[v_i2] != u8(0)))) { pc = 46; } else { pc = 44; }
+continue;
+}
+if (pc == 46) {
+t22 = v_t8;
+t23 = cast[*u8]("unterminated string literal");
+ErrorAt(t22, t23);
+pc = 44;
+continue;
+}
+if (pc == 47) {
+t35 = (i64((v_src)[v_i2]) != i64(0));
+if (t35) {
+t35 = (i64((v_src)[v_i2]) != 34);
+}
+if (t35) { pc = 63; } else { pc = 45; }
+continue;
+}
+if (pc == 48) {
+t24 = v_text;
+t25 = v_ch3;
+Char(t24, t25);
+pc = 47;
+continue;
+}
+if (pc == 49) {
+if ((v_ch3 == 92)) { pc = 59; } else { pc = 48; }
+continue;
+}
+if (pc == 50) {
+if ((v_ch3 == 110)) { pc = 51; } else { pc = 52; }
+continue;
+}
+if (pc == 51) {
+v_ch3 = 10;
+pc = 48;
+continue;
+}
+if (pc == 52) {
+if ((v_ch3 == 116)) { pc = 53; } else { pc = 54; }
+continue;
+}
+if (pc == 53) {
+v_ch3 = 9;
+pc = 48;
+continue;
+}
+if (pc == 54) {
+if ((v_ch3 == 114)) { pc = 55; } else { pc = 56; }
+continue;
+}
+if (pc == 55) {
+v_ch3 = 13;
+pc = 48;
+continue;
+}
+if (pc == 56) {
+t28 = (v_ch3 != 92);
+if (t28) {
+t28 = (v_ch3 != 34);
+}
+if (t28) { pc = 57; } else { pc = 48; }
+continue;
+}
+if (pc == 57) {
+t26 = v_t8;
+t27 = cast[*u8]("unsupported string escape");
+ErrorAt(t26, t27);
+pc = 48;
+continue;
+}
+if (pc == 58) {
+t29 = v_col;
+v_col = v_col + i64(1);
+pc = 50;
+continue;
+}
+if (pc == 59) {
+t30 = v_i2;
+v_i2 = v_i2 + i64(1);
+v_ch3 = i64((v_src)[t30]);
+pc = 58;
+continue;
+}
+if (pc == 60) {
+if ((v_ch3 == 10)) { pc = 61; } else { pc = 49; }
+continue;
+}
+if (pc == 61) {
+t31 = v_t8;
+t32 = cast[*u8]("newline in string literal");
+ErrorAt(t31, t32);
+pc = 49;
+continue;
+}
+if (pc == 62) {
+t33 = v_col;
+v_col = v_col + i64(1);
+pc = 60;
+continue;
+}
+if (pc == 63) {
+t34 = v_i2;
+v_i2 = v_i2 + i64(1);
+v_ch3 = i64((v_src)[t34]);
+pc = 62;
+continue;
+}
+if (pc == 64) {
+t36 = v_col;
+v_col = v_col + i64(1);
+pc = 47;
+continue;
+}
+if (pc == 65) {
+t37 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 64;
+continue;
+}
+if (pc == 66) {
+t38 = TextNew();
+v_text = t38;
+pc = 65;
+continue;
+}
+if (pc == 67) {
+t95 = v_ch3;
+t96 = Digit(t95);
+if ((t96 != i8(0))) { pc = 122; } else { pc = 38; }
+continue;
+}
+if (pc == 68) {
+pc = 2;
+continue;
+}
+if (pc == 69) {
+t41 = (v_i2 == v_start1);
+if (!t41) {
+t42 = i64((v_src)[v_i2]);
+t43 = Alpha(t42);
+t41 = (i64(t43) != i64(0));
+}
+t44 = t41;
+if (!t44) {
+t45 = i64((v_src)[v_i2]);
+t46 = Digit(t45);
+t44 = (i64(t46) != i64(0));
+}
+if (t44) { pc = 70; } else { pc = 68; }
+continue;
+}
+if (pc == 70) {
+t39 = v_t8;
+t40 = cast[*u8]("invalid integer literal");
+ErrorAt(t39, t40);
+pc = 68;
+continue;
+}
+if (pc == 71) {
+t76 = (v_base == 10);
+if (t76) {
+t77 = (i64((v_src)[v_i2]) == 46);
+if (t77) {
+t78 = i64((v_src)[(v_i2 + 1)]);
+t79 = Digit(t78);
+t77 = (i64(t79) != i64(0));
+}
+t80 = t77;
+if (!t80) {
+t80 = (i64((v_src)[v_i2]) == 101);
+}
+t81 = t80;
+if (!t81) {
+t81 = (i64((v_src)[v_i2]) == 69);
+}
+t76 = t81;
+}
+if (t76) { pc = 87; } else { pc = 69; }
+continue;
+}
+if (pc == 72) {
+(v_t8).kind = 268;
+pc = 69;
+continue;
+}
+if (pc == 73) {
+if (!((v_ok != i64(0)))) { pc = 74; } else { pc = 72; }
+continue;
+}
+if (pc == 74) {
+t47 = v_t8;
+t48 = cast[*u8]("floating literal out of range or invalid");
+ErrorAt(t47, t48);
+pc = 72;
+continue;
+}
+if (pc == 75) {
+t49 = v_src;
+t50 = (v_t8).start;
+t51 = v_i2;
+t52 = Slice(t49, t50, t51);
+t53 = t52;
+t54 = &(v_ok);
+t55 = NativeParseFloat(t53, t54);
+(v_t8).val = t55;
+pc = 73;
+continue;
+}
+if (pc == 76) {
+t69 = (i64((v_src)[v_i2]) == 101);
+if (!t69) {
+t69 = (i64((v_src)[v_i2]) == 69);
+}
+if (t69) { pc = 86; } else { pc = 75; }
+continue;
+}
+if (pc == 77) {
+t58 = i64((v_src)[v_i2]);
+t59 = Digit(t58);
+if ((t59 != i8(0))) { pc = 79; } else { pc = 75; }
+continue;
+}
+if (pc == 78) {
+t56 = v_col;
+v_col = v_col + i64(1);
+pc = 77;
+continue;
+}
+if (pc == 79) {
+t57 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 78;
+continue;
+}
+if (pc == 80) {
+t62 = i64((v_src)[v_i2]);
+t63 = Digit(t62);
+if (!((t63 != i8(0)))) { pc = 81; } else { pc = 77; }
+continue;
+}
+if (pc == 81) {
+t60 = v_t8;
+t61 = cast[*u8]("expected exponent digits");
+ErrorAt(t60, t61);
+pc = 77;
+continue;
+}
+if (pc == 82) {
+t66 = (i64((v_src)[v_i2]) == 43);
+if (!t66) {
+t66 = (i64((v_src)[v_i2]) == 45);
+}
+if (t66) { pc = 84; } else { pc = 80; }
+continue;
+}
+if (pc == 83) {
+t64 = v_col;
+v_col = v_col + i64(1);
+pc = 80;
+continue;
+}
+if (pc == 84) {
+t65 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 83;
+continue;
+}
+if (pc == 85) {
+t67 = v_col;
+v_col = v_col + i64(1);
+pc = 82;
+continue;
+}
+if (pc == 86) {
+t68 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 85;
+continue;
+}
+if (pc == 87) {
+if ((i64((v_src)[v_i2]) == 46)) { pc = 92; } else { pc = 76; }
+continue;
+}
+if (pc == 88) {
+t72 = i64((v_src)[v_i2]);
+t73 = Digit(t72);
+if ((t73 != i8(0))) { pc = 90; } else { pc = 76; }
+continue;
+}
+if (pc == 89) {
+t70 = v_col;
+v_col = v_col + i64(1);
+pc = 88;
+continue;
+}
+if (pc == 90) {
+t71 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 89;
+continue;
+}
+if (pc == 91) {
+t74 = v_col;
+v_col = v_col + i64(1);
+pc = 88;
+continue;
+}
+if (pc == 92) {
+t75 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 91;
+continue;
+}
+if (pc == 93) {
+if (((v_src)[v_i2] != u8(0))) { pc = 113; } else { pc = 71; }
+continue;
+}
+if (pc == 94) {
+pc = 93;
+continue;
+}
+if (pc == 95) {
+t82 = v_col;
+v_col = v_col + i64(1);
+pc = 1;
+continue;
+}
+if (pc == 96) {
+t83 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 95;
+continue;
+}
+if (pc == 97) {
+(v_t8).val = (((v_t8).val * v_base) + v_d1);
+pc = 96;
+continue;
+}
+if (pc == 98) {
+if ((u64((v_t8).val) > ((18446744073709551615 - u64(v_d1)) / u64(v_base)))) { pc = 99; } else { pc = 97; }
+continue;
+}
+if (pc == 99) {
+t84 = v_t8;
+t85 = cast[*u8]("integer literal exceeds u64 range");
+ErrorAt(t84, t85);
+pc = 97;
+continue;
+}
+if (pc == 100) {
+t86 = (v_d1 < 0);
+if (!t86) {
+t86 = (v_d1 >= v_base);
+}
+if (t86) { pc = 101; } else { pc = 98; }
+continue;
+}
+if (pc == 101) {
+pc = 71;
+continue;
+}
+if (pc == 102) {
+if ((v_ch3 == 95)) { pc = 105; } else { pc = 100; }
+continue;
+}
+if (pc == 103) {
+pc = 1;
+continue;
+}
+if (pc == 104) {
+t87 = v_col;
+v_col = v_col + i64(1);
+pc = 103;
+continue;
+}
+if (pc == 105) {
+t88 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 104;
+continue;
+}
+if (pc == 106) {
+t89 = (65 <= v_ch3);
+if (t89) {
+t89 = (v_ch3 <= 70);
+}
+if (t89) { pc = 107; } else { pc = 102; }
+continue;
+}
+if (pc == 107) {
+v_d1 = ((v_ch3 - 65) + 10);
+pc = 102;
+continue;
+}
+if (pc == 108) {
+t90 = (97 <= v_ch3);
+if (t90) {
+t90 = (v_ch3 <= 102);
+}
+if (t90) { pc = 109; } else { pc = 106; }
+continue;
+}
+if (pc == 109) {
+v_d1 = ((v_ch3 - 97) + 10);
+pc = 106;
+continue;
+}
+if (pc == 110) {
+t91 = v_ch3;
+t92 = Digit(t91);
+if ((t92 != i8(0))) { pc = 111; } else { pc = 108; }
+continue;
+}
+if (pc == 111) {
+v_d1 = (v_ch3 - 48);
+pc = 108;
+continue;
+}
+if (pc == 112) {
+v_d1 = (-1);
+pc = 110;
+continue;
+}
+if (pc == 113) {
+v_ch3 = i64((v_src)[v_i2]);
+pc = 112;
+continue;
+}
+if (pc == 114) {
+v_start1 = v_i2;
+pc = 93;
+continue;
+}
+if (pc == 115) {
+t93 = (v_ch3 == 48);
+if (t93) {
+t94 = (v_next == 120);
+if (!t94) {
+t94 = (v_next == 98);
+}
+t93 = t94;
+}
+if (t93) { pc = 120; } else { pc = 114; }
+continue;
+}
+if (pc == 116) {
+v_col = v_col + 2;
+pc = 114;
+continue;
+}
+if (pc == 117) {
+v_i2 = v_i2 + 2;
+pc = 116;
+continue;
+}
+if (pc == 118) {
+if ((v_next == 98)) { pc = 119; } else { pc = 117; }
+continue;
+}
+if (pc == 119) {
+v_base = 2;
+pc = 117;
+continue;
+}
+if (pc == 120) {
+v_base = 16;
+pc = 118;
+continue;
+}
+if (pc == 121) {
+v_base = 10;
+pc = 115;
+continue;
+}
+if (pc == 122) {
+(v_t8).kind = 257;
+pc = 121;
+continue;
+}
+if (pc == 123) {
+t108 = v_ch3;
+t109 = Alpha(t108);
+if ((t109 != i8(0))) { pc = 129; } else { pc = 67; }
+continue;
+}
+if (pc == 124) {
+pc = 2;
+continue;
+}
+if (pc == 125) {
+t97 = v_src;
+t98 = v_start1;
+t99 = v_i2;
+t100 = Slice(t97, t98, t99);
+(v_t8).text = t100;
+pc = 124;
+continue;
+}
+if (pc == 126) {
+(v_t8).kind = 256;
+pc = 125;
+continue;
+}
+if (pc == 127) {
+t103 = i64((v_src)[v_i2]);
+t104 = Alpha(t103);
+t105 = (i64(t104) != i64(0));
+if (!t105) {
+t106 = i64((v_src)[v_i2]);
+t107 = Digit(t106);
+t105 = (i64(t107) != i64(0));
+}
+if (t105) { pc = 129; } else { pc = 126; }
+continue;
+}
+if (pc == 128) {
+t101 = v_col;
+v_col = v_col + i64(1);
+pc = 127;
+continue;
+}
+if (pc == 129) {
+t102 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 128;
+continue;
+}
+if (pc == 130) {
+v_emitted = i8(1);
+pc = 123;
+continue;
+}
+if (pc == 131) {
+(v_t8).start = v_i2;
+pc = 130;
+continue;
+}
+if (pc == 132) {
+v_start1 = v_i2;
+pc = 131;
+continue;
+}
+if (pc == 133) {
+(v_t8).col = v_col;
+pc = 132;
+continue;
+}
+if (pc == 134) {
+(v_t8).line = v_line;
+pc = 133;
+continue;
+}
+if (pc == 135) {
+(v_t8).package = ctx.v_lex_package;
+pc = 134;
+continue;
+}
+if (pc == 136) {
+(v_t8).file = v_file;
+pc = 135;
+continue;
+}
+if (pc == 137) {
+(v_t8).text = null;
+pc = 136;
+continue;
+}
+if (pc == 138) {
+(v_t8).val = 0;
+pc = 137;
+continue;
+}
+if (pc == 139) {
+t110 = ctx.v_ntok;
+ctx.v_ntok = ctx.v_ntok + i64(1);
+v_t8 = &((ctx.v_tokens)[t110]);
+pc = 138;
+continue;
+}
+if (pc == 140) {
+if ((ctx.v_ntok >= (262144 - 2))) { pc = 141; } else { pc = 139; }
+continue;
+}
+if (pc == 141) {
+t111 = 70;
+NativeExit(t111);
+pc = 139;
+continue;
+}
+if (pc == 142) {
+t119 = (v_ch3 == 47);
+if (t119) {
+t119 = (v_next == 42);
+}
+if (t119) { pc = 158; } else { pc = 140; }
+continue;
+}
+if (pc == 143) {
+pc = 2;
+continue;
+}
+if (pc == 144) {
+v_col = v_col + 2;
+pc = 143;
+continue;
+}
+if (pc == 145) {
+v_i2 = v_i2 + 2;
+pc = 144;
+continue;
+}
+if (pc == 146) {
+if (!(((v_src)[v_i2] != u8(0)))) { pc = 150; } else { pc = 145; }
+continue;
+}
+if (pc == 147) {
+t112 = &((ctx.v_tokens)[ctx.v_ntok]);
+t113 = cast[*u8]("unterminated comment");
+ErrorAt(t112, t113);
+pc = 145;
+continue;
+}
+if (pc == 148) {
+((ctx.v_tokens)[ctx.v_ntok]).col = v_col;
+pc = 147;
+continue;
+}
+if (pc == 149) {
+((ctx.v_tokens)[ctx.v_ntok]).line = v_line;
+pc = 148;
+continue;
+}
+if (pc == 150) {
+((ctx.v_tokens)[ctx.v_ntok]).file = v_file;
+pc = 149;
+continue;
+}
+if (pc == 151) {
+t117 = (i64((v_src)[v_i2]) != i64(0));
+if (t117) {
+t118 = (i64((v_src)[v_i2]) == 42);
+if (t118) {
+t118 = (i64((v_src)[(v_i2 + 1)]) == 47);
+}
+t117 = !(t118);
+}
+if (t117) { pc = 154; } else { pc = 146; }
+continue;
+}
+if (pc == 152) {
+t114 = v_col;
+v_col = v_col + i64(1);
+pc = 151;
+continue;
+}
+if (pc == 153) {
+t115 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 152;
+continue;
+}
+if (pc == 154) {
+if ((i64((v_src)[v_i2]) == 10)) { pc = 156; } else { pc = 153; }
+continue;
+}
+if (pc == 155) {
+v_col = 0;
+pc = 153;
+continue;
+}
+if (pc == 156) {
+t116 = v_line;
+v_line = v_line + i64(1);
+pc = 155;
+continue;
+}
+if (pc == 157) {
+v_col = v_col + 2;
+pc = 151;
+continue;
+}
+if (pc == 158) {
+v_i2 = v_i2 + 2;
+pc = 157;
+continue;
+}
+if (pc == 159) {
+t123 = (v_ch3 == 47);
+if (t123) {
+t123 = (v_next == 47);
+}
+if (t123) { pc = 161; } else { pc = 142; }
+continue;
+}
+if (pc == 160) {
+pc = 2;
+continue;
+}
+if (pc == 161) {
+t122 = (i64((v_src)[v_i2]) != i64(0));
+if (t122) {
+t122 = (i64((v_src)[v_i2]) != 10);
+}
+if (t122) { pc = 163; } else { pc = 160; }
+continue;
+}
+if (pc == 162) {
+t120 = v_col;
+v_col = v_col + i64(1);
+pc = 161;
+continue;
+}
+if (pc == 163) {
+t121 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 162;
+continue;
+}
+if (pc == 164) {
+t127 = (v_ch3 == 32);
+if (!t127) {
+t127 = (v_ch3 == 9);
+}
+t128 = t127;
+if (!t128) {
+t128 = (v_ch3 == 13);
+}
+t129 = t128;
+if (!t129) {
+t129 = (v_ch3 == 10);
+}
+if (t129) { pc = 170; } else { pc = 159; }
+continue;
+}
+if (pc == 165) {
+pc = 2;
+continue;
+}
+if (pc == 166) {
+if ((v_ch3 == 10)) { pc = 168; } else { pc = 165; }
+continue;
+}
+if (pc == 167) {
+v_col = 1;
+pc = 165;
+continue;
+}
+if (pc == 168) {
+t124 = v_line;
+v_line = v_line + i64(1);
+pc = 167;
+continue;
+}
+if (pc == 169) {
+t125 = v_col;
+v_col = v_col + i64(1);
+pc = 166;
+continue;
+}
+if (pc == 170) {
+t126 = v_i2;
+v_i2 = v_i2 + i64(1);
+pc = 169;
+continue;
+}
+if (pc == 171) {
+v_next = i64((v_src)[(v_i2 + 1)]);
+pc = 164;
+continue;
+}
+if (pc == 172) {
+v_ch3 = i64((v_src)[v_i2]);
+pc = 171;
+continue;
+}
+if (pc == 173) {
+v_emitted = i8(0);
+pc = 172;
+continue;
+}
+if (pc == 174) {
+if (!((ctx.v_tokens != null))) { pc = 175; } else { pc = 8; }
+continue;
+}
+if (pc == 175) {
+t130 = i64((u64(262144) * sizeof(Token)));
+t131 = CAlloc(t130);
+ctx.v_tokens = cast[*Token](t131);
+pc = 8;
+continue;
+}
+if (pc == 176) {
+pc = 174;
+continue;
+}
+if (pc == 177) {
+pc = 176;
+continue;
+}
+if (pc == 178) {
+pc = 177;
+continue;
+}
+if (pc == 179) {
+v_i2 = 0;
+v_line = 1;
+v_col = 1;
+pc = 178;
+continue;
+}
+}
+}
+return;
+}
+
