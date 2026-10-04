@@ -2,18 +2,18 @@
 class ReplPackage { U8 *name,*fingerprint;ReplPackage *next; };
 ReplPackage *repl_packages,*repl_saved_packages;
 ReplPackage *ReplFindPackage(ReplPackage *head,U8 *name){ReplPackage *item=head;while(item){if(Eq(item->name,name))return item;item=item->next;}return NULL;}
-U0 ReplPackagesRestore(){ReplPackage *item;while(repl_packages!=repl_saved_packages){item=repl_packages;repl_packages=item->next;Free(item);}lex_package="__main";}
+U0 ReplPackagesRestore(){ReplPackage *item;Alias *alias;while(repl_packages!=repl_saved_packages){item=repl_packages;repl_packages=item->next;Free(item->fingerprint);Free(item);}while(aliases!=repl_aliases){alias=aliases;aliases=alias->next;Free(alias);}lex_package="__main";}
 U0 ReplReadPackages(U8 *manifest,Token *token){
-    ReplPackage *previous=repl_packages,*existing,*package;I64 size=0,at=0,field,begin;U8 *fields[4],*source,*data=FileRead(manifest,&size,NULL);
+    ReplPackage *previous=repl_packages,*existing,*package;I64 size=0,at=0,field,begin;U8 *fields[4],*source,*data=ScratchOwn(FileRead(manifest,&size,NULL));
     if(!data)ErrorAt(token,"cannot read resolved package manifest");
     while(data[at]){
-        for(field=0;field<4;field++){begin=at;while(data[at] && data[at]!='\t' && data[at]!='\n')at++;if((field<3 && data[at]!='\t') || (field==3 && data[at]!='\n'))ErrorAt(token,"invalid resolved package manifest");fields[field]=Slice(data,begin,at++);}
+        for(field=0;field<4;field++){begin=at;while(data[at] && data[at]!='\t' && data[at]!='\n')at++;if((field<3 && data[at]!='\t') || (field==3 && data[at]!='\n'))ErrorAt(token,"invalid resolved package manifest");fields[field]=ScratchOwn(Slice(data,begin,at++));}
         existing=ReplFindPackage(repl_packages,fields[0]);if(existing && !Eq(existing->fingerprint,fields[1]))ErrorAt(token,"loaded package changed; start a new session");
         if(!ReplFindPackage(previous,fields[0])){
-            if(!existing){package=CAlloc(sizeof(ReplPackage));package->name=fields[0];package->fingerprint=fields[1];package->next=repl_packages;repl_packages=package;}
-            source=FileRead(fields[3],&size,NULL);if(!source)ErrorAt(token,"cannot read resolved package source");lex_package=fields[0];LexSource(source,fields[2]);
+            if(!existing){package=CAlloc(sizeof(ReplPackage));package->name=LiteralString(fields[0]);package->fingerprint=StrNew(fields[1]);package->next=repl_packages;repl_packages=package;}
+            source=ScratchOwn(FileRead(fields[3],&size,NULL));if(!source)ErrorAt(token,"cannot read resolved package source");lex_package=LiteralString(fields[0]);LexSource(source,LiteralString(fields[2]));
         }
-    }Free(data);
+    }ScratchRelease(data);
 }
 U0 ReplLoadImports(I64 start){
     I64 end=ntok,nesting=0,at,path_index;Bool reserved=FALSE;Token *token;U8 *path,*response;

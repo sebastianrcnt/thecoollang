@@ -76,6 +76,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `24-repl-tokens.cool` | Statement token disposal and session literal interning | `Core.cool`, `Repl.cool` |
 | `25-repl-functions.cool` | Transactional disposal of replaced/rejected function artifacts | `ReplFunctions.cool` |
 | `26-repl-source.cool` | Live declaration source marking, disposal and token relocation | `ReplSource.cool` |
+| `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -367,6 +368,28 @@ Non-visible survivors have their obsolete lexical `next` cleared. Cached
 function locals are outside this registry. Named session locals own separate
 `StrNew` name copies, released with their Local records; they never own the
 lexer's original identifier strings.
+
+Parser move snapshots, temporary type bindings and match coverage arrays use
+`ScratchAllocate`. In REPL mode an independent `CompilerScratch` list tracks
+allocations even when parser locals disappear through nonlocal recovery.
+`ScratchRelease` defers reclamation until input completion; outside REPL mode
+it frees its argument normally. `ScratchOwn` enrolls externally allocated
+manifest/file buffers and field substrings, each registered exactly once. Only
+explicitly temporary objects
+belong here: never enroll ASTs, Local identities, alias records or type fields.
+
+`ReplFreeScratch` runs after frame unwinding, move restoration and loan recovery,
+before function/local/source reclamation. It frees the complete list and clears
+`repl_moves` and temporary type bindings. Do not separately free the top-level
+move snapshot: it belongs to the same pool as nested parser snapshots.
+Package identity and original diagnostic paths are interned before the resolver
+scratch disappears; package fingerprints are separately owned and freed on
+package rollback. New alias records are also freed when restoring the saved
+alias head; their strings belong to token storage. Token package/file pointers
+must never refer to scratch fields.
+The native resolver response is a host-owned static buffer and is not enrolled.
+`ErrorAt` frees its formatted message after the synchronous write and before
+nonlocal recovery/exit. Session statistics similarly free their formatted text.
 
 REPL statements and commands reuse the token-table tail after the last retained
 declaration. `ReplFinishTokens` runs after nodes and locals are reconciled and

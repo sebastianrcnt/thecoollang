@@ -3778,7 +3778,7 @@ v_moves1 = t22;
 t23 = v_type30;
 t24 = Shape(t23);
 t25 = ((t24).count * 8);
-t26 = CAlloc(t25);
+t26 = ScratchAllocate(t25);
 v_seen = cast[*i64](t26);
 t27 = 123;
 t28 = cast[*u8]("expected match arms");
@@ -4007,7 +4007,7 @@ v_branch = t124;
 t125 = v_moves1;
 MoveFinish(t125);
 t126 = cast[*u8](v_seen);
-Free(t126);
+ScratchRelease(t126);
 return v_block2;
 }
 return null;

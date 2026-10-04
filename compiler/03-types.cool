@@ -523,7 +523,7 @@ v_i5 = 0;
 while (true) {
 if (!((v_i5 < v_count1))) { break; }
 t0 = i64(sizeof(TypeBinding));
-t1 = CAlloc(t0);
+t1 = ScratchAllocate(t0);
 v_b2 = cast[*TypeBinding](t1);
 (v_b2).name = (v_names)[v_i5];
 (v_b2).type = (v_types)[v_i5];

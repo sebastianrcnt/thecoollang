@@ -17,7 +17,7 @@ I64 SequenceType(I64 kind, I64 element, I64 count, Token *token) {
 class TypeBinding { U8 *name; I64 type; TypeBinding *next; };
 TypeBinding *type_bindings;
 I64 BindingType(U8 *name) { TypeBinding *b; for (b = type_bindings; b; b = b->next) if (Eq(b->name, name)) return b->type; return -1; }
-U0 BindTypes(U8 **names, I64 *types, I64 count) { I64 i; TypeBinding *b; type_bindings = NULL; for (i = 0; i < count; i++) { b = CAlloc(sizeof(TypeBinding)); b->name = names[i]; b->type = types[i]; b->next = type_bindings; type_bindings = b; } }
+U0 BindTypes(U8 **names, I64 *types, I64 count) { I64 i; TypeBinding *b; type_bindings = NULL; for (i = 0; i < count; i++) { b = ScratchAllocate(sizeof(TypeBinding)); b->name = names[i]; b->type = types[i]; b->next = type_bindings; type_bindings = b; } }
 I64 GenericNames(U8 **names) {
     I64 count = 0, j;
     if (!Take('[')) return 0;

@@ -22,6 +22,17 @@ def check(front, label, source, output, errors=()):
 
 
 for front in fronts:
+    check(front, 'repeated session statistics keep no formatting buffers', ':stats\n'*512,
+          'functions=0 compiled=0 bytecode_compilations=0 jit_compilations=0\n'*512)
+    check(front, 'branch snapshots have submission lifetime',
+          'var total=0;\n' + 'if(total>=0){total=total+1;}else{total=0;}\n'*100000 + 'total',
+          '100000\n')
+    prefix = 'import "std/mem";\nenum Choice{Left;Right;}\nlet kept=new[i64](42);\n'
+    failure = 'match(Choice.Left){Choice.Left=>{let moved=move kept;}}\n'
+    check(front, 'rejected match scratch and moves roll back together',
+          prefix + failure*512 + '*kept\nmem.owner_count()\n:forget kept\nmem.owner_count()',
+          '42\n1\n0\n', ['non-exhaustive match']*512)
+
     methods = ('struct Counter{value:i64;}\n'
                'struct CounterExtra{value:i64;}\n'
                'fn C()->i64{return 0;}\n'

@@ -511,12 +511,10 @@ var v_stats: *Text = null;
 var v_i27: i64 = i64(0);
 var v_compiled: i64 = i64(0);
 var v_d10: *DropSlot = null;
-var v_move: *MoveState = null;
 var t0: i64 = i64(0);
 var t1: i64 = i64(0);
 var t2: *u8 = null;
 var t3: *u8 = null;
-var t4: *u8 = null;
 var t5: *u8 = null;
 var t6: i64 = i64(0);
 var t7: *u8 = null;
@@ -613,23 +611,7 @@ pc = 8;
 continue;
 }
 if (pc == 10) {
-if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1; }
-continue;
-}
-if (pc == 11) {
-t4 = cast[*u8](v_move);
-Free(t4);
-pc = 10;
-continue;
-}
-if (pc == 12) {
-ctx.v_repl_moves = (v_move).next;
-pc = 11;
-continue;
-}
-if (pc == 13) {
-v_move = ctx.v_repl_moves;
-pc = 12;
+ReplFreeScratch(); ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1;
 continue;
 }
 if (pc == 14) {
@@ -712,6 +694,8 @@ continue;
 if (pc == 28) {
 t12 = (v_stats).data;
 Out(t12);
+Free(v_stats.data);
+Free(cast[*u8](v_stats));
 pc = 27;
 continue;
 }

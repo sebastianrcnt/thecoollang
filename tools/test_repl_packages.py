@@ -93,11 +93,11 @@ text.byte_len(&word)
  # frozen, and dependency changes cannot silently replace callable definitions.
  broken=project/'broken';broken.mkdir()
  for front in fronts:
-  (broken/'lib.cool').write_text('package broken;pub struct State{pub value:i64;}pub fn value()->i64{return missing;}')
+  (broken/'lib.cool').write_text('/*'+'padding '*65536+'*/\npackage broken;pub struct State{pub value:i64;}pub fn value()->i64{return missing;}')
   (local/'b.cool').write_text('package math;fn hidden()->i64{return 42;}')
   temporary=root/'session-temp';temporary.mkdir(exist_ok=True)
   process=subprocess.Popen([CLI,'repl','--offline'],cwd=project,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,env={**os.environ,'COOL_FRONTEND':str(front),'TMPDIR':str(temporary)})
-  process.stdin.write('import broken "example.test/app/broken";\nvar guard=7;\nguard\n');process.stdin.flush();assert line(process)=='7\n'
+  process.stdin.write('import broken "example.test/app/broken";\n'*32+'var guard=7;\nguard\n');process.stdin.flush();assert line(process)=='7\n'
   (broken/'lib.cool').write_text('package broken;pub struct State{pub value:i64;}pub fn value()->i64{return 11;}')
   process.stdin.write('import broken "example.test/app/broken";\nbroken.value()\n');process.stdin.flush();assert line(process)=='11\n'
   process.stdin.write('import m "example.test/app/math";\nm.answer()\n');process.stdin.flush();assert line(process)=='42\n'
@@ -108,5 +108,5 @@ text.byte_len(&word)
   (local/'b.cool').write_text('package math;fn hidden()->i64{return 99;}')
   process.stdin.write('import changed "example.test/app/math";\nm.answer()\nfn local_value()->i64{return 5;}\nlocal_value()\n:quit\n');process.stdin.flush()
   output,error=process.communicate(timeout=30)
-  assert process.returncode==0 and output=='42\n5\n' and error.count('error:')==2 and 'unknown variable' in error and 'loaded package changed' in error,(output,error)
+  assert process.returncode==0 and output=='42\n5\n' and error.count('error:')==33 and 'unknown variable' in error and 'loaded package changed' in error,(output,error)
  print('REPL packages: failed-load retry, type/alias rollback, immutable loaded sources and restored session namespace on both frontends PASS')

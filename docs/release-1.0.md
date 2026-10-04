@@ -593,6 +593,35 @@ through ordinary evaluation or library use.
   immutable text, storage holes and auxiliary parser/package allocations keep
   G6 open pending the complete lifecycle audit.
 
+- Input-lifetime compiler scratch: parser branch/loop move snapshots, temporary
+  generic bindings and match coverage arrays now enter an independent allocation
+  registry in REPL mode. Both success and nonlocal recovery release that registry
+  after restoring move/loan state and unwinding frames. Manifest buffers, loaded
+  source buffers and temporary manifest fields use the same registry. Package
+  names and original diagnostic paths are interned, while fingerprints have
+  explicit package ownership. Rollback frees new fingerprints, package records
+  and alias records. Error diagnostics are freed after the synchronous write
+  and before the nonlocal jump; `:stats` frees its formatting buffer too.
+  Both frontends and the compiler-instrumented ASan suite pass 100,000 branch
+  submissions, 512 rejected matches preserving a preexisting owner, 512 stats
+  commands, and 32 failed package loads (512 KiB comment per file) followed by
+  successful repair/retry. Existing function, source, loan and package tests pass.
+  Full `make test bootstrap-check` and `make distribution-test` pass. Self-host
+  IR SHA256: `1174b9a36a56855ac27b7e90c5a918942beebc0bdc4daaae5b035de9c28ad463`.
+  Against `ef1b3b7`, three fresh-process trials of 100,000 branch submissions
+  reduce median peak RSS from 5,406,720 to 2,211,840 bytes; the candidate uses the
+  same RSS at 2,000 inputs. Raw data: `build/release-audit/repl-scratch-memory.json`.
+  `tools/bench_repl_packages_memory.py` times the frontend itself, excluding the
+  Python resolver driver: at 128 failed imports, median peak RSS drops from
+  72,499,200 to 2,834,432 bytes (three fresh processes). At eight imports the
+  candidate uses 2,801,664 bytes. The package-source fixture is 524,341 bytes.
+  Raw data: `build/release-audit/repl-scratch-packages-final-memory.json`. A longer
+  1,024-failure run measures 2,867,200 bytes (three-process median), recorded in
+  `build/release-audit/repl-scratch-packages-stability.json`.
+  Measurements ran on macOS ARM64 alongside regression jobs; no isolated speed
+  or universal memory-bound claim is made. G6 remains open for the full lifetime
+  audit, including rejected nominal-layout metadata and newly interned text.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

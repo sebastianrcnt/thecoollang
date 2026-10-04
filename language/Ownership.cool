@@ -23,7 +23,7 @@ U0 InjectDrops(Function *f) {
 class MoveState { Local *local; I64 before, joined; MoveState *next; };
 MoveState *MoveSnapshot() {
     MoveState *head = NULL, *s; Local *l;
-    for (l = locals; l; l = l->next) { s = CAlloc(sizeof(MoveState)); s->local = l; s->before = l->moved; s->next = head; head = s; } return head;
+    for (l = locals; l; l = l->next) { s = ScratchAllocate(sizeof(MoveState)); s->local = l; s->before = l->moved; s->next = head; head = s; } return head;
 }
 U0 MoveRestore(MoveState *s) { while (s) { s->local->moved = s->before; s = s->next; } }
 U0 MoveJoin(MoveState *s) { while (s) { s->joined |= s->local->moved; s = s->next; } }

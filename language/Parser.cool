@@ -302,7 +302,7 @@ Node *MatchStatement() {
     pos++; Need('(', "expected '(' after match"); value = Expr(1); Transfer(value); Need(')', "expected ')' after match value"); type = value->type;
     if (AggregateKind(type) != A_ENUM) ErrorAt(token, "match requires an enum"); Layout(type);
     block = NewNode(N_BLOCK, token); binding = NewNode(N_BIND, token); binding->type = type; binding->a = value; slot = Storage(type); binding->slot = slot; ReferenceMatchBinding(binding); block->a = binding;
-    moves = MoveSnapshot(); seen = CAlloc(Shape(type)->count*8); Need('{', "expected match arms");
+    moves = MoveSnapshot(); seen = ScratchAllocate(Shape(type)->count*8); Need('{', "expected match arms");
     while (!Take('}')) {
         if (wildcard) Error("wildcard must be the last match arm");
         MoveRestore(moves); saved = locals; depth++; payload_bind = NULL;
@@ -335,7 +335,7 @@ Node *MatchStatement() {
         if (previous) previous->c = last->b; else binding->next = last->b;
     }
     if (Owned(type)) { branch = OwnerDefer(slot, type, token); branch->next = binding->next; binding->next = branch; }
-    MoveFinish(moves); Free(seen); return block;
+    MoveFinish(moves); ScratchRelease(seen); return block;
 }
 Node *Statement() {
     Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable; MoveState *moves;

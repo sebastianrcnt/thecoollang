@@ -1,0 +1,33 @@
+// Parser and resolver scratch survives nonlocal recovery, never a submission.
+fn ScratchOwn(data: *u8) -> *u8 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition != i8(0) && data != null) {
+            let item = cast[*CompilerScratch](CAlloc(i64(sizeof(CompilerScratch))));
+            item.data = data;
+            item.next = ctx.v_repl_scratch;
+            ctx.v_repl_scratch = item;
+        }
+        return data;
+    }
+}
+fn ScratchAllocate(size: i64) -> *u8 { unsafe { return ScratchOwn(CAlloc(size)); } }
+fn ScratchRelease(data: *u8) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition == i8(0)) { Free(data); }
+    }
+}
+fn ReplFreeScratch() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_repl_scratch != null) {
+            let item = ctx.v_repl_scratch;
+            ctx.v_repl_scratch = item.next;
+            Free(item.data);
+            Free(cast[*u8](item));
+        }
+        ctx.v_repl_moves = null;
+        ctx.v_type_bindings = null;
+    }
+}

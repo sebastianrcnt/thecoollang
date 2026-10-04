@@ -14,7 +14,7 @@ parser.add_argument('--baseline', type=Path)
 parser.add_argument('--candidate', type=Path, default=Path(__file__).resolve().parents[1] / 'build/cool-compiler')
 parser.add_argument('--counts', type=int, nargs='+', default=[2000, 16000])
 parser.add_argument('--trials', type=int, default=3)
-parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements', 'methods'], default='updates')
+parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements', 'methods', 'branches'], default='updates')
 parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 if platform.system() != 'Darwin':
@@ -28,6 +28,8 @@ for count in args.counts:
     if args.workload == 'methods':
         prefix += 'struct Counter{value:i64;}\nfn Counter.read(self:Counter)->i64{return self.value;}\nvar counter=Counter{value:1};\n'
         body = 'total=total+counter.read();\n' * count
+    elif args.workload == 'branches':
+        body = 'if(total>=0){total=total+1;}else{total=0;}\n' * count
     elif args.workload == 'replacements':
         body = ''.join(f'fn answer()->i64{{return {value};}}\n{{total=answer();total=answer();total=answer();total=answer();}}\n' for value in range(1, count + 1))
     else:

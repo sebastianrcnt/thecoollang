@@ -11,6 +11,7 @@ Bool repl_executing,repl_keep_tokens;
 I64 repl_token_end;
 MoveState *repl_moves;
 extern U0 ReplTrimStorage();
+#include "ReplScratch.cool"
 #include "ReplLoans.cool"
 #include "ReplPackages.cool"
 #include "ReplFunctions.cool"
@@ -130,7 +131,7 @@ U0 ReplStep(Text *text) {
     ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage(); FreeBytecode(f);
 }
 U0 Repl(Bool prompt) {
-    Text *text, *stats; I64 i, compiled; DropSlot *d; MoveState *move;
+    Text *text, *stats; I64 i, compiled; DropSlot *d;
     functions = CAlloc(MAX_FUNCTIONS * sizeof(Function)); nfun = 1;
     functions[0].name = "__session"; functions[0].package = "__main";
     repl_snapshot = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -146,7 +147,7 @@ U0 Repl(Bool prompt) {
             for (i = 1; i < nfun; i++) if (functions[i].bytecode) compiled++;
             Append(stats, "functions="); Number(stats, nfun - 1); Append(stats, " compiled="); Number(stats, compiled);
             Append(stats, " bytecode_compilations="); Number(stats, bytecode_compilations);
-            Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); goto repl_next;
+            Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); Free(stats->data); Free(stats); goto repl_next;
         }
         locals = repl_locals; repl_moves = MoveSnapshot(); repl_executing = FALSE;
         MemCpy(repl_snapshot, functions, nfun * sizeof(Function));
@@ -155,7 +156,7 @@ U0 Repl(Bool prompt) {
         if (AIWNIOS_SetJmp(repl_context)) ReplRestore();
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;
-        while (repl_moves) { move = repl_moves; repl_moves = move->next; Free(move); }
+        ReplFreeScratch();
         ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens();
 repl_next:
         Free(text->data); Free(text);

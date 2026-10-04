@@ -172,7 +172,7 @@ v_l2 = ctx.v_locals;
 while (true) {
 if (!((v_l2 != null))) { break; }
 t0 = i64(sizeof(MoveState));
-t1 = CAlloc(t0);
+t1 = ScratchAllocate(t0);
 v_s7 = cast[*MoveState](t1);
 (v_s7).local = v_l2;
 (v_s7).before = (v_l2).moved;

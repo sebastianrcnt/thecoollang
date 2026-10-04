@@ -116,6 +116,7 @@ U0 ErrorAt(Token *t, U8 *message) {
     Append(s, t->file); Char(s, ':'); Number(s, t->line); Char(s, ':'); Number(s, t->col);
     Append(s, ": error: "); Append(s, message); Char(s, '\n');
     NativeWrite(2, s->data, s->len);
+    Free(s->data); Free(s);
     if (recovery_context) AIWNIOS_LongJmp(recovery_context);
     NativeExit(2);
 }
@@ -286,3 +287,7 @@ extern Bool MethodAhead();
 extern Node *MethodCall(Node *receiver,Token *token);
 
 extern Node *ReferencePlaceSource(Node *place);
+
+extern U8 *ScratchAllocate(I64 size);
+extern U8 *ScratchOwn(U8 *data);
+extern U0 ScratchRelease(U8 *data);

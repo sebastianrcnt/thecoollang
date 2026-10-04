@@ -313,6 +313,8 @@ t17 = 2;
 t18 = (v_s3).data;
 t19 = (v_s3).len;
 t20 = NativeWrite(t17, t18, t19);
+Free(v_s3.data);
+Free(cast[*u8](v_s3));
 if ((ctx.v_recovery_context != null)) {
 t21 = ctx.v_recovery_context;
 NativeRaise(t21);

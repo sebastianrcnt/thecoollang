@@ -612,6 +612,14 @@ soon-to-be-discarded definition, compact that source and execute the imports
 again, including a new specialization.
 
 
+Temporary parser state (branch/loop move snapshots, generic bindings and match
+coverage arrays) is discarded after each input, including rejected inputs.
+Package manifest/source buffers and temporary fields have the same lifetime;
+package names and diagnostic paths remain stable. Regressions include 100,000
+branch submissions, 512 failed matches preserving an existing owner, and repeated
+failed package loads with a large source comment followed by a successful retry.
+
+
 ## Packages in the REPL
 
 Run `cool repl` from the project directory and use ordinary imports. The driver

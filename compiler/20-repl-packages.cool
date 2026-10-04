@@ -17,7 +17,13 @@ fn ReplPackagesRestore() {
         while (ctx.v_repl_packages != ctx.v_repl_saved_packages) {
             let item = ctx.v_repl_packages;
             ctx.v_repl_packages = item.next;
+            Free(item.fingerprint);
             Free(cast[*u8](item));
+        }
+        while (ctx.v_aliases != ctx.v_repl_aliases) {
+            let alias = ctx.v_aliases;
+            ctx.v_aliases = alias.next;
+            Free(cast[*u8](alias));
         }
         ctx.v_lex_package = cast[*u8]("__main");
     }
@@ -27,7 +33,7 @@ fn ReplReadPackages(manifest: *u8, token: *Token) {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         let previous = ctx.v_repl_packages;
         var size: i64 = 0;
-        let data = FileRead(manifest, &raw size, null);
+        let data = ScratchOwn(FileRead(manifest, &raw size, null));
         if (data == null) { ErrorAt(token, cast[*u8]("cannot read resolved package manifest")); }
         var at: i64 = 0;
         while (data[at] != 0) {
@@ -39,7 +45,7 @@ fn ReplReadPackages(manifest: *u8, token: *Token) {
                 if ((field < 3 && data[at] != 9) || (field == 3 && data[at] != 10)) {
                     ErrorAt(token, cast[*u8]("invalid resolved package manifest"));
                 }
-                fields[field] = Slice(data, begin, at);
+                fields[field] = ScratchOwn(Slice(data, begin, at));
                 at = at + 1;
                 field = field + 1;
             }
@@ -50,16 +56,16 @@ fn ReplReadPackages(manifest: *u8, token: *Token) {
             if (ReplFindPackage(previous, fields[0]) == null) {
                 if (existing == null) {
                     let package = cast[*ReplPackage](CAlloc(i64(sizeof(ReplPackage))));
-                    package.name = fields[0]; package.fingerprint = fields[1];
+                    package.name = LiteralString(fields[0]); package.fingerprint = StrNew(fields[1]);
                     package.next = ctx.v_repl_packages; ctx.v_repl_packages = package;
                 }
-                let source = FileRead(fields[3], &raw size, null);
+                let source = ScratchOwn(FileRead(fields[3], &raw size, null));
                 if (source == null) { ErrorAt(token, cast[*u8]("cannot read resolved package source")); }
-                ctx.v_lex_package = fields[0];
-                LexSource(source, fields[2]);
+                ctx.v_lex_package = LiteralString(fields[0]);
+                LexSource(source, LiteralString(fields[2]));
             }
         }
-        Free(data);
+        ScratchRelease(data);
     }
 }
 fn ReplLoadImports(start: i64) {
