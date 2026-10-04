@@ -609,3 +609,12 @@ because they have no body. Apply the same signature rule when a generic function
 is instantiated and to exported functions and methods. The current lazy-template
 validation limitation remains separate; this check must not imply that unused
 generic bodies have been fully analyzed.
+
+## For initializer stores
+
+For initializers accept N_STORE alongside binding/local assignment/expression
+nodes. Parse them with the ordinary statement parser so mutable-place checks,
+coercion, transfer and live-place validation remain active. The initializer stays
+before the loop node in its enclosing block, so it executes once and participates
+in the same ownership/reference analysis as an ordinary store. Do not special-case
+projected writes to bypass loans or introduce a separate unchecked evaluator.

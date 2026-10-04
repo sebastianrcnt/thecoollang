@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 7
+# Cool language specification — 1.0 draft 8
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -81,7 +81,7 @@ The following EBNF specifies individual top-level forms. `identifier` follows
 the lexical identifier rule; contextual parser words still have their grammatical
 meaning. `string_token` denotes a quoted string token. This section does not yet
 specify the driver's complete multi-file package-header/resolution rules.
-`block` is a braced statement sequence; statement grammar is a separate audit.
+`block` is the braced statement sequence defined below.
 
 ```ebnf
 package_decl   = "package", identifier, ";" ;
@@ -238,6 +238,83 @@ engines and an optimized standalone binary. Existing reference/ownership suites
 cover the separate validity obligations around moves and live destinations.
 This does not yet specify overflow/conversion policy or cleanup timing.
 
+## Statements, control flow and deferred calls
+
+```ebnf
+block          = "{", { statement }, "}" ;
+statement      = block | binding, ";" | assignment, ";" | expression, ";"
+               | "return", [ expression ], ";"
+               | "if", "(", expression, ")", block,
+                 [ "else", (block | if_statement) ]
+               | "while", "(", expression, ")", block
+               | "for", "(", [ for_init ], ";", [ expression ], ";",
+                 [ for_update ], ")", block
+               | "break", ";" | "continue", ";"
+               | "defer", expression, ";" | "unsafe", block | match_statement ;
+binding        = ("let" | "var"), identifier, [ ":", type ], "=", expression ;
+assignment     = expression, "=", expression ;
+for_init       = binding | assignment | expression ;
+for_update     = assignment | expression ;
+if_statement   = "if", "(", expression, ")", block,
+                 [ "else", (block | if_statement) ] ;
+match_statement = "match", "(", expression, ")", "{", { match_arm }, "}" ;
+match_arm      = pattern, "=>", block, [ "," ] ;
+pattern        = "_" | type, ".", identifier, [ "(", [ identifier ], ")" ] ;
+```
+
+A binding always has an initializer; its type may be inferred. `let` makes the
+binding immutable and `var` permits assignment. This is not a blanket claim of
+deep constness for all owned/referenced values: pointee mutability follows the
+reference and owner rules. An assignment requires a mutable place, such as a
+local, field, indexed element or dereference. Assignment is not an expression.
+Blocks introduce lexical scopes. A name cannot be redeclared at the same depth;
+an inner scope may shadow it. A for-initializer binding is local to that loop.
+
+Conditions must be bool. If/while/for bodies require braces; `else if` is the
+specified exception to an else block. A for loop evaluates its initializer once,
+checks the condition before each iteration, executes its body and then its update.
+An omitted condition means true. The initializer accepts the same assignment
+places as ordinary statements, including fields, array elements and dereferences.
+`continue` exits the current body scopes and performs a for update before the
+next condition check; a while loop instead proceeds to its condition. `break`
+exits the innermost loop without its update. Neither is valid outside a loop.
+`return` evaluates and captures its result, exits enclosing scopes, and returns
+from the function. Its presence/type must agree with the function result.
+
+Match is an enum statement, not a general expression or integer switch. Its
+scrutinee is evaluated once. A named arm must refer to a variant of that enum;
+payload variants require a binding name (or `_` to discard it). A unit variant
+has no binding and may use empty parentheses. Payload bindings are scoped to the
+arm. Arms require blocks, may each have a trailing comma, and do not fall through.
+Duplicate named arms are invalid. All variants must be covered unless a wildcard
+arm is present; a wildcard must be last. Moving/copying the scrutinee and payloads
+obeys ordinary ownership and borrowing checks.
+
+`defer` requires a call returning void, not a block or arbitrary non-call
+expression. The call arguments are evaluated and captured when execution reaches
+the defer statement. The deferred call runs on ordinary exit from its enclosing
+block, including return, break and continue, in reverse registration order.
+Capturing a reference captures that reference, not a snapshot of its pointee;
+its loan remains subject to scope/lifetime checks. An owned local registers its
+implicit drop when bound. Explicit defers and implicit drops follow their common
+reverse registration order, so a later deferred observer runs before an earlier
+owner's drop, and an earlier observer runs after that drop. These rules describe
+normal structured exits; they do not promise stack unwinding through every
+runtime failure or unsafe foreign failure. Failure recovery remains separately
+audited.
+
+`unsafe` introduces a lexical block in which the documented raw-pointer and
+foreign-call operations are permitted. It does not disable type checks or grant
+permission to violate an existing safe reference's rules. Empty statements,
+labels/goto, do/while and C switch statements are not part of this grammar.
+
+`make control-flow-test` verifies a 31-event trace covering immediate defer argument
+capture, nested reverse cleanup, return evaluation, loop updates/continue/break,
+once-evaluated enum matching, owner-drop ordering and projected for-initializer
+assignments. It also checks 23 rejected forms, including immutable and live-loan
+assignment destinations. Both frontends run all five engines and optimized
+binaries; the sanitizer target adds the instrumented compiler.
+
 ## Fixed-width integer values and operations
 
 Signed integer types `i8`, `i16`, `i32`, `i64` use two's-complement values from
@@ -317,6 +394,8 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 8: specify statement/control-flow/defer grammar and normal-exit ordering;
+  permit projected assignments in for initializers under normal safety checks.
 - Draft 7: add declaration/type EBNF and signature rules; reject duplicate
   parameter names during signature checking, including extern declarations.
 - Draft 6: define the decimal floating-token grammar; defer integer overflow

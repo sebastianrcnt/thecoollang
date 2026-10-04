@@ -368,7 +368,7 @@ Node *Statement() {
         block = NewNode(N_BLOCK, t); initial = NULL;
         if (!Take(';')) {
             initial = Statement();
-            if (initial->kind != N_BIND && initial->kind != N_ASSIGN && initial->kind != N_EXPR) ErrorAt(t, "invalid for initializer");
+            if (initial->kind != N_BIND && initial->kind != N_ASSIGN && initial->kind != N_EXPR && initial->kind != N_STORE) ErrorAt(t, "invalid for initializer");
         }
         moves = MoveSnapshot(); MoveJoin(moves);
         loop_depth++; n = NewNode(N_FOR, t);

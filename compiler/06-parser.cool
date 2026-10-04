@@ -3148,6 +3148,7 @@ t70 = t69;
 if (t70) {
 t70 = ((v_initial).kind != 16);
 }
+if(t70){t70=(v_initial.kind!=19);}
 if (t70) {
 t71 = v_t14;
 t72 = cast[*u8]("invalid for initializer");

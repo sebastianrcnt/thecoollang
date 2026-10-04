@@ -348,3 +348,10 @@ declarations-test: build/cool-compiler build/language.BIN
 test: declarations-test
 declarations-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_declarations.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: control-flow-test control-flow-sanitize-test
+control-flow-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_control_flow.py
+test: control-flow-test
+control-flow-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_control_flow.py --frontend build/repl-loans-asan/cool-compiler

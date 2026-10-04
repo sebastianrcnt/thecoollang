@@ -977,6 +977,26 @@ through ordinary evaluation or library use.
   G1 remains open for complete statement/primary grammar, full package/source
   rules and semantic contracts; G4/G9 are not closed by a declaration-only audit.
 
+- Statement/control-flow contract: draft 8 defines blocks, bindings, assignments,
+  if/while/for, loop exits, return, enum match, defer and unsafe forms. An exact
+  observable trace checks immediate defer argument capture, reverse scope exit,
+  result-before-cleanup ordering, continue/update/break behavior, once-evaluated
+  matching and owner drops interleaved with explicit deferred observers. The
+  audit also reproduced for initializers rejecting projected assignments while
+  allowing them elsewhere. Both parsers now accept N_STORE through their normal
+  statement and loan/ownership analysis. Array elements, struct fields and
+  reference dereferences work; immutable destinations and active shared loans
+  still reject writes. The suite passes 31 ordered events and 23 negative cases
+  on both frontends and the ASan compiler across five engines and optimized
+  binaries. Full regression, self-host/bootstrap convergence and installed
+  Neovim/distribution checks pass; remote CI is unobserved. Evidence is in
+  `build/release-audit/control-flow-{final,regression,sanitize,distribution}.log`.
+  Self-host IR SHA256 is
+  `b868ab248bfcd9813a427f2321292aac247266ddb04ec2a3e9a94a99a792c93f`.
+  Runtime-failure unwinding, complete primary grammar, package rules and other
+  remaining release-wide contracts remain open; structured-exit evidence is not
+  a claim that every runtime failure performs full stack cleanup.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
