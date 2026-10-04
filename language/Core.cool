@@ -103,7 +103,9 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define K_SHR 267
 #define K_FLOAT 268
 #define K_FAT_ARROW 269
-class ReplLiteral { U8 *text; ReplLiteral *next; };
+class ReplLiteral { U8 *text; ReplLiteral *next,*pending_next; I64 bucket; };
+ReplLiteral *repl_new_literals;
+Bool repl_discard_literals;
 ReplLiteral *repl_literals[1024];
 class Token { I64 kind, val, line, col, start, end; U8 *text, *file, *package, *raw; };
 #define MAX_TOKENS 262144
@@ -179,7 +181,7 @@ U8 *LiteralString(U8 *text) {
     if(!allow_redefinition)return text;
     while(text[i])hash=hash*33+text[i++];bucket=hash&1023;
     for(entry=repl_literals[bucket];entry;entry=entry->next)if(Eq(entry->text,text))return entry->text;
-    entry=CAlloc(sizeof(ReplLiteral));entry->text=StrNew(text);entry->next=repl_literals[bucket];repl_literals[bucket]=entry;return entry->text;
+    entry=CAlloc(sizeof(ReplLiteral));entry->text=StrNew(text);entry->next=repl_literals[bucket];repl_literals[bucket]=entry;entry->bucket=bucket;entry->pending_next=repl_new_literals;repl_new_literals=entry;return entry->text;
 }
 Local *AllocateLocal() {
     Local *local=CAlloc(sizeof(Local));
@@ -291,3 +293,5 @@ extern Node *ReferencePlaceSource(Node *place);
 extern U8 *ScratchAllocate(I64 size);
 extern U8 *ScratchOwn(U8 *data);
 extern U0 ScratchRelease(U8 *data);
+
+extern U0 ReplSaveLayout(I64 type);

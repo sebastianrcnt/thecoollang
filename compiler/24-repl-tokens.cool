@@ -17,6 +17,9 @@ fn LiteralString(text: *u8) -> *u8 {
         entry.text = StrNew(text);
         entry.next = ctx.v_repl_literals[bucket];
         ctx.v_repl_literals[bucket] = entry;
+        entry.bucket = bucket;
+        entry.pending_next = ctx.v_repl_new_literals;
+        ctx.v_repl_new_literals = entry;
         return entry.text;
     }
 }

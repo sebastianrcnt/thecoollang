@@ -185,6 +185,8 @@ var t8: i64 = i64(0);
 var t9: *u8 = null;
 var t10: bool = false;
 ctx.v_repl_token_end = ctx.v_ntok;
+ctx.v_repl_discard_literals = i8(0);
+if (ctx.v_repl_executing == i8(0)) { ctx.v_repl_discard_literals = i8(1); }
 ctx.v_repl_keep_tokens = false;
 ReplLoansFinish(ctx.v_repl_executing != i8(0), ctx.v_repl_locals);
 ReplPackagesRestore();
@@ -214,6 +216,7 @@ t5 = ctx.v_repl_moves;
 MoveRestore(t5);
 }
 ReplRollbackFunctions();
+ReplRollbackTypes();
 FreeBytecode(&raw ctx.v_functions[0]);
 t6 = cast[*u8](ctx.v_functions);
 t7 = cast[*u8](ctx.v_repl_snapshot);
@@ -611,7 +614,7 @@ pc = 8;
 continue;
 }
 if (pc == 10) {
-ReplFreeScratch(); ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1;
+ReplFreeScratch(); ReplCommitFunctions(); ReplCommitTypes(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); ReplFinishLiterals(); pc = 1;
 continue;
 }
 if (pc == 14) {
@@ -842,6 +845,7 @@ continue;
 }
 if (pc == 52) {
 ParseProgram();
+ReplFinishLiterals();
 pc = 7;
 continue;
 }

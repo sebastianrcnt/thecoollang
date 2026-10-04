@@ -12,6 +12,7 @@ I64 repl_token_end;
 MoveState *repl_moves;
 extern U0 ReplTrimStorage();
 #include "ReplScratch.cool"
+#include "ReplTypes.cool"
 #include "ReplLoans.cool"
 #include "ReplPackages.cool"
 #include "ReplFunctions.cool"
@@ -80,7 +81,7 @@ Text *Submission() {
 }
 U0 ReplRestore() {
     Frame *frame; DropSlot *d;
-    repl_token_end=ntok;repl_keep_tokens=FALSE;
+    repl_token_end=ntok;repl_keep_tokens=FALSE;repl_discard_literals=!repl_executing;
     ReplLoansFinish(repl_executing,repl_locals);
     ReplPackagesRestore();
     if (repl_executing) {
@@ -92,6 +93,7 @@ U0 ReplRestore() {
         ReplDiscardNewDrops(TRUE,TRUE);
     } else {ReplDiscardNewDrops(FALSE,TRUE);MoveRestore(repl_moves);}
     ReplRollbackFunctions();
+    ReplRollbackTypes();
     FreeBytecode(&functions[0]);
     MemCpy(functions, repl_snapshot, repl_saved_nfun * sizeof(Function));
     if(nfun>repl_saved_nfun)MemSet(&functions[repl_saved_nfun],0,(nfun-repl_saved_nfun)*sizeof(Function));
@@ -137,7 +139,7 @@ U0 Repl(Bool prompt) {
     repl_snapshot = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     allow_redefinition = TRUE; lex_package = "__main"; execution_mode = 3;
     // Standard IO is imported explicitly into the session's source scope.
-    LexSource("import \"std/io\";", "<repl>"); ParseProgram();
+    LexSource("import \"std/io\";", "<repl>"); ParseProgram(); ReplFinishLiterals();
     while (TRUE) {
         if (prompt) Out("cool> ");
         text = Submission(); if (!text) break;
@@ -157,7 +159,7 @@ U0 Repl(Bool prompt) {
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;
         ReplFreeScratch();
-        ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens();
+        ReplCommitFunctions(); ReplCommitTypes(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); ReplFinishLiterals();
 repl_next:
         Free(text->data); Free(text);
     }

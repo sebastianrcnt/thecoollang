@@ -1,0 +1,63 @@
+// Journal only existing lazy layouts actually touched by this submission.
+fn ReplSaveLayout(type: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition == i8(0) || type - 1000 >= ctx.v_repl_saved_types) { return; }
+        let change = cast[*ReplTypeChange](CAlloc(i64(sizeof(ReplTypeChange))));
+        change.target = Shape(type);
+        change.saved = *change.target;
+        change.next = ctx.v_repl_type_changes;
+        ctx.v_repl_type_changes = change;
+    }
+}
+fn ReplFreeFields(field: *Field) {
+    unsafe {
+        var current = field;
+        while (current != null) {
+            let next = current.next;
+            Free(cast[*u8](current));
+            current = next;
+        }
+    }
+}
+fn ReplRollbackTypes() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_repl_type_changes != null) {
+            let change = ctx.v_repl_type_changes;
+            ctx.v_repl_type_changes = change.next;
+            if (change.target.fields != change.saved.fields) { ReplFreeFields(change.target.fields); }
+            *change.target = change.saved;
+            Free(cast[*u8](change));
+        }
+        for (var i = ctx.v_repl_saved_types; i < ctx.v_naggregates; i = i + 1) {
+            ReplFreeFields(ctx.v_aggregate_types[i].fields);
+            MemSet(cast[*u8](&raw ctx.v_aggregate_types[i]), 0, i64(sizeof(AggregateType)));
+        }
+    }
+}
+fn ReplCommitTypes() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_repl_type_changes != null) {
+            let change = ctx.v_repl_type_changes;
+            ctx.v_repl_type_changes = change.next;
+            Free(cast[*u8](change));
+        }
+    }
+}
+fn ReplFinishLiterals() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_repl_new_literals != null) {
+            let entry = ctx.v_repl_new_literals;
+            ctx.v_repl_new_literals = entry.pending_next;
+            if (ctx.v_repl_discard_literals != i8(0)) {
+                ctx.v_repl_literals[entry.bucket] = entry.next;
+                Free(entry.text);
+                Free(cast[*u8](entry));
+            }
+        }
+        ctx.v_repl_discard_literals = i8(0);
+    }
+}

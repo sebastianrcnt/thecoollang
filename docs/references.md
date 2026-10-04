@@ -585,8 +585,9 @@ preserves the session. Normal statement history no longer consumes that limit.
 
 String literals are immutable and remain valid throughout the session, including
 when stored inside owners. Equal literals, including literals in function bodies,
-share a stable allocation; each distinct literal content is retained until session
-exit. Live functions, types and import aliases keep the source needed for subsequent
+share a stable allocation. Newly interned contents are discarded when checking
+fails before execution. After execution begins, distinct contents remain valid
+until session exit, including writes performed before a runtime failure. Live functions, types and import aliases keep the source needed for subsequent
 compilation. Replaced-only declaration blocks are reclaimed and the remaining
 tokens are compacted. A batch containing multiple declarations remains intact
 while any function, type or alias still needs it. Distinct literals and other
@@ -618,6 +619,14 @@ Package manifest/source buffers and temporary fields have the same lifetime;
 package names and diagnostic paths remain stable. Regressions include 100,000
 branch submissions, 512 failed matches preserving an existing owner, and repeated
 failed package loads with a large source comment followed by a successful retry.
+
+
+Lazy type layouts participate in the same transaction. A failed layout can be
+retried; declaring a previously missing type can repair it. Rejected declarations
+also restore completed layouts that were first computed while checking that input,
+so their field types cannot accidentally refer to reused descriptor IDs. The
+`repl-types-test` and `repl-types-sanitize-test` targets verify retries, repair,
+field reclamation, type ID reuse, owner destruction and staged text lifetime.
 
 
 ## Packages in the REPL

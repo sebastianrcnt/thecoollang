@@ -14,7 +14,7 @@ parser.add_argument('--baseline', type=Path)
 parser.add_argument('--candidate', type=Path, default=Path(__file__).resolve().parents[1] / 'build/cool-compiler')
 parser.add_argument('--counts', type=int, nargs='+', default=[2000, 16000])
 parser.add_argument('--trials', type=int, default=3)
-parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements', 'methods', 'branches'], default='updates')
+parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements', 'methods', 'branches', 'rejected-literals', 'rejected-types'], default='updates')
 parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 if platform.system() != 'Darwin':
@@ -24,8 +24,19 @@ if args.trials < 1 or any(count < 1 or count > 1000000 for count in args.counts)
 versions = ([('baseline', args.baseline)] if args.baseline else []) + [('candidate', args.candidate)]
 samples = []
 for count in args.counts:
+    expected_errors = 0
+    expected_output = str(count) + '\n'
     prefix = 'var total=0;\n'
-    if args.workload == 'methods':
+    if args.workload == 'rejected-types':
+        expected_errors = count
+        expected_output = '0\n'
+        fields = ''.join(f'field{i}:i64;' for i in range(32))
+        body = ('struct Rejected{'+fields+'bad:Missing;}\n') * count
+    elif args.workload == 'rejected-literals':
+        expected_errors = count
+        expected_output = '0\n'
+        body = ''.join(f'fn rejected{value}()->string{{let text="{value}'+ 'x'*1024 + '";return missing;}\n' for value in range(count))
+    elif args.workload == 'methods':
         prefix += 'struct Counter{value:i64;}\nfn Counter.read(self:Counter)->i64{return self.value;}\nvar counter=Counter{value:1};\n'
         body = 'total=total+counter.read();\n' * count
     elif args.workload == 'branches':
@@ -42,7 +53,7 @@ for count in args.counts:
             result = subprocess.run(['/usr/bin/time', '-l', compiler.resolve(), 'repl-quiet'],
                                     input=source, text=True, capture_output=True, timeout=120)
             elapsed = time.monotonic() - start
-            if result.returncode or result.stdout != str(count) + '\n' or 'error:' in result.stderr:
+            if result.returncode or result.stdout != expected_output or result.stderr.count('error:') != expected_errors:
                 raise RuntimeError(f'{label} failed workload: {result}')
             match = re.search(r'(\d+)\s+maximum resident set size', result.stderr)
             if match is None:

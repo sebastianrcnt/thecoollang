@@ -49,6 +49,7 @@ U0 Layout(I64 type) {
     if (a->generic_count) ErrorAt(a->token, "generic type requires explicit arguments");
     if (a->state == 2) return;
     if (a->state == 1) ErrorAt(a->token, "recursive aggregate requires a pointer");
+    ReplSaveLayout(type);
     a->state = 1; a->align = 1;
     if (a->kind == A_OWNER || a->kind == 6) { a->size = a->align = 8; }
     else if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }

@@ -26,7 +26,7 @@ cap: i64;
 
 struct CompilerScratch { data: *u8; next: *CompilerScratch; }
 struct ReplSource { begin: i64; end: i64; pinned: i64; live: i64; next: *ReplSource; }
-struct ReplLiteral { text: *u8; next: *ReplLiteral; }
+struct ReplLiteral { text: *u8; next: *ReplLiteral; pending_next: *ReplLiteral; bucket: i64; }
 
 struct Token {
 
@@ -402,6 +402,8 @@ parent: *BScope;
 }
 
 
+struct ReplTypeChange { target: *AggregateType; saved: AggregateType; next: *ReplTypeChange; }
+
 struct CompilerState {
 
 v_recovery_context: *i64;
@@ -421,6 +423,9 @@ v_lex_pending: *Text;
 v_repl_literals: [1024]*ReplLiteral;
 v_repl_sources: *ReplSource;
 v_repl_scratch: *CompilerScratch;
+v_repl_type_changes: *ReplTypeChange;
+v_repl_new_literals: *ReplLiteral;
+v_repl_discard_literals: i8;
 
 v_functions: *Function;
 

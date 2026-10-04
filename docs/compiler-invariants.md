@@ -77,6 +77,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `25-repl-functions.cool` | Transactional disposal of replaced/rejected function artifacts | `ReplFunctions.cool` |
 | `26-repl-source.cool` | Live declaration source marking, disposal and token relocation | `ReplSource.cool` |
 | `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
+| `28-repl-types.cool` | Lazy-layout journal, field rollback and staged immutable text | `ReplTypes.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -369,6 +370,18 @@ function locals are outside this registry. Named session locals own separate
 `StrNew` name copies, released with their Local records; they never own the
 lexer's original identifier strings.
 
+Before changing an existing lazy layout from state 0 to 1, `ReplSaveLayout`
+journals its full descriptor. It records only touched preexisting types, avoiding
+whole-table snapshots on every input. A failed submission restores these copies,
+frees newly built field lists and clears newly allocated descriptors before their
+IDs can be reused. Field lists belong to their nominal descriptor; generic
+templates have no computed fields to share with an instance. Runtime frames and
+new owned values must be dropped before restoring layouts, because destruction
+still needs the just-computed type information. Commit releases journal records
+without releasing the completed fields. Restoring only `naggregates` is incorrect:
+a previously retained lazy instance can otherwise remain in state 1, or in state
+2 with field type IDs that now refer to unrelated descriptors.
+
 Parser move snapshots, temporary type bindings and match coverage arrays use
 `ScratchAllocate`. In REPL mode an independent `CompilerScratch` list tracks
 allocations even when parser locals disappear through nonlocal recovery.
@@ -406,8 +419,13 @@ names are copied as described above. `LiteralString` interns all REPL literals a
 by bytes into stable session storage; lexical buffers can be discarded even if
 a string value escaped from a function into owning storage or foreign code.
 Function symbols also survive their declaration token storage. Equal literals may
-share storage and literals remain immutable. Distinct literal contents persist
-until session exit; this pool is not a claim of bounded memory for an unbounded
+share storage and literals remain immutable. New entries also enter an input-local
+LIFO list with their bucket index. Checking failures remove only these new entries
+in reverse insertion order, after function/type/local/token rollback. Existing
+entries are never removed. Once execution begins, keep the new entries even on
+runtime failure: prior writes or foreign code may retain their addresses. Startup
+imports commit their entries before the first user transaction. Accepted distinct
+literal contents persist until session exit; this pool is not a claim of bounded memory for an unbounded
 set of new literals. Lexer string-construction headers are freed on success and
 unfinished string buffers on recovery; numeric parsing substrings are temporary.
 Method lookup compares package, owner and member directly against declared

@@ -147,6 +147,7 @@ t4 = (v_a3).token;
 t5 = cast[*u8]("recursive aggregate requires a pointer");
 ErrorAt(t4, t5);
 }
+ReplSaveLayout(v_type8);
 (v_a3).state = 1;
 (v_a3).align = 1;
 if (((v_a3).kind == 5 || (v_a3).kind == 6)) {

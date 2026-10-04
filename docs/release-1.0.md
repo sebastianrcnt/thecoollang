@@ -622,6 +622,41 @@ through ordinary evaluation or library use.
   or universal memory-bound claim is made. G6 remains open for the full lifetime
   audit, including rejected nominal-layout metadata and newly interned text.
 
+- Type and immutable-text rollback: reproduced a semantic error where a retained
+  lazy generic instance remained in layout state 1 after failure, producing a
+  false recursive-type diagnostic on retry. A completed layout could also retain
+  field type IDs subsequently reused for unrelated types after another error.
+  Layout now journals only touched preexisting descriptors. Rollback restores
+  those descriptors, frees newly computed field lists and clears new type slots;
+  runtime frames/owners are destroyed before layout restoration. Commit retains
+  completed layouts and releases the journal. The original missing-type case
+  now retries consistently and succeeds after the missing type is declared.
+  Raw baseline/candidate reproduction: `build/release-audit/repl-types-reproduction.json`.
+  Interned text gains a per-input insertion list. Checking failures discard only
+  new entries after metadata/source cleanup. Once execution starts, new text
+  survives runtime errors because prior writes, owning storage or foreign code
+  may retain it. Previously committed text is untouched.
+  `make repl-types-test` covers lazy retry/repair, completed-layout rollback,
+  type ID reuse, failed nominal fields, runtime owner unwinding, 2,048 distinct
+  rejected names/literals, and scalar/owner string writes before runtime failure
+  on both frontends. `make repl-types-sanitize-test` passes with compiler LLVM
+  loads/stores ASan-instrumented; package/function/token/loan sanitizer suites
+  also pass. Full `make test bootstrap-check` and `make distribution-test` pass.
+  Self-host IR SHA256: `29a9dab7e9caa2bafa430e263fca7c3343bcba9f107d4414b2af9f9e350504a6`.
+  CI includes the new target; remote CI is still unverified.
+  Three fresh-process trials against `9691ef9` at 16,000 rejected declarations
+  measure peak RSS medians of 24,985,600 → 2,277,376 bytes for distinct 1 KiB
+  literals/names, and 26,918,912 → 2,228,224 bytes for 32-field nominal layouts
+  ending in an unknown type. Candidate RSS is identical at 2,000 and 16,000
+  inputs for each workload. Reproduce with `tools/bench_repl_memory.py --baseline
+  <old-compiler> --counts 2000 16000 --workload rejected-literals` or
+  `--workload rejected-types`. Raw reports are
+  `build/release-audit/repl-types-literals-memory.json` and
+  `build/release-audit/repl-types-fields-memory.json`. These macOS ARM64 runs
+  overlapped regression jobs and support workload-specific memory results.
+  G6 stays open pending the complete session-lifetime audit and sustained
+  real-project validation; accepted immutable text still has session lifetime.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
