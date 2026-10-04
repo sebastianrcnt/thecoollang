@@ -341,3 +341,10 @@ float-literals-test: build/cool-compiler build/language.BIN build/language-runti
 test: float-literals-test
 float-literals-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_float_literals.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: declarations-test declarations-sanitize-test
+declarations-test: build/cool-compiler build/language.BIN
+	python3 tools/test_declarations.py
+test: declarations-test
+declarations-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_declarations.py --frontend build/repl-loans-asan/cool-compiler

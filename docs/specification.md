@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 6
+# Cool language specification — 1.0 draft 7
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -74,6 +74,96 @@ rejection, all execution engines and formatter preservation on both frontends.
 `make integer-tokens-test` checks independently computed integer values and
 malformed tokens on both frontends, with tree, bytecode and native-JIT execution
 for valid cases. The broader language suite covers LLVM and numerical behavior.
+
+## Declaration and type forms
+
+The following EBNF specifies individual top-level forms. `identifier` follows
+the lexical identifier rule; contextual parser words still have their grammatical
+meaning. `string_token` denotes a quoted string token. This section does not yet
+specify the driver's complete multi-file package-header/resolution rules.
+`block` is a braced statement sequence; statement grammar is a separate audit.
+
+```ebnf
+package_decl   = "package", identifier, ";" ;
+import_decl    = "import", [ identifier ], string_token, ";" ;
+generic_names  = "[", identifier, { ",", identifier }, "]" ;
+type_arguments = "[", type, { ",", type }, "]" ;
+struct_decl    = [ "pub" ], "struct", identifier, [ generic_names ],
+                 "{", { field }, "}", [ ";" ] ;
+field          = [ "pub" ], identifier, ":", type, ";" ;
+enum_decl      = [ "pub" ], "enum", identifier, [ generic_names ],
+                 "{", variant, { variant }, "}", [ ";" ] ;
+variant        = [ "pub" ], identifier, [ "(", type, ")" ], ";" ;
+function_name  = identifier, [ ".", identifier ] ;
+parameter      = identifier, ":", type ;
+parameters     = "(", [ parameter, { ",", parameter } ], ")" ;
+result         = "->", type ;
+borrow_contract = "borrows", "(", [ identifier, { ",", identifier } ], ")" ;
+function_decl  = [ "pub" ], "fn", function_name, [ generic_names ],
+                 parameters, [ result ], [ borrow_contract ], block ;
+extern_decl    = [ "pub" ], "extern", '"C"', "fn", identifier,
+                 parameters, [ result ], [ borrow_contract ], ";" ;
+export_decl    = [ "pub" ], "export", '"C"', "fn", identifier,
+                 parameters, [ result ], [ borrow_contract ], block ;
+type           = primitive | named_type | "*", type | "&", [ "mut" ], type
+               | "own", "[", type, "]" | "[", integer_token, "]", type
+               | "[", "]", type ;
+named_type     = identifier, [ ".", identifier ], [ type_arguments ] ;
+primitive      = "void" | "bool" | "string" | "i8" | "i16" | "i32" | "i64"
+               | "u8" | "u16" | "u32" | "u64" | "isize" | "usize"
+               | "f32" | "f64" ;
+```
+
+A named type can also be a bound generic parameter. Type arguments apply to a
+generic nominal type and must match its parameter count; they are not optional
+in use merely because the EBNF also covers non-generic names. Arrays use a
+single nonnegative integer token as their length, not a constant expression.
+An owner or reference wraps its following type; slices are written `[]T` and
+fixed arrays `[N]T`. Nesting is grammatical, but the documented borrowed-storage
+restrictions still apply. `void` denotes no value and is permitted as a function result or raw-pointer
+element. An explicit enum variant payload `(void)` denotes a unit variant,
+equivalent to omitting the payload. `void` is not a struct field, parameter,
+array/slice/owner/reference element or generic type argument.
+
+Struct fields and enum variants have distinct names within their declaration.
+Enums require at least one variant; structs may be empty. A variant has zero or
+one payload type. Struct fields are package-private unless marked `pub`; enum
+variants are public within an accessible enum type. Declaring a type public
+does not make its private struct fields public. Nominal types are collected
+before layout, allowing forward references; recursive by-value layout is an
+error and requires indirection. Type names cannot redefine primitive names.
+Functions and nominal types cannot share a name in a package; function overloads
+by signature are not supported.
+
+Parameter names are unique in each signature, including extern declarations.
+Every parameter has an explicit type. Omitting a result means `void`. Parameter,
+generic-name, type-argument and borrow-contract lists do not allow trailing
+commas. Generic parameter names are unique; ordinary generic function calls
+require explicit type arguments. A method name is `Owner.member`, with a nominal
+owner declared in the same package and an explicit first receiver parameter.
+Method receiver adaptation and generic inference follow [methods](methods.md).
+A borrowed result requires an explicit borrow contract naming permitted parameter
+sources; actual lifetime/loan validation follows [references](references.md).
+
+`extern "C"` declares an externally supplied function and ends with a semicolon;
+`export "C"` defines a body with a C entry point. These forms cannot be generic
+or methods. Their supported ABI uses scalar values and raw pointers, with no
+by-value aggregates or language `string` values. `pub` controls package access
+independently of C linkage. Ordinary Cool functions have a body; C-style separate
+prototypes, default parameters, variadic parameters, type aliases and top-level
+variable declarations are not supplied by these forms.
+
+Current checked implementation limits include eight generic parameters/arguments,
+32 function parameters, array lengths up to 65,536, and aggregate layouts up to
+512 KiB. These are resource limits, not permission to accept malformed syntax.
+Generic signatures/bodies and generic type layouts are still validated lazily
+when instantiated; complete validation of unused templates remains release work.
+
+`make declarations-test` covers eleven valid declaration/type/boundary cases and
+35 rejections, including duplicate extern/ordinary/export/instantiated-generic
+parameters, duplicate nominal members, malformed lists, invalid C signatures,
+method owners, borrow contracts and implementation limits, on both frontends.
+The wider package/method/reference suites cover visibility and lifetime behavior.
 
 ## Expressions: precedence and sequencing
 
@@ -227,6 +317,8 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 7: add declaration/type EBNF and signature rules; reject duplicate
+  parameter names during signature checking, including extern declarations.
 - Draft 6: define the decimal floating-token grammar; defer integer overflow
   diagnostics until token classification so long finite float spellings work.
 - Draft 5: integer-to-f32 conversion rounds directly to binary32. Removed the

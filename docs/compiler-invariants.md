@@ -600,3 +600,12 @@ bits but keep scanning the spelling. Decimal tokens with a fraction or exponent
 are converted from the complete source spelling; their integer prefix need not
 fit u64. Only a token that remains K_INT reports integer overflow. Reset the
 flag for every number; it must not leak into later literals or REPL submissions.
+
+## Signature name validation
+
+Check uniqueness of function parameter names while collecting the signature,
+before any body or ABI handling. Checking only AddLocal misses extern functions
+because they have no body. Apply the same signature rule when a generic function
+is instantiated and to exported functions and methods. The current lazy-template
+validation limitation remains separate; this check must not imply that unused
+generic bodies have been fully analyzed.

@@ -4145,6 +4145,9 @@ Error(t7);
 }
 t8 = Ident();
 (&raw ((v_f8).arg_names)[0])[(v_f8).argc] = t8;
+for(var parameter_index:i64=0;parameter_index<v_f8.argc;parameter_index=parameter_index+1){
+if(Eq(v_f8.arg_names[parameter_index],t8)!=i8(0)){Error(cast[*u8]("duplicate parameter name"));}
+}
 t9 = 58;
 t10 = cast[*u8]("expected ':' after parameter");
 Need(t9, t10);

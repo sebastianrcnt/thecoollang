@@ -958,6 +958,25 @@ through ordinary evaluation or library use.
   This completes the audited decimal floating-token grammar; it does not close
   the complete language grammar, encoding, floating arithmetic or release audit.
 
+- Declaration/type contract: draft 7 adds EBNF for package/import, nominal types,
+  fields/variants, functions/methods, C declarations/exports, parameters, generic
+  lists, borrow contracts and type forms. It states duplicate-name rules, unit
+  variants (including explicit void payload spelling), private fields, nominal
+  forward references, required type arguments, resource limits and remaining
+  lazy-template validation. The audit reproduced both frontends accepting
+  duplicate parameter names on extern C functions: body-local checks never ran
+  for them. Parameter uniqueness is now checked in FunctionSignature, including
+  ordinary/exported functions and instantiated generic signatures. The new
+  declaration suite passes 11 positive cases, five duplicate signatures and
+  30 other malformed/invalid declarations on both frontends and the ASan build.
+  Full regression, self-host/bootstrap convergence and installed Neovim/distribution
+  checks pass. Remote CI remains unobserved.
+  Evidence is in `build/release-audit/declarations-{focused,final,regression,sanitize,distribution}.log`.
+  Self-host IR SHA256 is
+  `a63be7e6fbca71b821c1f140b0475cad299787daee07d5c6e4815f6efc4d3cad`.
+  G1 remains open for complete statement/primary grammar, full package/source
+  rules and semantic contracts; G4/G9 are not closed by a declaration-only audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

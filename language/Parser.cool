@@ -440,7 +440,7 @@ U0 FunctionSignature(Function *f) {
     I64 i; U8 *name; f->borrow_contract = f->has_contract = 0;
     Need('(', "expected '(' after function name");
     if (!Take(')')) {
-        do { if (f->argc == 32) Error("function argument limit exceeded"); f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter"); f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]); if (!f->arg_types[f->argc]) Error("parameter cannot be void"); f->argc++; } while (Take(','));
+        do { if (f->argc == 32) Error("function argument limit exceeded"); f->arg_names[f->argc] = Ident(); for(i=0;i<f->argc;i++)if(Eq(f->arg_names[i],f->arg_names[f->argc]))Error("duplicate parameter name"); Need(':', "expected ':' after parameter"); f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]); if (!f->arg_types[f->argc]) Error("parameter cannot be void"); f->argc++; } while (Take(','));
         Need(')', "expected ')'");
     }
     if (Take(K_ARROW)) { f->result = ParseType(); ValidateBorrowedElements(f->result); }
