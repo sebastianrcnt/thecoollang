@@ -1,0 +1,57 @@
+// Methods lower to ordinary calls, so every existing ownership/backend rule applies.
+U8 *MethodName(U8 *owner,U8 *member){Text *name=TextNew();Append(name,owner);Char(name,'.');Append(name,member);return name->data;}
+I64 MethodOwner(Function *f){I64 i;for(i=0;f->name[i];i++)if(f->name[i]=='.')return FindType(f->package,Slice(f->name,0,i));return -1;}
+U8 *MethodDeclarationName(){
+    Token *token=At();U8 *name=Ident();I64 type;
+    if(!Take('.'))return name;
+    type=FindType(token->package,name);
+    if(type<0 || (AggregateKind(type)!=A_STRUCT && AggregateKind(type)!=A_ENUM))ErrorAt(token,"method owner must be a type declared in this package");
+    return MethodName(name,Ident());
+}
+U0 ValidateMethodTemplate(Function *f){
+    I64 owner=MethodOwner(f),i;if(owner<0)return;
+    if(f->foreign || f->exported)ErrorAt(f->token,"methods cannot use the C ABI");
+    if(f->generic_count<Shape(owner)->generic_count)ErrorAt(f->token,"method must declare receiver type parameters first");
+    for(i=0;i<Shape(owner)->generic_count;i++)if(!Eq(f->generic_names[i],Shape(owner)->generic_names[i]))ErrorAt(f->token,"method must declare receiver type parameters first");
+}
+U0 ValidateMethodSignature(Function *f){
+    I64 owner=MethodOwner(f),type,base,i;Field *field;U8 *member;
+    if(owner<0)return;if(!f->argc)ErrorAt(f->token,"method requires an explicit first receiver parameter");
+    type=f->arg_types[0];if(AggregateKind(type)==A_OWNER || IsReference(type))type=Shape(type)->element;
+    if(AggregateKind(type)!=A_STRUCT && AggregateKind(type)!=A_ENUM)ErrorAt(f->token,"method receiver must use its declared owner type");
+    base=type;if(Shape(type)->origin)base=Shape(type)->origin;
+    if(base!=owner)ErrorAt(f->token,"method receiver must use its declared owner type");
+    for(i=0;f->name[i]!='.';i++);member=f->name+i+1;
+    Layout(type);for(field=Shape(type)->fields;field;field=field->next)if(Eq(field->name,member))ErrorAt(f->token,"method name conflicts with a field or variant");
+}
+Bool MethodAhead(){
+    I64 i,brackets=0;if(At()->kind!=K_ID)return FALSE;if(tokens[pos+1].kind=='(')return TRUE;
+    if(tokens[pos+1].kind!='[')return FALSE;
+    for(i=pos+1;tokens[i].kind;i++){if(tokens[i].kind=='[')brackets++;else if(tokens[i].kind==']'){brackets--;if(!brackets)return tokens[i+1].kind=='(';}}return FALSE;
+}
+Node *MethodCall(Node *receiver,Token *token){
+    I64 type=receiver->type,owner,id,args[8],extra[8],count=0,nextra=0,i,wanted;
+    U8 *member=Ident(),*name;Node *call,*tail,*arg,*address;
+    if(AggregateKind(type)==A_OWNER || IsReference(type))type=Shape(type)->element;
+    if(AggregateKind(type)!=A_STRUCT && AggregateKind(type)!=A_ENUM)ErrorAt(token,"methods require a struct or enum receiver");
+    owner=type;if(Shape(type)->origin)owner=Shape(type)->origin;
+    name=MethodName(Shape(owner)->name,member);id=FindFunIn(Shape(owner)->package,name);
+    if(id<0)ErrorAt(token,"unknown method");
+    if(!functions[id].public && !Eq(token->package,functions[id].package))ErrorAt(token,"method is private to its package");
+    count=Shape(owner)->generic_count;for(i=0;i<count;i++)args[i]=Shape(type)->generic_args[i];
+    if(At()->kind=='[')nextra=TypeArguments(extra);
+    if(count+nextra>8)ErrorAt(token,"generic argument limit exceeded");for(i=0;i<nextra;i++)args[count+i]=extra[i];
+    id=SpecializeFunction(id,args,count+nextra);wanted=functions[id].arg_types[0];
+    if(receiver->type!=wanted && (IsReference(wanted) || wanted==type)){
+        if(IsReference(receiver->type))receiver=ReferenceLoad(receiver,token);
+        else if(AggregateKind(receiver->type)==A_OWNER){address=NewNode(N_OWN_ADDRESS,token);address->a=receiver;address->type=T_PTR+type;arg=NewNode(N_LOAD,token);arg->a=address;arg->type=type;arg->mutable=TRUE;arg->storage=Storage(type);receiver=arg;}
+        if(IsReference(wanted) && receiver->type==Shape(wanted)->element)receiver=ReferenceForPlace(receiver,Shape(wanted)->count,token);
+    }
+    Coerce(receiver,wanted);Transfer(receiver);
+    call=NewNode(N_CALL,token);call->name=name;call->a=receiver;tail=receiver;call->value=1;
+    Need('(',"expected '(' after method name");
+    if(!Take(')')){do{arg=Expr(1);tail->next=arg;tail=arg;call->value++;}while(Take(','));Need(')',"expected ')' after method arguments");}
+    if(call->value!=functions[id].argc)ErrorAt(token,"wrong argument count");
+    arg=call->a;for(i=0;i<call->value;i++){Coerce(arg,functions[id].arg_types[i]);Transfer(arg);arg=arg->next;}
+    call->slot=id;call->type=functions[id].result;if(Aggregate(call->type))call->storage=Storage(call->type);return call;
+}

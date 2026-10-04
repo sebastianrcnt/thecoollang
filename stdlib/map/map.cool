@@ -250,3 +250,27 @@ pub fn keys[V](map: & Map[V]) -> vector.Vector[text.Text] {
     collect[V](root_pointer[V](map), & mut output);
     return move output;
 }
+pub fn Map.len[V](self: & Map[V]) -> usize {
+    return ( * self).count;
+}
+pub fn Map.contains[V](self: & Map[V], key: & text.Text) -> bool {
+    return contains[V](self, key);
+}
+pub fn Map.insert[V](self: & mut Map[V], key: text.Text, value: V) -> option.Option[V] {
+    return insert[V](self, move key, move value);
+}
+pub fn Map.remove[V](self: & mut Map[V], key: & text.Text) -> option.Option[V] {
+    return remove[V](self, key);
+}
+pub fn Map.at[V](self: & Map[V], key: & text.Text) -> & V borrows(self) {
+    return at[V](self, key);
+}
+pub fn Map.at_mut[V](self: & mut Map[V], key: & text.Text) -> & mut V borrows(self) {
+    return at_mut[V](self, key);
+}
+pub fn Map.clear[V](self: & mut Map[V]) {
+    clear[V](self);
+}
+pub fn Map.keys[V](self: & Map[V]) -> vector.Vector[text.Text] {
+    return keys[V](self);
+}

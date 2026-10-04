@@ -9,8 +9,10 @@ I64 ReferenceType(Token *token) {
     return SequenceType(6,ParseType(),exclusive,token);
 }
 Node *ReferenceExpression(Token *token) {
-    I64 exclusive=Is("mut"); Node *place, *address=NULL, *result;
-    if(exclusive)pos++; place=Primary();
+    I64 exclusive=Is("mut");if(exclusive)pos++;return ReferenceForPlace(Primary(),exclusive,token);
+}
+Node *ReferenceForPlace(Node *place,I64 exclusive,Token *token){
+    Node *address=NULL,*result;
     if(exclusive && !place->mutable) ErrorAt(token,"exclusive borrow requires a mutable place");
     if(Borrowed(place->type)) ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");
     if(place->kind==N_LOCAL){address=NewNode(N_LOCAL_ADDRESS,token);address->slot=place->slot;address->local_ref=place->local_ref;address->type=T_PTR+place->type;}

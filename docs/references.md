@@ -82,7 +82,8 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 - Reference calls with multiple return sources are rejected. These require
   richer provenance sets; nested calls with one declared source are supported.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
-  method receiver syntax or borrow-aware replacement for every collection API.
+  or borrow-aware replacement for every collection API.
+  [Methods](methods.md) use the same scoped loans.
 
 `make references-test` exercises both frontends, all five execution engines,
 optimized native output, generic owner exchange, diagnostics, formatting and

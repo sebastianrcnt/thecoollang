@@ -124,3 +124,22 @@ pub fn at_mut[T](vector: & mut Vector[T], index: usize) -> & mut T borrows(vecto
         return borrow_raw[ & mut T](pointer, vector);
     }
 }
+// Instance syntax preserves the free-function APIs and their borrow contracts.
+pub fn Vector.len[T](self: & Vector[T]) -> usize {
+    return ( * self).count;
+}
+pub fn Vector.append[T](self: & mut Vector[T], value: T) {
+    append[T](self, move value);
+}
+pub fn Vector.pop[T](self: & mut Vector[T]) -> option.Option[T] {
+    return pop[T](self);
+}
+pub fn Vector.clear[T](self: & mut Vector[T]) {
+    clear[T](self);
+}
+pub fn Vector.at[T](self: & Vector[T], index: usize) -> & T borrows(self) {
+    return at[T](self, index);
+}
+pub fn Vector.at_mut[T](self: & mut Vector[T], index: usize) -> & mut T borrows(self) {
+    return at_mut[T](self, index);
+}

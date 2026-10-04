@@ -274,3 +274,42 @@ pub fn ends_with(value: & Text, suffix: & Text) -> bool {
     }
     return true;
 }
+pub fn Text.byte_len(self: & Text) -> usize {
+    return byte_len(self);
+}
+pub fn Text.scalar_len(self: & Text) -> usize {
+    return scalar_len(self);
+}
+pub fn Text.scalar_at(self: & Text, index: usize) -> u32 {
+    return scalar_at(self, index);
+}
+pub fn Text.as_bytes(self: & Text) -> & vector.Vector[u8]borrows(self) {
+    return as_bytes(self);
+}
+pub fn Text.clone(self: & Text) -> Text {
+    return clone(self);
+}
+pub fn Text.append(self: & mut Text, value: & Text) {
+    append(self, value);
+}
+pub fn Text.append_literal(self: & mut Text, value: string) -> result.Result[usize, Utf8Error] {
+    return append_literal(self, value);
+}
+pub fn Text.append_scalar(self: & mut Text, value: u32) -> bool {
+    return append_scalar(self, value);
+}
+pub fn Text.clear(self: & mut Text) {
+    clear(self);
+}
+pub fn Text.equal(self: & Text, other: & Text) -> bool {
+    return equal(self, other);
+}
+pub fn Text.compare(self: & Text, other: & Text) -> i32 {
+    return compare(self, other);
+}
+pub fn Text.starts_with(self: & Text, other: & Text) -> bool {
+    return starts_with(self, other);
+}
+pub fn Text.ends_with(self: & Text, other: & Text) -> bool {
+    return ends_with(self, other);
+}

@@ -67,6 +67,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `15-native.cool` | Frontend CLI, bundles, metadata and tools | `Native.cool` |
 | `16-references.cool` | Scoped loans and unsafe storage bridges | `References.cool` |
 | `17-calls.cool` | Named expressions, builtins and function-call resolution | `Parser.cool: Atom` |
+| `18-methods.cool` | Nominal method declaration, receiver adaptation and call lowering | `Methods.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -140,6 +141,15 @@ stable function ID. Negative builtin slots are:
 | -1 / -2 | print or println / assert |
 | -3 / -4 / -5 | raw allocation / free / copy |
 | -6 / -7 | owner count / compiler-injected drop |
+
+Methods use package-qualified `Type.member` function names. Their first
+parameter is explicit; receiver generic arguments precede extra call-site type
+arguments. The parser inserts the receiver as the first ordinary call argument,
+using `ReferenceForPlace` for auto-borrows. Field indexing must not be mistaken
+for generic method syntax: lookahead requires a call after closing brackets.
+Declaration/template/signature checks reject foreign owners, C ABI methods,
+receiver mismatches and field/variant collisions. Backends do not get a separate
+method opcode.
 
 A function body is parsed and typed before `AnalyzeBorrows`, then
 `AnalyzeReferences`, then `InjectDrops`. Return-path validation follows.

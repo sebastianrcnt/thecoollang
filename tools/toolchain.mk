@@ -174,3 +174,8 @@ path-test: build/cool-compiler build/language-runtime.o build/language-runtime.d
 path-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_path.py --sanitize
 test: path-test
+
+.PHONY: methods-test
+methods-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_methods.py
+test: methods-test

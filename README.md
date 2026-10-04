@@ -91,6 +91,6 @@ cool legacy run examples/hello.cool
 
 회귀 검사는 기존 ARM64/x86-64 코드 생성, 새 언어 실행 경로 간 결과 일치, 패키지·캐시·체크섬, REPL 교체, 포매터·개발 도구를 확인합니다. `bootstrap-check`는 seed → gen1 → gen2 → gen3을 빌드해 gen2와 gen3의 바이트 일치를 검사합니다. 이 명령 자체는 체크인된 seed를 변경하지 않습니다.
 
-[성능 측정](docs/performance.md) · [표준 라이브러리](stdlib/README.md) · [셀프호스팅](compiler/README.md) · [전체 구현 목표](docs/language-plan.md) · [현재 지원 범위](language/README.md) · [추출 기준](SOURCE.md)
+[메서드](docs/methods.md) · [성능 측정](docs/performance.md) · [표준 라이브러리](stdlib/README.md) · [셀프호스팅](compiler/README.md) · [전체 구현 목표](docs/language-plan.md) · [현재 지원 범위](language/README.md) · [추출 기준](SOURCE.md)
 
 자체 코드는 MIT이며 포함된 외부 코드는 원래 라이선스를 따릅니다. [LICENSE](LICENSE) · [THIRD_PARTY.md](THIRD_PARTY.md)

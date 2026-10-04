@@ -48,7 +48,8 @@ only lists source paths for bootstrapping; it does not parse or transform Cool.
 
 `16-references.cool` contains the readable scoped-loan checker, and
 `17-calls.cool` separates named expressions, builtins and call resolution from
-the larger expression parser. The remaining mechanical sections are being
+the larger expression parser. `18-methods.cool` implements nominal receivers
+and lowers instance syntax to the same checked calls. The remaining mechanical sections are being
 simplified incrementally under differential and bootstrap tests.
 
 See [compiler invariants](../docs/compiler-invariants.md) for the source map,

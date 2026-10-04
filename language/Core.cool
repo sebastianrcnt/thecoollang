@@ -248,3 +248,10 @@ extern U0 AnalyzeReferences(Function *function);
 
 extern Node *RawReferenceExpression();
 extern Node *ReferencePointerCast(Node *value,I64 type,Token *token);
+
+extern Node *ReferenceForPlace(Node *place,I64 exclusive,Token *token);
+extern U8 *MethodDeclarationName();
+extern U0 ValidateMethodTemplate(Function *f);
+extern U0 ValidateMethodSignature(Function *f);
+extern Bool MethodAhead();
+extern Node *MethodCall(Node *receiver,Token *token);

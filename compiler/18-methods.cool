@@ -1,0 +1,218 @@
+// Nominal-type methods lower to ordinary calls; backends need no method opcode.
+fn MethodName(owner: * u8, member: * u8) -> * u8 {
+    unsafe {
+        let name = TextNew();
+        Append(name, owner);
+        Char(name, 46);
+        Append(name, member);
+        return name.data;
+    }
+}
+fn MethodOwner(function: * Function) -> i64 {
+    unsafe {
+        for (var i: i64 = 0; function.name[i] != u8(0); i = i + 1) {
+            if (function.name[i] == u8(46)) {
+                return FindType(function.package, Slice(function.name, 0, i));
+            }
+        }
+        return - 1;
+    }
+}
+fn MethodDeclarationName() -> * u8 {
+    unsafe {
+        let token = At();
+        let name = Ident();
+        if (Take(46) == i8(0)) {
+            return name;
+        }
+        let type = FindType(token.package, name);
+        if (type < 0 || (AggregateKind(type) != 1 && AggregateKind(type) != 4)) {
+            ErrorAt(token, cast[ * u8]("method owner must be a type declared in this package"));
+        }
+        return MethodName(name, Ident());
+    }
+}
+fn ValidateMethodTemplate(function: * Function) {
+    unsafe {
+        let owner = MethodOwner(function);
+        if (owner < 0) {
+            return;
+        }
+        if (function.foreign != 0 || function.exported != 0) {
+            ErrorAt(function.token, cast[ * u8]("methods cannot use the C ABI"));
+        }
+        if (function.generic_count < Shape(owner).generic_count) {
+            ErrorAt(function.token, cast[ * u8]("method must declare receiver type parameters first"));
+        }
+        for (var i: i64 = 0; i < Shape(owner).generic_count; i = i + 1) {
+            if (Eq(function.generic_names[i], Shape(owner).generic_names[i]) == i8(0)) {
+                ErrorAt(function.token, cast[ * u8]("method must declare receiver type parameters first"));
+            }
+        }
+    }
+}
+fn ValidateMethodSignature(function: * Function) {
+    unsafe {
+        let owner = MethodOwner(function);
+        if (owner < 0) {
+            return;
+        }
+        if (function.argc == 0) {
+            ErrorAt(function.token, cast[ * u8]("method requires an explicit first receiver parameter"));
+        }
+        var type = function.arg_types[0];
+        if (AggregateKind(type) == 5 || IsReference(type)) {
+            type = Shape(type).element;
+        }
+        if (AggregateKind(type) != 1 && AggregateKind(type) != 4) {
+            ErrorAt(function.token, cast[ * u8]("method receiver must use its declared owner type"));
+        }
+        var base = type;
+        if (Shape(type).origin != 0) {
+            base = Shape(type).origin;
+        }
+        if (base != owner) {
+            ErrorAt(function.token, cast[ * u8]("method receiver must use its declared owner type"));
+        }
+        var i: i64 = 0;
+        while (function.name[i] != u8(46)) {
+            i = i + 1;
+        }
+        let member = & raw function.name[i + 1];
+        Layout(type);
+        var field = Shape(type).fields;
+        while (field != null) {
+            if (Eq(field.name, member) != i8(0)) {
+                ErrorAt(function.token, cast[ * u8]("method name conflicts with a field or variant"));
+            }
+            field = field.next;
+        }
+    }
+}
+fn MethodAhead() -> bool {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (At().kind != 256) {
+            return false;
+        }
+        if (ctx.v_tokens[ctx.v_pos + 1].kind == 40) {
+            return true;
+        }
+        if (ctx.v_tokens[ctx.v_pos + 1].kind != 91) {
+            return false;
+        }
+        var brackets: i64 = 0;
+        var i = ctx.v_pos + 1;
+        while (ctx.v_tokens[i].kind != 0) {
+            if (ctx.v_tokens[i].kind == 91) {
+                brackets = brackets + 1;
+            } else if (ctx.v_tokens[i].kind == 93) {
+                brackets = brackets - 1;
+                if (brackets == 0) {
+                    return ctx.v_tokens[i + 1].kind == 40;
+                }
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+}
+fn MethodCall(receiver: * Node, token: * Token) -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var type = receiver.type;
+        let member = Ident();
+        if (AggregateKind(type) == 5 || IsReference(type)) {
+            type = Shape(type).element;
+        }
+        if (AggregateKind(type) != 1 && AggregateKind(type) != 4) {
+            ErrorAt(token, cast[ * u8]("methods require a struct or enum receiver"));
+        }
+        var owner = type;
+        if (Shape(type).origin != 0) {
+            owner = Shape(type).origin;
+        }
+        let name = MethodName(Shape(owner).name, member);
+        var id = FindFunIn(Shape(owner).package, name);
+        if (id < 0) {
+            ErrorAt(token, cast[ * u8]("unknown method"));
+        }
+        if (ctx.v_functions[id].public == 0 && Eq(token.package, ctx.v_functions[id].package) == i8(0)) {
+            ErrorAt(token, cast[ * u8]("method is private to its package"));
+        }
+        var arguments = [8]i64 {
+        };
+        var extra = [8]i64 {
+        };
+        let count = Shape(owner).generic_count;
+        var extra_count: i64 = 0;
+        for (var i: i64 = 0; i < count; i = i + 1) {
+            arguments[i] = Shape(type).generic_args[i];
+        }
+        if (At().kind == 91) {
+            extra_count = TypeArguments( & raw extra[0]);
+        }
+        if (count + extra_count > 8) {
+            ErrorAt(token, cast[ * u8]("generic argument limit exceeded"));
+        }
+        for (var i: i64 = 0; i < extra_count; i = i + 1) {
+            arguments[count + i] = extra[i];
+        }
+        id = SpecializeFunction(id, & raw arguments[0], count + extra_count);
+        let wanted = ctx.v_functions[id].arg_types[0];
+        var source = receiver;
+        if (source.type != wanted && (IsReference(wanted) || wanted == type)) {
+            if (IsReference(source.type)) {
+                source = ReferenceLoad(source, token);
+            } else if (AggregateKind(source.type) == 5) {
+                let address = NewNode(30, token);
+                address.a = source;
+                address.type = 100000 + type;
+                let load = NewNode(18, token);
+                load.a = address;
+                load.type = type;
+                load.mutable = 1;
+                load.storage = Storage(type);
+                source = load;
+            }
+            if (IsReference(wanted) && source.type == Shape(wanted).element) {
+                source = ReferenceForPlace(source, Shape(wanted).count, token);
+            }
+        }
+        Coerce(source, wanted);
+        Transfer(source);
+        let call = NewNode(4, token);
+        call.name = name;
+        call.a = source;
+        var tail = source;
+        call.value = 1;
+        Need(40, cast[ * u8]("expected '(' after method name"));
+        if (Take(41) == i8(0)) {
+            while (true) {
+                let argument = Expr(1);
+                tail.next = argument;
+                tail = argument;
+                call.value = call.value + 1;
+                if (Take(44) == i8(0)) {
+                    break;
+                }
+            }
+            Need(41, cast[ * u8]("expected ')' after method arguments"));
+        }
+        if (call.value != ctx.v_functions[id].argc) {
+            ErrorAt(token, cast[ * u8]("wrong argument count"));
+        }
+        var argument = call.a;
+        for (var i: i64 = 0; i < call.value; i = i + 1) {
+            Coerce(argument, ctx.v_functions[id].arg_types[i]);
+            Transfer(argument);
+            argument = argument.next;
+        }
+        call.slot = id;
+        call.type = ctx.v_functions[id].result;
+        if (Aggregate(call.type) != i8(0)) {
+            call.storage = Storage(call.type);
+        }
+        return call;
+    }
+}

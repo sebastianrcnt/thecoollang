@@ -1032,6 +1032,7 @@ v_t12 = t4;
 t5 = 46;
 t6 = Take(t5);
 if ((t6 != i8(0))) {
+if(MethodAhead()){v_n14=MethodCall(v_n14,v_t12);continue;}
 v_kind5 = (v_n14).type;
 v_mutable1 = i8((v_n14).mutable);
 t7 = v_kind5;
@@ -4245,6 +4246,7 @@ t48 = (v_f8).token;
 t49 = cast[*u8]("returning borrowed values requires a borrows(parameter) contract");
 ErrorAt(t48, t49);
 }
+ValidateMethodSignature(v_f8);
 }
 return;
 }
@@ -5167,6 +5169,7 @@ if (pc == 114) {
 t106 = &raw ((v_f9).generic_names)[0];
 t107 = GenericNames(t106);
 (v_f9).generic_count = t107;
+ValidateMethodTemplate(v_f9);
 pc = 113;
 continue;
 }
@@ -5364,7 +5367,7 @@ pc = 144;
 continue;
 }
 if (pc == 147) {
-t135 = Ident();
+t135 = MethodDeclarationName();
 v_name17 = t135;
 pc = 145;
 continue;

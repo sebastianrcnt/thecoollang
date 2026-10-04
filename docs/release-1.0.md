@@ -224,6 +224,21 @@ through ordinary evaluation or library use.
   The full `make test` suite and both bootstrap fixed-point checks pass after
   the refactor (new-compiler IR SHA256 begins `24c3b09c2d9ee851`).
 
+- Nominal methods: structs/enums now declare `fn Type.member(self: &Type, ...)`
+  (value, exclusive-reference and owning receivers also work). The defining
+  package owns the method set; visibility, field/variant collisions, receiver
+  types and explicit ownership are checked. Generic receiver arguments are
+  supplied from the instance; additional method type arguments remain explicit.
+  Calls lower to ordinary typed/borrow-checked calls across all backends.
+  Vector/Text/Map now provide corresponding safe methods alongside free APIs.
+  Focused tests cover both frontends, five engines/O2, imported same-named types,
+  docs/formatting, REPL body replacement and 19 negative cases. Full regression
+  and both bootstrap paths pass; final receiver-copy adjustments pass the
+  method suite and new-syntax convergence again (IR SHA256 begins
+  `e2d997b1e66690d4`). G4 remains open
+  for complete borrowing/iteration ergonomics and diagnostics; reference
+  temporary/storage/REPL restrictions have not been silently removed.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw
@@ -233,5 +248,6 @@ through ordinary evaluation or library use.
 - Maintain the documented AST/slot/ownership invariants while simplifying
   remaining port-generated compiler sections. Both frontend implementations
   must remain semantically aligned and bootstrap must continue to converge.
-- Complete scoped references and method calls, then migrate collection APIs
-  off raw-pointer-only usage. Do not suppress existing owner checks to do this.
+- Complete stored loans and tracked iteration, including the remaining
+  temporary receiver restrictions. Preserve existing ownership checks while
+  extending ordinary collection use.

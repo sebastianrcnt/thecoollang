@@ -341,3 +341,12 @@ normalization/join oracle, including root traversal, Unicode, long paths,
 hidden/trailing-dot names and idempotence. All five engines and optimized native
 output must agree, with zero remaining owners. `make path-sanitize-test` adds
 instrumented Cool ASan and C-runtime ASan/UBSan checks.
+
+
+## Instance methods
+
+`Vector`, `Text` and `Map` also expose their safe operations as instance methods,
+for example `values.append(42)`, `*values.at(0)`, `word.scalar_len()` and
+`map.at(&key).scalar_len()`. Factories remain package functions. Method calls
+use the same receiver loans and owning transfers as the free-function forms;
+see [declarations, generics and supported chains](../docs/methods.md).

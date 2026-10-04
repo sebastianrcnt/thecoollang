@@ -5,6 +5,7 @@
 #include "Ownership.cool"
 #include "Parser.cool"
 #include "References.cool"
+#include "Methods.cool"
 #include "Interpreter.cool"
 #include "LLVM.cool"
 #include "Bytecode.cool"

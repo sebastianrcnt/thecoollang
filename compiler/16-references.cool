@@ -32,7 +32,11 @@ fn ReferenceExpression(token: * Token) -> * Node {
         if (exclusive != 0) {
             ctx.v_pos = ctx.v_pos + 1;
         }
-        let place = Primary();
+        return ReferenceForPlace(Primary(),exclusive,token);
+    }
+}
+fn ReferenceForPlace(place:*Node,exclusive:i64,token:*Token)->*Node {
+    unsafe {
         if (exclusive != 0 && place.mutable == 0) {
             ErrorAt(token, cast[ * u8]("exclusive borrow requires a mutable place"));
         }
