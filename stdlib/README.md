@@ -15,6 +15,7 @@ packages are bundled sources and need no module download.
 | `std/text` | owning UTF-8 `Text`, strict validation, byte/scalar lengths, scalar access, append/clone/clear, byte conversion, ordering/prefix/suffix |
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
 | `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`; raw `cursor`/`next` |
+| `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
 | `std/os` | `arg_count`, `arg`; executable/runner flags excluded |
 
@@ -68,7 +69,7 @@ standalone output. Filesystem read errors release intermediate owned buffers;
 write errors and close/flush errors are returned. Paths use the current working
 directory. This is a core library, not a claim of Go standard-library parity:
 networking, async IO and Unicode normalization are outside the first release.
-Maps, serialization and other mandatory core APIs remain in development under
+Serialization and other mandatory core APIs remain in development under
 [the 1.0 release contract](../docs/release-1.0.md).
 
 
@@ -115,3 +116,55 @@ text. Text falls under normal move-only ownership and automatic destruction.
 decoder across five engines and O2, including every decoded scalar, 12 KiB growth,
 file round trips and allocation counts. `make text-sanitize-test` also instruments
 Cool output with ASan and the C runtime with ASan/UBSan.
+
+
+## Ordered maps
+
+`std/map.Map[V]` owns UTF-8 `Text` keys and generic values. It uses an AVL tree:
+lookup, insertion and removal perform O(log n) key comparisons regardless of
+insertion order. Comparisons use `text.compare` bytewise ordering and cost up to
+the common key length. This is a text-key ordered map, not a hash map or an
+arbitrary-key map. Empty and embedded-NUL keys are distinct and supported.
+
+```cool
+import map "std/map";
+import text "std/text";
+import result "std/result";
+import option "std/option";
+fn key(value: string) -> text.Text {
+    return result.value_or[text.Text, text.Utf8Error](
+        text.from_literal(value), text.create());
+}
+fn main() {
+    var counts = map.create[i64]();
+    map.insert[i64](&mut counts, key("hello"), 1);
+    let search = key("hello");
+    *map.at_mut[i64](&mut counts, &search) = 2;
+    assert(*map.at[i64](&counts, &search) == 2);
+    assert(option.value_or[i64](map.remove[i64](&mut counts, &search), 0) == 2);
+}
+```
+
+`insert` consumes its key/value and returns `Option[V]` containing the previous
+value on replacement. Replacing a value retains the existing equal key and
+releases the incoming key. `remove` returns ownership of the removed value;
+missing keys return `None`. Ignored owning results are automatically released.
+`len` is O(1). `clear` and normal destruction release every node, key and value.
+
+`at`/`at_mut` return shared/exclusive value references with `borrows(map)`.
+Missing keys trap; call `contains` when absence is expected. A live value loan
+prevents structural changes or incompatible access to the map. Like vectors,
+map values cannot yet contain borrowed references. `keys` returns an independent
+owned `Vector[Text]` in sorted order; it remains valid after changing or dropping
+the map and takes O(n + total key bytes) time and memory. It is a copied snapshot,
+not a replacement for the still-planned tracked iterator API.
+
+`make map-test` checks public APIs and two deterministic Python-dictionary
+models. A test-only companion module independently checks all ordering bounds,
+AVL balance, stored heights and node counts after every operation. Tests cover
+all four rotation patterns, two-child deletion, sorted insertion, random
+replacement/removal/clear/moves, exact live-owner counts, narrow integers,
+floats, owned values and loan conflicts on five engines plus O2.
+`make map-sanitize-test` also instruments Cool memory accesses with ASan and the
+C runtime with ASan/UBSan. Generated projects remain in `build/map-tests/` for
+reproduction; additional seeds/steps can be supplied to `tools/test_map.py`.

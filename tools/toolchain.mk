@@ -139,3 +139,12 @@ text-test: build/cool-compiler build/language-runtime.o build/language-runtime.d
 text-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_text.py --sanitize
 test: text-test
+
+.PHONY: map-test map-sanitize-test
+map-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_map_api.py
+	python3 tools/test_map.py
+map-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_map_api.py
+	python3 tools/test_map.py --sanitize
+test: map-test

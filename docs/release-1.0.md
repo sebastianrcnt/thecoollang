@@ -28,7 +28,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
-| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (initial packages exist) |
+| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector and ordered map validated) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
@@ -146,6 +146,18 @@ through ordinary evaluation or library use.
   surviving path. Negative coverage still rejects a move on a continuing path;
   both frontends, five engines and self-host convergence pass. This was exposed
   by implementing owning map insertion and does not relax live-path checks.
+
+- Ordered map: added owning text-key `std/map.Map[V]` with AVL-balanced
+  insert/replace/remove, borrowed read/mutation, clear and independent sorted
+  key snapshots. Two deterministic Python-dictionary models cover rotation
+  patterns, two-child deletion, sorted and random inputs; a test-only companion
+  independently verifies ordering bounds, AVL balance, heights and counts after
+  every operation. Exact allocation counts, five engines, O2 and instrumented
+  ASan/UBSan pass for seeds 7 and 2026. Public API tests also cover narrow/float
+  and owning text values, empty/NUL keys, missing-key traps and loan conflicts.
+  This supplies an ordered text-key map, not arbitrary-key hashing. G5 still
+  requires serialization, path/process utilities and real applications; stored
+  references and tracked iterators remain required by G2/G4/G5.
 
 ## Next implementation checkpoints
 

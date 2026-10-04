@@ -1,0 +1,252 @@
+package map;
+import text "std/text";
+import option "std/option";
+import vector "std/vector";
+// Ordered text-key map. AVL balancing bounds tree depth independently of key
+// order. Keys and values are owned; no raw node pointers escape this package.
+struct Node[V] {
+    key: text.Text;
+    value: V;
+    left: own[Node[V]];
+    right: own[Node[V]];
+    height: i64;
+}
+pub struct Map[V] {
+    root: own[Node[V]];
+    count: usize;
+}
+pub fn create[V]() -> Map[V] {
+    return Map[V] {
+    };
+}
+pub fn len[V](value: & Map[V]) -> usize {
+    return ( * value).count;
+}
+// Empty owners are represented by a zero pointer-sized cell in the Cool ABI.
+fn pointer[V](slot: * own[Node[V]]) -> * Node[V] {
+    unsafe {
+        if (cast[ * usize](slot)[0] == 0) {
+            return null;
+        }
+        return & raw * * slot;
+    }
+}
+fn height[V](node: * Node[V]) -> i64 {
+    unsafe {
+        if (node == null) {
+            return 0;
+        }
+        return ( * node).height;
+    }
+}
+fn update[V](node: * Node[V]) {
+    unsafe {
+        let left = height[V](pointer[V]( & raw( * node).left));
+        let right = height[V](pointer[V]( & raw( * node).right));
+        var highest = left;
+        if (right > highest) {
+            highest = right;
+        }
+        ( * node).height = highest + 1;
+    }
+}
+fn rotate_left[V](slot: * own[Node[V]]) {
+    unsafe {
+        let previous = move * slot;
+        let old = & raw * previous;
+        let replacement = move( * old).right;
+        let next = & raw * replacement;
+        ( * old).right = move( * next).left;
+        update[V](old);
+        ( * next).left = move previous;
+        update[V](next);
+        * slot = move replacement;
+    }
+}
+fn rotate_right[V](slot: * own[Node[V]]) {
+    unsafe {
+        let previous = move * slot;
+        let old = & raw * previous;
+        let replacement = move( * old).left;
+        let next = & raw * replacement;
+        ( * old).left = move( * next).right;
+        update[V](old);
+        ( * next).right = move previous;
+        update[V](next);
+        * slot = move replacement;
+    }
+}
+fn balance[V](slot: * own[Node[V]]) {
+    unsafe {
+        let node = pointer[V](slot);
+        if (node == null) {
+            return;
+        }
+        update[V](node);
+        let left = pointer[V]( & raw( * node).left);
+        let right = pointer[V]( & raw( * node).right);
+        let difference = height[V](left) - height[V](right);
+        if (difference > 1) {
+            if (height[V](pointer[V]( & raw( * left).left)) < height[V](pointer[V]( & raw( * left).right))) {
+                rotate_left[V]( & raw( * node).left);
+            }
+            rotate_right[V](slot);
+        } else if (difference < -1) {
+            if (height[V](pointer[V]( & raw( * right).right)) < height[V](pointer[V]( & raw( * right).left))) {
+                rotate_right[V]( & raw( * node).right);
+            }
+            rotate_left[V](slot);
+        }
+    }
+}
+fn insert_node[V](slot: * own[Node[V]], count: * usize, key: text.Text, value: V) -> option.Option[V] {
+    unsafe {
+        let node = pointer[V](slot);
+        if (node == null) {
+            let entry = new[Node[V]]();
+            let target = & raw * entry;
+            ( * target).key = move key;
+            ( * target).value = move value;
+            ( * target).height = 1;
+            * slot = move entry;
+            * count = * count + 1;
+            return option.Option[V].None;
+        }
+        let order = text.compare( & key, & ( * node).key);
+        if (order == 0) {
+            let old = move( * node).value;
+            ( * node).value = move value;
+            return option.Option[V].Some(move old);
+        }
+        var previous = option.Option[V].None;
+        if (order < 0) {
+            previous = insert_node[V]( & raw( * node).left, count, move key, move value);
+        } else {
+            previous = insert_node[V]( & raw( * node).right, count, move key, move value);
+        }
+        balance[V](slot);
+        return move previous;
+    }
+}
+pub fn insert[V](map: & mut Map[V], key: text.Text, value: V) -> option.Option[V] {
+    unsafe {
+        return insert_node[V]( & raw( * map).root, & raw( * map).count, move key, move value);
+    }
+}
+fn find[V](node: * Node[V], key: & text.Text) -> * Node[V] {
+    unsafe {
+        var current = node;
+        while (current != null) {
+            let order = text.compare(key, & ( * current).key);
+            if (order == 0) {
+                return current;
+            }
+            if (order < 0) {
+                current = pointer[V]( & raw( * current).left);
+            } else {
+                current = pointer[V]( & raw( * current).right);
+            }
+        }
+        return null;
+    }
+}
+fn root_pointer[V](map: & Map[V]) -> * Node[V] {
+    unsafe {
+        let address = cast[ * Map[V]](map);
+        return pointer[V]( & raw( * address).root);
+    }
+}
+pub fn contains[V](map: & Map[V], key: & text.Text) -> bool {
+    unsafe {
+        return find[V](root_pointer[V](map), key) != null;
+    }
+}
+pub fn at[V](map: & Map[V], key: & text.Text) -> & V borrows(map) {
+    unsafe {
+        let node = find[V](root_pointer[V](map), key);
+        assert(node != null);
+        return borrow_raw[ & V]( & raw( * node).value, map);
+    }
+}
+pub fn at_mut[V](map: & mut Map[V], key: & text.Text) -> & mut V borrows(map) {
+    unsafe {
+        let node = find[V](pointer[V]( & raw( * map).root), key);
+        assert(node != null);
+        return borrow_raw[ & mut V]( & raw( * node).value, map);
+    }
+}
+fn detach_min[V](slot: * own[Node[V]]) -> own[Node[V]] {
+    unsafe {
+        let node = pointer[V](slot);
+        if (pointer[V]( & raw( * node).left) == null) {
+            let found = move * slot;
+            * slot = move( * node).right;
+            return move found;
+        }
+        let found = detach_min[V]( & raw( * node).left);
+        balance[V](slot);
+        return move found;
+    }
+}
+fn remove_node[V](slot: * own[Node[V]], count: * usize, key: & text.Text) -> option.Option[V] {
+    unsafe {
+        let node = pointer[V](slot);
+        if (node == null) {
+            return option.Option[V].None;
+        }
+        let order = text.compare(key, & ( * node).key);
+        if (order < 0) {
+            let old = remove_node[V]( & raw( * node).left, count, key);
+            balance[V](slot);
+            return move old;
+        }
+        if (order > 0) {
+            let old = remove_node[V]( & raw( * node).right, count, key);
+            balance[V](slot);
+            return move old;
+        }
+        let old = move( * node).value;
+        * count = * count - 1;
+        if (pointer[V]( & raw( * node).left) == null) {
+            let removed = move * slot;
+            * slot = move( * node).right;
+            return option.Option[V].Some(move old);
+        }
+        if (pointer[V]( & raw( * node).right) == null) {
+            let removed = move * slot;
+            * slot = move( * node).left;
+            return option.Option[V].Some(move old);
+        }
+        let replacement = detach_min[V]( & raw( * node).right);
+        let next = & raw * replacement;
+        ( * node).key = move( * next).key;
+        ( * node).value = move( * next).value;
+        balance[V](slot);
+        return option.Option[V].Some(move old);
+    }
+}
+pub fn remove[V](map: & mut Map[V], key: & text.Text) -> option.Option[V] {
+    unsafe {
+        return remove_node[V]( & raw( * map).root, & raw( * map).count, key);
+    }
+}
+pub fn clear[V](map: & mut Map[V]) {
+    let removed = move( * map).root;
+    ( * map).count = 0;
+}
+fn collect[V](node: * Node[V], output: & mut vector.Vector[text.Text]) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        collect[V](pointer[V]( & raw( * node).left), output);
+        vector.append[text.Text](output, text.clone( & ( * node).key));
+        collect[V](pointer[V]( & raw( * node).right), output);
+    }
+}
+// Returns independent owned keys in bytewise sorted order.
+pub fn keys[V](map: & Map[V]) -> vector.Vector[text.Text] {
+    var output = vector.create[text.Text]();
+    collect[V](root_pointer[V](map), & mut output);
+    return move output;
+}
