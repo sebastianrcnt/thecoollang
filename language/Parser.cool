@@ -89,6 +89,7 @@ Node *EnumLiteral(I64 type, Token *token) {
 Node *Atom() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty, type_args[8], type_count = 0; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
+    if(Is("borrow_raw"))return RawReferenceExpression();
     if (Is("move")) {
         pos++; n = Primary(); if (!Owned(n->type)) return n;
         if (n->kind == N_CALL || n->kind == N_NEW || n->kind == N_AGG_LITERAL || n->kind == N_MOVE) return n;
@@ -109,6 +110,7 @@ Node *Atom() {
     if (Is("cast") && tokens[pos+1].kind == '[') {
         pos += 2; ty = ParseType(); Need(']', "expected ']' after cast type"); Need('(', "expected '(' after cast type");
         n = NewNode(N_CAST, t); n->a = Expr(1); n->type = ty; Need(')', "expected ')' after cast operand");
+        if(IsReference(n->a->type))return ReferencePointerCast(n->a,ty,t);
         if (Pointer(ty) || Pointer(n->a->type)) {
             if (!unsafe_depth) ErrorAt(t, "pointer casts require unsafe");
             if (!(Pointer(ty) || ty == T_U64 || ty == T_INT || ty == T_STRING) || !(Pointer(n->a->type) || Integer(n->a->type) || n->a->type == T_NULL || n->a->type == T_STRING)) ErrorAt(t, "invalid pointer cast");

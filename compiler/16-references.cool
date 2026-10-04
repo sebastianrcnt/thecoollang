@@ -222,9 +222,11 @@ fn ReferenceAddress(check: * ReferenceCheck, node: * Node) {
             return;
         }
         if (node.kind == 30) {
-            if (IsReference(node.a.type)) {
+            if (IsReference(node.a.type) && node.a.kind == 3) {
                 ReferenceAccess(check, node.a, false);
             } else {
+                // Calls and temporary borrow expressions must establish their
+                // loans before a later index or assignment RHS is evaluated.
                 ReferenceValue(check, node.a);
             }
             return;
@@ -239,6 +241,11 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         }
         if (IsReference(node.type)) {
             if (node.kind == 23) {
+                if (node.op == 1) {
+                    ReferenceValue(check, node.a);
+                    ReferenceAcquire(check, node.origin_source, Shape(node.type).count, node.token);
+                    return;
+                }
                 ReferenceAddress(check, node.a);
                 ReferenceAcquire(check, node.a, Shape(node.type).count, node.token);
                 return;
@@ -267,7 +274,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         }
         if (node.kind == 22 || node.kind == 24 || node.kind == 25 || node.kind == 30) {
             ReferenceAddress(check, node);
-            ReferenceAccess(check, node, true);
+            ReferenceAccess(check, node, node.op != 1 || node.kind != 30);
             return;
         }
         if (node.kind == 4) {
@@ -293,7 +300,11 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 var root: * Local = null;
                 var parent: * Local = null;
                 if (arg.kind == 23) {
-                    parent = BorrowRoot(arg.a);
+                    if (arg.op == 1) {
+                        parent = BorrowRoot(arg.origin_source);
+                    } else {
+                        parent = BorrowRoot(arg.a);
+                    }
                 } else {
                     parent = BorrowRoot(arg);
                 }
@@ -412,5 +423,61 @@ fn ReferenceSliceConflict(node: * Node, root: * Local) -> bool {
             return true;
         }
         return ReferenceSliceConflict(node.a, root) || ReferenceSliceConflict(node.b, root) || ReferenceSliceConflict(node.c, root) || ReferenceSliceConflict(node.next, root);
+    }
+}
+// Unsafe bridge for libraries whose storage is represented by raw links.
+// The anchor supplies the lifetime; validity of the pointer is an unsafe promise.
+fn RawReferenceExpression() -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let token = At();
+        ctx.v_pos = ctx.v_pos + 1;
+        if (ctx.v_unsafe_depth == 0) {
+            ErrorAt(token, cast[ * u8]("borrow_raw requires unsafe"));
+        }
+        Need(91, cast[ * u8]("expected '[' after borrow_raw"));
+        let type = ParseType();
+        Need(93, cast[ * u8]("expected ']'"));
+        if (!IsReference(type)) {
+            ErrorAt(token, cast[ * u8]("borrow_raw requires a reference result type"));
+        }
+        ValidateReferenceStorage(type, token);
+        Need(40, cast[ * u8]("expected '('"));
+        let pointer = Expr(1);
+        Need(44, cast[ * u8]("expected anchor argument"));
+        let anchor = Expr(1);
+        Need(41, cast[ * u8]("expected ')'"));
+        if (pointer.type != 100000 + Shape(type).element) {
+            ErrorAt(token, cast[ * u8]("borrow_raw pointer element type mismatch"));
+        }
+        if (anchor.kind != 3 || !IsReference(anchor.type)) {
+            ErrorAt(token, cast[ * u8]("borrow_raw anchor must be a named reference"));
+        }
+        if (Shape(type).count > Shape(anchor.type).count) {
+            ErrorAt(token, cast[ * u8]("exclusive reference requires an exclusive anchor"));
+        }
+        let result = NewNode(23, token);
+        result.type = type;
+        result.storage = Storage(type);
+        result.op = 1;
+        result.a = pointer;
+        result.origin_source = anchor;
+        return result;
+    }
+}
+fn ReferencePointerCast(value: * Node, type: i64, token: * Token) -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_unsafe_depth == 0) {
+            ErrorAt(token, cast[ * u8]("reference pointer casts require unsafe"));
+        }
+        if (type != 100000 + Shape(value.type).element) {
+            ErrorAt(token, cast[ * u8]("reference pointer cast element type mismatch"));
+        }
+        let result = NewNode(30, token);
+        result.a = value;
+        result.type = type;
+        result.op = 1;
+        return result;
     }
 }

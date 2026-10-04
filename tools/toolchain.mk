@@ -127,3 +127,8 @@ test: raw-address-test
 references-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_references.py
 test: references-test
+
+.PHONY: safe-vector-test
+safe-vector-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_safe_vector.py
+test: safe-vector-test

@@ -13,6 +13,8 @@ fn read(x:&i64)->i64{return *x;}
 fn identity(x:&i64)->&i64 borrows(x){return x;}
 fn field(x:&mut Pair)->&mut i64 borrows(x){return &mut (*x).value;}
 fn later(x:&mut i64){*x=90;}
+fn bridge(x:&mut i64)->&mut i64 borrows(x){unsafe{return borrow_raw[&mut i64](cast[*i64](x),x);}}
+fn bridge_read(x:&i64)->&i64 borrows(x){unsafe{return borrow_raw[&i64](cast[*i64](x),x);}}
 fn swap[T](left:&mut T,right:&mut T){let old=move *left;*left=move *right;*right=move old;}
 fn main(){
  assert(sizeof(&i64)==8);assert(sizeof(&mut Pair)==8);
@@ -20,7 +22,8 @@ fn main(){
  {let r=&mut x;plus(r);assert(*r==41);plus(r);}
  {let a=&x;let b=&x;assert(read(a)+read(b)==84);}
  {let r=identity(&x);assert(*r==42);}
- x=43;
+ {let r=bridge(&mut x);*r=43;}
+ {let r=bridge_read(&x);assert(*r==43);}
  {let r=&mut x;{let child=&mut *r;*child=44;}*r=45;}
  {let r=&mut x;{let child=&*r;assert(*child==45);assert(*r==45);}*r=46;}
  {let r=&mut x;let alias=r;*alias=47;}
@@ -57,6 +60,9 @@ NEGATIVE=[
  ('var x=1;var r=&mut x;var y=2;r=&mut y;', 'cannot be reassigned'),
  ('var x=1;defer set(&mut x);x=2;', 'conflicts'),
  ('var x=1;both(&mut x,&mut x);', 'conflicts'),
+ ('let p=new[i64](1);*(&mut *p)=consume(move p);', 'conflicts'),
+ ('let p=new[i64](1);*identity(&mut *p)=consume(move p);', 'conflicts'),
+ ('var x=1;let anchor=&mut x;unsafe{let p=cast[*i64](anchor);let r=identity(borrow_raw[&mut i64](p,anchor));*anchor=2;}', 'conflicts'),
  ('let p=new[i64](1);observe(&*p,consume(move p));', 'conflicts'),
  ('var x=1;both(&mut x,identity(&mut x));', 'conflicts'),
  ('var a=[2]i64{1,2};let s=a[:];let r=&mut a[0];', 'slices cannot share'),
@@ -65,6 +71,14 @@ NEGATIVE=[
  ('var x=1;let r=&mut x;unsafe{let p=&raw x;}', 'conflicts'),
 ]
 WHOLE_NEGATIVE=[
+ ('fn f(x:&i64){let p=cast[*i64](x);}fn main(){}','require unsafe'),
+ ('fn f(x:&i64){unsafe{let p=cast[*u8](x);}}fn main(){}','element type mismatch'),
+ ('fn f(x:&i64){let r=borrow_raw[&i64](null,x);}fn main(){}','requires unsafe'),
+ ('fn f(x:&i64){unsafe{let r=borrow_raw[&mut i64](cast[*i64](x),x);}}fn main(){}','exclusive anchor'),
+ ('fn f(x:&i64){unsafe{let r=borrow_raw[&i64](cast[*u8](0),x);}}fn main(){}','element type mismatch'),
+ ('fn f(x:&i64){unsafe{let r=borrow_raw[&i64](cast[*i64](x),&1);}}fn main(){}','stable place'),
+ ('fn f(x:&i64){unsafe{let r=borrow_raw[i64](cast[*i64](x),x);}}fn main(){}','reference result'),
+
  ('fn bad()->&i64 borrows() {let x=1;return &x;}fn main(){}', 'outlive'),
  ('fn bad(x:&i64)->&i64 borrows(x){let y=1;return &y;}fn main(){}', 'outlive'),
  ('struct S{r:&i64;}fn main(){}', 'aggregate storage'),

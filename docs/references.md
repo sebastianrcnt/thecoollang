@@ -84,3 +84,50 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 `make references-test` exercises both frontends, all five execution engines,
 optimized native output, generic owner exchange, diagnostics, formatting and
 REPL rollback. `make selfhost-check` separately proves bootstrap convergence.
+
+## Unsafe library bridges
+
+Low-level containers sometimes keep storage behind raw links. Inside `unsafe`,
+`cast[*T](reference)` exposes the pointee address with an exactly matching
+pointee type. The resulting raw pointer has no tracked lifetime. A pointer
+derived from a shared reference must not be used to mutate its shared storage.
+
+`borrow_raw[&T](pointer, anchor)` and `borrow_raw[&mut T](pointer, anchor)`
+construct references whose lifetime is rooted in a named reference `anchor`.
+They require `unsafe`, exact pointer element types, and an exclusive anchor for
+an exclusive result. The implementer must prove that the pointer is valid,
+properly aligned, initialized, and remains within storage protected by the
+anchor's loan. Merely naming an unrelated anchor does not make a pointer valid.
+The compiler retains the anchor's provenance and checks caller-side conflicts,
+but cannot verify arbitrary raw-pointer data structures.
+
+The vector implementation uses these bridges internally. Its public `len` and
+`at` accept `&Vector[T]`; `append`, `pop`, `clear` and `at_mut` accept
+`&mut Vector[T]`. `at` returns `&T`, and `at_mut` returns `&mut T`, both with
+`borrows(vector)`. A live element reference therefore prevents invalidating
+operations on the vector. Indices are checked; invalid indices trap.
+
+```cool
+import vector "std/vector";
+fn main() {
+    var values = vector.create[i64]();
+    vector.append[i64](&mut values, 40);
+    {
+        let value = vector.at_mut[i64](&mut values, 0);
+        *value = 42;
+    }
+    assert(*vector.at[i64](&values, 0) == 42);
+    vector.clear[i64](&mut values);
+}
+```
+
+`fs.write(path, &bytes)` similarly accepts a shared byte-vector reference.
+Vector `cursor`/`next` remain a raw, manually managed iteration API until stored
+reference support permits a tracked iterator. Cursor advancement still needs
+unsafe raw access and removal/clear/destruction invalidates raw cursors. File
+writing uses that internal linear traversal; it does not repeatedly index the
+chunk chain. Indexed access is O(index / 32); append and pop are O(1).
+
+`make safe-vector-test` executes an owning-vector and binary-file program with
+no `unsafe` blocks on five engines and rejects conflicting element-loan use.
+The seeded collection model also exercises the reference APIs under ASan.

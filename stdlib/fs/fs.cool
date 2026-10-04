@@ -31,7 +31,7 @@ pub fn read(path: string) -> result.Result[vector.Vector[u8], i32] {
             if (byte < 0) {
                 break;
             }
-            vector.append[u8]( &raw bytes, u8(byte));
+            vector.append[u8]( & mut bytes, u8(byte));
         }
         if (ferror(file) != 0) {
             return result.Result[vector.Vector[u8], i32].Err(error_code());
@@ -39,7 +39,7 @@ pub fn read(path: string) -> result.Result[vector.Vector[u8], i32] {
         return result.Result[vector.Vector[u8], i32].Ok(move bytes);
     }
 }
-pub fn write(path: string, bytes: * vector.Vector[u8]) -> result.Result[usize, i32] {
+pub fn write(path: string, bytes: & vector.Vector[u8]) -> result.Result[usize, i32] {
     unsafe {
         let file = fopen(cast[ * u8](path), cast[ * u8]("wb"));
         if (file == null) {
@@ -48,7 +48,7 @@ pub fn write(path: string, bytes: * vector.Vector[u8]) -> result.Result[usize, i
         let size = vector.len[u8](bytes);
         var cursor = vector.cursor[u8](bytes);
         for (var i: usize = 0; i < size; i = i + 1) {
-            if (fputc(i32( * vector.next[u8]( &raw cursor)), file) < 0) {
+            if (fputc(i32( * vector.next[u8]( & raw cursor)), file) < 0) {
                 let code = error_code();
                 fclose(file);
                 return result.Result[usize, i32].Err(code);

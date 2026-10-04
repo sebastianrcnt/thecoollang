@@ -114,6 +114,21 @@ through ordinary evaluation or library use.
   still open: aggregate-stored references, shared slice/loan analysis, persistent
   REPL loans and complete collection APIs are not implemented.
 
+- Safe collection APIs: vector length/indexing now take shared references;
+  append/pop/clear and mutable indexing take exclusive references. Indexed
+  elements retain a loan of their vector. File writing takes a shared byte
+  vector and retains linear raw-cursor traversal internally. Added explicit
+  unsafe, anchor-based raw-storage borrowing and exact-type reference-to-pointer
+  casts for library implementation; provenance and exclusivity remain checked
+  at safe call sites. A no-unsafe owning-vector/binary-file program passes all
+  five engines; conflicting live element use is rejected. Both frontend suites
+  (37 rejection cases), self-host convergence and all three owning-vector model
+  seeds under ASan/UBSan pass. An additional regression closes a pending-address
+  hole for temporary/returned references: their loans must be registered before
+  a later assignment RHS or index expression can invalidate storage. Raw cursors
+  still require manual lifetime care;
+  stored references and tracked iterators remain mandatory work for G2/G4/G5.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

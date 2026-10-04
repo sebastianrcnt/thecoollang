@@ -2016,6 +2016,7 @@ return null;
 
 fn Atom() -> *Node {
 unsafe {
+if(Is(cast[*u8]("borrow_raw"))!=i8(0)){return RawReferenceExpression();}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_t13: *Token = null;
 var v_n18: *Node = null;
@@ -2660,6 +2661,7 @@ t99 = Expr(t98);
 t100 = 41;
 t101 = cast[*u8]("expected ')' after cast operand");
 Need(t100, t101);
+if(IsReference(v_n18.a.type)){return ReferencePointerCast(v_n18.a,v_ty,v_t13);}
 t102 = v_ty;
 t103 = Pointer(t102);
 t104 = (i64(t103) != i64(0));

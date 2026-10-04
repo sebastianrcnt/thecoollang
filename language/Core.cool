@@ -245,3 +245,6 @@ extern Node *ReferenceExpression(Token *token);
 extern Node *ReferenceLoad(Node *value, Token *token);
 extern U0 ValidateReferenceStorage(I64 type, Token *token);
 extern U0 AnalyzeReferences(Function *function);
+
+extern Node *RawReferenceExpression();
+extern Node *ReferencePointerCast(Node *value,I64 type,Token *token);
