@@ -16,6 +16,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules import Graph, Manifest, atomic_write, cache_home, find_root, validate_path, version_key, tree_hash as tree_hash_for_vendor
 
 ROOT = Path(__file__).resolve().parents[1]
+FRONTEND = Path(os.environ.get('COOL_FRONTEND', ROOT/'build/cool-compiler')).resolve()
+
+def ensure_frontend():
+    if 'COOL_FRONTEND' not in os.environ:
+        ensure('build/cool-compiler')
+    elif not FRONTEND.is_file():
+        raise ValueError(f'frontend executable not found: {FRONTEND}')
+
 
 
 def ensure(*targets):
@@ -31,12 +39,12 @@ def ensure(*targets):
 
 
 def front(mode, source, *args, capture=False):
-    return subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', mode, source, *args],
+    return subprocess.run([FRONTEND, mode, source, *args],
                           check=True, text=True, capture_output=capture)
 
 
 def metadata(path):
-    key = hashlib.sha256((ROOT/'build/language.BIN').read_bytes() + path.read_bytes()).hexdigest()
+    key = hashlib.sha256(FRONTEND.read_bytes() + path.read_bytes()).hexdigest()
     cache = cache_home() / 'scan' / key
     if cache.exists():
         lines = cache.read_text()
@@ -109,7 +117,7 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
 
 def artifact(files, optimization):
     digest = hashlib.sha256(b'cool-artifact-v1\0' + optimization.encode())
-    for path in (ROOT/'build/language.BIN', ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h'):
+    for path in (FRONTEND, ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h'):
         digest.update(path.read_bytes())
     digest.update(subprocess.check_output(['clang', '--version']))
     for package, path in files:
@@ -146,7 +154,7 @@ def module_command(args):
         raise ValueError('no cool.mod; run cool mod init <module-path>')
     manifest = Manifest.read(root)
     if args.action == 'tidy':
-        ensure('build/language.BIN')
+        ensure_frontend()
         imports = set()
         for base, dirs, files in os.walk(root):
             dirs[:] = sorted(d for d in dirs if d not in ('build', 'vendor') and not d.startswith('.') and not (Path(base)/d/'cool.mod').exists())
@@ -236,7 +244,7 @@ def main():
         parser.error('new-language program arguments are not implemented yet; no arguments were discarded')
     if args.command in ('mod', 'get'):
         module_command(args); return
-    ensure('build/language.BIN')
+    ensure_frontend()
     if args.command == 'fmt':
         import difflib
         changed = False
@@ -271,7 +279,7 @@ def main():
             raise SystemExit(1)
         return
     if args.command == 'repl':
-        subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', 'repl' if sys.stdin.isatty() else 'repl-quiet'], check=True)
+        subprocess.run([FRONTEND, 'repl' if sys.stdin.isatty() else 'repl-quiet'], check=True)
         return
     if args.command == 'build' or (args.command == 'run' and args.backend == 'llvm'):
         ensure('build/language-runtime.o')

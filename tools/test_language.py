@@ -2,15 +2,17 @@
 """New-language compiler/interpreter conformance, implemented in Cool."""
 from pathlib import Path
 import subprocess
+import os
 import tempfile
 ROOT = Path(__file__).resolve().parents[1]
+FRONT = [Path(os.environ.get('COOL_FRONTEND', ROOT/'build/cool-compiler'))]
 CASES = []
 
 def invoke(source, mode='run'):
     with tempfile.TemporaryDirectory(prefix='cool-language-') as tmp:
         path = Path(tmp) / 'test.cool'
         path.write_text(source)
-        return subprocess.run([ROOT / 'build/coolc', '--run', ROOT / 'build/language.BIN', mode, path],
+        return subprocess.run([*FRONT, mode, path],
                               text=True, capture_output=True, timeout=10)
 
 def good(source, output, status=0):
@@ -119,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix='cool-llvm-') as tmp:
     for index, (source, expected, status) in enumerate(CASES):
         path, ir, exe = tmp / 'case.cool', tmp / 'case.ll', tmp / 'case'
         path.write_text(source)
-        subprocess.run([ROOT/'build/coolc', '--run', ROOT/'build/language.BIN', 'llvm', path, ir], check=True, capture_output=True)
+        subprocess.run([*FRONT, 'llvm', path, ir], check=True, capture_output=True)
         for optimization in ('-O0', '-O2'):
             compilation = subprocess.run(['clang', '-Wno-override-module', optimization, ir, ROOT/'language/runtime.c', '-o', exe], capture_output=True, text=True)
             assert compilation.returncode == 0, (index, optimization, compilation.stderr, ir.read_text())

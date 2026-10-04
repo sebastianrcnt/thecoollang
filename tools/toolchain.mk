@@ -75,3 +75,25 @@ test: generic-test
 ownership-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_ownership.py
 test: ownership-test
+
+# New-language compiler, built by the bootstrap frontend and then by itself.
+build/compiler-host.o: compiler/host.c language/ffi.h language/memory.h language/numeric.h | build
+	clang -std=c11 -Wall -Wextra -Werror -O2 -c $< -o $@
+build/compiler-stage1.ll: compiler/main.cool build/language.BIN | build
+	build/coolc --run build/language.BIN llvm $< $@
+build/compiler-stage1: build/compiler-stage1.ll build/compiler-host.o build/language-runtime.o
+	clang -Wno-override-module -O2 $^ -lffi -o $@
+build/compiler-stage2.ll: compiler/main.cool build/compiler-stage1
+	build/compiler-stage1 llvm $< $@
+build/cool-compiler: build/compiler-stage2.ll build/compiler-host.o build/language-runtime.o
+	clang -Wno-override-module -O2 $^ -lffi -o $@
+all: build/cool-compiler
+.PHONY: selfhost-check
+selfhost-check: build/cool-compiler
+	python3 tools/test_selfhost.py
+language-test aggregate-test ownership-test generic-test project-test repl-test developer-tools-test: build/cool-compiler
+
+.PHONY: export-test
+export-test: build/cool-compiler build/language-runtime.o
+	python3 tools/test_exports.py
+test: export-test selfhost-check

@@ -2,10 +2,11 @@
 """Aggregate safety, directory visibility, tooling and persistent session regressions."""
 from pathlib import Path
 import subprocess
+import os
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FRONT = [ROOT/'build/coolc', '--run', ROOT/'build/language.BIN']
+FRONT = [Path(os.environ.get('COOL_FRONTEND', ROOT/'build/cool-compiler'))]
 
 def run(command, *, code=0, **kwargs):
     p = subprocess.run(command, text=True, capture_output=True, timeout=30, **kwargs)

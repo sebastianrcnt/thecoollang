@@ -25,9 +25,10 @@ on normal block exit, return, break and continue. Panic/runtime failure terminat
 the process and does not promise cleanup.
 
 This is an implementation stage, not the full language: the complete standard
-library and new-syntax bootstrap are still pending.
-The new frontend is
-written in existing Cool; new-syntax self-hosting is not yet achieved.
+library is still being expanded.
+This directory retains the bootstrap frontend. The production frontend in
+`compiler/main.cool` uses new syntax and compiles itself; `make selfhost-check`
+verifies both IR and native binary convergence.
 
 ## Additional execution paths and projects
 
@@ -209,3 +210,12 @@ borrowed slices, and safe slices of owners or views into owned storage are
 rejected until exclusive scoped loans are implemented. Unsafe raw pointers do
 not carry lifetime proofs. `make ownership-test` covers all five engines, LLVM
 O0/O2, nested cleanup, Result/Option transfers, invalid moves and REPL recovery.
+
+## C ABI exports
+
+`export "C" fn name(...) -> T { ... }` makes a scalar/pointer function callable
+from C in LLVM output. Unlike `pub`, it explicitly requests a global C symbol;
+duplicate exported symbols, runtime names and generic or aggregate ABI signatures
+are rejected. Argument and return conversions handle bool, narrow integers,
+f32/f64 and pointers. Native callbacks are used by the self-hosted compiler's
+JIT and recovery adapter. `make export-test` checks calls from an actual C caller.

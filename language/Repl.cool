@@ -57,7 +57,7 @@ U0 ReplStep(Text *text) {
     repl_executing = FALSE;
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
-    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("struct") || Is("enum")) { ParseProgram(); return; }
+    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {

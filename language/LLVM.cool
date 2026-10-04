@@ -262,6 +262,7 @@ foreign_already_declared:;
             offset += TypeSlots(f->arg_types[j]);
         }
         if (f->foreign) { ForeignWrapper(f); terminated = TRUE; } else EmitStmt(f->body); if (!terminated) IR("  ret i64 0\n"); IR("}\n");
+        if (f->exported) ExportWrapper(f, i);
 llvm_function_next:;
     }
     IR("define i32 @main() {\nentry:\n  %exit = call i64 @__cool_fn"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");

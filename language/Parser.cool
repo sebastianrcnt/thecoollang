@@ -453,7 +453,7 @@ I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
     pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
 }
 U0 ParseProgram() {
-    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign; Token *t;
+    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign, exported; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     CollectTypes();
     while (At()->kind) {
@@ -469,9 +469,9 @@ U0 ParseProgram() {
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
             if (Is("struct") || Is("enum")) { pos++; name = Ident(); id = FindType(At()->package, name); if (!Shape(id)->generic_count) { Layout(id); ValidateBorrowedElements(id); } pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
-            foreign = FALSE;
-            if (Is("extern")) {
-                foreign = TRUE; pos++;
+            foreign = FALSE; exported = FALSE;
+            if (Is("extern") || Is("export")) {
+                exported = Is("export"); foreign = !exported; pos++;
                 if (At()->kind != K_STRING || !Eq(At()->text, "C")) Error("only extern C is supported");
                 pos++;
             }
@@ -490,19 +490,20 @@ U0 ParseProgram() {
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
             f->drops = NULL; f->all_locals = NULL; f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
-            f->foreign = foreign; f->name = name; f->package = At()->package; f->public = public; f->token = At();
+            f->foreign = foreign; f->exported = exported; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); f->signature = pos;
-            if (f->generic_count) { if (foreign) Error("foreign functions cannot be generic"); while (At()->kind && At()->kind != '{') pos++; }
+            if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); while (At()->kind && At()->kind != '{') pos++; }
             else FunctionSignature(f);
             if (old) {
                 if (old->argc != f->argc || old->result != f->result || old->borrow_contract != f->borrow_contract) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
             }
-            if (foreign) {
+            if (foreign || exported) {
                 if (Eq(name, "main") || (StrLen(name) >= 7 && name[0] == '_' && name[1] == '_' && name[2] == 'c' && name[3] == 'o' && name[4] == 'o' && name[5] == 'l' && name[6] == '_') || (StrLen(name) >= 5 && name[0] == 'c' && name[1] == 'o' && name[2] == 'o' && name[3] == 'l' && name[4] == '_')) Error("reserved C runtime symbol");
                 for (k = 0; k < nfun; k++) {
-                    if (k != id && functions[k].foreign && Eq(functions[k].name, name)) {
+                    if (k != id && (functions[k].foreign || functions[k].exported) && Eq(functions[k].name, name)) {
+                        if (exported || functions[k].exported) Error("duplicate exported C symbol");
                         if (functions[k].argc != f->argc || functions[k].result != f->result) Error("conflicting C function signature");
                         for (j = 0; j < f->argc; j++) if (functions[k].arg_types[j] != f->arg_types[j]) Error("conflicting C function signature");
                     }
@@ -511,7 +512,7 @@ U0 ParseProgram() {
                 for (j = 0; j < f->argc; j++) if (Aggregate(f->arg_types[j])) Error("C ABI aggregate values are not supported; use a pointer");
                 if (f->result == T_STRING) Error("C ABI strings must use an explicit pointer");
                 for (j = 0; j < f->argc; j++) if (f->arg_types[j] == T_STRING) Error("C ABI strings must use an explicit pointer");
-                Need(';', "expected ';' after extern declaration"); f->body = NULL; goto declaration_next;
+                if (foreign) { Need(';', "expected ';' after extern declaration"); f->body = NULL; goto declaration_next; }
             }
             f->begin = pos; Need('{', "expected function body"); braces = 1;
             while (braces) {

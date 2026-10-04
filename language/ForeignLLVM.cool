@@ -48,3 +48,33 @@ U0 ForeignWrapper(Function *f) {
     } else { IR("  ret i64 %foreign\n"); return; }
     IR("  ret i64 %converted\n");
 }
+
+// Export a normal Cool body through an explicitly requested scalar C ABI.
+U0 ExportWrapper(Function *f, I64 id) {
+    I64 j, type;
+    IR("define "); CAttribute(f->result); IR(CType(f->result)); IR(" @"); IR(f->name); IR("(");
+    for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR(CType(f->arg_types[j])); IR(" "); CAttribute(f->arg_types[j]); IR("%in"); RI(j); }
+    IR(") {\nentry:\n");
+    for (j = 0; j < f->argc; j++) {
+        type = f->arg_types[j];
+        if (type == T_F32) { IR("  %wide"); RI(j); IR(" = fpext float %in"); RI(j); IR(" to double\n"); }
+        IR("  %arg"); RI(j); IR(" = ");
+        if (Pointer(type)) IR("ptrtoint ptr ");
+        else if (Floating(type)) IR("bitcast double ");
+        else if (type == T_BOOL || Width(type) < 64) { if (Unsigned(type) || type == T_BOOL) IR("zext "); else IR("sext "); IR(CType(type)); IR(" "); }
+        else IR("add i64 0, ");
+        if (type == T_F32) IR("%wide"); else IR("%in"); RI(j);
+        if (Pointer(type) || Floating(type) || type == T_BOOL || Width(type) < 64) IR(" to i64"); IR("\n");
+    }
+    IR("  %result = call i64 @__cool_fn"); RI(id); IR("(");
+    for (j = 0; j < f->argc; j++) { if (j) IR(", "); IR("i64 %arg"); RI(j); } IR(")\n");
+    type = f->result;
+    if (!type) IR("  ret void\n");
+    else if (Pointer(type)) IR("  %out = inttoptr i64 %result to ptr\n  ret ptr %out\n");
+    else if (Floating(type)) {
+        IR("  %out = bitcast i64 %result to double\n");
+        if (type == T_F32) IR("  %narrow = fptrunc double %out to float\n  ret float %narrow\n"); else IR("  ret double %out\n");
+    } else if (type == T_BOOL || Width(type) < 64) { IR("  %out = trunc i64 %result to "); IR(CType(type)); IR("\n  ret "); IR(CType(type)); IR(" %out\n"); }
+    else IR("  ret i64 %result\n");
+    IR("}\n");
+}
