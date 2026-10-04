@@ -5228,6 +5228,7 @@ continue;
 }
 if (pc == 125) {
 (v_f9).bytecode = null;
+(v_f9).byte_allocations = null;
 pc = 124;
 continue;
 }

@@ -695,7 +695,7 @@ var t2: i64 = i64(0);
 var t3: *Node = null;
 var t4: i64 = i64(0);
 t0 = (((v_n39).value + 1) * 8);
-t1 = CAlloc(t0);
+t1 = ByteAllocate(t0);
 v_args9 = cast[*i64](t1);
 v_i21 = 0;
 v_a15 = (v_n39).a;
@@ -927,7 +927,7 @@ t1 = (v_n40).kind;
 if (t1 == 12) { while (true) {
 v_saved6 = ctx.v_bc_scope;
 t2 = i64(sizeof(BScope));
-t3 = CAlloc(t2);
+t3 = ByteAllocate(t2);
 ctx.v_bc_scope = cast[*BScope](t3);
 (ctx.v_bc_scope).parent = v_saved6;
 v_s17 = (v_n40).a;
@@ -939,7 +939,7 @@ t4 = !((ctx.v_bc_done != i8(0)));
 if (!(t4)) { break; }
 if (((v_s17).kind == 15)) {
 t5 = i64(sizeof(BDefer));
-t6 = CAlloc(t5);
+t6 = ByteAllocate(t5);
 v_d7 = cast[*BDefer](t6);
 (v_d7).call = (v_s17).a;
 t7 = (v_s17).a;

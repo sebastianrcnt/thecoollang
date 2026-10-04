@@ -155,10 +155,11 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 class Local { U8 *name; I64 type, slot, mutable, depth, region, moved, loop_level; Local *next, *all_next; U8 *sources; };
 class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
 class DropSlot { I64 slot, type; DropSlot *next; };
+class ByteAllocation { ByteAllocation *next; };
 class Function {
     U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, exported, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals; DropSlot *drops;
     U8 *generic_names[8]; I64 generic_args[8];
-    U8 *bytecode, *machine; I64 code_count, code_capacity, registers, calls;
+    U8 *bytecode, *machine; ByteAllocation *byte_allocations; I64 code_count, code_capacity, registers, calls;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
 };
 #define MAX_FUNCTIONS 4096

@@ -563,7 +563,9 @@ run against that compiler. These checks do not prove bounded metadata use in
 long sessions, which remains release work. `make repl-storage-test` additionally
 checks repeated large temporary/forgotten arrays beyond the former cumulative
 slot limit, stable references, mixed owning/non-owning slot reuse and compile/
-runtime rollback on both frontends. `make repl-storage-sanitize-test` repeats
+runtime rollback on both frontends. Completed and rejected submission bytecode
+and its argument/scope allocations are reclaimed, including shared deferred
+argument vectors; ordinary function caches remain live. `make repl-storage-sanitize-test` repeats
 these checks on the ASan-instrumented compiler. Package loading is described
 below.
 

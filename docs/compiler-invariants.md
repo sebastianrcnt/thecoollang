@@ -70,6 +70,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `18-methods.cool` | Nominal method declaration, receiver adaptation and call lowering | `Methods.cool` |
 | `19-repl-loans.cool` | Persistent loan transactions, recovery filtering and explicit binding release | `ReplLoans.cool` |
 | `20-repl-packages.cool` | Import discovery, immutable package staging and rollback | `ReplPackages.cool` |
+| `21-bytecode-memory.cool` | Compilation-owned argument/scope allocation lists and disposal | `Bytecode.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -321,6 +322,18 @@ request is skipped. The driver may delete the previous request's snapshots
 only after receiving the next request: the frontend has consumed them into
 its own token storage by then. A malformed/closed channel reports an import
 error rather than discarding existing session values or loan state.
+
+Bytecode argument vectors and scope/defer records belong to a function's
+`byte_allocations` list. `ByteAllocate` uses one allocation containing an aligned
+list header followed by zeroed payload. Deferred calls may emit several
+instructions sharing the same argument vector, so never free instruction `args`
+independently. `FreeBytecode` walks the allocation list exactly once and clears
+the instruction buffer and counts. Currently it disposes only the completed or
+rejected REPL submission (function zero), after execution/unwind and before a
+snapshot restore. Function zero is never JIT-compiled. Do not dispose ordinary
+cached bytecode while any live JIT code or frame could reference its instructions.
+This recovers submission compilation buffers, not all AST, token, invocation
+scratch memory or replaced-function caches.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

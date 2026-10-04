@@ -126,6 +126,8 @@ next: *DropSlot;
 }
 
 
+struct ByteAllocation { next: *ByteAllocation; }
+
 struct Function {
 
 name: *u8;
@@ -167,6 +169,8 @@ generic_names: [8]*u8;
 generic_args: [8]i64;
 
 bytecode: *u8;
+
+byte_allocations: *ByteAllocation;
 
 machine: *u8;
 

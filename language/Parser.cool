@@ -501,7 +501,7 @@ U0 ParseProgram() {
             }
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
-            f->drops = NULL; f->all_locals = NULL; f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
+            f->drops = NULL; f->all_locals = NULL; f->bytecode = NULL; f->byte_allocations = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
             f->foreign = foreign; f->exported = exported; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); ValidateMethodTemplate(f); f->signature = pos;

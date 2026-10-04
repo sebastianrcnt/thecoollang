@@ -1,0 +1,27 @@
+// The compilation owns argument vectors and temporary scope/defer records.
+// Several instructions may share a deferred call's argument vector, so their
+// pointers must not be treated as independently owned allocations.
+fn ByteAllocate(size: i64) -> *u8 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let allocation = cast[*ByteAllocation](CAlloc(i64(sizeof(ByteAllocation)) + size));
+        allocation.next = ctx.v_bc_fun.byte_allocations;
+        ctx.v_bc_fun.byte_allocations = allocation;
+        return cast[*u8](allocation) + i64(sizeof(ByteAllocation));
+    }
+}
+fn FreeBytecode(function: *Function) {
+    unsafe {
+        var allocation = function.byte_allocations;
+        while (allocation != null) {
+            let next = allocation.next;
+            Free(cast[*u8](allocation));
+            allocation = next;
+        }
+        Free(function.bytecode);
+        function.bytecode = null;
+        function.byte_allocations = null;
+        function.code_count = 0;
+        function.code_capacity = 0;
+    }
+}

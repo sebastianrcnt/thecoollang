@@ -211,6 +211,7 @@ ReplDiscardNewDrops(false, true);
 t5 = ctx.v_repl_moves;
 MoveRestore(t5);
 }
+FreeBytecode(&raw ctx.v_functions[0]);
 t6 = cast[*u8](ctx.v_functions);
 t7 = cast[*u8](ctx.v_repl_snapshot);
 t8 = i64((u64(4096) * sizeof(Function)));
@@ -486,6 +487,7 @@ ReplDiscardNewDrops(true, false);
 ReplLoansFinish(true, ctx.v_locals);
 ctx.v_repl_locals = ctx.v_locals;
 ReplTrimStorage();
+FreeBytecode(v_f19);
 }
 return;
 }

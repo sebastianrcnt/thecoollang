@@ -63,6 +63,7 @@ U0 ReplRestore() {
         }
         ReplDiscardNewDrops(TRUE,TRUE);
     } else {ReplDiscardNewDrops(FALSE,TRUE);MoveRestore(repl_moves);}
+    FreeBytecode(&functions[0]);
     MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
     nfun = repl_saved_nfun; ntok = repl_saved_ntok; naggregates = repl_saved_types;
     aliases = repl_aliases; locals = repl_locals; call_depth = 0; type_bindings = NULL; specialization_depth = 0;
@@ -97,7 +98,7 @@ U0 ReplStep(Text *text) {
     for (i = repl_snapshot[0].slots; i < f->slots; i++) repl_values[i] = 0;
     // The session's locals remain live; expression temporaries are regenerated.
     repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
-    ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage();
+    ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage(); FreeBytecode(f);
 }
 U0 Repl(Bool prompt) {
     Text *text, *stats; I64 i, compiled; DropSlot *d; MoveState *move;

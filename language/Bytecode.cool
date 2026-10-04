@@ -32,6 +32,19 @@ I64 bytecode_compilations;
 BScope *bc_scope, *bc_loop_scope;
 I64 bc_break, bc_continue;
 Bool bc_done;
+// Deferred calls can share an argument array across several instructions.
+// Track each allocation once with the function that owns the compilation.
+U8 *ByteAllocate(I64 size) {
+    ByteAllocation *allocation=CAlloc(sizeof(ByteAllocation)+size);
+    allocation->next=bc_fun->byte_allocations;
+    bc_fun->byte_allocations=allocation;return allocation(U8 *)+sizeof(ByteAllocation);
+}
+U0 FreeBytecode(Function *function) {
+    ByteAllocation *allocation,*next;
+    for(allocation=function->byte_allocations;allocation;allocation=next){next=allocation->next;Free(allocation);}
+    Free(function->bytecode);function->bytecode=NULL;function->byte_allocations=NULL;
+    function->code_count=function->code_capacity=0;
+}
 I64 Slot() { return bc_fun->registers++; }
 Instruction *CodeAt(I64 index) { return &bc_fun->bytecode(Instruction *)[index]; }
 I64 InstructionNew(I64 op, I64 dst = 0, I64 a = 0, I64 b = 0, Node *node = NULL) {
@@ -45,7 +58,7 @@ I64 InstructionNew(I64 op, I64 dst = 0, I64 a = 0, I64 b = 0, Node *node = NULL)
     ins = CodeAt(index); ins->op = op; ins->dst = dst; ins->a = a; ins->b = b; ins->node = node; return index;
 }
 extern I64 ByteExpr(Node *n);
-I64 *ByteArgs(Node *n) { I64 *args = CAlloc((n->value + 1) * 8), i = 0; Node *a = n->a; while (a) { args[i++] = ByteExpr(a); a = a->next; } return args; }
+I64 *ByteArgs(Node *n) { I64 *args = ByteAllocate((n->value + 1) * 8), i = 0; Node *a = n->a; while (a) { args[i++] = ByteExpr(a); a = a->next; } return args; }
 U0 ByteCleanup(BScope *until) {
     BScope *s = bc_scope; BDefer *d; I64 at;
     while (s != until) {
@@ -95,10 +108,10 @@ U0 ByteStmt(Node *n) {
     if (!n || bc_done) return;
     switch (n->kind) {
         case N_BLOCK:
-            saved = bc_scope; bc_scope = CAlloc(sizeof(BScope)); bc_scope->parent = saved;
+            saved = bc_scope; bc_scope = ByteAllocate(sizeof(BScope)); bc_scope->parent = saved;
             s = n->a;
             while (s && !bc_done) {
-                if (s->kind == N_DEFER) { d = CAlloc(sizeof(BDefer)); d->call = s->a; d->args = ByteArgs(s->a); d->next = bc_scope->calls; bc_scope->calls = d; }
+                if (s->kind == N_DEFER) { d = ByteAllocate(sizeof(BDefer)); d->call = s->a; d->args = ByteArgs(s->a); d->next = bc_scope->calls; bc_scope->calls = d; }
                 else ByteStmt(s);
                 s = s->next;
             }

@@ -401,6 +401,34 @@ through ordinary evaluation or library use.
   Interior holes and in-memory AST/token/code reclamation remain open, so this
   does not close G6 or declare bounded total session memory.
 
+- REPL bytecode ownership: submission instruction buffers, argument vectors
+  and scope/defer records now have explicit compilation ownership and are
+  released after execution or failed code generation/runtime recovery. A
+  single allocation contains each list header and its aligned payload;
+  shared defer arguments are released once even when several cleanup paths
+  reference them. Ordinary cached functions keep their compilation storage.
+  Both frontends and compiler ASan pass repeated break/continue/defer, partial
+  execution and generated-register-limit recovery, alongside existing REPL
+  loan/package/JIT tests. Full regression, both bootstraps and the read-only
+  external installation test pass with IR
+  SHA256 `d20c741de2a8a09b73e80db03bdf565d38d224a135a16e924a14e6d02f1334c9`.
+  This does not reclaim AST/tokens, replaced-function caches or all invocation
+  scratch memory; G6 remains open.
+
+  A macOS 27 ARM64 microbenchmark compares the prior `a38fb83` compiler with
+  this change using identical `var total=0;`, N separate `total=total+1;`
+  submissions, then printing `total`. `tools/bench_repl_memory.py --baseline
+  <prior-compiler> --candidate build/cool-compiler` runs three fresh processes
+  per version/count and verifies output. `/usr/bin/time -l` median peak RSS
+  fell from 19,791,872 to 11,616,256 bytes at 2,000 submissions, and from
+  94,896,128 to 29,163,520 bytes at 16,000 submissions (90.5 to 27.8 MiB).
+  Baseline Cool sources were extracted from `a38fb83` and compiled with the
+  current compiler and unchanged C adapters at `-O2`. Raw measurements are in
+  `build/release-audit/repl-bytecode-memory-reproduce.json`. Full regression
+  ran concurrently, so elapsed-time medians (0.74 vs 0.66 seconds at 16,000)
+  are not an isolated speed claim. Remaining RSS growth demonstrates that
+  total session memory is still not bounded; G8 also remains open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
