@@ -17,6 +17,7 @@ I64 TypeName(U8 *s) {
 }
 I64 ParseType() {
     I64 t, count, kind; Token *token = At(); U8 *name, *package = token->package;
+    CompletionGeneral(TRUE);
     if (Take('&')) return ReferenceType(At());
     if (Is("own")) { pos++; Need('[', "expected '[' after own"); t = ParseType(); Need(']', "expected ']' after owned type"); return SequenceType(A_OWNER, t, 0, token); }
     if (Take('*')) { t = ParseType(); if (t >= 100*T_PTR) Error("pointer nesting limit exceeded"); return T_PTR+t; }
@@ -27,7 +28,7 @@ I64 ParseType() {
         return SequenceType(kind, ParseType(), count, token);
     }
     name = Ident(); t = BindingType(name); if (t >= 0) return t; t = TypeName(name); if (t >= 0) return t;
-    if (FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(token, name); name = Ident(); }
+    if (FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(token, name); CompletionQualified(package,TRUE); name = Ident(); }
     t = FindType(package, name); if (t < 0) ErrorAt(token, "unsupported or unknown type");
     if (!Eq(package, token->package) && !Shape(t)->public) ErrorAt(token, "type is private to its package");
     EditorTypeReference(name,t);
@@ -80,7 +81,7 @@ Node *AggregateLiteral(I64 type, Token *token) {
 }
 Node *EnumLiteral(I64 type, Token *token) {
     Field *variant; Node *n, *tag, *payload;
-    Layout(type); ValidateBorrowedElements(type); Need('.', "enum construction requires a variant"); variant = FindField(type, Ident(), token);
+    Layout(type); ValidateBorrowedElements(type); Need('.', "enum construction requires a variant"); CompletionMembers(type,TRUE); variant = FindField(type, Ident(), token);
     n = NewNode(N_AGG_LITERAL, token); n->type = type; n->storage = Storage(type);
     tag = NewNode(N_INT, token); tag->type = T_INT; tag->value = variant->tag; n->a = tag;
     if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Transfer(payload); Need(')', "expected ')' after payload"); payload->offset = 8; tag->next = payload; }
@@ -89,6 +90,7 @@ Node *EnumLiteral(I64 type, Token *token) {
 }
 Node *Atom() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty, type_args[8], type_count = 0; U8 *name, *package; Bool qualified = FALSE;
+    CompletionGeneral(FALSE);
     package = t->package;
     if(Is("borrow_raw"))return RawReferenceExpression();
     if (Is("move")) {
@@ -147,8 +149,9 @@ Node *Atom() {
         if (k == '-' && n->a->kind == N_INT && !Floating(n->type)) { if (n->a->type == T_U64 && n->a->value != (-0x7FFFFFFFFFFFFFFF - 1)) ErrorAt(t, "negative literal exceeds i64 range"); n->kind = N_INT; n->value = -n->a->value; if (n->a->type == T_U64) n->type = T_INT; }
         return n;
     }
+    CompletionGeneral(FALSE);
     name = Ident();
-    if (!FindLocal(name) && FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
+    if (!FindLocal(name) && FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(t, name); CompletionQualified(package,FALSE); name = Ident(); qualified = TRUE; }
     ty = FindType(package, name); EditorTypeReference(name,ty);
     if (ty >= 0 && Shape(ty)->generic_count) ty = InstantiateType(ty);
     if (ty >= 0 && AggregateKind(ty) == A_ENUM) { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return EnumLiteral(ty, t); }
@@ -218,6 +221,7 @@ Node *Primary() {
     while (At()->kind == '[' || At()->kind == '.') {
         t = At();
         if (Take('.')) {
+            CompletionMembers(n->type,FALSE);
             if(MethodAhead()){n=MethodCall(n,t);goto primary_next;}
             kind = n->type; mutable = n->mutable;
             if (Pointer(kind)) { if (!unsafe_depth) ErrorAt(t, "pointer field access requires unsafe"); kind -= T_PTR; address = n; mutable = TRUE; }
@@ -339,6 +343,7 @@ Node *MatchStatement() {
     MoveFinish(moves); ScratchRelease(seen); return block;
 }
 Node *Statement() {
+    CompletionStatement();
     Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable; MoveState *moves;
     if (t->kind == '{') return Block();
     if (Is("match")) return MatchStatement();

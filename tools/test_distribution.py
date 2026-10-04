@@ -67,6 +67,7 @@ fn test_answer(){assert(m.value()==42);}
     messages[-2:-2]=[
         {'jsonrpc':'2.0','method':'textDocument/didChange','params':{'textDocument':{'uri':source.as_uri(),'version':2},'contentChanges':[{'text':editor_text}]}},
         {'jsonrpc':'2.0','id':3,'method':'textDocument/definition','params':{'textDocument':{'uri':source.as_uri()},'position':{'line':0,'character':editor_text.index('value()')}}}]
+    messages[-2:-2]=[{'jsonrpc':'2.0','id':4,'method':'textDocument/completion','params':{'textDocument':{'uri':source.as_uri()},'position':{'line':0,'character':editor_text.index('value()')+2}}}]
     frames=b''
     for message in messages:
         body=json.dumps(message).encode()
@@ -79,6 +80,7 @@ fn test_answer(){assert(m.value()==42);}
     assert any(item.get('method')=='textDocument/publishDiagnostics' and
         item['params']['uri']==source.as_uri() and item['params']['diagnostics'] and 'unknown variable' in item['params']['diagnostics'][0]['message'] for item in records),records
     assert next(item for item in records if item.get('id')==3)['result'][0]['uri']==(library/'math.cool').as_uri(),records
+    assert [item['label'] for item in next(item for item in records if item.get('id')==4)['result']['items']]==['value'],records
     for backend in ('tree','interp','jit','llvm','llvm-jit'):
         assert run([cli,'run','--backend',backend,'.'],cwd=project,env=env).stdout=='42\n'
     session='import m "example.com/distribution/math";\nimport v "std/vector";\nvar values=v.create[i64]();\nvalues.append(m.value());\nlet r=values.at(0);\n*r\n:forget r\nvalues.append(7);\nvalues.len()\n:quit\n'

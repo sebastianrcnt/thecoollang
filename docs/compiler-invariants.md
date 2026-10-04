@@ -79,6 +79,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
 | `28-repl-types.cool` | Lazy-layout journal, field rollback and staged immutable text | `ReplTypes.cool` |
 | `29-editor.cool` | Native JSON diagnostics and semantic reference index | `Editor.cool` |
+| `30-completion.cool` | Cursor token preparation and parser-context completion | `Completion.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -515,3 +516,15 @@ functions keep their template's declaration token. The editor mode is a fresh
 process with no REPL token compaction or interned session identifiers. Never use
 this index across source reloads without rebuilding it. Python may map paths and
 positions and deduplicate records; it must not infer Cool name resolution.
+
+Completion runs in its own native checking process. Insert synthetic tokens only
+before CollectTypes/ParseProgram establish token pointers and declaration ranges.
+Preserve the final EOF token and enforce the token capacity on every insertion.
+Temporary closing braces only allow the declaration scan to locate incomplete
+function bodies; ordinary parser state determines actual visible locals, type
+names, package exports and receiver members. Never infer scope from spelling or
+return moved/shadowed outer bindings as live locals. The lexer excludes comment
+ranges; strings and other literal interiors cannot become completion markers.
+Reaching the marker emits results and exits before executing user code. Failures
+before the cursor can still prevent completion; this path does not certify a
+whole incomplete program or replace the normal checker.

@@ -30,7 +30,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
-| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
+| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open (native diagnostics/definitions/scoped completion verified; recovery and editor audit pending) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
 | G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
@@ -729,6 +729,32 @@ through ordinary evaluation or library use.
   and `editor-definition-{compiler,lsp-compiler}-sample.json`.
   G7 remains open for completion, import/builtin and uninstantiated-template
   navigation, analysis of incomplete code and broader editor integration.
+
+- Native parser-context completion: `editor-complete-bundle` prepares a cursor
+  token and temporary closing braces before declaration collection. The ordinary
+  parser emits candidates when it reaches that position with live locals,
+  imported package visibility and checked receiver types. `cool lsp` advertises
+  completion with a dot trigger and UTF-16 identifier replacement edits. Tests
+  cover prefix/mid-word completion, parameters, scoped and moved bindings,
+  qualified type/value contexts, public/private fields and methods, enum variants,
+  generic receivers, statement/loop keywords, std/io builtins, unfinished nested
+  blocks, Unicode before the cursor, and comment/string exclusion. Source/module
+  files remain unchanged. Both frontends and the compiler-instrumented ASan
+  frontend pass; the read-only installed distribution supports completion too.
+  Full `make test bootstrap-check` passes after correcting one new test oracle:
+  types imported under alias `l` belong in `l.` completion, not bare type scope.
+  Self-host IR/native convergence passes with IR SHA256
+  `dc0f6941551808e47965ce2953b74336c0c96dddc341de37e981ddc2707016c8`.
+  A temporary normal module containing all 32 compiler source files opens without
+  diagnostics and completes CompilerState members through the LSP. One whole
+  server run took 1.282 seconds with the existing configured scan cache while
+  other checks ran; this is an observation, not a benchmark median or latency
+  guarantee. Evidence: `build/release-audit/completion-verified.log`,
+  `completion-final.log`, `completion-sanitize.log`, `completion-distribution.log`
+  and `completion-lsp-compiler-sample.json`.
+  G7 remains open: earlier unrelated errors can prevent reaching the cursor,
+  uninstantiated generic bodies/top-level/import paths need support, and wider
+  error recovery, cancellation and editor integration still need validation.
 
 ## Next implementation checkpoints
 

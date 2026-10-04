@@ -1,5 +1,6 @@
 fn ParseType() -> i64 {
 unsafe {
+CompletionGeneral(true);
 if(Take(38)!=i8(0)){return ReferenceType(At());}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_t9: i64 = i64(0);
@@ -162,6 +163,7 @@ t44 = v_token2;
 t45 = v_name9;
 t46 = ResolveAlias(t44, t45);
 v_package2 = t46;
+CompletionQualified(v_package2, true);
 t47 = Ident();
 v_name9 = t47;
 }
@@ -1033,6 +1035,7 @@ v_t12 = t4;
 t5 = 46;
 t6 = Take(t5);
 if ((t6 != i8(0))) {
+CompletionMembers(v_n14.type, false);
 if(MethodAhead()){v_n14=MethodCall(v_n14,v_t12);continue;}
 v_kind5 = (v_n14).type;
 v_mutable1 = i8((v_n14).mutable);
@@ -1947,6 +1950,7 @@ ValidateReferenceStorage(t1,At());
 t2 = 46;
 t3 = cast[*u8]("enum construction requires a variant");
 Need(t2, t3);
+CompletionMembers(v_type29, true);
 t4 = v_type29;
 t5 = Ident();
 t6 = t5;
@@ -2002,6 +2006,7 @@ return null;
 
 fn Atom() -> *Node {
 unsafe {
+CompletionGeneral(false);
 if(Is(cast[*u8]("borrow_raw"))!=i8(0)){return RawReferenceExpression();}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_t13: *Token = null;
@@ -2759,6 +2764,7 @@ return null;
 
 fn Statement() -> *Node {
 unsafe {
+CompletionStatement();
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_t14: *Token = null;
 var v_n19: *Node = null;

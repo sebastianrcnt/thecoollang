@@ -411,6 +411,10 @@ v_recovery_context: *i64;
 v_allow_redefinition: i8;
 v_editor_diagnostics: i8;
 v_editor_index: i8;
+v_completion_token: *Token;
+v_completion_prefix: *u8;
+v_completion_file: *u8;
+v_completion_offset: i64;
 v_editor_names: **Token;
 v_editor_capacity: i64;
 

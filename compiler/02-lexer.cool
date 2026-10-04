@@ -49,6 +49,7 @@ var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_src: *u8 = arg_v_src;
 var v_file: *u8 = arg_v_file;
 var v_i2: i64 = i64(0);
+var completion_comment_start: i64 = 0;
 var v_line: i64 = i64(0);
 var v_col: i64 = i64(0);
 var v_start1: i64 = i64(0);
@@ -1057,6 +1058,7 @@ if (t119) { pc = 158; } else { pc = 140; }
 continue;
 }
 if (pc == 143) {
+CompletionExcluded(v_file, completion_comment_start, v_i2);
 pc = 2;
 continue;
 }
@@ -1141,6 +1143,7 @@ pc = 151;
 continue;
 }
 if (pc == 158) {
+completion_comment_start=v_i2;
 v_i2 = v_i2 + 2;
 pc = 157;
 continue;
@@ -1150,10 +1153,11 @@ t123 = (v_ch3 == 47);
 if (t123) {
 t123 = (v_next == 47);
 }
-if (t123) { pc = 161; } else { pc = 142; }
+if (t123) { completion_comment_start=v_i2;pc = 161; } else { pc = 142; }
 continue;
 }
 if (pc == 160) {
+CompletionExcluded(v_file, completion_comment_start, v_i2+1);
 pc = 2;
 continue;
 }

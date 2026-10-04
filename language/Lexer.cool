@@ -1,7 +1,7 @@
 Bool Alpha(I64 ch) { return ('a' <= ch <= 'z') || ('A' <= ch <= 'Z') || ch == '_'; }
 Bool Digit(I64 ch) { return '0' <= ch <= '9'; }
 U0 LexSource(U8 *src, U8 *file) {
-    I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok;
+    I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok, comment_start;
     Token *t; Text *text; Bool emitted; U8 *number;
     if (!tokens) tokens = CAlloc(MAX_TOKENS * sizeof(Token));
     while (src[i]) {
@@ -10,14 +10,14 @@ U0 LexSource(U8 *src, U8 *file) {
         if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
             i++; col++; if (ch == '\n') { line++; col = 1; } goto lex_next;
         }
-        if (ch == '/' && next == '/') { while (src[i] && src[i] != '\n') { i++; col++; } goto lex_next; }
+        if (ch == '/' && next == '/') { comment_start=i;while (src[i] && src[i] != '\n') { i++; col++; } CompletionExcluded(file,comment_start,i+1);goto lex_next; }
         if (ch == '/' && next == '*') {
-            i += 2; col += 2;
+            comment_start=i;i += 2; col += 2;
             while (src[i] && !(src[i] == '*' && src[i + 1] == '/')) {
                 if (src[i] == '\n') { line++; col = 0; } i++; col++;
             }
             if (!src[i]) { tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col; ErrorAt(&tokens[ntok], "unterminated comment"); }
-            i += 2; col += 2; goto lex_next;
+            i += 2; col += 2; CompletionExcluded(file,comment_start,i);goto lex_next;
         }
         if (ntok >= MAX_TOKENS - 2) {tokens[ntok].file=file;tokens[ntok].line=line;tokens[ntok].col=col;ErrorAt(&tokens[ntok],"token limit exceeded");}
         t = &tokens[ntok++]; t->val = 0; t->text = NULL; t->raw=NULL; t->kind=0; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i; t->start = i; emitted = TRUE;

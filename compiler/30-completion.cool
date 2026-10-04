@@ -1,0 +1,310 @@
+// Completion runs in an isolated checking process and exits at the requested
+// parser position. No source rewriting or guessed Python name resolution.
+fn CompletionInsert(index: i64, token: * Token) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_ntok >= 262142) {
+            ErrorAt(token, cast[ * u8]("completion token limit exceeded"));
+        }
+        var i = ctx.v_ntok;
+        while (i >= index) {
+            ctx.v_tokens[i + 1] = ctx.v_tokens[i];
+            i = i - 1;
+        }
+        ctx.v_tokens[index] = * token;
+        ctx.v_ntok = ctx.v_ntok + 1;
+    }
+}
+fn CompletionBegin(file: * u8, number: * u8) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var offset: i64 = 0;
+        var i: i64 = 0;
+        while (number[i] != u8(0)) {
+            if (number[i] < u8(48) || number[i] > u8(57) || offset > 100000000) {
+                NativeExit(2);
+            }
+            offset = offset * 10 + i64(number[i]) - 48;
+            i = i + 1;
+        }
+        ctx.v_completion_file = file;
+        ctx.v_completion_offset = offset;
+    }
+}
+fn CompletionExcluded(file: * u8, start: i64, end: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_completion_file != null && Eq(file, ctx.v_completion_file) != i8(0) && start <= ctx.v_completion_offset && ctx.v_completion_offset < end) {
+            NativeExit(0);
+        }
+    }
+}
+fn CompletionPrepare(file: * u8, number: * u8) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var offset: i64 = 0;
+        var i: i64 = 0;
+        while (number[i] != u8(0)) {
+            if (number[i] < u8(48) || number[i] > u8(57) || offset > 100000000) {
+                NativeExit(2);
+            }
+            offset = offset * 10 + i64(number[i]) - 48;
+            i = i + 1;
+        }
+        var first: i64 = -1;
+        var last: i64 = -1;
+        var braces: i64 = 0;
+        i = 0;
+        while (i < ctx.v_ntok) {
+            let t = & raw ctx.v_tokens[i];
+            if (Eq(t.file, file) != i8(0)) {
+                if (first < 0) {
+                    first = i;
+                }
+                last = i;
+                if (t.kind == 123) {
+                    braces = braces + 1;
+                }
+                if (t.kind == 125) {
+                    braces = braces - 1;
+                }
+            }
+            i = i + 1;
+        }
+        if (first < 0) {
+            NativeExit(0);
+        }
+        // The declaration pass skips function bodies. Close unfinished blocks
+        // in this temporary token stream so it can reach the actual body parser.
+        var close = ctx.v_tokens[last];
+        close.kind = 125;
+        close.text = cast[ * u8]("}");
+        if (offset > close.end) {
+            close.end = offset;
+        }
+        close.start = close.end;
+        while (braces > 0) {
+            CompletionInsert(last + 1, & raw close);
+            last = last + 1;
+            braces = braces - 1;
+        }
+        var selected: i64 = -1;
+        i = first;
+        while (i <= last) {
+            let t = & raw ctx.v_tokens[i];
+            if (t.kind != 256 && t.start < offset && offset < t.end) {
+                NativeExit(0);
+            }
+            if (t.kind == 256 && t.start <= offset && offset <= t.end) {
+                selected = i;
+                break;
+            }
+            i = i + 1;
+        }
+        if (selected >= 0) {
+            ctx.v_completion_prefix = Slice(ctx.v_tokens[selected].text, 0, offset - ctx.v_tokens[selected].start);
+        } else {
+            i = first;
+            while (i <= last && ctx.v_tokens[i].start < offset) {
+                i = i + 1;
+            }
+            var marker = ctx.v_tokens[first];
+            marker.kind = 256;
+            marker.text = cast[ * u8]("__cool_completion__");
+            marker.raw = null;
+            marker.start = offset;
+            marker.end = offset;
+            CompletionInsert(i, & raw marker);
+            selected = i;
+            ctx.v_completion_prefix = cast[ * u8]("");
+        }
+        ctx.v_completion_token = & raw ctx.v_tokens[selected];
+    }
+}
+fn CompletionAt() -> bool {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        return ctx.v_completion_token != null && At() == ctx.v_completion_token;
+    }
+}
+fn CompletionItem(name: * u8, kind: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var i: i64 = 0;
+        while (ctx.v_completion_prefix[i] != u8(0)) {
+            if (name[i] != ctx.v_completion_prefix[i]) {
+                return;
+            }
+            i = i + 1;
+        }
+        let out = TextNew();
+        Append(out, cast[ * u8]("{\"kind\":\"completion\",\"label\":"));
+        EditorQuote(out, name);
+        Append(out, cast[ * u8](",\"completionKind\":"));
+        Number(out, kind);
+        Append(out, cast[ * u8](",\"start\":"));
+        Number(out, ctx.v_completion_token.start);
+        Append(out, cast[ * u8](",\"end\":"));
+        Number(out, ctx.v_completion_token.end);
+        Append(out, cast[ * u8]("}\n"));
+        Out(out.data);
+        Free(out.data);
+        Free(cast[ * u8](out));
+    }
+}
+fn CompletionPackage(package: * u8, external: bool, types_only: bool) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var i: i64 = 0;
+        while (i < ctx.v_nfun) {
+            let f = & raw ctx.v_functions[i];
+            if (!types_only && f.origin == 0 && Eq(f.package, package) != i8(0) && (!external || f.public != 0) && MethodOwner(f) < 0) {
+                CompletionItem(f.name, 3);
+            }
+            i = i + 1;
+        }
+        i = 0;
+        while (i < ctx.v_naggregates) {
+            let t = & raw ctx.v_aggregate_types[i];
+            if ((t.kind == 1 || t.kind == 4) && t.origin == 0 && Eq(t.package, package) != i8(0) && (!external || t.public != 0)) {
+                CompletionItem(t.name, 22);
+            }
+            i = i + 1;
+        }
+        if (!types_only && Eq(package, cast[ * u8]("std/io")) != i8(0)) {
+            CompletionItem(cast[ * u8]("print"), 3);
+            CompletionItem(cast[ * u8]("println"), 3);
+        }
+        if (!types_only && Eq(package, cast[ * u8]("std/mem")) != i8(0)) {
+            CompletionItem(cast[ * u8]("alloc"), 3);
+            CompletionItem(cast[ * u8]("free"), 3);
+            CompletionItem(cast[ * u8]("copy"), 3);
+            CompletionItem(cast[ * u8]("owner_count"), 3);
+        }
+    }
+}
+fn CompletionQualified(package: * u8, types_only: bool) {
+    unsafe {
+        if (CompletionAt()) {
+            CompletionPackage(package, true, types_only);
+            NativeExit(0);
+        }
+    }
+}
+fn CompletionGeneral(types_only: bool) {
+    unsafe {
+        if (!CompletionAt()) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (!types_only) {
+            var local = ctx.v_locals;
+            while (local != null) {
+                if (local.moved == 0 && FindLocal(local.name) == local) {
+                    CompletionItem(local.name, 6);
+                }
+                local = local.next;
+            }
+        }
+        CompletionPackage(At().package, false, types_only);
+        var alias = ctx.v_aliases;
+        while (alias != null) {
+            if (Eq(alias.file, At().file) != i8(0)) {
+                CompletionItem(alias.name, 9);
+            }
+            alias = alias.next;
+        }
+        CompletionItem(cast[ * u8]("i64"), 14);
+        CompletionItem(cast[ * u8]("i32"), 14);
+        CompletionItem(cast[ * u8]("i16"), 14);
+        CompletionItem(cast[ * u8]("i8"), 14);
+        CompletionItem(cast[ * u8]("u64"), 14);
+        CompletionItem(cast[ * u8]("u32"), 14);
+        CompletionItem(cast[ * u8]("u16"), 14);
+        CompletionItem(cast[ * u8]("u8"), 14);
+        CompletionItem(cast[ * u8]("usize"), 14);
+        CompletionItem(cast[ * u8]("isize"), 14);
+        CompletionItem(cast[ * u8]("f64"), 14);
+        CompletionItem(cast[ * u8]("f32"), 14);
+        CompletionItem(cast[ * u8]("bool"), 14);
+        CompletionItem(cast[ * u8]("string"), 14);
+        CompletionItem(cast[ * u8]("own"), 14);
+        if (!types_only) {
+            CompletionItem(cast[ * u8]("assert"), 3);
+            CompletionItem(cast[ * u8]("len"), 3);
+            CompletionItem(cast[ * u8]("sizeof"), 3);
+            CompletionItem(cast[ * u8]("true"), 14);
+            CompletionItem(cast[ * u8]("false"), 14);
+            CompletionItem(cast[ * u8]("null"), 14);
+        }
+        NativeExit(0);
+    }
+}
+fn CompletionMembers(type: i64, variants: bool) {
+    unsafe {
+        if (!CompletionAt()) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var fields_type = type;
+        if (Pointer(fields_type) != i8(0) && ctx.v_unsafe_depth != 0) {
+            fields_type = fields_type - 100000;
+        }
+        if (AggregateKind(fields_type) == 1 || (variants && AggregateKind(fields_type) == 4)) {
+            Layout(fields_type);
+            var field = Shape(fields_type).fields;
+            while (field != null) {
+                if (field.public != 0 || Eq(Shape(fields_type).package, At().package) != i8(0)) {
+                    CompletionItem(field.name, 5);
+                }
+                field = field.next;
+            }
+        }
+        if (!variants) {
+            var owner = type;
+            if (AggregateKind(owner) == 5 || IsReference(owner)) {
+                owner = Shape(owner).element;
+            }
+            if (AggregateKind(owner) == 1 || AggregateKind(owner) == 4) {
+                if (Shape(owner).origin != 0) {
+                    owner = Shape(owner).origin;
+                }
+                var i: i64 = 0;
+                while (i < ctx.v_nfun) {
+                    let f = & raw ctx.v_functions[i];
+                    if (f.origin == 0 && (f.public != 0 || Eq(f.package, At().package) != i8(0)) && MethodOwner(f) == owner) {
+                        var j: i64 = 0;
+                        while (f.name[j] != u8(46)) {
+                            j = j + 1;
+                        }
+                        CompletionItem(f.name + j + 1, 2);
+                    }
+                    i = i + 1;
+                }
+            }
+        }
+        NativeExit(0);
+    }
+}
+fn CompletionStatement() {
+    unsafe {
+        if (!CompletionAt()) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        CompletionItem(cast[ * u8]("let"), 14);
+        CompletionItem(cast[ * u8]("var"), 14);
+        CompletionItem(cast[ * u8]("if"), 14);
+        CompletionItem(cast[ * u8]("while"), 14);
+        CompletionItem(cast[ * u8]("for"), 14);
+        CompletionItem(cast[ * u8]("return"), 14);
+        CompletionItem(cast[ * u8]("unsafe"), 14);
+        CompletionItem(cast[ * u8]("defer"), 14);
+        CompletionItem(cast[ * u8]("match"), 14);
+        if (ctx.v_loop_depth != 0) {
+            CompletionItem(cast[ * u8]("break"), 14);
+            CompletionItem(cast[ * u8]("continue"), 14);
+        }
+        CompletionGeneral(false);
+    }
+}

@@ -91,10 +91,12 @@ fn NamedAtom(token: * Token) -> * Node {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         var package = token.package;
+        CompletionGeneral(false);
         var name = Ident();
         var qualified = false;
         if (FindLocal(name) == null && FindType(package, name) < 0 && Take(46) != i8(0)) {
             package = ResolveAlias(token, name);
+            CompletionQualified(package, false);
             name = Ident();
             qualified = true;
         }

@@ -216,6 +216,38 @@ class Server:
             self.send(method='textDocument/publishDiagnostics',params=params)
         self.published = current
 
+    def complete(self,params):
+        path = uri_path(params['textDocument']['uri'])
+        content = self.documents[path].text if path in self.documents else path.read_bytes().decode('utf-8')
+        offset = len(content[:text_index(content,params['position'])].encode('utf-8'))
+        positions = PositionMap(content)
+        with tempfile.TemporaryDirectory(prefix='cool-completion-') as directory:
+            work = Path(directory)
+            overlays = {}
+            for index,(original,document) in enumerate(self.documents.items()):
+                snapshot = work/f'buffer-{index}.cool'
+                snapshot.write_bytes(document.text.encode('utf-8'))
+                overlays[original] = snapshot
+            try:
+                entry = path.parent if find_root(path) else path
+                manifest,_ = self.bundle(entry,work,True,True,True,overlays=overlays,editor=True)
+                result = subprocess.run([self.frontend,'editor-complete-bundle',manifest,overlays.get(path,path),str(offset)],
+                    capture_output=True,text=True,timeout=20)
+            except (subprocess.CalledProcessError,subprocess.TimeoutExpired,OSError,ValueError):
+                return {'isIncomplete':True,'items':[]}
+            items = {}
+            for line in result.stdout.splitlines():
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(record,dict) or record.get('kind')!='completion':
+                    continue
+                label = record['label']
+                items.setdefault(label,{'label':label,'kind':record['completionKind'],
+                    'textEdit':{'range':{'start':positions.position(record['start']),'end':positions.position(record['end'])},'newText':label}})
+            return {'isIncomplete':result.returncode!=0,'items':sorted(items.values(),key=lambda item:item['label'])}
+
     def handle(self, message):
         if not isinstance(message,dict) or message.get('jsonrpc') != '2.0' or not isinstance(message.get('method'),str):
             self.error(None,-32600,'invalid JSON-RPC request')
@@ -243,7 +275,7 @@ class Server:
                 self.error(identifier,-32600,'already initialized')
             else:
                 self.initialized = True
-                self.send(id=identifier,result={'capabilities':{'positionEncoding':'utf-16','definitionProvider':True,'textDocumentSync':{'openClose':True,'change':2,'save':{'includeText':False}}},
+                self.send(id=identifier,result={'capabilities':{'positionEncoding':'utf-16','definitionProvider':True,'completionProvider':{'triggerCharacters':['.'],'resolveProvider':False},'textDocumentSync':{'openClose':True,'change':2,'save':{'includeText':False}}},
                     'serverInfo':{'name':'Cool','version':(self.root/'VERSION').read_text().strip()}})
             return None
         if not self.initialized or self.shutdown:
@@ -289,6 +321,8 @@ class Server:
             elif method == 'textDocument/didClose':
                 self.documents.pop(path,None)
             self.analyze()
+        elif method == 'textDocument/completion' and request:
+            self.send(id=identifier,result=self.complete(params))
         elif method == 'textDocument/definition' and request:
             path = uri_path(params['textDocument']['uri'])
             content = self.documents[path].text if path in self.documents else path.read_bytes().decode('utf-8')

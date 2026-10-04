@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
     root = Path(temporary).resolve()
     project = root/'project';project.mkdir();(project/'cool.mod').write_text('module example.test/editor\n')
     main = project/'main.cool';main.write_text('package main;fn main(){}\n')
-    library = project/'lib';library.mkdir();source = library/'lib.cool';source.write_text('package lib;pub fn answer()->i64{return 7;}\npub struct Box{pub value:i64;}\npub fn Box.read(self:&Box)->i64{return (*self).value;}\npub fn identity[T](value:T)->T{return value;}\n')
+    library = project/'lib';library.mkdir();source = library/'lib.cool';source.write_text('package lib;pub fn answer()->i64{return 7;}\npub struct Box{pub value:i64;}\npub fn Box.read(self:&Box)->i64{return (*self).value;}\npub fn identity[T](value:T)->T{return value;}\nfn secret()->i64{return 1;}\nfn Box.hidden(self:&Box)->i64{return (*self).value;}\npub struct Vault{pub visible:i64;hidden:i64;}\npub fn make()->Vault{return Vault{visible:1,hidden:2};}\npub enum Choice{First;Second(i64);}\npub struct BoxT[T]{pub value:T;}\npub fn BoxT.read[T](self:&BoxT[T])->T{return (*self).value;}\n')
     original = {p:p.read_bytes() for p in (main,source,project/'cool.mod')}
     bootstrap = root/'bootstrap'
     bootstrap.write_text('#!/bin/sh\nexec '+shlex.quote(str(ROOT/'build/coolc'))+' --run '+shlex.quote(str(ROOT/'build/language.BIN'))+' "$@"\n');bootstrap.chmod(0o755)
@@ -155,6 +155,45 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             assert client.barrier()[uri]['diagnostics']
             client.send('textDocument/definition',{'textDocument':{'uri':uri},'position':{'line':2,'character':1}},identifier='stale-definition')
             response,_=client.until('stale-definition');assert response['result']==[]
+            version=10
+            def completion(marked,wanted,excluded=()):
+                prefix,suffix=marked.split('|');text=prefix+suffix
+                client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':completion.version},'contentChanges':[{'text':text}]})
+                completion.version+=1;client.barrier()
+                identifier='completion'+str(completion.version)
+                client.send('textDocument/completion',{'textDocument':{'uri':uri},'position':byte_position(text,len(prefix.encode()))},identifier=identifier)
+                response,_=client.until(identifier)
+                result=response.get('result',{});items=result.get('items',[]);labels=[item['label'] for item in items]
+                assert set(wanted)<=set(labels) and not set(excluded)&set(labels),(marked,response)
+                assert len(labels)==len(set(labels)),response
+                for item in items:
+                    start=text_index(text,item['textEdit']['range']['start']);end=text_index(text,item['textEdit']['range']['end'])
+                    assert start<=len(prefix)<=end and item['textEdit']['newText']==item['label'],item
+                return result
+            completion.version=version
+            pre='package main;import l "example.test/editor/lib";fn main(){let prior=1;{let gone=2;}let object=l.Box{value:1};let vault=l.make();'
+            completion(pre+'pri|;}',{'prior'},{'gone'})
+            completion(pre+'l.|;}',{'answer','Box','Vault','identity','make'},{'secret','Box.hidden','prior'})
+            completion(pre+'object.|;}',{'value','read'},{'hidden','answer'})
+            completion(pre+'vault.|;}',{'visible'},{'hidden','value'})
+            completion(pre+'l.Choice.|;}',{'First','Second'},{'value','read'})
+            completion(pre+'let generic=l.BoxT[i64]{value:1};generic.|;}',{'value','read'},{'hidden'})
+            completion(pre+'let thing:|;}',{'i64','l'},{'answer','prior','main','Box','Vault'})
+            completion(pre+'let thing:l.|;}',{'Box','Vault','Choice'},{'answer','prior','main'})
+            completion(pre+'let thing:l.Va|;}',{'Vault'},{'answer','prior'})
+            completion(pre+'let owner=new[i64](1);let moved=move owner;owner|;}',set(),{'owner'})
+            completion(pre+'{let nested=3;nes|',{'nested'},{'gone'})
+            completion(pre+'l.ans|wer();}',{'answer'},{'make'})
+            completion(pre+'let emoji="🙂";pri|',{'prior'})
+            completion(pre+'   |',{'prior','object','let','var','return'},{'gone','break','continue'})
+            completion(pre+'ret|',{'return'})
+            completion('package main;fn helper(parameter:i64){par|}',{'parameter'})
+            completion('package main;import io "std/io";fn main(){io.pr|}',{'print','println'})
+            completion(pre+'while(true){br|;}}',{'break'})
+            completion(pre+'/* finished */pri|',{'prior'})
+            assert completion(pre+'// pri|\n}',set())['items']==[]
+            assert completion(pre+'/* pri| */}',set())['items']==[]
+            assert completion(pre+'let text="pri|";}',set())['items']==[]
             client.send('textDocument/didClose',{'textDocument':{'uri':uri}})
             assert client.barrier()[uri]['diagnostics']==[]
             client.close()
@@ -171,7 +210,7 @@ for bad in (b'Content-Length: -1\r\n\r\n',b'Content-Length: 2\r\n\r\n{',b'Conten
     try:read_message(io.BytesIO(bad))
     except ValueError:pass
     else:raise AssertionError(bad)
-print('LSP: native diagnostics and definition lookup, shadowed locals/assignment/parameters, imported functions/types/fields/methods/generics, fragmented framing, UTF-16/CRLF, unsaved dependencies/new files, version ordering, index invalidation and no source writes PASS')
+print('LSP: native diagnostics, definitions and scoped/package/type/member completion, shadowed locals/assignment/parameters, imported functions/types/fields/methods/generics, fragmented framing, UTF-16/CRLF, unsaved dependencies/new files, version ordering, index invalidation and no source writes PASS')
 
 # No-argument lifecycle requests also accept explicit JSON null parameters.
 output=io.BytesIO();server=Server(None,None,ROOT,output)
