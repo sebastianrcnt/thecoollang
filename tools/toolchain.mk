@@ -327,3 +327,10 @@ integer-semantics-test: build/cool-compiler build/language.BIN build/language-ru
 test: integer-semantics-test
 integer-semantics-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_integer_semantics.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: float-conversions-test float-conversions-sanitize-test
+float-conversions-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_float_conversions.py
+test: float-conversions-test
+float-conversions-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_float_conversions.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

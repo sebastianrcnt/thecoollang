@@ -40,7 +40,7 @@ void NativeSetProgramArgs(int64_t start) { CoolArgsStart(start); }
 int64_t NativeArgCount(void) { return *_NSGetArgc(); }
 char *NativeArg(int64_t i) { return i>=0 && i<*_NSGetArgc() ? (*_NSGetArgv())[i] : NULL; }
 int64_t NativeGetChar(void) { return getchar(); }
-int64_t NativeParseFloat(const char *text,int64_t *ok) { char *end; errno=0; double n=strtod(text,&end); *ok=end!=text && !*end && errno!=ERANGE; return cool_bits(n); }
+int64_t NativeParseFloat(const char *text,int64_t *ok) { return cool_parse_float(text,ok); }
 int64_t NativeNumericCast(int64_t bits,int64_t from,int64_t to,int64_t *ok) { return cool_numeric_cast(bits,from,to,ok); }
 void NativePrintFloat(int64_t bits) { printf("%.17g",cool_double(bits)); }
 int64_t NativeForeignCall(const char *name,int64_t result,const int64_t *types,const int64_t *values,int64_t count,int64_t *ok) { return cool_foreign_call(name,result,types,values,count,ok); }

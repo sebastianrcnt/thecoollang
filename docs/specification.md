@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 3
+# Cool language specification — 1.0 draft 4
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -166,8 +166,47 @@ Each frontend runs the same oracle under five engines and an optimized native
 build; the sanitizer target adds a compiler-instrumented frontend and
 ASan-instrumented LLVM linked with the ASan/UBSan C runtime.
 
+## Floating conversions and literal range
+
+Floating literals have type `f64`. A decimal literal may represent a finite
+subnormal value, including the smallest nonzero binary64 value (`5e-324` rounds
+to that value). A nonzero literal whose conversion underflows to zero is an
+error, as is overflow to infinity. Zero itself is valid. These rules apply to
+source conversion; runtime arithmetic and explicit float narrowing may produce
+zero, infinity or NaN. Complete floating-token grammar remains under audit.
+
+A floating-to-integer conversion requires a finite input in a half-open interval:
+`[-2^(w-1), 2^(w-1))` for signed destinations and `[0, 2^w)` for unsigned
+ones. The check applies to the original floating value, before truncation toward
+zero. Thus `i8(127.75)` is 127, `i8(-128.75)` fails, and `u8(-0.75)` fails.
+Negative zero converts to integer zero. NaN, either infinity, and values outside
+the interval fail with a checked conversion error. There is no saturation or
+unchecked host float-to-integer cast for such inputs. An input originating in
+`f32` follows the same rules using its represented value.
+
+Integer-to-`f64` conversion rounds to binary64. The current implementation of
+integer-to-`f32` conversion passes through binary64 before rounding to binary32;
+this double-rounding behavior is explicitly still a pre-freeze design
+issue. For example, converting integer `9223372586610589697` currently produces
+`9223372036854775808`, whereas directly rounding to the nearest binary32 value
+would produce `9223373136366403584`. This discrepancy must be resolved before
+freezing the numeric contract. `f64` to `f32` rounds to binary32, and widening a finite `f32` to `f64`
+preserves its value exactly. Signed zero is preserved across float conversions.
+The supported default floating environment rounds halfway cases to even; unsafe
+foreign changes to that environment are outside this audited contract.
+
+`make float-conversions-test` checks adjacent representable binary64 values at
+all integer-width boundaries, signed zero, fractional truncation, f32 precision
+ties, widening/narrowing, representable subnormals, and NaN/infinite/out-of-range
+rejections across both frontends, five engines and optimized binaries. The
+sanitizer target additionally checks the compiler with ASan and generated LLVM
+with ASan, linking the runtime with UBSan and float-cast-overflow checks enabled.
+This section does not yet specify the full floating arithmetic/rounding contract.
+
 ## Draft revisions
 
+- Draft 4: specify float-to-integer checks and subnormal literal acceptance;
+  record remaining float arithmetic and integer-to-f32 rounding work.
 - Draft 3: specify fixed-width integer operations and conversions. Signed
   division/remainder overflow now fails at every width; earlier development
   builds wrapped the narrow-width quotient. Correct bootstrap `u64` remainder

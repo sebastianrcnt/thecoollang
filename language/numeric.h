@@ -3,8 +3,19 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
+#include <stdlib.h>
 static inline double cool_double(int64_t bits) { double n; memcpy(&n, &bits, 8); return n; }
 static inline int64_t cool_bits(double n) { int64_t bits; memcpy(&bits, &n, 8); return bits; }
+// ERANGE also covers representable subnormals. Reject only non-finite results
+// and actual underflow to zero, rather than rejecting all small literals.
+static inline int64_t cool_parse_float(const char *text, int64_t *ok) {
+    char *end;
+    errno = 0;
+    double value = strtod(text, &end);
+    *ok = end != text && !*end && isfinite(value) && !(errno == ERANGE && value == 0.0);
+    return cool_bits(value);
+}
 static inline int cool_unsigned(int64_t type) { return type == 5 || type == 8 || type == 9 || type == 10; }
 static inline int cool_width(int64_t type) {
     if (type == 5 || type == 6) return 8;

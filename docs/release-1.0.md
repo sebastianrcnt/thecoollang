@@ -897,6 +897,27 @@ through ordinary evaluation or library use.
   this audit does not cover all floating conversion/encoding/inference contracts
   or replace ownership, full grammar and final release acceptance work.
 
+- Floating conversion/literal audit: both hosts rejected representable subnormal
+  source literals such as `1e-310` because strtod may set ERANGE for nonzero
+  subnormals. A shared numeric adapter now accepts these finite values while
+  rejecting literal overflow to infinity and nonzero underflow to zero. The
+  seed is unchanged. Specification draft 4 records half-open float-to-integer
+  range checks before truncation, non-finite rejection and subnormal source
+  acceptance. A Python/IEEE boundary suite checks 105 expected values, 21 runtime
+  failures and two literal range rejections on both frontends under five engines
+  and optimized builds. Sanitizer coverage adds the ASan frontend and emitted
+  LLVM, plus ASan/UBSan/float-cast-overflow on the C numeric runtime. Evidence is
+  in `build/release-audit/float-conversions-{regression,sanitize,distribution}.log`.
+  Full regression, self-host/bootstrap convergence and read-only installed
+  Neovim/distribution checks pass; remote CI has not been observed.
+  Compiler Cool sources are unchanged; the IR SHA256 remains
+  `0bcc61fc4c98a63e2e5b358f78a9be27b5e538b9c641b23f13d1f1d1453f5c74`.
+  The audit also reproduced integer-to-f32 double rounding for
+  `9223372586610589697`: the current binary64 intermediary rounds down to
+  `9223372036854775808`, while direct nearest binary32 is `9223373136366403584`.
+  That issue, complete floating-token grammar and the arithmetic contract remain
+  mandatory pre-freeze work. G1/G9 stay open; this is not a completed numeric audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

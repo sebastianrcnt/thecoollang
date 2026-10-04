@@ -122,11 +122,7 @@ static int64_t host_ticks(void) {
 }
 static double host_atan2_xy(double x, double y) { return atan2(y, x); }
 static int64_t host_parse_float(const char *text, int64_t *ok) {
-    char *end;
-    errno = 0;
-    double value = strtod(text, &end);
-    *ok = end != text && !*end && errno != ERANGE;
-    return cool_bits(value);
+    return cool_parse_float(text, ok);
 }
 static void host_print_float(int64_t bits) { printf("%.17g", cool_double(bits)); }
 static void host_err_puts(const char *text) {

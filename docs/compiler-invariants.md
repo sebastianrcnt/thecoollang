@@ -574,3 +574,14 @@ formula aligned. This avoids relying on that seed instruction while leaving the
 seed/provenance unchanged; it does not claim the legacy compiler is repaired.
 Use an independent large-u64 oracle, not just cross-engine agreement, to guard
 this boundary. The LLVM runtime's C unsigned remainder remains full-width.
+
+## Floating host boundary
+
+Both production and bootstrap hosts use cool_parse_float from numeric.h. strtod
+may set ERANGE for a nonzero representable subnormal, so ERANGE alone must not
+reject a literal. Reject non-finite results and ERANGE with a zero result, along
+with incomplete/invalid parses. Do not let host wrappers diverge on this rule.
+The lexer owns token grammar; this adapter only converts an already selected
+numeric spelling. Float-to-integer casts must check finiteness and the half-open
+destination range before executing the host cast; sanitizer tests explicitly
+enable float-cast-overflow in addition to undefined/address checks.
