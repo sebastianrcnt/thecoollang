@@ -155,7 +155,7 @@ U0 CompileBytecode(Function *f) {
     for (zero = 0; zero < f->code_count; zero++) if (CodeAt(zero)->op == BC_RETURN_PREP) CodeAt(zero)->value = f->registers;
 }
 I64 Compute(Instruction *ins, I64 *values) {
-    I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, *args; Node *n = ins->node;
+    I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, args[32]; Node *n = ins->node;
     if (ins->op == BC_CONST) return ins->value;
     if (ins->op == BC_COPY) return a;
     if (ins->op == BC_LOCAL_READ) return ValueRead(&values[ins->a], n->type, &values[n->storage]);
@@ -173,9 +173,9 @@ I64 Compute(Instruction *ins, I64 *values) {
     if (ins->op == BC_SLICE) { result = SequenceLength(n, a); if (n->c) result = values[ins->target]; return MakeSlice(n, a, b, result, &values[n->storage]); }
     if (ins->op == BC_LENGTH) { if (AggregateKind(n->a->type) == A_SLICE) return a(I64 *)[1]; return Shape(n->a->type)->count; }
     if (ins->op == BC_CALL) {
-        args = CAlloc((n->value + 1) * 8);
+        if(n->value<0 || n->value>32)ErrorAt(n->token,"invalid bytecode argument count");
         for (i = 0; i < n->value; i++) args[i] = values[ins->args[i]];
-        result = Invoke(n, args, &values[n->storage]); Free(args); return result;
+        result = Invoke(n, args, &values[n->storage]); return result;
     }
     if (ins->op == BC_ADDRESS) { b *= ByteSize(n->type - T_PTR); if (n->op == '-') return a - b; return a + b; }
     if (ins->op == BC_LOAD || ins->op == BC_STORE) {

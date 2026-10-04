@@ -1,0 +1,31 @@
+// Statement syntax is disposable; cached function syntax is not. A wrapper
+// keeps allocation links outside Node, which coercion clones copy by value.
+fn AllocateNode() -> *Node {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition == i8(0) || ctx.v_current_fun != 0) {
+            return cast[*Node](CAlloc(i64(sizeof(Node))));
+        }
+        let allocation = cast[*ReplNode](CAlloc(i64(sizeof(ReplNode))));
+        allocation.next = ctx.v_repl_nodes;
+        ctx.v_repl_nodes = allocation;
+        return &raw allocation.value;
+    }
+}
+fn ReplFreeNodes() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        // Persistent loans carry Local identity and mode. Expression identity
+        // is needed only while checking the current submission. Clearing it
+        // prevents allocator address reuse from matching an old expression.
+        var loan = ctx.v_repl_loans;
+        while (loan != null) { loan.expression = null; loan = loan.next; }
+        var allocation = ctx.v_repl_nodes;
+        while (allocation != null) {
+            let next = allocation.next;
+            Free(cast[*u8](allocation));
+            allocation = next;
+        }
+        ctx.v_repl_nodes = null;
+    }
+}

@@ -428,9 +428,7 @@ var v_t5: *Token = arg_v_t5;
 var v_n4: *Node = null;
 var t0: i64 = i64(0);
 var t1: *u8 = null;
-t0 = i64(sizeof(Node));
-t1 = CAlloc(t0);
-v_n4 = cast[*Node](t1);
+v_n4 = AllocateNode();
 (v_n4).kind = v_kind;
 (v_n4).token = v_t5;
 (v_n4).slot = (-1);
@@ -1117,9 +1115,7 @@ if (t5) {
 t5 = (v_type17 == 100000);
 }
 if (t5) {
-t6 = i64(sizeof(Node));
-t7 = CAlloc(t6);
-v_child = cast[*Node](t7);
+v_child = AllocateNode();
 t8 = cast[*u8](v_child);
 t9 = cast[*u8](v_n5);
 t10 = i64(sizeof(Node));
@@ -1159,9 +1155,7 @@ t20 = t21;
 t13 = t20;
 }
 if (t13) {
-t22 = i64(sizeof(Node));
-t23 = CAlloc(t22);
-v_child = cast[*Node](t23);
+v_child = AllocateNode();
 t24 = cast[*u8](v_child);
 t25 = cast[*u8](v_n5);
 t26 = i64(sizeof(Node));
@@ -1239,9 +1233,7 @@ t57 = (t59 > t61);
 t51 = t57;
 }
 if (t51) {
-t62 = i64(sizeof(Node));
-t63 = CAlloc(t62);
-v_child = cast[*Node](t63);
+v_child = AllocateNode();
 t64 = cast[*u8](v_child);
 t65 = cast[*u8](v_n5);
 t66 = i64(sizeof(Node));

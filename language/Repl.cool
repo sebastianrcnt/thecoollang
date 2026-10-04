@@ -12,6 +12,12 @@ MoveState *repl_moves;
 extern U0 ReplTrimStorage();
 #include "ReplLoans.cool"
 #include "ReplPackages.cool"
+U0 ReplFreeNodes() {
+    ReferenceLoan *loan;ReplNode *allocation,*next;
+    for(loan=repl_loans;loan;loan=loan->next)loan->expression=NULL;
+    for(allocation=repl_nodes;allocation;allocation=next){next=allocation->next;Free(allocation);}
+    repl_nodes=NULL;
+}
 // Only records added by this submission may be discarded on rollback.
 // Rejected code has never initialized its slots: never drop those values.
 U0 ReplDiscardNewDrops(Bool executed, Bool failed) {
@@ -127,6 +133,7 @@ U0 Repl(Bool prompt) {
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;
         while (repl_moves) { move = repl_moves; repl_moves = move->next; Free(move); }
+        ReplFreeNodes();
 repl_next:
         Free(text->data); Free(text);
     }

@@ -115,6 +115,8 @@ local_ref: *Local;
 }
 
 
+struct ReplNode { value: Node; next: *ReplNode; }
+
 struct DropSlot {
 
 slot: i64;
@@ -491,6 +493,8 @@ v_repl_capacity: i64;
 v_repl_executing: i8;
 
 v_repl_moves: *MoveState;
+
+v_repl_nodes: *ReplNode;
 
 v_repl_loans: *ReferenceLoan;
 

@@ -1192,7 +1192,7 @@ var v_b10: i64 = i64(0);
 var v_op5: i64 = i64(0);
 var v_result5: i64 = i64(0);
 var v_i22: i64 = i64(0);
-var v_args10: *i64 = null;
+var v_args10: [32]i64 = [32]i64{};
 var v_n41: *Node = null;
 var t0: i64 = i64(0);
 var t1: i64 = i64(0);
@@ -1448,9 +1448,7 @@ t64 = Shape(t63);
 return (t64).count;
 }
 if (((v_ins2).op == 6)) {
-t65 = (((v_n41).value + 1) * 8);
-t66 = CAlloc(t65);
-v_args10 = cast[*i64](t66);
+if (v_n41.value < 0 || v_n41.value > 32) { ErrorAt(v_n41.token, cast[*u8]("invalid bytecode argument count")); }
 v_i22 = 0;
 while (true) {
 if (!((v_i22 < (v_n41).value))) { break; }
@@ -1459,12 +1457,11 @@ t67 = v_i22;
 v_i22 = v_i22 + i64(1);
 }
 t68 = v_n41;
-t69 = v_args10;
+t69 = &raw v_args10[0];
 t70 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t71 = Invoke(t68, t69, t70);
 v_result5 = t71;
-t72 = cast[*u8](v_args10);
-Free(t72);
+
 return v_result5;
 }
 if (((v_ins2).op == 10)) {

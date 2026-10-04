@@ -604,7 +604,7 @@ pc = 8;
 continue;
 }
 if (pc == 10) {
-if ((ctx.v_repl_moves != null)) { pc = 13; } else { pc = 1; }
+if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplFreeNodes(); pc = 1; }
 continue;
 }
 if (pc == 11) {

@@ -429,6 +429,31 @@ through ordinary evaluation or library use.
   are not an isolated speed claim. Remaining RSS growth demonstrates that
   total session memory is still not bounded; G8 also remains open.
 
+- Disposable REPL syntax: all node allocation, including coercion clones, now
+  goes through one allocator. Synthetic-session nodes have wrapper-owned
+  allocation links outside the copied Node payload and are freed after each
+  submission or recovery. Persistent loan expression pointers are cleared
+  before disposal, preserving Local identities, permissions and ancestry without
+  allowing allocator address reuse to match stale expressions. Ordinary and
+  specialized function bodies remain cached. Bytecode invocation argument
+  vectors now use bounded native stack scratch (32 accepted arguments), so
+  nonlocal runtime recovery cannot skip a heap-vector free.
+  Regression sessions cover all coercion clone paths, persistent strings and
+  generic bodies, zero/32 owning arguments, deep recursive error recovery,
+  shared defer cleanup and prior persistent-loan/package behavior. Both
+  frontends and compiler ASan pass. Full regression, both bootstraps and the
+  read-only external installation test pass; fixed-point IR SHA256 is
+  `133f313eaf0e12aae00daf293c0322a365fab581668031859428d07588d0c128`.
+  The same three-trial fresh-process scalar-update benchmark against `9f5ae8b`
+  lowers median peak RSS at 16,000 submissions from 29,179,904 to 18,857,984
+  bytes (27.8 to 18.0 MiB); at 2,000, from 11,632,640 to 10,354,688 bytes.
+  Raw measurements are `build/release-audit/repl-nodes-memory.json`; build and
+  measurement methodology matches the preceding entry. Concurrent regression
+  means elapsed times are not an isolated performance claim. Tokens/lexical
+  strings, Local metadata and replaced or rolled-back function caches still
+  require reclamation. G6/G8 remain open and this is not a bounded-total-memory
+  claim.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

@@ -154,6 +154,8 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_OWN_ADDRESS 30
 class Local { U8 *name; I64 type, slot, mutable, depth, region, moved, loop_level; Local *next, *all_next; U8 *sources; };
 class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
+class ReplNode { Node value; ReplNode *next; };
+ReplNode *repl_nodes;
 class DropSlot { I64 slot, type; DropSlot *next; };
 class ByteAllocation { ByteAllocation *next; };
 class Function {
@@ -167,7 +169,13 @@ Function *functions;
 I64 nfun;
 Local *locals;
 I64 depth, loop_depth, current_fun, unsafe_depth;
-Node *NewNode(I64 kind, Token *t) { Node *n = CAlloc(sizeof(Node)); n->kind = kind; n->token = t; n->slot = -1; return n; }
+Node *AllocateNode() {
+    ReplNode *allocation;
+    if(!allow_redefinition || current_fun!=0)return CAlloc(sizeof(Node));
+    allocation=CAlloc(sizeof(ReplNode));allocation->next=repl_nodes;repl_nodes=allocation;
+    return &allocation->value;
+}
+Node *NewNode(I64 kind, Token *t) { Node *n = AllocateNode(); n->kind = kind; n->token = t; n->slot = -1; return n; }
 I64 FindFunIn(U8 *package, U8 *name) { I64 i; for (i = 0; i < nfun; i++) if (!functions[i].origin && Eq(functions[i].package, package) && Eq(functions[i].name, name)) return i; return -1; }
 I64 FindFun(U8 *name) { return FindFunIn("__main", name); }
 class Alias { U8 *file, *name, *path; Alias *next; };
@@ -226,15 +234,15 @@ U0 Coerce(Node *n, I64 type) {
     Node *child;
     if (n->type == type) return;
     if (n->type == T_NULL && Pointer(type)) { n->type = type; return; }
-    if (Pointer(n->type) && type == T_PTR) { child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL; n->kind = N_CAST; n->a = child; n->type = type; return; }
+    if (Pointer(n->type) && type == T_PTR) { child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL; n->kind = N_CAST; n->a = child; n->type = type; return; }
     if ((n->type == T_F32 && type == T_F64) || (n->kind == N_INT && Integer(n->type) && Floating(type) && -16777216 <= n->value <= 16777216)) {
-        child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
+        child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL;
         n->kind = N_CAST; n->a = child; n->type = type; return;
     }
     if (Integer(n->type) && Integer(type)) {
         if (n->kind == N_INT && !(Unsigned(n->type) && n->value < 0 && type != T_U64) && Fits(n->value, type)) { n->type = type; return; }
         if ((Unsigned(type) == Unsigned(n->type) && Width(type) > Width(n->type)) || (!Unsigned(type) && Unsigned(n->type) && Width(type) > Width(n->type))) {
-            child = CAlloc(sizeof(Node)); MemCpy(child, n, sizeof(Node)); child->next = NULL;
+            child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL;
             n->kind = N_CAST; n->a = child; n->type = type; return;
         }
     }

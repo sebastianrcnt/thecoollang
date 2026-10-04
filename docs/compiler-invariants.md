@@ -71,6 +71,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `19-repl-loans.cool` | Persistent loan transactions, recovery filtering and explicit binding release | `ReplLoans.cool` |
 | `20-repl-packages.cool` | Import discovery, immutable package staging and rollback | `ReplPackages.cool` |
 | `21-bytecode-memory.cool` | Compilation-owned argument/scope allocation lists and disposal | `Bytecode.cool` |
+| `22-repl-nodes.cool` | Disposable submission node allocation and cleanup | `Core.cool`, `Repl.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -332,8 +333,22 @@ the instruction buffer and counts. Currently it disposes only the completed or
 rejected REPL submission (function zero), after execution/unwind and before a
 snapshot restore. Function zero is never JIT-compiled. Do not dispose ordinary
 cached bytecode while any live JIT code or frame could reference its instructions.
-This recovers submission compilation buffers, not all AST, token, invocation
-scratch memory or replaced-function caches.
+This recovers submission compilation buffers, not token or replaced-function
+caches. Bytecode invocation argument values use native stack scratch with the
+language's 32-argument bound; nonlocal runtime recovery cannot leak that vector.
+Argument scratch contains borrowed value representations, never ownership of
+the referenced aggregate storage.
+
+All AST allocation and coercion clones go through `AllocateNode`. In REPL mode,
+nodes created for synthetic function zero have an outer `ReplNode` allocation
+link, separate from the copied Node payload. `ReplFreeNodes` runs after successful
+submission execution or recovery, after bytecode disposal and move-state cleanup.
+It first clears persistent loans' expression pointers: these identify expressions
+only during checking, whereas Local identities, modes and ancestry persist. A
+freed expression address must never match a later allocation. Generic specialization
+switches `current_fun` before building its body, so cached function nodes do not
+enter this disposable pool. Node cleanup does not free lexical strings, tokens,
+Local metadata or function bodies; those have independent lifetimes.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

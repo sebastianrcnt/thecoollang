@@ -565,7 +565,10 @@ checks repeated large temporary/forgotten arrays beyond the former cumulative
 slot limit, stable references, mixed owning/non-owning slot reuse and compile/
 runtime rollback on both frontends. Completed and rejected submission bytecode
 and its argument/scope allocations are reclaimed, including shared deferred
-argument vectors; ordinary function caches remain live. `make repl-storage-sanitize-test` repeats
+argument vectors. Submission AST nodes and coercion clones are reclaimed after
+checking/execution; cached function/generic bodies and literal strings survive.
+Bytecode call argument scratch uses the native stack, including error recovery.
+Ordinary function caches remain live. `make repl-storage-sanitize-test` repeats
 these checks on the ASan-instrumented compiler. Package loading is described
 below.
 
