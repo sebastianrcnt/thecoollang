@@ -234,6 +234,7 @@ U0 EmitLLVM(U8 *output) {
     IR("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
     IR("declare void @cool_zero(i64, i64)\ndeclare i64 @cool_length(i64, i64, i64)\ndeclare i64 @cool_index(i64, i64, i64, i64, i64)\ndeclare void @cool_slice(i64, i64, i64, i64, i64, i64, i64)\n");
     IR("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n");
+    IR("declare void @cool_args_init(i32, ptr)\n");
     IR("declare i64 @cool_cast(i64, i64, i64)\n");
     IR("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n");
     for (i = 0; i < nfun; i++) {
@@ -265,7 +266,7 @@ foreign_already_declared:;
         if (f->exported) ExportWrapper(f, i);
 llvm_function_next:;
     }
-    IR("define i32 @main() {\nentry:\n  %exit = call i64 @__cool_fn"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
+    IR("define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @cool_args_init(i32 %argc, ptr %argv)\n  %exit = call i64 @__cool_fn"); RI(main); IR("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
     all = TextNew(); if (globals->len) Append(all, globals->data); Append(all, ir->data);
     if (!FileWrite(output, all->data, all->len)) Error("failed to write LLVM IR");
 }

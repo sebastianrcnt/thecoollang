@@ -33,6 +33,8 @@ int64_t FileWrite(const char *path,const void *data,int64_t size) {
 }
 int64_t NativeWrite(int64_t fd,const void *data,int64_t size) { return write((int)fd,data,(size_t)size); }
 void NativeExit(int64_t code) { exit((int)code); }
+extern void CoolArgsStart(int64_t start);
+void NativeSetProgramArgs(int64_t start) { CoolArgsStart(start); }
 int64_t NativeArgCount(void) { return *_NSGetArgc(); }
 char *NativeArg(int64_t i) { return i>=0 && i<*_NSGetArgc() ? (*_NSGetArgv())[i] : NULL; }
 int64_t NativeGetChar(void) { return getchar(); }

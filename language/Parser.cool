@@ -91,7 +91,7 @@ Node *Atom() {
     if (Is("move")) {
         pos++; n = Primary(); if (!Owned(n->type)) return n;
         if (n->kind == N_CALL || n->kind == N_NEW || n->kind == N_AGG_LITERAL || n->kind == N_MOVE) return n;
-        l = BorrowRoot(n); if (l) { if (l->moved) ErrorAt(t, "use of moved value"); if (l->loop_level < loop_depth) ErrorAt(t, "cannot move an outer owner inside a loop"); l->moved = TRUE; }
+        l = BorrowRoot(n); if (l && Owned(l->type)) { if (l->moved) ErrorAt(t, "use of moved value"); if (l->loop_level < loop_depth) ErrorAt(t, "cannot move an outer owner inside a loop"); l->moved = TRUE; }
         if (n->kind == N_LOCAL) { arg = NewNode(N_LOCAL_ADDRESS, t); arg->slot = n->slot; arg->type = T_PTR+n->type; arg->local_ref = n->local_ref; }
         else if (n->kind == N_LOAD) arg = n->a; else ErrorAt(t, "move requires a place or a fresh value");
         tail = NewNode(N_MOVE, t); tail->a = arg; tail->type = n->type; tail->storage = Storage(n->type); return tail;
@@ -110,7 +110,7 @@ Node *Atom() {
         n = NewNode(N_CAST, t); n->a = Expr(1); n->type = ty; Need(')', "expected ')' after cast operand");
         if (Pointer(ty) || Pointer(n->a->type)) {
             if (!unsafe_depth) ErrorAt(t, "pointer casts require unsafe");
-            if (!(Pointer(ty) || ty == T_U64 || ty == T_INT) || !(Pointer(n->a->type) || Integer(n->a->type) || n->a->type == T_NULL || n->a->type == T_STRING)) ErrorAt(t, "invalid pointer cast");
+            if (!(Pointer(ty) || ty == T_U64 || ty == T_INT || ty == T_STRING) || !(Pointer(n->a->type) || Integer(n->a->type) || n->a->type == T_NULL || n->a->type == T_STRING)) ErrorAt(t, "invalid pointer cast");
         } else if (!Numeric(ty) || !Numeric(n->a->type)) ErrorAt(t, "invalid cast");
         return n;
     }

@@ -1,0 +1,130 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "repeats": 5,
+  "workload": "sum integers [0, 10000)",
+  "note": "All measurements include process startup; setup excluded. No in-process latency claim.",
+  "results": {
+    "frontend_check_with_process_startup": {
+      "median_ms": 1.725,
+      "min_ms": 1.707,
+      "samples_ms": [
+        1.756209,
+        1.809875,
+        1.716417,
+        1.724875,
+        1.707209
+      ]
+    },
+    "run_cold_compile_and_execute_with_startup": {
+      "median_ms": 6.367,
+      "min_ms": 6.106,
+      "samples_ms": [
+        6.367041,
+        6.486417,
+        6.53325,
+        6.269542,
+        6.105584
+      ]
+    },
+    "bytecode_cold_compile_and_execute_with_startup": {
+      "median_ms": 10.755,
+      "min_ms": 10.376,
+      "samples_ms": [
+        10.754584,
+        10.376292,
+        10.993167,
+        10.576208,
+        12.900792
+      ]
+    },
+    "jit_cold_compile_and_execute_with_startup": {
+      "median_ms": 1.7,
+      "min_ms": 1.644,
+      "samples_ms": [
+        1.643625,
+        1.7005,
+        1.731958,
+        1.692375,
+        1.851416
+      ]
+    },
+    "auto_cold_compile_and_execute_with_startup": {
+      "median_ms": 10.497,
+      "min_ms": 10.159,
+      "samples_ms": [
+        10.159334,
+        11.250209,
+        10.248792,
+        10.496708,
+        11.170292
+      ]
+    },
+    "adaptive_run_including_driver": {
+      "median_ms": 91.884,
+      "min_ms": 90.403,
+      "samples_ms": [
+        93.6495,
+        91.759666,
+        90.403292,
+        92.963958,
+        91.883709
+      ]
+    },
+    "llvm_ir_emission_with_startup": {
+      "median_ms": 1.905,
+      "min_ms": 1.555,
+      "samples_ms": [
+        2.31925,
+        1.90525,
+        1.555209,
+        1.693917,
+        1.910083
+      ]
+    },
+    "llvm_cold_build_including_driver": {
+      "median_ms": 120.879,
+      "min_ms": 120.026,
+      "samples_ms": [
+        120.026084,
+        120.879209,
+        121.095084,
+        121.495375,
+        120.325417
+      ]
+    },
+    "llvm_cached_build_including_driver": {
+      "median_ms": 95.044,
+      "min_ms": 94.024,
+      "samples_ms": [
+        95.143292,
+        95.461584,
+        95.044042,
+        94.023958,
+        94.564375
+      ]
+    },
+    "llvm_executable_with_startup": {
+      "median_ms": 4.841,
+      "min_ms": 3.994,
+      "samples_ms": [
+        322.865708,
+        6.729,
+        4.841416,
+        4.479709,
+        3.993916
+      ]
+    },
+    "repl_compile_hot_replace_and_call_with_startup": {
+      "median_ms": 4.835,
+      "min_ms": 3.94,
+      "samples_ms": [
+        7.359125,
+        5.716125,
+        4.834708,
+        4.067375,
+        3.939791
+      ]
+    }
+  }
+}

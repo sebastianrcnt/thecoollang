@@ -117,7 +117,7 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
 
 def artifact(files, optimization):
     digest = hashlib.sha256(b'cool-artifact-v1\0' + optimization.encode())
-    for path in (FRONTEND, ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h'):
+    for path in (FRONTEND, ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h', ROOT/'language/args.h'):
         digest.update(path.read_bytes())
     digest.update(subprocess.check_output(['clang', '--version']))
     for package, path in files:
@@ -240,8 +240,8 @@ def main():
     if '--' in raw:
         at = raw.index('--'); raw, forwarded = raw[:at], raw[at+1:]
     args = parser.parse_args(raw)
-    if forwarded:
-        parser.error('new-language program arguments are not implemented yet; no arguments were discarded')
+    if forwarded and args.command != 'run':
+        parser.error('program arguments after -- require run')
     if args.command in ('mod', 'get'):
         module_command(args); return
     ensure_frontend()
@@ -314,7 +314,7 @@ def main():
             atomic_write(output, (work/'program.ll').read_bytes())
         elif args.command == 'run' and args.backend in ('auto', 'interp', 'tree', 'jit'):
             mode = {'auto': 'auto-bundle', 'interp': 'bytecode-bundle', 'tree': 'run-bundle', 'jit': 'jit-bundle'}[args.backend]
-            front(mode, manifest)
+            front(mode, manifest, *forwarded)
         elif args.command == 'run' and args.backend == 'llvm-jit':
             lli = os.environ.get('COOL_LLI') or shutil.which('lli')
             if not lli and Path('/opt/homebrew/opt/llvm/bin/lli').exists():
@@ -323,11 +323,11 @@ def main():
                 raise ValueError('LLVM lli not found; set COOL_LLI')
             ensure('build/language-runtime.dylib')
             front('llvm-bundle', manifest, work/'program.ll')
-            subprocess.run([lli, '--dlopen=' + str(ROOT/'build/language-runtime.dylib'), work/'program.ll'], check=True)
+            subprocess.run([lli, '--dlopen=' + str(ROOT/'build/language-runtime.dylib'), work/'program.ll', *forwarded], check=True)
         else:
             binary = native(manifest, files, '-O2' if args.release else '-O0')
             if args.command == 'run':
-                subprocess.run([binary], check=True)
+                subprocess.run([binary, *forwarded], check=True)
             else:
                 output = Path(args.output).resolve()
                 if output in [p for _, p in files]:

@@ -1,0 +1,15 @@
+package os;
+extern "C" fn CoolArgsCount() -> i64;
+extern "C" fn CoolArgsAt(index: i64) -> * u8;
+// Program arguments exclude the executable name and compiler/runner flags.
+pub fn arg_count() -> usize {
+    unsafe {
+        return usize(CoolArgsCount());
+    }
+}
+pub fn arg(index: usize) -> string {
+    assert(index < arg_count());
+    unsafe {
+        return cast[string](CoolArgsAt(i64(index)));
+    }
+}

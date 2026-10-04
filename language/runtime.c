@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "memory.h"
+#include "args.h"
 void cool_print(int64_t value, int64_t type, int64_t newline) {
     if (type == 3) fputs((const char *)(uintptr_t)value, stdout);
     else if (type == 11 || type == 12) printf("%.17g", cool_double(value));

@@ -89,8 +89,10 @@ static void host_exit(int64_t status) {
 }
 
 // Standalone program services. Compiler invocations do not expose their argv.
+#include "../../language/args.h"
 static int native_argc;
 static char **native_argv;
+static void host_program_args(int64_t start) { cool_args_init(native_argc, native_argv); CoolArgsStart(start); }
 static int64_t host_arg_count(void) { return native_argc; }
 static const char *host_arg(int64_t index) {
     if (index < 0 || index >= native_argc)
@@ -450,6 +452,7 @@ static void register_host_symbols(Module *m) {
     HOST("NativeExit", host_exit);
     HOST("NativeErrPutS", host_err_puts);
     HOST("NativeArgCount", host_arg_count);
+    HOST("NativeSetProgramArgs", host_program_args);
     HOST("NativeArg", host_arg);
     HOST("NativeGetChar", host_get_char);
     HOST("NativeParseFloat", host_parse_float);

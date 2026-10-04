@@ -8,9 +8,9 @@ build:
 	mkdir -p build
 build/cool: tools/cool | build
 	ln -sf ../tools/cool $@
-build/coolc: language/ffi.h language/numeric.h language/memory.h coolc/Host/native.c coolc/Host/warm_net.h coolc/Host/warm_task.h coolc/Host/warm_file.h coolc/Host/except.S | build
+build/coolc: language/args.h language/ffi.h language/numeric.h language/memory.h coolc/Host/native.c coolc/Host/warm_net.h coolc/Host/warm_task.h coolc/Host/warm_file.h coolc/Host/except.S | build
 	clang -std=c11 -Wall -Wextra -Werror -O2 -fno-omit-frame-pointer -ffixed-x28 $(filter %.c %.S,$^) -lffi -o $@
-build/coolc-x86_64: language/ffi.h language/numeric.h language/memory.h coolc/Host/native.c coolc/Host/x86.S coolc/Host/x86-native.h coolc/Host/warm_net.h coolc/Host/warm_task.h coolc/Host/warm_file.h | build
+build/coolc-x86_64: language/args.h language/ffi.h language/numeric.h language/memory.h coolc/Host/native.c coolc/Host/x86.S coolc/Host/x86-native.h coolc/Host/warm_net.h coolc/Host/warm_task.h coolc/Host/warm_file.h | build
 	clang -arch x86_64 -std=c11 -Wall -Wextra -Werror -O2 -fno-omit-frame-pointer coolc/Host/native.c coolc/Host/x86.S -lffi -o $@
 build/hcfmt.BIN: coolc/Fmt/Native.cool coolc/Fmt/HCFmt.cool coolc/Fmt/HCTok.cool coolc/seed/Compiler.BIN build/coolc | build
 	COOLC_COMPILER_BIN="$(COOLC_SEED)" gtimeout 45 build/coolc coolc/Fmt/Native.cool $@ > build/hcfmt-compile.log 2>&1
@@ -39,9 +39,9 @@ build/language.BIN: $(LANGUAGE_SRC) build/coolc coolc/seed/Compiler.BIN | build
 .PHONY: language-test
 language-test: build/language.BIN
 	python3 tools/test_language.py
-build/language-runtime.o: language/runtime.c language/numeric.h language/memory.h | build
+build/language-runtime.o: language/runtime.c language/numeric.h language/memory.h language/args.h | build
 	clang -std=c11 -Wall -Wextra -Werror -O2 -c $< -o $@
-build/language-runtime.dylib: language/runtime.c language/numeric.h language/memory.h | build
+build/language-runtime.dylib: language/runtime.c language/numeric.h language/memory.h language/args.h | build
 	clang -std=c11 -Wall -Wextra -Werror -O2 -dynamiclib $< -o $@
 all: build/language.BIN build/language-runtime.o
 .PHONY: project-test
@@ -97,3 +97,8 @@ language-test aggregate-test ownership-test generic-test project-test repl-test 
 export-test: build/cool-compiler build/language-runtime.o
 	python3 tools/test_exports.py
 test: export-test selfhost-check
+
+.PHONY: stdlib-test
+stdlib-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_stdlib.py
+test: stdlib-test

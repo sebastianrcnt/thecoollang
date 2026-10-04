@@ -33,7 +33,7 @@ fn sum(limit: i64) -> i64 {
 }
 fn main() { io.println(sum(10000)); }
 ''')
-    front = [str(ROOT/'build/coolc'), '--run', str(ROOT/'build/language.BIN')]
+    front = [str(ROOT/'build/cool-compiler')]
     cli = str(ROOT/'tools/cool')
 
     def measure(name, command, expected='', input=None, setup=None):

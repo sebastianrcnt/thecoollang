@@ -1,0 +1,112 @@
+package vector;
+import option "std/option";
+// Stable chunks avoid relocating live elements when the vector grows.
+struct Chunk[T] {
+    values: [32]T;
+    previous: * Chunk[T];
+    next: own[Chunk[T]];
+}
+pub struct Vector[T] {
+    head: own[Chunk[T]];
+    tail: * Chunk[T];
+    count: usize;
+}
+pub fn create[T]() -> Vector[T] {
+    return Vector[T] {
+    };
+}
+pub fn len[T](vector: * Vector[T]) -> usize {
+    unsafe {
+        return ( * vector).count;
+    }
+}
+pub fn append[T](vector: * Vector[T], value: T) {
+    unsafe {
+        let index = ( * vector).count % 32;
+        if (index == 0) {
+            let chunk = new[Chunk[T]]();
+            let pointer = & * chunk;
+            ( * pointer).previous = ( * vector).tail;
+            if (( * vector).count == 0) {
+                ( * vector).head = move chunk;
+            } else {
+                ( * ( * vector).tail).next = move chunk;
+            }
+            ( * vector).tail = pointer;
+        }
+        ( * ( * vector).tail).values[index] = move value;
+        ( * vector).count = ( * vector).count + 1;
+    }
+}
+pub fn at[T](vector: * Vector[T], index: usize) -> * T {
+    unsafe {
+        assert(index < ( * vector).count);
+        var chunk = & * ( * vector).head;
+        var block = index / 32;
+        while (block > 0) {
+            chunk = & * ( * chunk).next;
+            block = block - 1;
+        }
+        return & ( * chunk).values[index % 32];
+    }
+}
+pub fn pop[T](vector: * Vector[T]) -> option.Option[T] {
+    unsafe {
+        if (( * vector).count == 0) {
+            return option.Option[T].None;
+        }
+        let index = (( * vector).count - 1) % 32;
+        let chunk = ( * vector).tail;
+        let value = move( * chunk).values[index];
+        ( * vector).count = ( * vector).count - 1;
+        if (index == 0) {
+            let previous = ( * chunk).previous;
+            ( * vector).tail = previous;
+            if (previous == null) {
+                let released = move( * vector).head;
+            } else {
+                let released = move( * previous).next;
+            }
+        }
+        return option.Option[T].Some(move value);
+    }
+}
+pub fn clear[T](vector: * Vector[T]) {
+    unsafe {
+        while (( * vector).count > 0) {
+            pop[T](vector);
+        }
+    }
+}
+// A raw cursor borrows the vector; removal, clear or destruction can invalidate it.
+pub struct Cursor[T] {
+    chunk: * Chunk[T];
+    index: usize;
+    remaining: usize;
+}
+pub fn cursor[T](vector: * Vector[T]) -> Cursor[T] {
+    unsafe {
+        var first: * Chunk[T] = null;
+        if (( * vector).count > 0) {
+            first = & * ( * vector).head;
+        }
+        return Cursor[T] {
+            chunk: first, index: 0, remaining: ( * vector).count
+        };
+    }
+}
+pub fn next[T](cursor: * Cursor[T]) -> * T {
+    unsafe {
+        if (( * cursor).remaining == 0) {
+            return null;
+        }
+        let value = & ( * ( * cursor).chunk).values[( * cursor).index];
+        ( * cursor).index = ( * cursor).index + 1;
+        ( * cursor).remaining = ( * cursor).remaining - 1;
+        if (( * cursor).index == 32 && ( * cursor).remaining > 0) {
+            ( * cursor).chunk = & * ( * ( * cursor).chunk).next;
+            ( * cursor).index = 0;
+        }
+        return value;
+    }
+}

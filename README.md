@@ -2,7 +2,7 @@
 
 C처럼 저수준 코드를 표현하되 읽기 쉬운 문법, 단순한 패키지 구조와 빠른 반복 실행을 목표로 하는 언어입니다. 원본 coolcom이나 OS 저장소 없이 빌드합니다.
 
-현재는 **언어 구현 진행 단계**입니다. 스칼라·구조체·고정 배열·범위 검사 슬라이스, 함수, 패키지, 인터프리터·JIT·LLVM 실행 경로를 구현했습니다. payload enum·제네릭 특수화·명시적 이동 소유권·슬라이스 반환 계약도 지원합니다. 새 문법 컴파일러의 셀프호스팅과 세대 간 일치 검증도 통과했습니다. 표준 라이브러리는 확장 중입니다. 전체 목표와 실제 지원 범위를 구별해 기록합니다.
+현재는 **언어 구현 진행 단계**입니다. 스칼라·구조체·고정 배열·범위 검사 슬라이스, 함수, 패키지, 인터프리터·JIT·LLVM 실행 경로를 구현했습니다. payload enum·제네릭 특수화·명시적 이동 소유권·슬라이스 반환 계약도 지원합니다. 새 문법 컴파일러의 셀프호스팅과 세대 간 일치 검증도 통과했습니다. Result·Option·슬라이스·문자열·검사 산술·동적 벡터·파일·프로그램 인자를 제공하는 기본 표준 라이브러리도 포함합니다. 전체 목표와 실제 지원 범위를 구별해 기록합니다.
 
 ## 시작하기
 
@@ -56,11 +56,11 @@ C로 트랜스파일하지 않습니다. Cool로 작성된 프런트엔드가 �
 
 일반 `cool` 명령은 **새 문법으로 작성되고 자기 자신을 컴파일하는 `compiler/main.cool`**을 사용합니다. 최초 빌드는 기존 컴파일러를 seed로 사용하고, 이후 세대는 새 컴파일러로 빌드합니다. `make selfhost-check`는 3세대 LLVM IR과 2·3세대 네이티브 바이너리의 바이트 일치를 확인합니다. REPL은 변수·함수와 컴파일 캐시를 유지하며 같은 시그니처의 함수 본문만 교체할 수 있습니다.
 
-`build`는 Clang으로 LLVM IR을 네이티브 실행 파일로 만듭니다. 생성물은 호환되는 Mac에서 소스·Python·Cool 컴파일러 없이 실행됩니다. 현재 새 언어 프로그램에 명령행 인자를 전달하는 기능은 미구현입니다.
+`build`는 Clang으로 LLVM IR을 네이티브 실행 파일로 만듭니다. 생성물은 호환되는 Mac에서 소스·Python·Cool 컴파일러 없이 실행됩니다. `cool run program.cool -- arg1 arg2`로 프로그램 인자를 전달하고 `std/os`에서 읽을 수 있습니다.
 
 ## 패키지
 
-디렉터리가 패키지입니다. `pub fn`만 외부에 공개하며 순환 import는 거부합니다. `cool.mod`와 `cool.sum`, MVS 버전 선택, 로컬 replace와 `cool.work`, 오프라인·동결 해석을 지원합니다.
+디렉터리가 패키지입니다. `pub` 함수·타입·필드를 외부에 공개하며 순환 import는 거부합니다. `cool.mod`와 `cool.sum`, MVS 버전 선택, 로컬 replace와 `cool.work`, 오프라인·동결 해석을 지원합니다.
 
 ```sh
 cool mod init example.com/team/demo
@@ -89,6 +89,6 @@ cool legacy run examples/hello.cool
 
 회귀 검사는 기존 ARM64/x86-64 코드 생성, 새 언어 실행 경로 간 결과 일치, 패키지·캐시·체크섬, REPL 교체, 포매터·개발 도구를 확인합니다. `bootstrap-check`는 seed → gen1 → gen2 → gen3을 빌드해 gen2와 gen3의 바이트 일치를 검사합니다. 이 명령 자체는 체크인된 seed를 변경하지 않습니다.
 
-[전체 구현 목표](docs/language-plan.md) · [현재 지원 범위](language/README.md) · [추출 기준](SOURCE.md)
+[표준 라이브러리](stdlib/README.md) · [셀프호스팅](compiler/README.md) · [전체 구현 목표](docs/language-plan.md) · [현재 지원 범위](language/README.md) · [추출 기준](SOURCE.md)
 
 자체 코드는 MIT이며 포함된 외부 코드는 원래 라이선스를 따릅니다. [LICENSE](LICENSE) · [THIRD_PARTY.md](THIRD_PARTY.md)

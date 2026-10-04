@@ -19,6 +19,7 @@ import I64 FileWrite(U8 *path, U8 *data, I64 size);
 import I64 NativeWrite(I64 fd, U8 *data, I64 size);
 import U0 NativeExit(I64 code);
 import I64 NativeArgCount();
+import U0 NativeSetProgramArgs(I64 start);
 import U8 *NativeArg(I64 index);
 import I64 NativeGetChar();
 import I64 NativeParseFloat(U8 *text, I64 *ok);

@@ -30,7 +30,7 @@ U0 ReadBundle(U8 *file) {
 U0 LanguageMain() {
     U8 *mode;
     if (NativeArgCount() == 2 && (Eq(NativeArg(1), "repl") || Eq(NativeArg(1), "repl-quiet"))) { Repl(Eq(NativeArg(1), "repl")); return; }
-    if (NativeArgCount() < 3 || NativeArgCount() > 4) { Out("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n"); NativeExit(2); }
+    if (NativeArgCount() < 3) { Out("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n"); NativeExit(2); }
     mode = NativeArg(1);
     if (Eq(mode, "fmt")) { if (NativeArgCount() != 4) NativeExit(2); FormatFile(NativeArg(2), NativeArg(3)); return; }
     if (Eq(mode, "auto") || Eq(mode, "auto-bundle")) execution_mode = 3;
@@ -94,7 +94,7 @@ symbol_next:;
         if (!tests) Error("no test_ functions found");
         summary = TextNew(); Number(summary, tests); Append(summary, " tests passed\n"); Out(summary->data); return;
     }
-    if (execution_mode || Eq(mode, "run") || Eq(mode, "run-bundle")) NativeExit(RunMain());
+    if (execution_mode || Eq(mode, "run") || Eq(mode, "run-bundle")) { NativeSetProgramArgs(3); NativeExit(RunMain()); }
     if (Eq(mode, "llvm") || Eq(mode, "llvm-bundle")) { if (NativeArgCount() != 4) NativeExit(2); EmitLLVM(NativeArg(3)); return; }
     if (!Eq(mode, "check") && !Eq(mode, "check-bundle")) { Out("unknown command\n"); NativeExit(2); }
 }

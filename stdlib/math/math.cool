@@ -1,0 +1,38 @@
+package math;
+import result "std/result";
+pub fn min[T](left: T, right: T) -> T {
+    if (left < right) {
+        return left;
+    }
+    return right;
+}
+pub fn max[T](left: T, right: T) -> T {
+    if (left > right) {
+        return left;
+    }
+    return right;
+}
+pub fn clamp[T](value: T, low: T, high: T) -> T {
+    assert(low <= high);
+    return min[T](max[T](value, low), high);
+}
+pub enum ArithmeticError {
+    Overflow;
+    DivisionByZero;
+}
+pub fn add_i64(left: i64, right: i64) -> result.Result[i64, ArithmeticError] {
+    let sum = left + right;
+    if ((right > 0 && sum < left) || (right < 0 && sum > left)) {
+        return result.Result[i64, ArithmeticError].Err(ArithmeticError.Overflow);
+    }
+    return result.Result[i64, ArithmeticError].Ok(sum);
+}
+pub fn divide_i64(left: i64, right: i64) -> result.Result[i64, ArithmeticError] {
+    if (right == 0) {
+        return result.Result[i64, ArithmeticError].Err(ArithmeticError.DivisionByZero);
+    }
+    if (left == -9223372036854775808 && right == -1) {
+        return result.Result[i64, ArithmeticError].Err(ArithmeticError.Overflow);
+    }
+    return result.Result[i64, ArithmeticError].Ok(left / right);
+}

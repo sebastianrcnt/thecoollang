@@ -1,0 +1,62 @@
+package fs;
+import result "std/result";
+import vector "std/vector";
+extern "C" fn fopen(path: * u8, mode: * u8) -> * void;
+extern "C" fn fclose(file: * void) -> i32;
+extern "C" fn fgetc(file: * void) -> i32;
+extern "C" fn fputc(byte: i32, file: * void) -> i32;
+extern "C" fn ferror(file: * void) -> i32;
+extern "C" fn __error() -> * i32;
+fn close(file: * void) {
+    unsafe {
+        fclose(file);
+    }
+}
+fn error_code() -> i32 {
+    unsafe {
+        return * __error();
+    }
+}
+// Errors are Darwin errno values on the currently supported macOS host.
+pub fn read(path: string) -> result.Result[vector.Vector[u8], i32] {
+    unsafe {
+        let file = fopen(cast[ * u8](path), cast[ * u8]("rb"));
+        if (file == null) {
+            return result.Result[vector.Vector[u8], i32].Err(error_code());
+        }
+        defer close(file);
+        var bytes = vector.create[u8]();
+        while (true) {
+            let byte = fgetc(file);
+            if (byte < 0) {
+                break;
+            }
+            vector.append[u8]( & bytes, u8(byte));
+        }
+        if (ferror(file) != 0) {
+            return result.Result[vector.Vector[u8], i32].Err(error_code());
+        }
+        return result.Result[vector.Vector[u8], i32].Ok(move bytes);
+    }
+}
+pub fn write(path: string, bytes: * vector.Vector[u8]) -> result.Result[usize, i32] {
+    unsafe {
+        let file = fopen(cast[ * u8](path), cast[ * u8]("wb"));
+        if (file == null) {
+            return result.Result[usize, i32].Err(error_code());
+        }
+        let size = vector.len[u8](bytes);
+        var cursor = vector.cursor[u8](bytes);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (fputc(i32( * vector.next[u8]( & cursor)), file) < 0) {
+                let code = error_code();
+                fclose(file);
+                return result.Result[usize, i32].Err(code);
+            }
+        }
+        if (fclose(file) != 0) {
+            return result.Result[usize, i32].Err(error_code());
+        }
+        return result.Result[usize, i32].Ok(size);
+    }
+}

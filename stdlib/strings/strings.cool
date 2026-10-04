@@ -1,0 +1,95 @@
+package strings;
+import result "std/result";
+extern "C" fn strlen(value: * u8) -> usize;
+extern "C" fn strcmp(left: * u8, right: * u8) -> i32;
+pub fn length(value: string) -> usize {
+    unsafe {
+        return strlen(cast[ * u8](value));
+    }
+}
+pub fn equal(left: string, right: string) -> bool {
+    unsafe {
+        return strcmp(cast[ * u8](left), cast[ * u8](right)) == 0;
+    }
+}
+pub fn byte_at(value: string, index: usize) -> u8 {
+    assert(index < length(value));
+    unsafe {
+        return cast[ * u8](value)[index];
+    }
+}
+pub fn starts_with(value: string, prefix: string) -> bool {
+    let size = length(prefix);
+    if (size > length(value)) {
+        return false;
+    }
+    unsafe {
+        let source = cast[ * u8](value);
+        let target = cast[ * u8](prefix);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (source[i] != target[i]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+pub fn ends_with(value: string, suffix: string) -> bool {
+    let size = length(suffix);
+    let total = length(value);
+    if (size > total) {
+        return false;
+    }
+    unsafe {
+        let source = cast[ * u8](value);
+        let target = cast[ * u8](suffix);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (source[total - size + i] != target[i]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+pub enum ParseError {
+    Empty;
+    InvalidDigit;
+    Overflow;
+}
+pub fn parse_i64(value: string) -> result.Result[i64, ParseError] {
+    let size = length(value);
+    if (size == 0) {
+        return result.Result[i64, ParseError].Err(ParseError.Empty);
+    }
+    var index: usize = 0;
+    var negative = false;
+    let first = byte_at(value, 0);
+    if (first == 45 || first == 43) {
+        negative = first == 45;
+        index = 1;
+    }
+    if (index == size) {
+        return result.Result[i64, ParseError].Err(ParseError.InvalidDigit);
+    }
+    var limit: u64 = 9223372036854775807;
+    if (negative) {
+        limit = 9223372036854775808;
+    }
+    var parsed: u64 = 0;
+    while (index < size) {
+        let byte = byte_at(value, index);
+        if (byte < 48 || byte > 57) {
+            return result.Result[i64, ParseError].Err(ParseError.InvalidDigit);
+        }
+        let digit = u64(byte - 48);
+        if (parsed > (limit - digit) / 10) {
+            return result.Result[i64, ParseError].Err(ParseError.Overflow);
+        }
+        parsed = parsed * 10 + digit;
+        index = index + 1;
+    }
+    if (negative) {
+        return result.Result[i64, ParseError].Ok(i64(u64(0) - parsed));
+    }
+    return result.Result[i64, ParseError].Ok(i64(parsed));
+}

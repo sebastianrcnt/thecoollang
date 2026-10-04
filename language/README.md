@@ -25,7 +25,8 @@ on normal block exit, return, break and continue. Panic/runtime failure terminat
 the process and does not promise cleanup.
 
 This is an implementation stage, not the full language: the complete standard
-library is still being expanded.
+library covers core collections, text, checked arithmetic, files and process
+arguments, with additional domains still pending.
 This directory retains the bootstrap frontend. The production frontend in
 `compiler/main.cool` uses new syntax and compiles itself; `make selfhost-check`
 verifies both IR and native binary convergence.
@@ -111,13 +112,14 @@ and a persistent-session replacement workload. Setup is excluded; every reported
 measurement includes process startup. JSON samples go to
 `build/language-benchmark.json`; no hardware-dependent pass threshold is imposed.
 
-On the development Apple Silicon Mac, five-sample medians for summing integers
-from 0 through 9,999 were approximately 3.4 ms for direct frontend checking,
-3.0 ms for cold baseline JIT plus execution, and 88 ms for `cool run` including
-the Python driver. LLVM build medians were 128 ms cold and 99 ms cached; the built
-executable including startup took 2.7 ms. These are small-workload measurements,
-not large-project throughput or in-process incremental compilation latency.
-The driver overhead remains a performance task.
+On the development Apple Silicon Mac, five-sample medians using the self-hosted
+frontend for summing integers from 0 through 9,999 were 1.725 ms for direct
+checking, 1.700 ms for cold native JIT plus execution, and 1.905 ms for LLVM IR
+emission. `cool run` including the Python driver took 91.884 ms; LLVM cold/cached
+builds including that driver took 120.879/95.044 ms. These measurements include
+process startup and do not measure large-project throughput. The CLI driver
+overhead remains a performance task. Raw samples, including outliers, are in
+[`docs/benchmarks/selfhost-arm64.json`](../docs/benchmarks/selfhost-arm64.json).
 
 ## Structs, arrays and borrowed slices
 
@@ -163,8 +165,8 @@ fn main() {
   parameters may accept slices; returning borrowed values requires an explicit
   `borrows(parameter, ...)` contract, checked against local storage and all assignment paths. Mutable slice elements cannot contain
   further slices, which prevents storing a local borrow into caller-owned storage.
-  Slice growth/append, dynamic arrays
-  and owning containers are not implemented. Unsafe pointers retain manual
+  Slice growth/append is not implemented; `std/vector` provides a chunked owning
+  dynamic collection. Unsafe pointers retain manual
   lifetime obligations.
 - `pub struct` and `pub` fields expose package APIs. Nominal types and layouts are
   collected before function signatures, permitting forward declarations and
@@ -184,7 +186,8 @@ and REPL behavior in addition to the differential cases in `language-test`.
 `match (value) { Result[i64,string].Ok(n) => { ... } ... }` arms. Generic
 functions, structs and enums specialize for explicit type arguments. Recursive
 specializations reuse their concrete identity; generic REPL redefinition requires
-a new session. `std/result`, `std/option` and `std/slice` are source packages.
+a new session. `std/result`, `std/option`, `std/slice`, `std/vector`, `std/strings`, `std/math`,
+`std/fs` and `std/os` are source packages.
 
 `new[T](value)` produces `own[T]`; `new[T]()` zero-initializes its storage.
 Owners and aggregates containing owners are move-only: use `move value` when
