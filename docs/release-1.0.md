@@ -214,14 +214,24 @@ through ordinary evaluation or library use.
   subsequent path suite passes separately. G5 still requires realistic project
   validation and coherent borrowed iteration; G1–G10 remain open.
 
+- Compiler maintenance: named expression/call resolution is now a direct,
+  descriptive `compiler/17-calls.cool` module rather than hundreds of temporary
+  assignments inside Atom. The bootstrap frontend retains its independent
+  equivalent implementation. `docs/compiler-invariants.md` records build/host
+  boundaries, type/frame layout, AST tags, pass order, ownership/loan invariants,
+  backend/recovery obligations and known resource limits. This is implementation
+  documentation, not a substitute for the versioned language specification.
+  The full `make test` suite and both bootstrap fixed-point checks pass after
+  the refactor (new-compiler IR SHA256 begins `24c3b09c2d9ee851`).
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw
   pointers separate and add rejection regressions before removing restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
-- Document shared typed AST/slot layout and new-frontend bootstrap maintenance.
-  Production source is `compiler/*.cool`; `language/*.cool` is the bootstrap
-  frontend, and changes to shared semantics must keep its seed path valid.
+- Maintain the documented AST/slot/ownership invariants while simplifying
+  remaining port-generated compiler sections. Both frontend implementations
+  must remain semantically aligned and bootstrap must continue to converge.
 - Complete scoped references and method calls, then migrate collection APIs
   off raw-pointer-only usage. Do not suppress existing owner checks to do this.

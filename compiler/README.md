@@ -44,3 +44,14 @@ interpretation, LLVM/foreign ABI emission, bytecode/JIT, REPL, formatting and th
 driver. `main.cool` initializes state and enters the driver. Files share the
 ordinary directory package rules used by applications. `tools/compiler_sources.py`
 only lists source paths for bootstrapping; it does not parse or transform Cool.
+
+
+`16-references.cool` contains the readable scoped-loan checker, and
+`17-calls.cool` separates named expressions, builtins and call resolution from
+the larger expression parser. The remaining mechanical sections are being
+simplified incrementally under differential and bootstrap tests.
+
+See [compiler invariants](../docs/compiler-invariants.md) for the source map,
+type/slot/AST representation, pass ordering, ownership and loan requirements,
+backend obligations and recovery/resource limitations. Read it before changing
+shared representations; self-host convergence alone cannot validate semantics.

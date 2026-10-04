@@ -1,0 +1,196 @@
+// Named expression and call resolution. AST/type tags match language/Core.cool.
+// The bootstrap counterpart lives in language/Parser.cool:Atom.
+fn ResolveBuiltinCall(call: * Node, package: * u8, name: * u8, qualified: bool) -> bool {
+    unsafe {
+        let token = call.token;
+        let count = call.value;
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (!qualified && Eq(name, cast[ * u8]("len")) != i8(0)) {
+            if (count != 1 || (AggregateKind(call.a.type) != 2 && AggregateKind(call.a.type) != 3)) {
+                ErrorAt(token, cast[ * u8]("len expects an array or slice"));
+            }
+            call.kind = 27;
+            call.type = 10;
+            return true;
+        }
+        var type: i64 = -1;
+        if (!qualified) {
+            type = TypeName(name);
+        }
+        if (type >= 0) {
+            if (count != 1 || type == 0 || type == 3 || Numeric(call.a.type) == i8(0) || Numeric(type) == i8(0)) {
+                ErrorAt(token, cast[ * u8]("cast expects one numeric operand and a numeric target"));
+            }
+            call.kind = 17;
+            call.type = type;
+            return true;
+        }
+        if (qualified && Eq(package, cast[ * u8]("std/io")) != i8(0) && (Eq(name, cast[ * u8]("print")) != i8(0) || Eq(name, cast[ * u8]("println")) != i8(0))) {
+            if (count != 1 || call.a.type == 0 || Aggregate(call.a.type) != i8(0)) {
+                ErrorAt(token, cast[ * u8]("print/println expects one scalar value"));
+            }
+            call.slot = -1;
+            call.type = 0;
+            return true;
+        }
+        if (qualified && Eq(package, cast[ * u8]("std/mem")) != i8(0)) {
+            if (Eq(name, cast[ * u8]("owner_count")) != i8(0)) {
+                if (count != 0) {
+                    Error(cast[ * u8]("owner_count takes no arguments"));
+                }
+                call.slot = -6;
+                call.type = 10;
+                return true;
+            }
+            if (Eq(name, cast[ * u8]("alloc")) != i8(0)) {
+                if (count != 1) {
+                    ErrorAt(token, cast[ * u8]("mem.alloc requires a byte count"));
+                }
+                Coerce(call.a, 10);
+                call.slot = -3;
+                call.type = 100005;
+                return true;
+            }
+            if (Eq(name, cast[ * u8]("free")) != i8(0)) {
+                if (ctx.v_unsafe_depth == 0) {
+                    ErrorAt(token, cast[ * u8]("manual free requires unsafe"));
+                }
+                if (count != 1 || Pointer(call.a.type) == i8(0)) {
+                    ErrorAt(token, cast[ * u8]("mem.free requires a pointer"));
+                }
+                call.slot = -4;
+                call.type = 0;
+                return true;
+            }
+            if (Eq(name, cast[ * u8]("copy")) != i8(0)) {
+                if (ctx.v_unsafe_depth == 0) {
+                    ErrorAt(token, cast[ * u8]("raw memory copy requires unsafe"));
+                }
+                if (count != 3 || Pointer(call.a.type) == i8(0) || Pointer(call.a.next.type) == i8(0)) {
+                    ErrorAt(token, cast[ * u8]("mem.copy requires destination, source, byte count"));
+                }
+                Coerce(call.a.next.next, 10);
+                call.slot = -5;
+                call.type = 0;
+                return true;
+            }
+            ErrorAt(token, cast[ * u8]("unknown std/mem function"));
+        }
+        if (!qualified && Eq(name, cast[ * u8]("assert")) != i8(0)) {
+            if (count != 1 || call.a.type != 2) {
+                ErrorAt(token, cast[ * u8]("assert expects one bool"));
+            }
+            call.slot = -2;
+            call.type = 0;
+            return true;
+        }
+        return false;
+    }
+}
+fn NamedAtom(token: * Token) -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var package = token.package;
+        var name = Ident();
+        var qualified = false;
+        if (FindLocal(name) == null && FindType(package, name) < 0 && Take(46) != i8(0)) {
+            package = ResolveAlias(token, name);
+            name = Ident();
+            qualified = true;
+        }
+        var type = FindType(package, name);
+        if (type >= 0 && Shape(type).generic_count != 0) {
+            type = InstantiateType(type);
+        }
+        if (type >= 0 && AggregateKind(type) == 4) {
+            if (qualified && Shape(type).public == 0) {
+                ErrorAt(token, cast[ * u8]("type is private to its package"));
+            }
+            return EnumLiteral(type, token);
+        }
+        var type_arguments = [8]i64 {
+        };
+        var type_count: i64 = 0;
+        if (type < 0 && (qualified || FindLocal(name) == null) && At().kind == 91) {
+            type_count = TypeArguments( & raw type_arguments[0]);
+        }
+        if (type >= 0 && At().kind == 123) {
+            if (qualified && Shape(type).public == 0) {
+                ErrorAt(token, cast[ * u8]("type is private to its package"));
+            }
+            return AggregateLiteral(type, token);
+        }
+        if (Take(40) != i8(0)) {
+            let call = NewNode(4, token);
+            call.name = name;
+            var tail: * Node = null;
+            var count: i64 = 0;
+            if (Take(41) == i8(0)) {
+                while (true) {
+                    let argument = Expr(1);
+                    if (tail != null) {
+                        tail.next = argument;
+                    } else {
+                        call.a = argument;
+                    }
+                    tail = argument;
+                    count = count + 1;
+                    if (Take(44) == i8(0)) {
+                        break;
+                    }
+                }
+                Need(41, cast[ * u8]("expected ')' after arguments"));
+            }
+            call.value = count;
+            if (ResolveBuiltinCall(call, package, name, qualified)) {
+                return call;
+            }
+            var id = FindFunIn(package, name);
+            if (id < 0) {
+                ErrorAt(token, cast[ * u8]("unknown function"));
+            }
+            if (ctx.v_functions[id].foreign != 0 && ctx.v_unsafe_depth == 0) {
+                ErrorAt(token, cast[ * u8]("foreign calls require unsafe"));
+            }
+            if (qualified && ctx.v_functions[id].public == 0) {
+                ErrorAt(token, cast[ * u8]("function is private to its package"));
+            }
+            id = SpecializeFunction(id, & raw type_arguments[0], type_count);
+            if (count != ctx.v_functions[id].argc) {
+                ErrorAt(token, cast[ * u8]("wrong argument count"));
+            }
+            var argument = call.a;
+            for (var i: i64 = 0; i < count; i = i + 1) {
+                Coerce(argument, ctx.v_functions[id].arg_types[i]);
+                Transfer(argument);
+                argument = argument.next;
+            }
+            call.slot = id;
+            call.type = ctx.v_functions[id].result;
+            if (Aggregate(call.type) != i8(0)) {
+                call.storage = Storage(call.type);
+            }
+            return call;
+        }
+        var local: * Local = null;
+        if (!qualified) {
+            local = FindLocal(name);
+        }
+        if (local == null) {
+            ErrorAt(token, cast[ * u8]("unknown variable (functions require explicit calls)"));
+        }
+        if (local.moved != 0) {
+            ErrorAt(token, cast[ * u8]("use of moved value"));
+        }
+        let value = NewNode(3, token);
+        value.name = name;
+        value.slot = local.slot;
+        value.type = local.type;
+        value.local_ref = local;
+        value.mutable = local.mutable;
+        if (Aggregate(value.type) != i8(0)) {
+            value.storage = Storage(value.type);
+        }
+        return value;
+    }
+}
