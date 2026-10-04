@@ -294,6 +294,7 @@ Node *Block() {
     }
     depth--; locals = saved; return n;
 }
+extern Bool Returns(Node *n);
 Node *MatchStatement() {
     Token *token = At(); Node *block, *value, *binding, *branch, *last = NULL, *previous = NULL, *address, *load, *constant, *test, *arm, *payload_bind = NULL;
     I64 type, pattern, slot, count = 0, *seen; Field *variant; Local *saved, *local; U8 *name; Bool wildcard = FALSE; MoveState *moves;
@@ -324,7 +325,7 @@ Node *MatchStatement() {
         }
         Need(K_FAT_ARROW, "expected '=>' after match pattern"); arm = Block();
         if (payload_bind) { branch = NewNode(N_BLOCK, token); branch->a = payload_bind; if (Owned(payload_bind->type)) { payload_bind->next = OwnerDefer(payload_bind->slot, payload_bind->type, token); payload_bind->next->next = arm; } else payload_bind->next = arm; arm = branch; }
-        MoveJoin(moves); locals = saved; depth--; Take(',');
+        if(!Returns(arm)) MoveJoin(moves); locals = saved; depth--; Take(',');
         if (wildcard) { if (last) last->c = arm; else binding->next = arm; }
         else { branch = NewNode(N_IF, token); branch->a = test; branch->b = arm; if (last) last->c = branch; else binding->next = branch; previous = last; last = branch; }
     }
@@ -389,11 +390,11 @@ Node *Statement() {
         if (mutable) loop_depth++;
         Need('(', "expected '(' before condition"); n->a = Expr(1); Need(')', "expected ')' after condition");
         if (n->a->type != T_BOOL) ErrorAt(t, "condition must have type bool");
-        moves = MoveSnapshot(); if (mutable) MoveJoin(moves); n->b = Block(); MoveJoin(moves);
+        moves = MoveSnapshot(); if (mutable) MoveJoin(moves); n->b = Block(); if(mutable || !Returns(n->b)) MoveJoin(moves);
         if (!mutable) MoveRestore(moves);
         if (mutable) loop_depth--;
         else if (Is("else")) { pos++; if (Is("if")) n->c = Statement(); else n->c = Block(); }
-        MoveJoin(moves); MoveFinish(moves); return n;
+        if(mutable || !Returns(n->c)) MoveJoin(moves); MoveFinish(moves); return n;
     }
     if (Is("break") || Is("continue")) {
         if (!loop_depth) Error("loop control outside a loop");

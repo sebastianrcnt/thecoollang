@@ -140,6 +140,13 @@ through ordinary evaluation or library use.
   additional path/process utilities and real applications; G2 remains open for
   stored references and tracked iteration.
 
+- Move-state control flow: terminal `return` branches in `if` and exhaustive
+  `match` no longer contribute moved flags to following reachable statements.
+  This permits ordinary early-return ownership transfer without rejecting the
+  surviving path. Negative coverage still rejects a move on a continuing path;
+  both frontends, five engines and self-host convergence pass. This was exposed
+  by implementing owning map insertion and does not relax live-path checks.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

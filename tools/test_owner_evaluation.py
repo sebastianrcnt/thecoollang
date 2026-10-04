@@ -11,6 +11,7 @@ NEGATIVE=[
  'struct S { items:[2]i64; } fn consume(p:own[S])->i64{return 0;} fn main(){let p=new[S](); let x=(*p).items[consume(move p)];}',
  'struct S { item:i64; } fn consume(p:own[S])->i64{return 9;} fn main(){let p=new[S](); (*p).item=consume(move p);}',
 ]
+NEGATIVE.append('fn consume(p:own[i64])->i64{return 1;}fn f(p:own[i64],flag:bool)->i64{if(flag){return 0;}else{consume(move p);}return *p;}fn main(){}')
 LOOP_NEGATIVE=[
  'while(false){p=new[i64](2);}',
  'for(var i=0;i<0;i=i+1){p=new[i64](2);}',
@@ -18,7 +19,17 @@ LOOP_NEGATIVE=[
 ]
 POSITIVE='''import "std/io";
 fn consume(p:own[i64])->i64{return *p;}
+enum Choice { First; Second; }
+fn early(p:own[i64],first:bool)->own[i64]{if(first){return move p;}return move p;}
+fn selected(p:own[i64],choice:Choice)->own[i64]{
+ match(choice){Choice.First=>{return move p;}Choice.Second=>{}}
+ return move p;
+}
 fn main(){
+  assert(consume(early(new[i64](8),true))==8);
+  assert(consume(early(new[i64](9),false))==9);
+  assert(consume(selected(new[i64](10),Choice.First))==10);
+  assert(consume(selected(new[i64](11),Choice.Second))==11);
   let a=new[[2]i64]([2]i64{10,20}); let b=new[i64](1);
   io.println((*a)[consume(move b)]);
   let p=new[i64](2); let q=new[i64](3); *p=consume(move q); io.println(*p);
@@ -37,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='cool-owner-evaluation-') as tmp:
   p.write_text(source)
   for front in FRONTS:
    run=subprocess.run([*front,'check',p],capture_output=True,text=True,timeout=10)
-   assert run.returncode==2 and 'owner moved while an access' in run.stderr,(source,front,run)
+   assert run.returncode==2 and ('owner moved while an access' in run.stderr or 'moved value' in run.stderr),(source,front,run)
  for loop in LOOP_NEGATIVE:
   p.write_text('fn main(){var p=new[i64](1);let q=move p;'+loop+'let invalid=*p;}')
   for front in FRONTS:
@@ -47,4 +58,4 @@ with tempfile.TemporaryDirectory(prefix='cool-owner-evaluation-') as tmp:
  for mode in ('tree','interp','jit','llvm','llvm-jit'):
   run=subprocess.run([ROOT/'tools/cool','run','--backend',mode,p],capture_output=True,text=True,timeout=30)
   assert (run.returncode,run.stdout,run.stderr)==(0,'20\n3\n4\n',''),(mode,run)
-print('owner evaluation: pending index/store moves and zero-iteration/for-update liveness rejected by both frontends; unrelated moves and reinitialization across five engines PASS')
+print('owner evaluation: pending index/store moves and zero-iteration/for-update liveness rejected by both frontends; unrelated moves, reinitialization and terminal-branch transfers across five engines PASS')

@@ -3986,7 +3986,7 @@ if (v_mutable2 != 0) { MoveJoin(v_moves); }
 t149 = Block();
 (v_n19).b = t149;
 t150 = v_moves;
-MoveJoin(t150);
+if(v_mutable2!=i8(0) || Returns(v_n19.b)==i8(0)){MoveJoin(t150);}
 if (!((v_mutable2 != i8(0)))) {
 t151 = v_moves;
 MoveRestore(t151);
@@ -4012,7 +4012,7 @@ t159 = Block();
 }
 }
 t160 = v_moves;
-MoveJoin(t160);
+if(v_mutable2!=i8(0) || Returns(v_n19.c)==i8(0)){MoveJoin(t160);}
 t161 = v_moves;
 MoveFinish(t161);
 return v_n19;
@@ -4613,7 +4613,7 @@ t107 = OwnerDefer(t104, t105, t106);
 v_arm = v_branch;
 }
 t108 = v_moves1;
-MoveJoin(t108);
+if(Returns(v_arm)==i8(0)){MoveJoin(t108);}
 ctx.v_locals = v_saved4;
 t109 = ctx.v_depth;
 ctx.v_depth = ctx.v_depth - i64(1);
