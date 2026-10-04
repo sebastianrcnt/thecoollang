@@ -14,7 +14,7 @@ packages are bundled sources and need no module download.
 | `std/strings` | UTF-8 byte `length`, `byte_at`, `equal`, `starts_with`, `ends_with`; checked decimal `parse_i64` |
 | `std/text` | owning UTF-8 `Text`, strict validation, byte/scalar lengths, scalar access, append/clone/clear, byte conversion, ordering/prefix/suffix |
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
-| `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`, `iter`, `Iterator.remaining`/`next`; raw `cursor`/`next` |
+| `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`, `iter`/`iter_mut`, `Iterator`/`IteratorMut.remaining`/`next`; raw `cursor`/`next` |
 | `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
 | `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
@@ -53,6 +53,11 @@ mutating or moving the source. See [tracked iteration](../docs/references.md#tra
 for an example. Independent/copied iterators and ordinary shared element
 references may coexist; retaining a result freezes only its own iterator. Raw free-function
 `cursor`/`next` still require manual lifetime care and unsafe pointer access.
+`values.iter_mut()` provides checked exclusive traversal through
+`IteratorMut.next() -> Option[&mut T]`, including owning-element replacement.
+A retained element freezes advancement; copying an exclusive iterator suspends
+its parent's conflicting access until the copy's scope ends. See
+[mutable iteration](../docs/references.md#stored-exclusive-references-and-mutable-iteration).
 Chunks cannot contain borrowed references until owned stored-loan support exists.
 
 `Result`/`Option` helpers take values by value. An owning argument requires

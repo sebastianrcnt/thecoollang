@@ -70,9 +70,44 @@ fn independent_case(){
  }
  values.clear();
 }
+fn mutable_case(count:usize){
+ var values=v.create[i64]();for(var i:usize=0;i<count;i=i+1){values.append(i64(i));}
+ let allocations=mem.owner_count();
+ {var it=values.iter_mut();var seen:usize=0;
+  while(it.remaining()>0){match(it.next()){
+   o.Option[&mut i64].None=>{assert(false);}
+   o.Option[&mut i64].Some(value)=>{*value=*value+10;seen=seen+1;}
+  }}assert(seen==count);assert(mem.owner_count()==allocations);
+  match(it.next()){o.Option[&mut i64].None=>{}o.Option[&mut i64].Some(value)=>{assert(false);}}
+ }
+ for(var i:usize=0;i<count;i=i+1){assert(*values.at(i)==i64(i)+10);}
+ if(count>0){
+  {var parent=values.iter_mut();{var child=parent;match(child.next()){
+   o.Option[&mut i64].None=>{assert(false);}
+   o.Option[&mut i64].Some(value)=>{*value=99;}
+  }}assert(parent.remaining()==count);match(parent.next()){
+   o.Option[&mut i64].None=>{assert(false);}
+   o.Option[&mut i64].Some(value)=>{assert(*value==99);*value=100;}
+  }}assert(*values.at(0)==100);
+ }
+ values.clear();
+}
+fn mutable_owners(){
+ var values=v.create[own[i64]]();for(var i=0;i<65;i=i+1){values.append(new[i64](i));}
+ let allocations=mem.owner_count();
+ {var it=values.iter_mut();while(it.remaining()>0){match(it.next()){
+  o.Option[&mut own[i64]].None=>{assert(false);}
+  o.Option[&mut own[i64]].Some(value)=>{
+   **value=**value+10;let old=move *value;*value=new[i64](*old+1);
+   assert(mem.owner_count()==allocations+1);
+  }
+ }}assert(mem.owner_count()==allocations);}
+ for(var i:usize=0;i<65;i=i+1){assert(**values.at(i)==i64(i)+11);}
+ values.clear();
+}
 fn main(){
-'''+''.join(f'integer_case({n});assert(mem.owner_count()==0);' for n in (0,1,2,31,32,33,63,64,65,127,128,129))+'''
- owner_case();assert(mem.owner_count()==0);independent_case();assert(mem.owner_count()==0);io.println(42);
+'''+''.join(f'integer_case({n});mutable_case({n});assert(mem.owner_count()==0);' for n in (0,1,2,31,32,33,63,64,65,127,128,129))+'''
+ owner_case();assert(mem.owner_count()==0);independent_case();assert(mem.owner_count()==0);mutable_owners();assert(mem.owner_count()==0);io.println(42);
 }
 '''
 # usize subtraction in the zero-length oracle must not underflow.
@@ -89,6 +124,20 @@ NEGATIVE=[
  ('var it=values.iter();let r=&it;it.next();','conflicts'),
  ('var it=values.iter();it.position.remaining=0;','private'),
  ('let it=v.Iterator[i64]{};','private'),
+]
+NEGATIVE += [
+ ('var it=values.iter_mut();values.at(0);','conflicts'),
+ ('var it=values.iter_mut();values.clear();','conflicts'),
+ ('var it=values.iter_mut();let second=values.iter_mut();','conflicts'),
+ ('var it=values.iter_mut();let shared=values.iter();','conflicts'),
+ ('var it=values.iter_mut();let moved=move values;','conflicts'),
+ ('var it=values.iter_mut();let item=it.next();it.next();','conflicts'),
+ ('var it=values.iter_mut();var copy=it;it.next();','conflicts'),
+ ('var it=values.iter_mut();var copy=it;it.remaining();','conflicts'),
+ ('var it=values.iter_mut();let shared=&it;(*shared).next();','mutable'),
+ ('var it=values.iter_mut();match(it.next()){o.Option[&mut i64].None=>{}o.Option[&mut i64].Some(value)=>{let shared=&*value;*value=2;}}','conflicts'),
+ ('var it=values.iter_mut();let item=it.next();let child=item;match(item){o.Option[&mut i64].None=>{}o.Option[&mut i64].Some(value)=>{*value=2;}}','conflicts'),
+ ('let it=v.IteratorMut[i64]{};','private'),
 ]
 WHOLE=[
  (IMPORTS+'fn bad()->v.Iterator[i64] borrows(){var values=v.create[i64]();return values.iter();}fn main(){}','outlive'),
@@ -121,4 +170,4 @@ with tempfile.TemporaryDirectory(prefix='cool-tracked-iteration-') as tmp:
   source.write_text(body)
   for front in fronts:
    p=run([ROOT/'tools/cool','check',source],env={**os.environ,'COOL_FRONTEND':str(front)});assert p.returncode==2 and error in p.stderr,(body,error,p)
- print(f'tracked iteration: 12 boundary sizes, owner elements, independent/copy iterators, retained shared elements, exhaustion, early break and allocation counts; five engines/O2; {len(NEGATIVE)+len(WHOLE)} rejections on both frontends PASS')
+ print(f'tracked iteration: 12 boundary sizes, owner elements/replacement, independent shared iterators, exclusive iterator reborrows, retained elements, exhaustion, early break and allocation counts; five engines/O2; {len(NEGATIVE)+len(WHOLE)} rejections on both frontends PASS')

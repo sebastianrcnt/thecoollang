@@ -70,7 +70,7 @@ NEGATIVE += [
  ('fn main(){var x=1;var y=2;var a=array(&x,&y);a[0]=&y;}','cannot be reassigned'),
  ('fn main(){var x=1;var y=2;let v=pair(&x,&y);*v.left=3;}','immutable'),
  ('fn main(){var x=1;var y=2;let v=pair(&x,&y);let r=&mut *v.left;}','mutable place'),
- ('struct Bad{r:&mut i64;}fn main(){}','aggregate storage'),
+ ('struct Bad{r:&mut &i64;}fn main(){}','aggregate storage'),
  ('struct Bad{r:&i64;bytes:[]u8;}fn main(){}','aggregate storage'),
  ('struct Bad{r:&i64;p:own[i64];}fn main(){}','aggregate storage'),
  ('fn main(){var x=1;let p=new[View](pair(&x,&x));}','owned storage'),

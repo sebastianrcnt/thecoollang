@@ -54,7 +54,7 @@ NEGATIVE += [
  ('fn bad(v:&View)->&mut View borrows(v){return &mut *v;}fn main(){}','mutable place'),
  ('fn bad(v:&[]i64){}fn main(){}','nested borrowed'),
  ('fn main(){var a=[2]i64{1,2};var s=a[:];let p=&s;}','nested borrowed'),
- ('fn bad(p:&mut &mut i64){}fn main(){}','nested borrowed'),
+ ('fn bad(p:&mut &mut &mut i64){}fn main(){}','nested borrowed'),
 ]
 def run(args):return subprocess.run([str(x) for x in args],cwd=ROOT,text=True,capture_output=True,timeout=120)
 with tempfile.TemporaryDirectory(prefix='cool-nested-refs-') as tmp:

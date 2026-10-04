@@ -170,3 +170,30 @@ pub fn Iterator.next[T](self: & mut Iterator[T]) -> option.Option[ & T]borrows(s
 pub fn Vector.iter[T](self: & Vector[T]) -> Iterator[T]borrows(self) {
     return iter[T](self);
 }
+// Copying an exclusive iterator reborrows its source and suspends the parent.
+// Only one iterator or element loan may mutate a source at a time.
+pub struct IteratorMut[T] {
+    source: & mut Vector[T];
+    position: Cursor[T];
+}
+pub fn iter_mut[T](source: & mut Vector[T]) -> IteratorMut[T]borrows(source) {
+    let position = cursor[T]( & * source);
+    return IteratorMut[T] {
+        source: source, position: position
+    };
+}
+pub fn IteratorMut.remaining[T](self: & IteratorMut[T]) -> usize {
+    return ( * self).position.remaining;
+}
+pub fn IteratorMut.next[T](self: & mut IteratorMut[T]) -> option.Option[ & mut T]borrows(self) {
+    unsafe {
+        let pointer = next[T]( & raw( * self).position);
+        if (pointer == null) {
+            return option.Option[ & mut T].None;
+        }
+        return option.Option[ & mut T].Some(borrow_raw[ & mut T](pointer, self));
+    }
+}
+pub fn Vector.iter_mut[T](self: & mut Vector[T]) -> IteratorMut[T]borrows(self) {
+    return iter_mut[T](self);
+}

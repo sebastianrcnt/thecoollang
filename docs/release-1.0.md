@@ -310,10 +310,30 @@ through ordinary evaluation or library use.
   container example executes successfully. Exclusive stored references, slices
   and lifetime-aware reassignment remain required.
 
+- Exclusive stored loans and mutable iteration: non-owning structs/arrays/enums
+  can now retain exclusive references alongside shared ones. Copies reborrow;
+  each root preserves its mode, shared receivers only expose reads, and child
+  exclusivity suspends the parent. `IteratorMut` provides checked in-place
+  traversal, including owning-element moves and replacement. A 192-query
+  permission model, 27 storage rejections and 26 iterator rejection cases cover
+  both frontends; valid programs pass five engines/O2 and iterator ASan/UBSan.
+  An additional audit found reference-mediated owner moves during a pending
+  pointee address; shared pins now prevent invalidation through named, stored
+  and returned references. Six new rejection cases and valid owner updates
+  exercise the fix. Computed shared receivers cannot extract exclusive handles
+  or modify owning pointees; plain reads remain valid. Full `make test
+  bootstrap-check`, stored-reference and iterator ASan/UBSan, and executable
+  documentation checks pass. Self-hosted stage 1/2/3 IR and stage 2/3 native
+  binaries converge (IR SHA256
+  `22ff0f9c1a8de58834b7a3bca7e10d43c12ff54e1f9e675f3cddb7d7e17a9bf4`).
+  Owned/nested stored lifetimes, borrowed slices and reassignment remain
+  required; this does not close G2/G4/G5.
+
 ## Next implementation checkpoints
 
-- Extend stored loans to exclusive references and slice aliases; keep unsafe
-  raw pointers separate and add rejection regressions before removing restrictions.
+- Extend stored lifetimes to owned/nested storage and slice aliases; keep
+  unsafe raw pointers separate and add rejection regressions before removing
+  restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

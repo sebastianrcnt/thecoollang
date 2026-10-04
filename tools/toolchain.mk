@@ -213,3 +213,8 @@ test: nested-references-test tracked-iteration-test
 loan-layers-test: build/cool-compiler
 	python3 tools/test_loan_layers.py
 test: loan-layers-test
+
+.PHONY: exclusive-storage-test
+exclusive-storage-test: build/cool-compiler
+	python3 tools/test_exclusive_storage.py
+test: exclusive-storage-test

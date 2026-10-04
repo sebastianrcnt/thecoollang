@@ -196,7 +196,7 @@ temporaries expire at that statement. Reborrowing a computed reference transform
 its temporary result loans after address evaluation, preserving the root set
 and preventing an exclusive upgrade from a shared source.
 
-Shared-reference-only aggregate values use the same provenance sets. Literal
+Reference-containing aggregate values use the same provenance sets. Literal
 members relabel their result loans to the container expression; copies and
 projections retain the entire set. Anonymous match storage receives a Local in
 `all_locals` (not the name lookup chain), so payloads reborrow an already
@@ -206,10 +206,15 @@ Reference-containing arrays/structs cannot be zero initialized or reassigned.
 
 The checker currently treats an entire root as conflicting, not individual
 fields. Layer zero is the addressed storage of a reference, or the contained
-reference roots of a by-value aggregate. Layer one retains the shared payload
+reference roots of a by-value aggregate. Layer one retains the payload
 referents of a reference to borrowed storage. Taking a container address adds a
-physical local root at layer zero and retains payloads at layer one with shared
-mode. Access through a stored reference selects the payload layer; scalar field
+physical local root at layer zero and retains payloads at layer one. A shared
+outer borrow downgrades payloads; an exclusive outer borrow preserves each
+source mode. `ReferenceMode` computes the capability a typed copy requires,
+never an instruction to promote every source. Reborrows/calls intersect the
+requested mode with each source's existing mode. Read-only lifetime anchors
+are not treated as writable roots when accessing an exclusive result. Access
+through a stored reference selects the payload layer; scalar field
 access and receiver mutation select the physical layer. Named/temporary payload
 loads flatten selected payload loans back to layer zero, leaving evaluation
 loans temporary until the statement ends. Source acquisition checks conflicts
@@ -218,11 +223,25 @@ Nested-reference returns preserve nested argument layers; other anchors are
 conservative in both layers. Ordinary borrowed returns combine selected roots.
 This avoids inventing an exclusive source-vector loan when mutating an iterator,
 while keeping physical receiver aliases and all referent invalidations checked.
-Exclusive reference storage, mixed owner/slice/reference aggregates, integrated
-slice loans and persistent REPL references remain unsupported. Do not remove
+Mixed owner/slice/reference aggregates, arbitrary nested stored lifetimes,
+integrated slice loans and persistent REPL references remain unsupported. Do not remove
 their rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).
+
+Address analysis distinguishes reads from writes when loading a stored
+reference, so a shared receiver may read an exclusive reference's pointee
+without extracting exclusive access. Computed projections propagate the
+requested permission through intermediate aggregate loads and reject exclusive
+extraction from a shared receiver before deriving the result loans.
+Temporary result loans are exempt only
+for the exact reference expression currently being dereferenced. Owner-pointer
+projections retain a shared pending-access pin (or reuse an existing evaluated
+reference loan) before later indices/RHS expressions execute. This prevents
+moving/replacing an owner through another use of the same reference while a
+pointee address is pending. Plain loads release address-evaluation loans after
+access; owner loads keep them for surrounding projections. Never exempt another
+argument or a merely similar expression from these pins.
 
 ## Backends, replacement and recovery
 

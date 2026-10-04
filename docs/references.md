@@ -72,12 +72,12 @@ with unsafe code. There is no implicit reference-to-pointer conversion.
 
 This is a development foundation, not completion of the 1.0 borrowing gate.
 
-- Shared references can be stored in non-owning, slice-free structs, arrays and
-  enums, as described below. Stored exclusive references, reference-containing
-  owned allocations and aggregates mixing references with owners/slices are
-  still rejected. Borrowing shared-reference-only storage tracks its physical
-  container separately from its shared referents. Reassignment of borrowed bindings/fields,
-  exclusive reference storage and borrowed slices require further tracking.
+- Shared and exclusive references can be stored in non-owning, slice-free
+  structs, arrays and enums. A stored reference's pointee must not itself contain
+  borrowed storage. Reference-containing owned allocations and aggregates mixing
+  references with owners/slices remain rejected. Reassignment of borrowed
+  bindings/fields, general nested stored lifetimes and borrowed slices need
+  further tracking.
 - Existing mutable slices cannot share a root with references within one
   function, even in disjoint scopes. References into aliasable slice storage are
   rejected. Slice and reference provenance must be integrated before relaxing
@@ -104,7 +104,10 @@ construct references whose lifetime is rooted in a named reference `anchor`.
 They require `unsafe`, exact pointer element types, and an exclusive anchor for
 an exclusive result. The implementer must prove that the pointer is valid,
 properly aligned, initialized, and remains within storage protected by the
-anchor's loan. Merely naming an unrelated anchor does not make a pointer valid.
+anchor's loan. An exclusive result also requires that the pointed-to storage
+itself is exclusively protected: an exclusive container anchor does not upgrade
+its contained shared references. Merely naming an unrelated anchor does not
+make a pointer valid.
 The compiler retains the anchor's provenance and checks caller-side conflicts,
 but cannot verify arbitrary raw-pointer data structures.
 
@@ -227,8 +230,9 @@ exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
 source roots as shared loans while separately borrowing the container's storage.
 An exclusive container receiver can update ordinary fields, but
 cannot replace reference fields or mutate through a contained shared reference.
-Stored `&mut T`, mixed ownership/slice storage and general lifetime-aware
-replacement remain required work for the full stored-reference gate.
+Stored `&mut T` uses the reborrow rules below. Mixed ownership/slice storage,
+general nested stored lifetimes and lifetime-aware replacement remain required
+work for the full stored-reference gate.
 
 `make stored-references-test` checks nested structs/arrays/enums, generic
 copies, methods, computed projections, match evaluation, empty results, owner
@@ -289,8 +293,8 @@ to advance. The source vector remains immutable until all its loans end.
 
 Fields within one container still share a conservative physical root. References
 returned from a locally bound iterator cannot escape its scope, even if the
-source outlives it: `next` explicitly borrows `self`. Exclusive stored loans,
-borrowed slice integration and lifetime-aware replacement remain necessary for
+source outlives it: `next` explicitly borrows `self`. Borrowed slice integration,
+general stored lifetimes and lifetime-aware replacement remain necessary for
 the complete borrowing design; this API does not close that release gate.
 
 `make nested-references-test` covers container receiver mutation, reborrows,
@@ -309,8 +313,10 @@ existing strict UTF-8 oracle corpus and sanitizer checks cover this integration.
 ## Container and referent provenance
 
 A reference to shared-reference storage carries a physical-storage loan and
-shared payload loans. Reborrowing `&mut container` is exclusive only for the
-container. Copying a reference field or copying the referenced container value
+shared payload loans. Reborrowing `&mut container` does not upgrade its shared
+payloads. A container storing exclusive references retains their exclusive
+payload loans when borrowed exclusively; a shared outer borrow downgrades its
+payload reborrows to shared. Copying a reference field or copying the referenced container value
 retains the payload loans without retaining its former physical address. Taking
 `&container.scalar_field`, however, protects the container's physical root.
 Computed projections obey the same rules as named values.
@@ -347,3 +353,89 @@ compare container mutations and referent mutations against an independent
 storage/source-set model on both frontends; valid programs run on five engines
 and optimized native output. The tracked-iteration sanitizer test also covers
 independent/copied iterators and retained shared element references.
+
+
+## Stored exclusive references and mutable iteration
+
+A non-owning struct, array or enum may store `&mut T`, including alongside
+shared references. Each source retains its own mode: a shared source is never
+promoted just because another field is exclusive. Copying or passing the value
+reborrows its references. An exclusive child suspends conflicting use of the
+parent's borrowed fields until the child scope ends; `move` of a non-owning
+borrowed container has the same reborrow meaning. No owner allocation or
+implicit reference count is added.
+
+```cool
+struct View { input: &i64; output: &mut i64; }
+fn main() {
+    var input = 10;
+    var output = 0;
+    {
+        let view = View { input: &input, output: &mut output };
+        {
+            let child = view;
+            let input_value = *child.input;
+            let target = child.output;
+            *target = *target + input_value;
+        }
+        *view.output = 20;
+        assert(input == 10);
+    }
+    assert(output == 20);
+}
+```
+
+Reference fields and whole borrowed containers still cannot be reassigned.
+Shared outer receivers may read through contained exclusive references or
+reborrow them as shared, but cannot copy an exclusive handle or mutate through
+it. This also applies to computed receivers such as `(*share(&view)).output`;
+reading its pointee is permitted, extracting its exclusive handle is rejected.
+A `borrows(...)` return preserves each selected source's mode. Field/root
+sets remain conservative: name an element reference before updating its
+pointee when a compound expression would otherwise create competing temporary
+reborrows of a stored handle.
+
+`values.iter_mut()` returns `IteratorMut[T]`, which exclusively borrows the
+source. Its `next()` returns `Option[&mut T]`; `remaining()` observes the cursor.
+A retained result prevents further advancement. Copying the iterator reborrows
+its source and suspends the original iterator until that copy's scope ends;
+copying its position does not advance the original. An ordinary shared iterator
+or element loan cannot coexist with this exclusive source loan.
+
+```cool
+import vector "std/vector";
+import option "std/option";
+fn main() {
+    var values = vector.create[i64]();
+    values.append(10);
+    values.append(20);
+    {
+        var iterator = values.iter_mut();
+        while (iterator.remaining() > 0) {
+            match (iterator.next()) {
+                option.Option[&mut i64].None => { assert(false); }
+                option.Option[&mut i64].Some(value) => { *value = *value + 1; }
+            }
+        }
+    }
+    assert(*values.at(0) == 11);
+    assert(*values.at(1) == 21);
+}
+```
+
+Owning elements may be modified, moved out or replaced through the returned
+exclusive reference. Moving an owner leaves its slot empty. A pointer into an
+owner remains protected while an index or assignment RHS is evaluated, even
+when the owner is reached through a named, stored or returned reference. Moving
+or replacing that owner during this pending access is rejected. Non-owning
+loaded values release their address-evaluation loans after the load; loaded
+owner handles retain them until the surrounding projection is finished.
+
+`make exclusive-storage-test` checks 192 modeled read/write queries, 27 negative
+cases and valid mixed/generic/array/enum reborrows on both frontends, five engines
+and O2. The tracked-iteration suite covers shared and exclusive traversal at
+12 chunk-boundary sizes, parent resumption, owner mutation/movement/replacement,
+empty/exhausted iterators and 26 rejection cases. Its sanitizer mode instruments
+Cool memory accesses and C runtime operations. `make owner-evaluation-test`
+includes six further reference-mediated pending-owner rejection cases and valid
+reads/updates through named and returned owner references.

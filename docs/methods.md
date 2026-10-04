@@ -65,13 +65,13 @@ The current reference restrictions still apply. A shared/exclusive receiver
 borrow requires a stable tracked place; borrowing a fresh by-value temporary is
 not implemented. Reference-returning calls can chain directly, including shared reborrows of
 computed exclusive receivers such as `map.at_mut(&key).scalar_len()`. Every
-possible source in a multi-parameter return contract remains protected. Shared
+possible source in a multi-parameter return contract remains protected. Shared and exclusive
 references can be stored in non-owning aggregates and used with by-value
-receivers. Shared-reference-only containers also support shared/exclusive
-receivers, including `Iterator.next`; its physical storage loan is distinct
-from its underlying shared source loans. Independent iterators can therefore
-advance while sharing a source. Exclusive reference storage,
-slice-loan integration and top-level persistent REPL loans remain open work;
+receivers, which reborrow their sources. Such containers support shared and
+exclusive receivers; their physical storage loans are distinct from underlying
+source loans. Shared `Iterator` values advance independently, while copies of
+`IteratorMut` suspend the parent until the child scope ends. General stored
+lifetimes, slice-loan integration and top-level persistent REPL loans remain open work;
 methods do not bypass these checks. Compiled functions containing methods can
 be used and replaced in the REPL under its existing signature rules.
 
