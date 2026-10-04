@@ -18,6 +18,7 @@ packages are bundled sources and need no module download.
 | `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
 | `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
+| `std/path` | lexical POSIX path `clean`, `join`, `name`, `parent`, `extension`, `is_absolute` on owned text |
 | `std/process` | blocking direct-argv execution with inherited cwd/environment/stdio, exit/signal status, structured start/wait errors |
 | `std/os` | `arg_count`, `arg`; executable/runner flags excluded |
 
@@ -295,3 +296,48 @@ and owner cleanup on all five engines and O2. `make process-sanitize-test` also
 checks generated Cool memory accesses with ASan and the C runtime with
 ASan/UBSan, counts explicit raw-buffer allocations/frees and injects an
 interrupted wait to verify retry. This does not certify other OS ABIs.
+
+
+## Paths
+
+`std/path` operates on borrowed `Text` and returns independent owning text.
+These are lexical POSIX path operations: they do not access the filesystem,
+resolve symlinks or consult the working directory. Normalization is not a
+filesystem containment/security check, because symlinks can change resolution.
+
+| Operation | Defined behavior |
+| --- | --- |
+| `clean(path)` | Collapse repeated `/`, remove `.`, cancel normal components followed by `..`; preserve leading relative `..`, clamp at an absolute root |
+| `is_absolute(path)` | Whether the first byte is `/` |
+| `join(base, child)` | An absolute child replaces the base; otherwise concatenate with `/`, then normalize |
+| `name(path)` | Final component of the normalized path; `/` for root and `.` for an empty normalized relative path |
+| `parent(path)` | Remove the final component of the normalized path, then normalize the remainder |
+| `extension(path)` | Last dot suffix of `name`; empty for a lone leading dot or a trailing dot |
+
+Empty input cleans to `.`. Multiple leading separators clean to a single `/`;
+trailing separators are removed. `name` and `parent` normalize first, so
+`parent("a/b/")` is `a` and `name("a/..")` is `.`. Backslash is an ordinary
+character. `.config` has no extension, `.config.json` has `.json`, and `file.`
+has none. Unicode, whitespace and NUL are preserved lexically; APIs that pass
+paths to the OS must reject embedded NUL. This package does not claim Windows
+path semantics.
+
+```cool
+import path "std/path";
+import text "std/text";
+import result "std/result";
+fn main() {
+    let input = result.value_or[text.Text, text.Utf8Error](
+        text.from_literal("/config/./cache/../app.json"), text.create());
+    let normalized = path.clean(&input);
+    let expected = result.value_or[text.Text, text.Utf8Error](
+        text.from_literal("/config/app.json"), text.create());
+    assert(text.equal(&normalized, &expected));
+}
+```
+
+`make path-test` compares 126 fixed/seeded cases to an independent Python
+normalization/join oracle, including root traversal, Unicode, long paths,
+hidden/trailing-dot names and idempotence. All five engines and optimized native
+output must agree, with zero remaining owners. `make path-sanitize-test` adds
+instrumented Cool ASan and C-runtime ASan/UBSan checks.

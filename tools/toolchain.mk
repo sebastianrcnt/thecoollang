@@ -167,3 +167,10 @@ process-test: build/cool-compiler build/language-runtime.o build/language-runtim
 process-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_process.py --sanitize
 test: process-test
+
+.PHONY: path-test path-sanitize-test
+path-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_path.py
+path-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_path.py --sanitize
+test: path-test

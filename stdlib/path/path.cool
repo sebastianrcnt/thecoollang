@@ -1,0 +1,145 @@
+package path;
+import text "std/text";
+import vector "std/vector";
+import result "std/result";
+import option "std/option";
+// Pure lexical POSIX paths. No filesystem, symlink resolution or cwd lookup.
+struct Parts {
+    absolute: bool;
+    segments: vector.Vector[text.Text];
+}
+fn literal(value: string) -> text.Text {
+    return result.value_or[text.Text, text.Utf8Error](text.from_literal(value), text.create());
+}
+fn dots(value: & text.Text) -> bool {
+    return text.byte_len(value) == 2 && text.scalar_at(value, 0) == 46 && text.scalar_at(value, 1) == 46;
+}
+pub fn is_absolute(value: & text.Text) -> bool {
+    return text.byte_len(value) > 0 && text.scalar_at(value, 0) == 47;
+}
+fn finish(segments: & mut vector.Vector[text.Text], buffer: & mut vector.Vector[u8], absolute: bool) {
+    let bytes = move * buffer;
+    * buffer = vector.create[u8]();
+    let segment = result.value_or[text.Text, text.Utf8Error](text.from_bytes(move bytes), text.create());
+    let size = text.byte_len( & segment);
+    if (size == 0 || (size == 1 && text.scalar_at( & segment, 0) == 46)) {
+        return;
+    }
+    if (dots( & segment)) {
+        let count = vector.len[text.Text]( & * segments);
+        var parent = false;
+        if (count > 0) {
+            parent = !dots(vector.at[text.Text]( & * segments, count - 1));
+        }
+        if (parent) {
+            vector.pop[text.Text](segments);
+            return;
+        }
+        if (absolute) {
+            return;
+        }
+    }
+    vector.append[text.Text](segments, move segment);
+}
+fn split(value: & text.Text) -> Parts {
+    let absolute = is_absolute(value);
+    var parts = Parts {
+        absolute: absolute, segments: vector.create[text.Text]()
+    };
+    var buffer = vector.create[u8]();
+    unsafe {
+        var cursor = vector.cursor[u8](text.as_bytes(value));
+        let size = text.byte_len(value);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            let byte = * vector.next[u8]( & raw cursor);
+            if (byte == 47) {
+                finish( & mut parts.segments, & mut buffer, absolute);
+            } else {
+                vector.append[u8]( & mut buffer, byte);
+            }
+        }
+    }
+    finish( & mut parts.segments, & mut buffer, absolute);
+    return move parts;
+}
+fn assemble(parts: & Parts) -> text.Text {
+    var out = text.create();
+    if (( * parts).absolute) {
+        text.append_scalar( & mut out, 47);
+    }
+    let size = vector.len[text.Text]( & ( * parts).segments);
+    unsafe {
+        var cursor = vector.cursor[text.Text]( & ( * parts).segments);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (i > 0) {
+                text.append_scalar( & mut out, 47);
+            }
+            let segment = borrow_raw[ & text.Text](vector.next[text.Text]( & raw cursor), parts);
+            text.append( & mut out, segment);
+        }
+    }
+    if (size == 0 && !( * parts).absolute) {
+        text.append_scalar( & mut out, 46);
+    }
+    return move out;
+}
+pub fn clean(value: & text.Text) -> text.Text {
+    let parts = split(value);
+    return assemble( & parts);
+}
+// An absolute child replaces the base. Otherwise join with one separator and
+// normalize. Empty operands follow clean's empty-path == "." convention.
+pub fn join(base: & text.Text, child: & text.Text) -> text.Text {
+    if (is_absolute(child) || text.byte_len(base) == 0) {
+        return clean(child);
+    }
+    var joined = text.clone(base);
+    text.append_scalar( & mut joined, 47);
+    text.append( & mut joined, child);
+    return clean( & joined);
+}
+// Both name and parent operate on the normalized path, ignoring trailing '/'.
+pub fn name(value: & text.Text) -> text.Text {
+    var parts = split(value);
+    if (vector.len[text.Text]( & parts.segments) == 0) {
+        if (parts.absolute) {
+            return literal("/");
+        }
+        return literal(".");
+    }
+    return option.value_or[text.Text](vector.pop[text.Text]( & mut parts.segments), text.create());
+}
+pub fn parent(value: & text.Text) -> text.Text {
+    var parts = split(value);
+    vector.pop[text.Text]( & mut parts.segments);
+    return assemble( & parts);
+}
+// Suffix from the last dot in the normalized name. A leading dot alone or a
+// trailing dot is not an extension; ".config.json" has extension ".json".
+pub fn extension(value: & text.Text) -> text.Text {
+    let base = name(value);
+    let size = text.byte_len( & base);
+    var dot: usize = 0;
+    unsafe {
+        var scan = vector.cursor[u8](text.as_bytes( & base));
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if ( * vector.next[u8]( & raw scan) == 46) {
+                dot = i;
+            }
+        }
+    }
+    if (dot == 0 || dot + 1 == size) {
+        return text.create();
+    }
+    var bytes = vector.create[u8]();
+    unsafe {
+        var scan = vector.cursor[u8](text.as_bytes( & base));
+        for (var i: usize = 0; i < size; i = i + 1) {
+            let byte = * vector.next[u8]( & raw scan);
+            if (i >= dot) {
+                vector.append[u8]( & mut bytes, byte);
+            }
+        }
+    }
+    return result.value_or[text.Text, text.Utf8Error](text.from_bytes(move bytes), text.create());
+}

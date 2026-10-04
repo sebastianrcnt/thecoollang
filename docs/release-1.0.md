@@ -205,6 +205,15 @@ through ordinary evaluation or library use.
   injects an interrupted wait to verify retry. This is a synchronous API; pipe capture and per-child overrides are
   not implemented. G5 remains open for path utilities and realistic projects.
 
+- Lexical POSIX paths: `std/path` adds owned-text normalization, rooted joining,
+  name/parent/extension and absolute-path queries with explicit Unicode/NUL,
+  trailing separator and dot rules. 126 fixed/seeded oracle cases, idempotence,
+  owner cleanup, five engines, O2 and ASan/UBSan pass. These operations do not
+  resolve symlinks or provide filesystem containment. The complete `make test`
+  suite also passes after the JSON/reference/namespace/process changes; the
+  subsequent path suite passes separately. G5 still requires realistic project
+  validation and coherent borrowed iteration; G1–G10 remain open.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw
