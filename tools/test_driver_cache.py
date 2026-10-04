@@ -58,7 +58,8 @@ os.execv({str(ROOT/'build/cool-compiler')!r},[{str(ROOT/'build/cool-compiler')!r
  # A rebuilt runtime object must invalidate native output even if source and
  # object mtimes are unchanged. Use an isolated toolchain tree, never the repo.
  isolated=tmp/'toolchain';(isolated/'tools').mkdir(parents=True);(isolated/'build').mkdir();(isolated/'language').mkdir()
- for name in ('cool','driver_common.py'):shutil.copy2(ROOT/'tools'/name,isolated/'tools'/name)
+ for name in ('cool','driver_common.py','release_support.py'):shutil.copy2(ROOT/'tools'/name,isolated/'tools'/name)
+ shutil.copy2(ROOT/'VERSION',isolated/'VERSION')
  for name in ('runtime.c','numeric.h','memory.h','args.h'):(isolated/'language'/name).symlink_to(ROOT/'language'/name)
  obj=isolated/'build/language-runtime.o';shutil.copy2(ROOT/'build/language-runtime.o',obj)
  (isolated/'Makefile').write_text('build/language-runtime.o:\n\t@test -f $@\n')

@@ -1,0 +1,34 @@
+name: Verify Cool development build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Prepare toolchain
+        run: |
+          test "$(uname -m)" = arm64
+          brew install coreutils llvm
+          echo "COOL_LLI=$(brew --prefix llvm)/bin/lli" >> "$GITHUB_ENV"
+          python3 --version
+          clang --version
+          arch -x86_64 /usr/bin/true
+      - name: Compiler, runtime and bootstrap regressions
+        run: make test bootstrap-check
+      - name: Instrumented storage and library checks
+        run: make collection-sanitize-test text-sanitize-test map-sanitize-test json-sanitize-test process-sanitize-test path-sanitize-test
+      - name: External distribution validation
+        run: make distribution-test
+      - name: Package development artifact
+        run: python3 tools/package_release.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cool-development-darwin-arm64
+          path: build/dist/*
+          if-no-files-found: error

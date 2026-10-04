@@ -28,6 +28,10 @@ def ensure_frontend():
 
 
 def ensure(*targets):
+    if (ROOT/'release.json').exists():
+        from release_support import ensure_installed
+        if ensure_installed(ROOT, targets):
+            return
     (ROOT / 'build').mkdir(exist_ok=True)
     with (ROOT / 'build/.cool.lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -249,8 +253,15 @@ def module_command(args):
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == 'legacy':
+        if (ROOT/'release.json').exists():
+            raise ValueError('legacy tools are available only in the source checkout')
         os.execv(str(ROOT/'tools/cool-legacy'), [str(ROOT/'tools/cool-legacy'), *sys.argv[2:]])
     parser = argparse.ArgumentParser(description=__doc__)
+    class VersionAction(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            from release_support import version
+            print(version(ROOT)); parser.exit()
+    parser.add_argument('--version', action=VersionAction, nargs=0, help='show compiler distribution version')
     sub = parser.add_subparsers(dest='command', required=True)
     for name in ('run', 'build', 'check', 'emit-ir'):
         p = sub.add_parser(name)
@@ -263,6 +274,7 @@ def main():
             p.add_argument('-o', '--output', default='a.out' if name == 'build' else 'program.ll')
         if name in ('run', 'build'):
             p.add_argument('--release', action='store_true')
+    sub.add_parser('doctor')
     sub.add_parser('repl')
     p = sub.add_parser('test'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--backend', choices=('interp', 'jit'), default='interp'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
     p = sub.add_parser('doc'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
@@ -279,6 +291,9 @@ def main():
     args = parser.parse_args(raw)
     if forwarded and args.command != 'run':
         parser.error('program arguments after -- require run')
+    if args.command == 'doctor':
+        from release_support import doctor
+        raise SystemExit(0 if doctor(ROOT) else 2)
     if args.command in ('mod', 'get'):
         module_command(args); return
     ensure_frontend()

@@ -239,6 +239,17 @@ through ordinary evaluation or library use.
   for complete borrowing/iteration ergonomics and diagnostics; reference
   temporary/storage/REPL restrictions have not been silently removed.
 
+- Development distribution: added `VERSION`, lazy `--version`, `doctor`, a
+  reproducible checksummed binary archive, verified versioned prefix install
+  and identity-checked uninstall. Installed drivers use bundled artifacts and
+  never invoke make; actual Mach-O minimum OS metadata is retained. External
+  tests cover a read-only prefix with spaces, absent seed/failing make, five
+  engines, a directory project with JSON, fmt/test/doc, native output, managed
+  upgrades, collision/symlink/tamper rejection and missing-artifact errors.
+  Project/tooling/cache regressions also pass. A pinned-action ARM64 CI workflow
+  is prepared but not remotely run. This is explicitly `0.1.0-dev`; G10 remains
+  open for remote CI evidence and the final 1.0 release process/notes.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

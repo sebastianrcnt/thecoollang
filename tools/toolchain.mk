@@ -179,3 +179,9 @@ test: path-test
 methods-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_methods.py
 test: methods-test
+
+.PHONY: distribution-test package-dev
+distribution-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_distribution.py
+package-dev: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/package_release.py
