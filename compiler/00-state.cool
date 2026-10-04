@@ -409,6 +409,7 @@ struct CompilerState {
 v_recovery_context: *i64;
 
 v_allow_redefinition: i8;
+v_editor_diagnostics: i8;
 
 v_tokens: *Token;
 

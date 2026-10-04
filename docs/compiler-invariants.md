@@ -78,6 +78,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `26-repl-source.cool` | Live declaration source marking, disposal and token relocation | `ReplSource.cool` |
 | `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
 | `28-repl-types.cool` | Lazy-layout journal, field rollback and staged immutable text | `ReplTypes.cool` |
+| `29-editor.cool` | Native JSON diagnostics for editor transport | `Editor.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -493,3 +494,14 @@ actually emitted memory checks. Merely passing `-fsanitize=address` while
 linking arbitrary LLVM IR is insufficient. UBSan on the C runtime does not prove
 Cool language arithmetic semantics. Large compiler changes still require the
 cross-engine, C ABI, package/tooling and bootstrap tests, not only library tests.
+
+## Editor boundary
+
+Editor diagnostics use the native Token file/start/end fields (UTF-8 byte
+positions, including EOF). JSON escaping must preserve valid source UTF-8 and
+escape path/message quotes, backslashes and control bytes. ErrorAt keeps the
+ordinary human diagnostic and failure status; structured output is enabled only
+for editor modes. The transport converts positions and orchestrates unsaved
+snapshots, never reimplements parsing or type/ownership decisions. Overlay files
+must keep their original module-resolution identity and must not update source
+files, module sums or the persistent source scan cache.

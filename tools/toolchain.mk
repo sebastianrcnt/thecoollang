@@ -278,3 +278,10 @@ repl-project-test: build/cool-compiler build/language.BIN build/language-runtime
 test: repl-project-test
 repl-project-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_repl_project.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: lsp-test lsp-sanitize-test
+lsp-test: build/cool-compiler build/language.BIN
+	python3 tools/test_lsp.py
+test: lsp-test
+lsp-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_lsp.py --frontend build/repl-loans-asan/cool-compiler

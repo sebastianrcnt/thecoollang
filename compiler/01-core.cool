@@ -257,6 +257,7 @@ return null;
 fn ErrorAt(arg_v_t4: *Token, arg_v_message: *u8) {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+if (ctx.v_editor_diagnostics != i8(0)) { EditorDiagnostic(arg_v_t4, arg_v_message); }
 var v_t4: *Token = arg_v_t4;
 var v_message: *u8 = arg_v_message;
 var v_s3: *Text = null;

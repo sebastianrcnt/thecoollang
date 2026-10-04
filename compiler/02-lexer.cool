@@ -221,6 +221,8 @@ pc = 5;
 continue;
 }
 if (pc == 7) {
+ctx.v_tokens[ctx.v_ntok].start = v_i2;
+ctx.v_tokens[ctx.v_ntok].end = v_i2;
 ((ctx.v_tokens)[ctx.v_ntok]).kind = 0;
 pc = 6;
 continue;

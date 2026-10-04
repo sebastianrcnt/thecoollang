@@ -43,9 +43,9 @@ def ensure(*targets):
         subprocess.run(['make', '-s', '-C', ROOT, *targets], check=True, stdout=sys.stderr, env=env)
 
 
-def front(mode, source, *args, capture=False):
+def front(mode, source, *args, capture=False, timeout=None):
     return subprocess.run([FRONTEND, mode, source, *args],
-                          check=True, text=True, capture_output=capture)
+                          check=True, text=True, capture_output=capture, timeout=timeout)
 
 
 def frontend_digest():
@@ -57,22 +57,24 @@ def frontend_digest():
     return _FRONTEND_DIGEST
 
 
-def metadata_many(paths, work):
+def metadata_many(paths, work, overlays=None, editor=False):
+    overlays = overlays or {}
     cached, missing = {}, {}
     for path in paths:
         if '\t' in str(path) or '\n' in str(path):
             raise ValueError('source paths cannot contain tabs or newlines')
-        key = hashlib.sha256(b'cool-scan-v2\0' + frontend_digest() + path.read_bytes()).hexdigest()
+        actual = overlays.get(path, path)
+        key = hashlib.sha256(b'cool-scan-v2\0' + frontend_digest() + actual.read_bytes()).hexdigest()
         cache = cache_home() / 'scan' / key
-        if cache.exists():
+        if path not in overlays and cache.exists():
             cached[path] = cache.read_text()
         else:
-            missing[str(path)] = (path, cache)
+            missing[str(actual)] = (path, None if path in overlays else cache)
     if missing:
         manifest = work / 'scan.list'
         manifest.write_text(''.join(f'__scan\t{path}\n' for path in missing))
         # Language tokens are still scanned by Cool, once for all package files.
-        output = front('scan-bundle', manifest, capture=True).stdout
+        output = front('editor-scan-bundle' if editor else 'scan-bundle', manifest, capture=True, timeout=20 if editor else None).stdout
         records = {path: [] for path in missing}
         for line in output.splitlines():
             path, kind, value = line.split('\t', 2)
@@ -81,7 +83,8 @@ def metadata_many(paths, work):
             records[path].append(kind + '\t' + value + '\n')
         for name, (path, cache) in missing.items():
             lines = ''.join(records[name])
-            atomic_write(cache, lines.encode())
+            if cache is not None:
+                atomic_write(cache, lines.encode())
             cached[path] = lines
     return {path: parse_metadata(path, cached[path]) for path in paths}
 
@@ -99,9 +102,10 @@ def parse_metadata(path, lines):
     return package, imports
 
 
-def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, import_path=None):
+def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, import_path=None, overlays=None, editor=False):
+    overlays = overlays or {}
     entry = Path(entry).resolve()
-    if not entry.exists():
+    if not entry.exists() and entry not in overlays:
         raise ValueError(f'input does not exist: {entry}')
     root = find_root(entry)
     graph = None
@@ -115,13 +119,13 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, imp
             raise ValueError('import cycle: ' + ' -> '.join([*active, package]))
         if package in done:
             return
-        sources = [location] if location.is_file() else sorted(p for p in location.glob('*.cool') if include_tests or not p.name.endswith('_test.cool'))
+        sources = [location] if location.is_file() or location in overlays else sorted({p for p in [*location.glob('*.cool'), *(p for p in overlays if p.parent==location)] if include_tests or not p.name.endswith('_test.cool')})
         if not sources:
             raise ValueError(f'no Cool files in package {package}: {location}')
         active.append(package)
         declared = set()
         imports = set()
-        scanned = metadata_many(sources, work)
+        scanned = metadata_many(sources, work, overlays, editor)
         for source in sources:
             name, dependencies = scanned[source]
             if location.is_dir() and name is None:
@@ -157,8 +161,8 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, imp
     else:
         visit_import(import_path)
     manifest = work / 'sources.list'
-    manifest.write_text(''.join(f'{package}\t{path}\n' for package, path in files))
-    if graph:
+    manifest.write_text(''.join(f'{package}\t{overlays.get(path,path)}\n' for package, path in files))
+    if graph and not editor:
         graph.save_sums()
     return manifest, files
 
@@ -283,6 +287,7 @@ def main():
         if name in ('run', 'build'):
             p.add_argument('--release', action='store_true')
     sub.add_parser('doctor')
+    sub.add_parser('lsp', help='serve editor diagnostics over LSP stdio')
     p = sub.add_parser('repl'); p.add_argument('--offline',action='store_true'); p.add_argument('--frozen',action='store_true')
     p = sub.add_parser('test'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--backend', choices=('interp', 'jit'), default='interp'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
     p = sub.add_parser('doc'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
@@ -305,6 +310,9 @@ def main():
     if args.command in ('mod', 'get'):
         module_command(args); return
     ensure_frontend()
+    if args.command == 'lsp':
+        from lsp_server import serve
+        raise SystemExit(serve(FRONTEND, bundle, ROOT))
     if args.command == 'fmt':
         import difflib
         changed = False

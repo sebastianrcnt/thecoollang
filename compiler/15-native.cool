@@ -125,6 +125,12 @@ fn LanguageMain() {
 unsafe {
 if(NativeArgCount()>=3 && Eq(NativeArg(1),cast[*u8]("scan-bundle"))!=i8(0)){ReadBundle(NativeArg(2));ScanMetadataFiles();return;}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+if (NativeArgCount() >= 3 && (Eq(NativeArg(1), cast[*u8]("diagnostics-bundle")) != i8(0) || Eq(NativeArg(1), cast[*u8]("editor-scan-bundle")) != i8(0))) {
+    ctx.v_editor_diagnostics = i8(1); ReadBundle(NativeArg(2));
+    if (Eq(NativeArg(1), cast[*u8]("editor-scan-bundle")) != i8(0)) { ScanMetadataFiles(); } else { ParseProgram(); }
+    return;
+}
+
 var v_mode: *u8 = null;
 var v_i32: i64 = i64(0);
 var v_nesting1: i64 = i64(0);

@@ -688,6 +688,24 @@ through ordinary evaluation or library use.
   This strengthens G5/G6/G9/G10 evidence; it does not close the remaining language,
   resource-lifetime, tooling or release gates.
 
+- Editor diagnostics foundation: `cool lsp` serves native compiler diagnostics
+  through framed JSON-RPC. Both frontend implementations emit JSON with UTF-8
+  byte ranges, including correct EOF offsets. The transport maps these into
+  UTF-16 positions and supports unsaved dependency buffers, newly opened files,
+  ordered incremental edits, stale-version rejection, save/watch and close/reset.
+  Source and module files remain unchanged; analysis is offline/frozen. Tests
+  cover quoted Unicode paths, emoji, CRLF, lexer/type errors and fragmented
+  framing on both frontends and the compiler-instrumented ASan frontend.
+  Full `make test bootstrap-check`, self-host IR/native convergence and installed
+  read-only distribution tests pass. IR SHA256 is
+  `8f4c7d371b083ec7a5af7841af40db461d89af8b56a7001805a2d625092437fd`.
+  Logs: `build/release-audit/lsp-regression.log`, `lsp-sanitize.log`,
+  `lsp-final-focused.log` and `lsp-distribution.log`. CI includes the new target;
+  remote CI has not been observed. Analysis is synchronous, with a 20-second
+  timeout per native process, and reports the compiler's first error per package.
+  Definition lookup and completion remain unimplemented; G7 stays open. See
+  [editor integration](editor.md) for the exact supported scope.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

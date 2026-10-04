@@ -113,7 +113,10 @@ Token *tokens;
 I64 ntok, pos;
 U8 *lex_package = "__main";
 Token *At() { return &tokens[pos]; }
+Bool editor_diagnostics;
+extern U0 EditorDiagnostic(Token *token,U8 *message);
 U0 ErrorAt(Token *t, U8 *message) {
+    if(editor_diagnostics)EditorDiagnostic(t,message);
     Text *s = TextNew();
     Append(s, t->file); Char(s, ':'); Number(s, t->line); Char(s, ':'); Number(s, t->col);
     Append(s, ": error: "); Append(s, message); Char(s, '\n');

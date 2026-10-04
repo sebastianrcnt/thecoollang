@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reproducible archive, isolated prefix install, read-only use and safe uninstall."""
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -54,6 +55,25 @@ with tempfile.TemporaryDirectory(prefix='cool external distribution ') as tempor
 fn main(){let input=r.value_or[t.Text,t.Utf8Error](t.from_literal("[42]"),t.create());let value=r.value_or[own[j.Value],j.ParseError](j.parse(&input),j.null_value());assert(j.array_len(&*value)==1);io.println(m.value());}
 fn test_answer(){assert(m.value()==42);}
 ''')
+    # Exercise the installed stdio server from a read-only prefix without seed/make.
+    sys.path.insert(0,str(installed/'tools'))
+    from lsp_server import read_message
+    messages=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'capabilities':{}}},
+        {'jsonrpc':'2.0','method':'initialized','params':{}},
+        {'jsonrpc':'2.0','method':'textDocument/didOpen','params':{'textDocument':{
+            'uri':source.as_uri(),'languageId':'cool','version':1,'text':'package main;fn main(){missing;}'}}},
+        {'jsonrpc':'2.0','id':2,'method':'shutdown'}, {'jsonrpc':'2.0','method':'exit'}]
+    frames=b''
+    for message in messages:
+        body=json.dumps(message).encode()
+        frames+=f'Content-Length: {len(body)}\r\n\r\n'.encode()+body
+    response=subprocess.run([cli,'lsp'],cwd=project,env=env,input=frames,capture_output=True,timeout=60)
+    assert response.returncode==0,(response.stdout,response.stderr)
+    stream=io.BytesIO(response.stdout);records=[]
+    while (record:=read_message(stream)) is not None:records.append(record)
+    assert records[0]['result']['capabilities']['positionEncoding']=='utf-16',records
+    assert any(item.get('method')=='textDocument/publishDiagnostics' and
+        item['params']['uri']==source.as_uri() and 'unknown variable' in item['params']['diagnostics'][0]['message'] for item in records),records
     for backend in ('tree','interp','jit','llvm','llvm-jit'):
         assert run([cli,'run','--backend',backend,'.'],cwd=project,env=env).stdout=='42\n'
     session='import m "example.com/distribution/math";\nimport v "std/vector";\nvar values=v.create[i64]();\nvalues.append(m.value());\nlet r=values.at(0);\n*r\n:forget r\nvalues.append(7);\nvalues.len()\n:quit\n'

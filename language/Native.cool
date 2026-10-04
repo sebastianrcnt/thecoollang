@@ -1,5 +1,6 @@
 #include "Core.cool"
 #include "Lexer.cool"
+#include "Editor.cool"
 #include "Types.cool"
 #include "Borrow.cool"
 #include "Ownership.cool"
@@ -47,6 +48,7 @@ U0 LanguageMain() {
     if (NativeArgCount() == 2 && (Eq(NativeArg(1), "repl") || Eq(NativeArg(1), "repl-quiet"))) { Repl(Eq(NativeArg(1), "repl")); return; }
     if (NativeArgCount() < 3) { Out("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n"); NativeExit(2); }
     mode = NativeArg(1);
+    if(Eq(mode,"diagnostics-bundle") || Eq(mode,"editor-scan-bundle")){editor_diagnostics=TRUE;ReadBundle(NativeArg(2));if(Eq(mode,"editor-scan-bundle"))ScanMetadataFiles();else ParseProgram();return;}
     if(Eq(mode,"scan-bundle")){ReadBundle(NativeArg(2));ScanMetadataFiles();return;}
     if (Eq(mode, "fmt")) { if (NativeArgCount() != 4) NativeExit(2); FormatFile(NativeArg(2), NativeArg(3)); return; }
     if (Eq(mode, "auto") || Eq(mode, "auto-bundle")) execution_mode = 3;

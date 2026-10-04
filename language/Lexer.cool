@@ -84,5 +84,5 @@ digit_next:;
 lex_next:
         if (emitted) { t->end = i; t->raw = Slice(src, t->start, i); }
     }
-    tokens[ntok].kind = 0; tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col;
+    tokens[ntok].start=i;tokens[ntok].end=i;tokens[ntok].kind = 0; tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col;
 }

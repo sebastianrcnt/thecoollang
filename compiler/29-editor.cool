@@ -1,0 +1,32 @@
+// Machine-readable compiler diagnostics. Protocol/UTF-16 conversion stays in
+// the editor transport; all language decisions still come from the frontend.
+fn EditorQuote(out: *Text, value: *u8) {
+    unsafe {
+        Char(out, 34);
+        if (value != null) {
+            let hex = cast[*u8]("0123456789abcdef");
+            var i: i64 = 0;
+            while (value[i] != u8(0)) {
+                let byte = i64(value[i]);
+                if (byte == 34 || byte == 92) { Char(out, 92); Char(out, byte); }
+                else if (byte < 32) { Append(out, cast[*u8]("\\u00")); Char(out, i64(hex[byte / 16])); Char(out, i64(hex[byte % 16])); }
+                else { Char(out, byte); }
+                i = i + 1;
+            }
+        }
+        Char(out, 34);
+    }
+}
+fn EditorDiagnostic(token: *Token, message: *u8) {
+    unsafe {
+        let out = TextNew();
+        Append(out, cast[*u8]("{\"file\":")); EditorQuote(out, token.file);
+        Append(out, cast[*u8](",\"start\":")); Number(out, token.start);
+        Append(out, cast[*u8](",\"end\":")); Number(out, token.end);
+        Append(out, cast[*u8](",\"line\":")); Number(out, token.line);
+        Append(out, cast[*u8](",\"column\":")); Number(out, token.col);
+        Append(out, cast[*u8](",\"message\":")); EditorQuote(out, message);
+        Append(out, cast[*u8]("}\n")); Out(out.data);
+        Free(out.data); Free(cast[*u8](out));
+    }
+}
