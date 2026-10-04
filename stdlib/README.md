@@ -18,6 +18,7 @@ packages are bundled sources and need no module download.
 | `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
 | `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
+| `std/process` | blocking direct-argv execution with inherited cwd/environment/stdio, exit/signal status, structured start/wait errors |
 | `std/os` | `arg_count`, `arg`; executable/runner flags excluded |
 
 ## Ownership and low-level interfaces
@@ -238,3 +239,59 @@ It checks malformed syntax/UTF-8, byte offsets, depth limits, NUL/Unicode,
 duplicate-key destruction, tree mutation, safe loan rejection and zero leaked
 owners. `make json-sanitize-test` additionally instruments generated Cool memory
 accesses with ASan and the C runtime with ASan/UBSan.
+
+
+## Processes
+
+On the supported macOS host, `std/process.run(&Text, &Vector[Text])` executes a
+program using `posix_spawnp`, waits for that child and returns
+`Result[Status, Error]`. The program is also `argv[0]`; the vector contains the
+remaining arguments. Names without `/` use the inherited `PATH`. The child
+inherits the caller's working directory, environment and standard IO.
+
+```cool
+import process "std/process";
+import text "std/text";
+import vector "std/vector";
+import result "std/result";
+fn main() {
+    let program = result.value_or[text.Text, text.Utf8Error](
+        text.from_literal("/usr/bin/true"), text.create());
+    let arguments = vector.create[text.Text]();
+    match (process.run(&program, &arguments)) {
+        result.Result[process.Status, process.Error].Ok(status) => {
+            assert(process.success(status));
+        }
+        result.Result[process.Status, process.Error].Err(error) => {
+            assert(false);
+        }
+    }
+}
+```
+
+No shell interprets arguments. Spaces, quotes, dollar signs, semicolons, newlines
+and empty strings are passed literally. To run a shell script, explicitly
+execute a shell with its arguments. Text must not contain NUL: `NulByte(index)`
+identifies the program at index 0 or an argument at its one-based argv index.
+An empty program returns `EmptyProgram`; argument-storage arithmetic overflow
+returns `TooLarge`. `Spawn(errno)` reports an OS start failure, including missing
+executables, permissions and OS argument limits. `Wait(errno)` reports a wait
+failure. Interrupted waits are retried. These errno values use the supported
+Darwin ABI.
+
+A child exiting unsuccessfully is still a successful process operation:
+`Status.Exit(code)` contains its exit code (0–255), and `Status.Signal(signal)`
+records termination by a signal. `success` is true only for `Exit(0)`. Temporary
+C argv/text buffers are released on every return path. Input text and argument
+vectors remain caller-owned. Allocation failure follows the runtime's normal
+allocation-failure trap policy.
+
+This initial synchronous API has no timeout, detached child handle, environment
+or cwd overrides, or captured pipes. Children must terminate for `run` to return.
+It does not add a shell-command string API. `make process-test` covers literal
+argv, Unicode/empty arguments, 300 arguments, inherited PATH/cwd/environment,
+nonzero exits, signal termination, missing/nonexecutable programs, NUL rejection
+and owner cleanup on all five engines and O2. `make process-sanitize-test` also
+checks generated Cool memory accesses with ASan and the C runtime with
+ASan/UBSan, counts explicit raw-buffer allocations/frees and injects an
+interrupted wait to verify retry. This does not certify other OS ABIs.

@@ -196,6 +196,15 @@ through ordinary evaluation or library use.
   that ambiguity, generic runtime cases pass all five engines, and exact
   self-host convergence passes. This defect was exposed by the process library.
 
+- Process execution: `std/process.run` now passes exact text arguments directly
+  to macOS `posix_spawnp` and waits for exit/signal status, with structured
+  start/wait errors and NUL rejection. PATH/cwd/environment/stdio are inherited;
+  no shell parses the supplied arguments. All five engines, O2 and ASan/UBSan
+  pass literal/Unicode/empty/300-argument cases, signal/nonzero exit and error
+  paths. The sanitizer harness also counts raw-buffer allocations/frees and
+  injects an interrupted wait to verify retry. This is a synchronous API; pipe capture and per-child overrides are
+  not implemented. G5 remains open for path utilities and realistic projects.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

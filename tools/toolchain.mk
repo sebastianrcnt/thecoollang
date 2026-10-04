@@ -160,3 +160,10 @@ json-test: build/cool-compiler build/language-runtime.o build/language-runtime.d
 json-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_json.py --sanitize
 test: json-test
+
+.PHONY: process-test process-sanitize-test
+process-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_process.py
+process-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_process.py --sanitize
+test: process-test

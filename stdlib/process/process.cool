@@ -1,0 +1,121 @@
+package process;
+import text "std/text";
+import vector "std/vector";
+import result "std/result";
+import "std/mem";
+// Apple Silicon macOS/libSystem ABI. Arguments are passed directly to exec;
+// no shell parses them. The child inherits environment, cwd and standard IO.
+extern "C" fn posix_spawnp(pid: * i32, path: * u8, actions: * void, attributes: * void, arguments: * * u8, environment: * * u8) -> i32;
+extern "C" fn _NSGetEnviron() -> * * * u8;
+extern "C" fn waitpid(pid: i32, status: * i32, options: i32) -> i32;
+extern "C" fn __error() -> * i32;
+pub enum Status {
+    Exit(i32);
+    Signal(i32);
+}
+pub enum Error {
+    EmptyProgram;
+    NulByte(usize);
+    TooLarge;
+    Spawn(i32);
+    Wait(i32);
+}
+pub fn success(status: Status) -> bool {
+    match (status) {
+        Status.Exit(code) => {
+            return code == 0;
+        }
+        Status.Signal(signal) => {
+            return false;
+        }
+    }
+}
+fn copy_text(value: & text.Text, output: * u8) -> bool {
+    unsafe {
+        var cursor = vector.cursor[u8](text.as_bytes(value));
+        let size = text.byte_len(value);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            let byte = * vector.next[u8]( & raw cursor);
+            if (byte == 0) {
+                return false;
+            }
+            output[i] = byte;
+        }
+        output[size] = 0;
+        return true;
+    }
+}
+// Blocking execution, with an explicit distinction between start/wait errors
+// and the child's own unsuccessful exit. argv[0] is the supplied program name.
+pub fn run(program: & text.Text, arguments: & vector.Vector[text.Text]) -> result.Result[Status, Error] {
+    let program_size = text.byte_len(program);
+    let count = vector.len[text.Text](arguments);
+    if (program_size == 0) {
+        return result.Result[Status, Error].Err(Error.EmptyProgram);
+    }
+    // Allocator byte counts use i64; leave room for terminators and argv's NULL.
+    let limit: usize = 9223372036854775807;
+    if (program_size >= limit || count > limit / sizeof( * u8) - 2) {
+        return result.Result[Status, Error].Err(Error.TooLarge);
+    }
+    var total = program_size + 1;
+    unsafe {
+        var cursor = vector.cursor[text.Text](arguments);
+        for (var i: usize = 0; i < count; i = i + 1) {
+            let item = borrow_raw[ & text.Text](vector.next[text.Text]( & raw cursor), arguments);
+            let size = text.byte_len(item);
+            if (size >= limit - total) {
+                return result.Result[Status, Error].Err(Error.TooLarge);
+            }
+            total = total + size + 1;
+        }
+        let storage = mem.alloc(total);
+        defer mem.free(storage);
+        let raw_arguments = mem.alloc((count + 2) * sizeof( * u8));
+        defer mem.free(raw_arguments);
+        let argv = cast[ * * u8](raw_arguments);
+        let bytes = cast[ * u8](storage);
+        argv[0] = bytes;
+        if (!copy_text(program, bytes)) {
+            return result.Result[Status, Error].Err(Error.NulByte(0));
+        }
+        var offset = program_size + 1;
+        var copied = vector.cursor[text.Text](arguments);
+        for (var i: usize = 0; i < count; i = i + 1) {
+            let item = borrow_raw[ & text.Text](vector.next[text.Text]( & raw copied), arguments);
+            argv[i + 1] = & raw bytes[offset];
+            if (!copy_text(item, argv[i + 1])) {
+                return result.Result[Status, Error].Err(Error.NulByte(i + 1));
+            }
+            offset = offset + text.byte_len(item) + 1;
+        }
+        argv[count + 1] = null;
+        var pid: i32 = 0;
+        let started = posix_spawnp( & raw pid, bytes, null, null, argv, * _NSGetEnviron());
+        if (started != 0) {
+            return result.Result[Status, Error].Err(Error.Spawn(started));
+        }
+        var child_status = Status.Exit(0);
+        while (true) {
+            var status: i32 = 0;
+            let waited = waitpid(pid, & raw status, 0);
+            if (waited < 0) {
+                let error = * __error();
+                if (error == 4) {
+                    continue;
+                }
+                return result.Result[Status, Error].Err(Error.Wait(error));
+            }
+            let signal = status & 127;
+            if (signal == 0) {
+                child_status = Status.Exit((status >> 8) & 255);
+                break;
+            }
+            if (signal != 127) {
+                child_status = Status.Signal(signal);
+                break;
+            }
+        }
+        return result.Result[Status, Error].Ok(child_status);
+    }
+}
