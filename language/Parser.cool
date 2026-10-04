@@ -136,7 +136,7 @@ Node *Atom() {
     }
     if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; if (t->val < 0) n->type = T_U64; return n; }
     if (Take(K_FLOAT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_F64; return n; }
-    if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = t->text; n->type = T_STRING; return n; }
+    if (Take(K_STRING)) { n = NewNode(N_STRING, t); n->name = LiteralString(t->text); n->type = T_STRING; return n; }
     if (Is("true") || Is("false")) { n = NewNode(N_INT, t); n->type = T_BOOL; n->value = Is("true"); pos++; return n; }
     if (Take('(')) { n = Expr(1); Need(')', "expected ')'"); return n; }
     if (t->kind == '-' || t->kind == '!' || t->kind == '~') {

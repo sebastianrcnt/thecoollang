@@ -7,7 +7,8 @@ Local *repl_locals;
 Alias *repl_aliases;
 I64 *repl_values;
 I64 repl_capacity;
-Bool repl_executing;
+Bool repl_executing,repl_keep_tokens;
+I64 repl_token_end;
 MoveState *repl_moves;
 extern U0 ReplTrimStorage();
 #include "ReplLoans.cool"
@@ -25,8 +26,15 @@ U0 ReplReclaimLocals() {
     for(loan=repl_loans;loan;loan=loan->next){if(loan->root)loan->root->repl_mark|=2;if(loan->holder)loan->holder->repl_mark|=2;if(loan->parent)loan->parent->repl_mark|=2;}
     functions[0].all_locals=NULL;tail=&functions[0].all_locals;link=&repl_allocated_locals;
     while(*link){local=*link;if(local->repl_mark){if(!(local->repl_mark&1))local->next=NULL;*tail=local;tail=&local->all_next;link=&local->repl_next;}
-        else{*link=local->repl_next;edge=local->sources;while(edge){next=edge->next;Free(edge);edge=next;}Free(local);}}
+        else{*link=local->repl_next;edge=local->sources;while(edge){next=edge->next;Free(edge);edge=next;}Free(local->name);Free(local);}}
     *tail=NULL;
+}
+U0 ReplFinishTokens() {
+    I64 i,end=ntok;if(repl_token_end>end)end=repl_token_end;
+    if(lex_pending){Free(lex_pending->data);Free(lex_pending);lex_pending=NULL;}
+    if(repl_keep_tokens)return;
+    for(i=repl_saved_ntok;i<end;i++){Free(tokens[i].text);Free(tokens[i].raw);MemSet(&tokens[i],0,sizeof(Token));}
+    MemSet(&tokens[end],0,sizeof(Token));ntok=repl_saved_ntok;pos=ntok;
 }
 // Only records added by this submission may be discarded on rollback.
 // Rejected code has never initialized its slots: never drop those values.
@@ -69,6 +77,7 @@ Text *Submission() {
 }
 U0 ReplRestore() {
     Frame *frame; DropSlot *d;
+    repl_token_end=ntok;repl_keep_tokens=FALSE;
     ReplLoansFinish(repl_executing,repl_locals);
     ReplPackagesRestore();
     if (repl_executing) {
@@ -86,15 +95,15 @@ U0 ReplRestore() {
 }
 U0 ReplStep(Text *text) {
     I64 start = ntok, result, register_id, i; Node *statement, *call, *arg; Function *f; I64 *grown;
-    repl_executing = FALSE;
+    repl_executing = FALSE; repl_keep_tokens=FALSE;repl_token_end=0;
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
     if(ReplLoanCommand())return;
-    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { ReplLoadImports(start); ParseProgram(); return; }
+    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { repl_keep_tokens=TRUE;ReplLoadImports(start); ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {
-        tokens[ntok] = tokens[ntok-1]; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
+        tokens[ntok] = tokens[ntok-1];tokens[ntok].text=NULL;tokens[ntok].raw=NULL; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
     }
     if (Is("return") || Is("defer")) Error("top-level return/defer requires an explicit function or block");
     statement = Statement(); ReplLoansBegin(statement); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
@@ -143,7 +152,7 @@ U0 Repl(Bool prompt) {
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;
         while (repl_moves) { move = repl_moves; repl_moves = move->next; Free(move); }
-        ReplFreeNodes(); ReplReclaimLocals();
+        ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens();
 repl_next:
         Free(text->data); Free(text);
     }

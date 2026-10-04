@@ -2,7 +2,7 @@ Bool Alpha(I64 ch) { return ('a' <= ch <= 'z') || ('A' <= ch <= 'Z') || ch == '_
 Bool Digit(I64 ch) { return '0' <= ch <= '9'; }
 U0 LexSource(U8 *src, U8 *file) {
     I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok;
-    Token *t; Text *text; Bool emitted;
+    Token *t; Text *text; Bool emitted; U8 *number;
     if (!tokens) tokens = CAlloc(MAX_TOKENS * sizeof(Token));
     while (src[i]) {
         emitted = FALSE;
@@ -19,8 +19,8 @@ U0 LexSource(U8 *src, U8 *file) {
             if (!src[i]) { tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col; ErrorAt(&tokens[ntok], "unterminated comment"); }
             i += 2; col += 2; goto lex_next;
         }
-        if (ntok >= MAX_TOKENS - 2) NativeExit(70);
-        t = &tokens[ntok++]; t->val = 0; t->text = NULL; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i; t->start = i; emitted = TRUE;
+        if (ntok >= MAX_TOKENS - 2) {tokens[ntok].file=file;tokens[ntok].line=line;tokens[ntok].col=col;ErrorAt(&tokens[ntok],"token limit exceeded");}
+        t = &tokens[ntok++]; t->val = 0; t->text = NULL; t->raw=NULL; t->kind=0; t->file = file; t->package = lex_package; t->line = line; t->col = col; start = i; t->start = i; emitted = TRUE;
         if (Alpha(ch)) {
             do { i++; col++; } while (Alpha(src[i]) || Digit(src[i]));
             t->kind = K_ID; t->text = Slice(src, start, i); goto lex_next;
@@ -47,7 +47,7 @@ digit_next:;
                     if (!Digit(src[i])) ErrorAt(t, "expected exponent digits");
                     while (Digit(src[i])) { i++; col++; }
                 }
-                t->val = NativeParseFloat(Slice(src, t->start, i), &ok);
+                number=Slice(src,t->start,i);t->val = NativeParseFloat(number, &ok);Free(number);
                 if (!ok) ErrorAt(t, "floating literal out of range or invalid");
                 t->kind = K_FLOAT;
             }
@@ -55,7 +55,7 @@ digit_next:;
             goto lex_next;
         }
         if (ch == '"') {
-            text = TextNew(); i++; col++;
+            text = TextNew(); lex_pending=text; i++; col++;
             while (src[i] && src[i] != '"') {
                 ch = src[i++]; col++;
                 if (ch == '\n') ErrorAt(t, "newline in string literal");
@@ -67,7 +67,7 @@ digit_next:;
                 Char(text, ch);
             }
             if (!src[i]) ErrorAt(t, "unterminated string literal");
-            Reserve(text, 0); t->text = text->data; t->kind = K_STRING; i++; col++; goto lex_next;
+            Reserve(text, 0); t->text = text->data; Free(text);lex_pending=NULL;t->kind = K_STRING; i++; col++; goto lex_next;
         }
         t->kind = ch; i++; col++;
         if (ch == '=' && next == '>') t->kind = K_FAT_ARROW;

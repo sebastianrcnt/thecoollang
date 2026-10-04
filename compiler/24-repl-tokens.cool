@@ -1,0 +1,43 @@
+// Literals have session lifetime, including values retained in owning storage
+// or passed to unsafe foreign code. Equal literal bytes share one stable copy.
+fn LiteralString(text: *u8) -> *u8 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition == i8(0) || ctx.v_current_fun != 0) { return text; }
+        var hash: u64 = 5381;
+        var i: i64 = 0;
+        while (text[i] != u8(0)) { hash = hash * u64(33) + u64(text[i]); i = i + 1; }
+        let bucket = i64(hash & u64(1023));
+        var entry = ctx.v_repl_literals[bucket];
+        while (entry != null) {
+            if (Eq(entry.text, text) != i8(0)) { return entry.text; }
+            entry = entry.next;
+        }
+        entry = cast[*ReplLiteral](CAlloc(i64(sizeof(ReplLiteral))));
+        entry.text = StrNew(text);
+        entry.next = ctx.v_repl_literals[bucket];
+        ctx.v_repl_literals[bucket] = entry;
+        return entry.text;
+    }
+}
+fn ReplFinishTokens() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var end = ctx.v_ntok;
+        if (ctx.v_repl_token_end > end) { end = ctx.v_repl_token_end; }
+        if (ctx.v_lex_pending != null) {
+            Free(ctx.v_lex_pending.data);
+            Free(cast[*u8](ctx.v_lex_pending));
+            ctx.v_lex_pending = null;
+        }
+        if (ctx.v_repl_keep_tokens) { return; }
+        for (var i = ctx.v_repl_saved_ntok; i < end; i = i + 1) {
+            Free(ctx.v_tokens[i].text);
+            Free(ctx.v_tokens[i].raw);
+            MemSet(cast[*u8](&raw ctx.v_tokens[i]), 0, i64(sizeof(Token)));
+        }
+        MemSet(cast[*u8](&raw ctx.v_tokens[end]), 0, i64(sizeof(Token)));
+        ctx.v_ntok = ctx.v_repl_saved_ntok;
+        ctx.v_pos = ctx.v_ntok;
+    }
+}

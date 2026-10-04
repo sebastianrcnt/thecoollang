@@ -538,7 +538,9 @@ be declared again. Dead storage after the last surviving binding is reused,
 including statement temporaries and failed new bindings. Surviving bindings
 keep stable addresses. Dead session-local metadata is reclaimed, while surviving
 loan roots and parent identities remain live even after their lexical blocks
-end. Interior holes, tokens and function caches are not yet fully reclaimed; the existing register limit still applies to each
+end. Ordinary statement tokens are recycled after execution or rejection.
+Interior holes and replaced-function source/caches are not yet fully reclaimed;
+the existing register limit still applies to each
 submission and its live storage. Raw pointers remain subject to explicit
 unsafe lifetime obligations and must not access forgotten/reused storage.
 The REPL reserves its internal `__session` function: user code cannot redefine
@@ -572,6 +574,21 @@ Bytecode call argument scratch uses the native stack, including error recovery.
 Ordinary function caches remain live. `make repl-storage-sanitize-test` repeats
 these checks on the ASan-instrumented compiler. Package loading is described
 below.
+
+
+`make repl-tokens-test` runs 100,000 submissions with surviving string values,
+owning storage, functions and generic source, then checks partial lexing and
+rejected-declaration recovery on both frontends. `make repl-tokens-sanitize-test`
+adds the ASan-instrumented compiler. A single oversized input or too many retained
+declarations can still exceed the token-table limit; it reports an error and
+preserves the session. Normal statement history no longer consumes that limit.
+
+String literals are immutable and remain valid throughout the session, including
+when stored inside owners. Equal statement literals share a stable allocation;
+each distinct literal content is retained until session exit. Successful function,
+type and import declarations keep their source for subsequent compilation.
+Repeated body replacement and large sets of distinct literals still require
+further resource work before the full long-session release gate can close.
 
 
 ## Packages in the REPL

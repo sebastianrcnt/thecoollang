@@ -700,6 +700,7 @@ v_l1 = (v_l1).next;
 }
 v_res = AllocateLocal();
 (v_res).name = v_name5;
+if (ctx.v_allow_redefinition != i8(0) && ctx.v_current_fun == 0) { v_res.name = StrNew(v_name5); }
 (v_res).type = v_type3;
 (v_res).mutable = i64(v_mutable);
 (v_res).depth = ctx.v_depth;

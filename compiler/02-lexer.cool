@@ -437,6 +437,8 @@ continue;
 }
 if (pc == 43) {
 (v_t8).text = (v_text).data;
+Free(cast[*u8](v_text));
+ctx.v_lex_pending = null;
 pc = 42;
 continue;
 }
@@ -571,6 +573,7 @@ continue;
 if (pc == 66) {
 t38 = TextNew();
 v_text = t38;
+ctx.v_lex_pending = v_text;
 pc = 65;
 continue;
 }
@@ -653,6 +656,7 @@ t52 = Slice(t49, t50, t51);
 t53 = t52;
 t54 = &raw (v_ok);
 t55 = NativeParseFloat(t53, t54);
+Free(t53);
 (v_t8).val = t55;
 pc = 73;
 continue;
@@ -1013,6 +1017,8 @@ continue;
 }
 if (pc == 137) {
 (v_t8).text = null;
+v_t8.raw = null;
+v_t8.kind = 0;
 pc = 136;
 continue;
 }
@@ -1033,8 +1039,10 @@ if ((ctx.v_ntok >= (262144 - 2))) { pc = 141; } else { pc = 139; }
 continue;
 }
 if (pc == 141) {
-t111 = 70;
-NativeExit(t111);
+ctx.v_tokens[ctx.v_ntok].file = v_file;
+ctx.v_tokens[ctx.v_ntok].line = v_line;
+ctx.v_tokens[ctx.v_ntok].col = v_col;
+ErrorAt(&raw ctx.v_tokens[ctx.v_ntok], cast[*u8]("token limit exceeded"));
 pc = 139;
 continue;
 }

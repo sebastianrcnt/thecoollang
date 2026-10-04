@@ -250,3 +250,10 @@ repl-storage-test: build/cool-compiler build/language.BIN
 test: repl-storage-test
 repl-storage-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_repl_storage.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: repl-tokens-test repl-tokens-sanitize-test
+repl-tokens-test: build/cool-compiler build/language.BIN
+	python3 tools/test_repl_tokens.py
+test: repl-tokens-test
+repl-tokens-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_repl_tokens.py --frontend build/repl-loans-asan/cool-compiler

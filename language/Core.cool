@@ -38,6 +38,7 @@ I64 *recovery_context;
 Bool allow_redefinition;
 
 class Text { U8 *data; I64 len, cap; };
+Text *lex_pending;
 Text *TextNew() { return CAlloc(sizeof(Text)); }
 U0 Reserve(Text *t, I64 more) {
     U8 *p;
@@ -102,6 +103,8 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define K_SHR 267
 #define K_FLOAT 268
 #define K_FAT_ARROW 269
+class ReplLiteral { U8 *text; ReplLiteral *next; };
+ReplLiteral *repl_literals[1024];
 class Token { I64 kind, val, line, col, start, end; U8 *text, *file, *package, *raw; };
 #define MAX_TOKENS 262144
 Token *tokens;
@@ -170,6 +173,13 @@ Function *functions;
 I64 nfun;
 Local *locals;
 I64 depth, loop_depth, current_fun, unsafe_depth;
+U8 *LiteralString(U8 *text) {
+    U64 hash=5381;I64 i=0,bucket;ReplLiteral *entry;
+    if(!allow_redefinition || current_fun!=0)return text;
+    while(text[i])hash=hash*33+text[i++];bucket=hash&1023;
+    for(entry=repl_literals[bucket];entry;entry=entry->next)if(Eq(entry->text,text))return entry->text;
+    entry=CAlloc(sizeof(ReplLiteral));entry->text=StrNew(text);entry->next=repl_literals[bucket];repl_literals[bucket]=entry;return entry->text;
+}
 Local *AllocateLocal() {
     Local *local=CAlloc(sizeof(Local));
     if(allow_redefinition && current_fun==0){local->repl_next=repl_allocated_locals;repl_allocated_locals=local;}
@@ -203,13 +213,13 @@ U0 RegisterDrop(I64 slot, I64 type) { DropSlot *d; if (!Owned(type)) return; d =
 Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
-    res = AllocateLocal(); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
+    res = AllocateLocal(); res->name = name; if(allow_redefinition && current_fun==0)res->name=StrNew(name); res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
     res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; RegisterDrop(res->slot, type); res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
 Bool Pointer(I64 type) { return type >= T_PTR; }
 class Field { U8 *name; I64 type, offset, public, tag; Field *next; };
-class AggregateType { U8 *name, *package; I64 kind, element, count, size, align, state, begin, end, public, generic_count, origin; U8 *generic_names[8]; I64 generic_args[8]; Token *token; Field *fields; };
+class AggregateType { U8 *name, *package; I64 kind, element, count, size, align, state, begin, end, public, generic_count, origin; U8 *generic_names[8]; I64 generic_args[8]; Token *token; Token diagnostic; Field *fields; };
 #define MAX_TYPES 4096
 AggregateType aggregate_types[MAX_TYPES];
 I64 naggregates;

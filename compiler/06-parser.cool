@@ -2636,7 +2636,7 @@ t179 = 2;
 t180 = v_t13;
 t181 = NewNode(t179, t180);
 v_n18 = t181;
-(v_n18).name = (v_t13).text;
+(v_n18).name = LiteralString((v_t13).text);
 (v_n18).type = 3;
 return v_n18;
 }

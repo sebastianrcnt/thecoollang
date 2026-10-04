@@ -5,7 +5,7 @@ I64 FindType(U8 *package, U8 *name) {
 }
 I64 NewType(I64 kind, Token *token) {
     I64 type; if (naggregates == MAX_TYPES) ErrorAt(token, "type limit exceeded");
-    type = T_AGG + naggregates++; MemSet(&aggregate_types[type-T_AGG], 0, sizeof(AggregateType)); Shape(type)->kind = kind; Shape(type)->token = token; return type;
+    type = T_AGG + naggregates++; MemSet(&aggregate_types[type-T_AGG], 0, sizeof(AggregateType)); Shape(type)->kind = kind; Shape(type)->diagnostic=*token;Shape(type)->diagnostic.text=NULL;Shape(type)->diagnostic.raw=NULL;Shape(type)->token=&Shape(type)->diagnostic; return type;
 }
 I64 SequenceType(I64 kind, I64 element, I64 count, Token *token) {
     I64 i, type;

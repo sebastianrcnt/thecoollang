@@ -396,7 +396,10 @@ t8 = Shape(t7);
 (t8).kind = v_kind1;
 t9 = v_type18;
 t10 = Shape(t9);
-(t10).token = v_token;
+t10.diagnostic = *v_token;
+t10.diagnostic.text = null;
+t10.diagnostic.raw = null;
+t10.token = &raw t10.diagnostic;
 return v_type18;
 }
 return i64(0);

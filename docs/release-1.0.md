@@ -29,7 +29,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
-| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans, explicit release and package loading verified) |
+| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans/packages and ordinary submission reclamation verified) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
@@ -479,6 +479,35 @@ through ordinary evaluation or library use.
   (`build/release-audit/repl-token-limit-baseline.json`). Reusing/reclaiming
   tokens while preserving literals, types and cached/generic function source
   is the next mandatory resource fix; increasing the limit alone is insufficient.
+
+- REPL token reuse: completed/rejected statements and session commands now
+  release lexical text/raw buffers and reuse the token-table tail after retained
+  declarations. Session locals own copied names; types own diagnostic coordinates;
+  statement literals are interned into stable session storage. Synthetic
+  semicolons do not duplicate buffer ownership, and recovery records the lexical
+  allocation range before restoring counters. Lexer string-construction headers,
+  unfinished buffers and floating-parser substrings have explicit cleanup.
+  A genuinely oversized input now reports a recoverable token-limit diagnostic.
+  The former 50,000-input exit is fixed: 100,000 updates pass on both frontends
+  and compiler ASan with strings, owning storage, functions and deferred generic
+  specialization intact. Partial lexing, rejected declarations, implicit
+  semicolons and oversized-input recovery also pass. Full regression, both
+  bootstraps and external read-only installation pass. Fixed-point IR SHA256:
+  `d3ca068cac35eb5063765ba5718c20425af7a002c89c9a54090a39cabe0e78a3`.
+  CI includes the token sanitizer target; remote execution remains unverified.
+
+  Against `acb7b7d`, three fresh-process trials reduce the 16,000-update median
+  peak RSS from 18,857,984 to 9,142,272 bytes, and the temporary-binding workload
+  from 30,425,088 to 9,175,040 bytes. The candidate's 2,000 and 100,000 update
+  medians are both 9,142,272 bytes (8.7 MiB). Reproduce the latter with
+  `python3 tools/bench_repl_memory.py --counts 2000 100000`; a baseline is now
+  optional. Raw files are `build/release-audit/repl-tokens-memory.json`,
+  `repl-tokens-bindings-memory.json` and `repl-tokens-stability.json`. The same
+  macOS ARM64 methodology applies; these are workload-specific memory results,
+  not an isolated speed or universal bounded-memory claim. Successful
+  declarations/imports still retain source, replaced-function caches need
+  reclamation, and distinct immutable literal contents have session lifetime.
+  G6 stays open for these remaining lifecycle requirements.
 
 ## Next implementation checkpoints
 

@@ -184,6 +184,8 @@ var t7: *u8 = null;
 var t8: i64 = i64(0);
 var t9: *u8 = null;
 var t10: bool = false;
+ctx.v_repl_token_end = ctx.v_ntok;
+ctx.v_repl_keep_tokens = false;
 ReplLoansFinish(ctx.v_repl_executing != i8(0), ctx.v_repl_locals);
 ReplPackagesRestore();
 if ((ctx.v_repl_executing != i8(0))) {
@@ -312,6 +314,8 @@ v_start3 = ctx.v_ntok;
 ctx.v_repl_executing = i8(0);
 t0 = (v_text5).data;
 t1 = cast[*u8]("<repl>");
+ctx.v_repl_keep_tokens = false;
+ctx.v_repl_token_end = 0;
 LexSource(t0, t1);
 ctx.v_pos = v_start3;
 if (ReplLoanCommand()) { return; }
@@ -358,6 +362,7 @@ t22 = Is(t21);
 t20 = (i64(t22) != i64(0));
 }
 if (t20) {
+ctx.v_repl_keep_tokens = true;
 ReplLoadImports(v_start3);
 ParseProgram();
 return;
@@ -380,6 +385,8 @@ if (t24) {
 (ctx.v_tokens)[ctx.v_ntok] = (ctx.v_tokens)[(ctx.v_ntok - 1)];
 t25 = ctx.v_ntok;
 ctx.v_ntok = ctx.v_ntok + i64(1);
+ctx.v_tokens[t25].text = null;
+ctx.v_tokens[t25].raw = null;
 ((ctx.v_tokens)[t25]).kind = 59;
 ((ctx.v_tokens)[ctx.v_ntok]).kind = 0;
 }
@@ -604,7 +611,7 @@ pc = 8;
 continue;
 }
 if (pc == 10) {
-if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplFreeNodes(); ReplReclaimLocals(); pc = 1; }
+if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1; }
 continue;
 }
 if (pc == 11) {

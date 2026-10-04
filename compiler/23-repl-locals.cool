@@ -46,6 +46,7 @@ fn ReplReclaimLocals() {
                     Free(cast[*u8](edge));
                     edge = next;
                 }
+                Free(local.name);
                 Free(cast[*u8](local));
             }
         }

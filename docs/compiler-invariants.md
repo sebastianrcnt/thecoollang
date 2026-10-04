@@ -73,6 +73,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `21-bytecode-memory.cool` | Compilation-owned argument/scope allocation lists and disposal | `Bytecode.cool` |
 | `22-repl-nodes.cool` | Disposable submission node allocation and cleanup | `Core.cool`, `Repl.cool` |
 | `23-repl-locals.cool` | Session-local allocation registry and loan-rooted reclamation | `Core.cool`, `References.cool`, `Repl.cool` |
+| `24-repl-tokens.cool` | Statement token disposal and session literal interning | `Core.cool`, `Repl.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -362,8 +363,29 @@ including an assignment executed before a runtime error; never infer liveness
 only from name lookup. The independent registry survives snapshot restoration.
 Marking and sweeping are linear in registered locals, visible bindings and loans.
 Non-visible survivors have their obsolete lexical `next` cleared. Cached
-function locals are outside this registry; lexical strings/tokens are not
-owned by Local and must not be freed with it.
+function locals are outside this registry. Named session locals own separate
+`StrNew` name copies, released with their Local records; they never own the
+lexer's original identifier strings.
+
+REPL statements and commands reuse the token-table tail after the last retained
+declaration. `ReplFinishTokens` runs after nodes and locals are reconciled and
+frees each discarded token's text/raw buffers. Synthetic semicolons copy source
+coordinates but must clear text/raw pointers to avoid duplicate ownership.
+Recovery records the pre-restore token end before resetting `ntok`; otherwise
+partial lexing and rejected declarations would lose their allocation range.
+Successful declarations/imports retain tokens for cached bodies and later
+generic specialization. A token-table limit reports a recoverable diagnostic.
+
+Type descriptors own an inline copy of diagnostic coordinates, with text/raw
+cleared, so structural types can outlive their statement tokens. Session-local
+names are copied as described above. `LiteralString` interns statement literals
+by bytes into stable session storage; lexical buffers can be discarded even if
+a string value escaped into owning storage or foreign code. Equal literals may
+share storage and literals remain immutable. Distinct literal contents persist
+until session exit; this pool is not a claim of bounded memory for an unbounded
+set of new literals. Lexer string-construction headers are freed on success and
+unfinished string buffers on recovery; numeric parsing substrings are temporary.
+Statement token reuse does not reclaim successful replaced-function source.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

@@ -24,6 +24,8 @@ cap: i64;
 }
 
 
+struct ReplLiteral { text: *u8; next: *ReplLiteral; }
+
 struct Token {
 
 kind: i64;
@@ -263,6 +265,8 @@ generic_args: [8]i64;
 
 token: *Token;
 
+diagnostic: Token;
+
 fields: *Field;
 
 }
@@ -404,6 +408,10 @@ v_pos: i64;
 
 v_lex_package: *u8;
 
+v_lex_pending: *Text;
+
+v_repl_literals: [1024]*ReplLiteral;
+
 v_functions: *Function;
 
 v_nfun: i64;
@@ -495,6 +503,10 @@ v_repl_values: *i64;
 v_repl_capacity: i64;
 
 v_repl_executing: i8;
+
+v_repl_keep_tokens: bool;
+
+v_repl_token_end: i64;
 
 v_repl_moves: *MoveState;
 
