@@ -109,3 +109,11 @@ x86 probes. A remote workflow run has **not** been executed or certified by loca
 validation; G10 remains open until real CI/release evidence is recorded.
 
 No stable release has been published, signed or uploaded by this work.
+
+## Editor client configuration
+
+The archive includes `editors/neovim/cool.lua` for Neovim's built-in LSP client.
+See [editor integration](editor.md) for setup and the exact supported capabilities.
+`make editor-distribution-test` exercises that installed configuration and server
+from a read-only prefix, using the pinned or explicitly supplied Neovim client.
+The client binary itself is downloaded only for explicit tests and is not shipped.

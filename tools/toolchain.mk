@@ -285,3 +285,15 @@ lsp-test: build/cool-compiler build/language.BIN
 test: lsp-test
 lsp-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_lsp.py --frontend build/repl-loans-asan/cool-compiler
+
+# Real-editor tests are explicit: ordinary make test never downloads a client.
+NVIM ?= $(CURDIR)/build/editor-client/nvim-macos-arm64/bin/nvim
+.PHONY: editor-client-fetch editor-client-test editor-client-sanitize-test editor-distribution-test
+editor-client-fetch:
+	python3 tools/fetch_test_neovim.py
+editor-client-test: build/cool-compiler
+	python3 tools/test_neovim.py --nvim "$(NVIM)"
+editor-client-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_neovim.py --nvim "$(NVIM)" --frontend build/repl-loans-asan/cool-compiler --report-name neovim-sanitize
+editor-distribution-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_distribution.py --nvim "$(NVIM)"

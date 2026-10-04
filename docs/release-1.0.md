@@ -30,7 +30,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
-| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open (native diagnostics/definitions/scoped completion verified; recovery and editor audit pending) |
+| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open (native tooling and real Neovim client verified; broader recovery/unsupported contexts pending) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
 | G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
@@ -771,6 +771,29 @@ through ordinary evaluation or library use.
   Evidence: `build/release-audit/completion-order-{focused,regression,sanitize,distribution}.log`.
   This is a checking-order improvement, not general syntax or statement recovery;
   G7 remains open for the documented unsupported contexts and editor validation.
+
+- Real editor integration: `editors/neovim/cool.lua` configures Neovim's native
+  LSP client, filetype detection, cool.mod workspace selection and completion.
+  The config ships in the checksummed distribution. An explicit fetch target
+  downloads Neovim v0.12.5 for Apple Silicon macOS into build/ and verifies SHA256
+  `65fb000099e47ca1b762584c484cc833f40e30851a0ec450d4174e16317c1f9b`;
+  normal `make test` never downloads an editor. The headless client test uses
+  actual Neovim document synchronization, UTF-16 conversions, diagnostics,
+  requests and edit application. It passes CRLF/emoji locations, cross-package
+  definitions, applying a completion edit, shared-client unsaved dependencies,
+  close/reset, standalone files without a module and graceful shutdown.
+  Source/module bytes are unchanged; editor config/data/state/cache are isolated.
+  Checkout, compiler-instrumented ASan (halt-on-error) and read-only installed
+  configurations all pass. The installed run uses an unavailable compiler seed
+  and blocked make. Existing `make lsp-test` also passes on both frontends, and
+  the full distribution suite passes with the editor configuration included.
+  CI explicitly fetches and tests the pinned client, including sanitizer and
+  installed runs; remote CI has not been observed. This validates the real
+  headless client, not visual popup/UI behavior. Compiler sources are unchanged
+  in this milestone. Evidence: `build/release-audit/neovim-{checkout,sanitize,distribution,lsp-regression}.log`
+  and `neovim-{client,sanitize,installed}-report.json`.
+  G7 remains open for the documented analysis/recovery gaps, rather than absence
+  of an actual editor client test. See [editor setup](editor.md#neovim-setup).
 
 ## Next implementation checkpoints
 

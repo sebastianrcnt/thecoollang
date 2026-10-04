@@ -8,7 +8,8 @@ JSON-RPC messages. No editor extension is required by the server itself.
 
 The current implementation supplies diagnostics, definition lookup for
 successfully checked packages, and compiler-driven completion. Broader recovery
-from invalid code and editor integration remain open for the 1.0 tooling gate.
+from invalid code and the documented unsupported contexts remain open for the
+1.0 tooling gate. A real Neovim client integration test is included.
 
 ## Supported behavior
 
@@ -79,6 +80,59 @@ top-level declarations and import path strings still need completion support.
 The server returns an empty incomplete list when scanning/checking fails. Each
 request uses synchronous analysis with the same native-process timeout; requests
 are not yet cancellable or debounced.
+
+## Neovim setup
+
+The release includes `editors/neovim/cool.lua`, tested with Neovim 0.12.5's
+built-in LSP client. It registers `.cool` files, finds the package workspace via
+`cool.mod`, starts `cool lsp`, and enables native completion with automatic
+triggering. It does not install plugins or modify your editor configuration.
+Add this to your own Neovim configuration after putting `cool` on PATH:
+
+```lua
+local cool = vim.fn.exepath('cool')
+assert(cool ~= '', 'cool must be on PATH')
+local executable = assert(vim.uv.fs_realpath(cool))
+local root = vim.fs.dirname(vim.fs.dirname(executable))
+dofile(root .. '/editors/neovim/cool.lua').setup({ cmd = { cool, 'lsp' } })
+```
+
+The same root lookup works for `tools/cool` in a checkout and the installed
+`bin/cool` symlink. You can also load the Lua file using an explicit absolute
+path and pass `{ cmd = { '/absolute/path/to/cool', 'lsp' } }`. The optional table
+accepts ordinary Neovim LSP configuration fields; supplied fields override the
+module defaults. No keymaps are replaced. Neovim's definition and completion
+commands remain available through its built-in LSP APIs.
+
+Real-client checks are separate from the compiler suite:
+
+```sh
+make editor-client-fetch       # pinned, checksummed client downloaded into build/
+make editor-client-test
+make editor-client-sanitize-test
+make editor-distribution-test
+# Or use an existing client without downloading:
+make editor-client-test NVIM=/absolute/path/to/nvim
+```
+
+The fetch helper currently targets Apple Silicon macOS, the first release host.
+Ordinary `make test` does not download software. The headless test uses Neovim's
+actual filetype detection, workspace attachment, incremental synchronization,
+UTF-16 conversion, diagnostic store, request client and text-edit application.
+It tests CRLF/emoji positions, cross-package definitions, applying a completion
+edit, shared-client unsaved dependency buffers, close/reset, standalone files
+outside modules and graceful shutdown.
+Source and module files must remain unchanged. Config/data/state/cache directories
+are temporary, and user init/runtime overrides are excluded. This is native
+client integration evidence, not a visual popup/UI acceptance test.
+
+The same test runs against the instrumented ASan frontend and the checksummed,
+read-only installed distribution with seed/make unavailable. CI downloads the
+pinned client and runs these explicit targets; remote CI still requires observation.
+The client archive is a test dependency, not part of the Cool distribution.
+
+References: [Neovim LSP documentation](https://neovim.io/doc/user/lsp/) and
+[the pinned Neovim 0.12.5 release](https://github.com/neovim/neovim/releases/tag/v0.12.5).
 
 ## Implementation and verification
 

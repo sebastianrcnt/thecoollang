@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Reproducible archive, isolated prefix install, read-only use and safe uninstall."""
+import argparse
 import hashlib
 import io
 import json
@@ -11,6 +12,9 @@ import sys
 import tarfile
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser()
+parser.add_argument('--nvim',type=Path)
+args=parser.parse_args()
 
 
 def run(args,*,cwd,env=None,code=0,input=None):
@@ -49,6 +53,9 @@ with tempfile.TemporaryDirectory(prefix='cool external distribution ') as tempor
     for path in installed.rglob('*'):
         path.chmod(0o555 if path.is_dir() or path.stat().st_mode & 0o111 else 0o444)
     installed.chmod(0o555)
+    if args.nvim:
+        run([sys.executable,ROOT/'tools/test_neovim.py','--nvim',args.nvim.resolve(),'--cli',cli,
+             '--config',installed/'editors/neovim/cool.lua','--report-name','neovim-installed'],cwd=root,env=env)
     project=root/'project';project.mkdir();run([cli,'mod','init','example.com/distribution'],cwd=project,env=env)
     library=project/'math';library.mkdir();(library/'math.cool').write_text('package math;pub fn value()->i64{return 42;}')
     source=project/'main.cool';source.write_text('''package main;import m "example.com/distribution/math";import "std/io";import "std/mem";import j "std/json";import t "std/text";import r "std/result";

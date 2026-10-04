@@ -35,7 +35,7 @@ def main():
     revision=command('git','rev-parse','HEAD');epoch=int(os.environ.get('SOURCE_DATE_EPOCH',command('git','show','-s','--format=%ct','HEAD')))
     with tempfile.TemporaryDirectory(prefix='cool-package-') as temporary:
         stage=Path(temporary)/'payload';stage.mkdir()
-        files=['VERSION','LICENSE','THIRD_PARTY.md','SOURCE.md','tools/cool','tools/driver_common.py','tools/modules.py','tools/repl_driver.py','tools/lsp_server.py','tools/release_support.py',
+        files=['editors/neovim/cool.lua','VERSION','LICENSE','THIRD_PARTY.md','SOURCE.md','tools/cool','tools/driver_common.py','tools/modules.py','tools/repl_driver.py','tools/lsp_server.py','tools/release_support.py',
                'build/cool-compiler','build/language-runtime.o','build/language-runtime.dylib','language/runtime.c','language/numeric.h','language/memory.h','language/args.h']
         files += [str(path.relative_to(ROOT)) for path in sorted((ROOT/'stdlib').rglob('*')) if path.is_file() and path.suffix in ('.cool','.md')]
         files += [str(path.relative_to(ROOT)) for path in sorted((ROOT/'docs').glob('*.md'))]
