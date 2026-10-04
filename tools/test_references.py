@@ -11,6 +11,8 @@ struct Pair { value:i64; }
 fn plus(x:&mut i64){*x=*x+1;}
 fn read(x:&i64)->i64{return *x;}
 fn identity(x:&i64)->&i64 borrows(x){return x;}
+fn identity_mut(x:&mut i64)->&mut i64 borrows(x){return x;}
+fn second(x:&i64,y:&i64)->&i64 borrows(y){return y;}
 fn field(x:&mut Pair)->&mut i64 borrows(x){return &mut (*x).value;}
 fn later(x:&mut i64){*x=90;}
 fn bridge(x:&mut i64)->&mut i64 borrows(x){unsafe{return borrow_raw[&mut i64](cast[*i64](x),x);}}
@@ -28,6 +30,11 @@ fn main(){
  {let r=&mut x;{let child=&*r;assert(*child==45);assert(*r==45);}*r=46;}
  {let r=&mut x;let alias=r;*alias=47;}
  assert(x==47);
+ {let r=identity(identity(identity(&x)));assert(*r==47);}
+ {let r=identity_mut(identity_mut(&mut x));*r=48;}assert(x==48);x=47;
+ {var first=1;var last=2;let selected=second(identity(&first),identity(&last));first=9;assert(*selected==2);}
+ {let anchor=&mut x;{let child=identity_mut(identity_mut(anchor));*child=49;}*anchor=47;}
+ {let r=identity(bridge_read(identity(&x)));assert(*r==47);}
  var pair=Pair{value:3};{let r=field(&mut pair);*r=7;}assert(pair.value==7);
  let p=new[i64](10);{let r=&mut *p;*r=11;}assert(*p==11);
  {let r=&*p;assert(*r==11);}let q=move p;assert(*q==11);
@@ -65,6 +72,12 @@ NEGATIVE=[
  ('var x=1;let anchor=&mut x;unsafe{let p=cast[*i64](anchor);let r=identity(borrow_raw[&mut i64](p,anchor));*anchor=2;}', 'conflicts'),
  ('let p=new[i64](1);observe(&*p,consume(move p));', 'conflicts'),
  ('var x=1;both(&mut x,identity(&mut x));', 'conflicts'),
+ ('var x=1;let r=identity(identity(&mut x));x=2;', 'conflicts'),
+ ('var x=1;let parent=&mut x;let r=identity(identity(parent));*parent=2;', 'conflicts'),
+ ('var x=1;both(identity(identity(&mut x)),&mut x);', 'conflicts'),
+ ('let p=new[i64](1);*identity(identity(&mut *p))=consume(move p);', 'conflicts'),
+ ('let p=new[i64](1);hold(identity(identity(&mut *p)),consume(move p));', 'conflicts'),
+ ('var x=1;defer set(identity(identity(&mut x)));x=2;', 'conflicts'),
  ('var a=[2]i64{1,2};let s=a[:];let r=&mut a[0];', 'slices cannot share'),
  ('var a=[2]i64{1,2};let s=a[:];let r=&mut s[0];', 'aliasable slice'),
  ('var a=[2]i64{1,2};let r=&mut a[0];let s=a[:];', 'slices cannot share'),
@@ -81,11 +94,12 @@ WHOLE_NEGATIVE=[
 
  ('fn bad()->&i64 borrows() {let x=1;return &x;}fn main(){}', 'outlive'),
  ('fn bad(x:&i64)->&i64 borrows(x){let y=1;return &y;}fn main(){}', 'outlive'),
+ ('fn id(x:&i64)->&i64 borrows(x){return x;}fn bad(x:&i64)->&i64 borrows(x){let y=1;return id(id(&y));}fn main(){}', 'outlive'),
  ('struct S{r:&i64;}fn main(){}', 'aggregate storage'),
  ('fn f(x:&[]i64){}fn main(){}', 'nested borrowed'),
  ('fn main(){var x=1;let p=new[&i64](&x);}', 'owned storage'),
 ]
-PRELUDE='fn consume(p:own[i64])->i64{return 0;}fn observe(p:&i64,n:i64){}fn set(x:&mut i64){*x=1;}fn both(x:&mut i64,y:&mut i64){}fn identity(x:&mut i64)->&mut i64 borrows(x){return x;} '
+PRELUDE='fn consume(p:own[i64])->i64{return 0;}fn observe(p:&i64,n:i64){}fn hold(p:&mut i64,n:i64){}fn set(x:&mut i64){*x=1;}fn both(x:&mut i64,y:&mut i64){}fn identity(x:&mut i64)->&mut i64 borrows(x){return x;} '
 
 
 def run(args,**kwargs):

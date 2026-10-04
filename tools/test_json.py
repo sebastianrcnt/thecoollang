@@ -16,9 +16,9 @@ fn deep(count:i64)->own[j.Value]{if(count==0){return j.null_value();}let parent=
 fn api(){
  let object=j.object_value();j.object_insert(&mut *object,key("minimum"),j.integer_value(-9223372036854775808));
  let name=key("minimum");assert(j.object_contains(&*object,&name));assert(j.object_len(&*object)==1);
- {let member=j.object_at(&*object,&name);assert(t.equal(j.number_text(member),&name)==false);}
+ assert(t.equal(j.number_text(j.object_at(&*object,&name)),&name)==false);
  let array=j.array_value();j.array_push(&mut *array,j.boolean_value(true));j.array_push(&mut *array,j.string_value(key("한글🙂")));
- assert(j.array_len(&*array)==2);assert(j.as_bool(j.array_at(&*array,0)));{let item=j.array_at(&*array,1);assert(t.scalar_len(j.as_text(item))==3);}
+ assert(j.array_len(&*array)==2);assert(j.as_bool(j.array_at(&*array,0)));assert(t.scalar_len(j.as_text(j.array_at(&*array,1)))==3);
  j.object_insert(&mut *object,key("array"),move array);
  let encoded=r.value_or[t.Text,j.ErrorKind](j.encode(&*object),t.create());
  let again=r.value_or[own[j.Value],j.ParseError](j.parse(&encoded),j.null_value());assert(j.object_len(&*again)==2);

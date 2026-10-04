@@ -205,8 +205,9 @@ fn main() {
 `object_len`/`object_contains`/`object_at` to inspect matching kinds. Access with
 an incorrect kind, absent key or invalid array index traps. Borrowed child/text
 access prevents mutation or movement of the parent for the loan's scope.
-Reference-returning chains currently need named intermediate references, as in
-the example.
+Reference-returning calls may be nested directly, for example
+`text.byte_len(json.number_text(json.array_at(&*value, 1)))`; the original tree
+remains borrowed throughout the expression.
 
 Construct trees with `null_value`, `boolean_value`, `integer_value`,
 `number_value(Text)`, `string_value(Text)`, `array_value` and `object_value`.

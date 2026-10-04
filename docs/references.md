@@ -47,9 +47,12 @@ fn swap[T](left: &mut T, right: &mut T) {
 
 A function returning a reference declares `borrows(parameter)` and may only
 return storage rooted in that parameter. Returning a local or local owner is
-rejected. Callers currently require one declared source and a named reference
-or direct borrow as that argument. A returned field reference keeps the entire
-source root borrowed.
+rejected. Calls require one declared source; its argument may be a named
+reference, a direct borrow or another reference-returning call. Nested calls
+retain the selected argument's original root and reborrow parent, including
+when the source is not the first parameter. Argument loans protect evaluation
+of later arguments; the result loan remains live through its enclosing binding
+or expression. A returned field reference keeps the entire source root borrowed.
 
 ```cool
 struct Pair { value: i64; }
@@ -76,8 +79,8 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
   these restrictions.
 - REPL statement submissions containing references are rejected because loans
   are not yet retained across submissions. Compiled function bodies are checked.
-- Reference calls with multiple return sources or nested computed return-source
-  arguments are rejected. References need richer provenance sets for these.
+- Reference calls with multiple return sources are rejected. These require
+  richer provenance sets; nested calls with one declared source are supported.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
   method receiver syntax or borrow-aware replacement for every collection API.
 

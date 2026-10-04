@@ -279,40 +279,37 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         }
         if (node.kind == 4) {
             let saved = check.loans;
-            var arg = node.a;
-            while (arg != null) {
-                ReferenceValue(check, arg);
-                arg = arg.next;
-            }
+            var contract: i64 = 0;
             if (IsReference(node.type)) {
-                // Until union-valued roots are supported, reject ambiguous contracts.
                 let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-                let contract = ctx.v_functions[node.slot].borrow_contract;
+                contract = ctx.v_functions[node.slot].borrow_contract;
                 if (contract == 0 || (contract & (contract - 1)) != 0) {
                     ErrorAt(node.token, cast[ * u8]("reference return requires exactly one borrows source"));
                 }
-                var index: i64 = 0;
-                arg = node.a;
-                while ((contract & (1 << index)) == 0) {
-                    arg = arg.next;
-                    index = index + 1;
-                }
-                var root: * Local = null;
-                var parent: * Local = null;
-                if (arg.kind == 23) {
-                    if (arg.op == 1) {
-                        parent = BorrowRoot(arg.origin_source);
-                    } else {
-                        parent = BorrowRoot(arg.a);
+            }
+            var root: * Local = null;
+            var parent: * Local = null;
+            var index: i64 = 0;
+            var arg = node.a;
+            while (arg != null) {
+                let before = check.loans;
+                ReferenceValue(check, arg);
+                if ((contract & (1 << index)) != 0) {
+                    // A reference expression leaves its result loan at the head.
+                    // Preserve provenance before evaluating later arguments, and
+                    // before replacing temporary argument loans with the result.
+                    if (!IsReference(arg.type) || check.loans == before) {
+                        ErrorAt(node.token, cast[ * u8]("reference return requires a tracked reference argument"));
                     }
-                } else {
-                    parent = BorrowRoot(arg);
+                    root = check.loans.root;
+                    parent = check.loans.parent;
                 }
-                if (parent != null) {
-                    root = ReferenceRoot(check, parent);
-                }
+                index = index + 1;
+                arg = arg.next;
+            }
+            if (IsReference(node.type)) {
                 if (root == null) {
-                    ErrorAt(node.token, cast[ * u8]("reference return requires a named or direct borrowed argument"));
+                    ErrorAt(node.token, cast[ * u8]("reference return requires a tracked reference argument"));
                 }
                 ReferenceRelease(check, saved);
                 let loan = cast[ * ReferenceLoan](CAlloc(i64(sizeof(ReferenceLoan))));

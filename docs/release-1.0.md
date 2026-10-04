@@ -182,6 +182,14 @@ through ordinary evaluation or library use.
   real applications; this is JSON support, not general serialization derivation.
 
 
+- Nested reference-returning calls now propagate the selected argument's actual
+  loan root and reborrow parent, rather than requiring a syntactically named
+  argument. Later arguments cannot invalidate that loan, and pending assignment
+  addresses remain protected. Both frontends pass 44 rejection cases plus five
+  engines/O2, safe vector and JSON sanitizer suites; both bootstrap paths
+  converge. Single-source contracts remain required; stored-reference and slice
+  integration work is still open.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

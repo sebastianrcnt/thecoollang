@@ -70,7 +70,7 @@ U0 ReferenceAddress(ReferenceCheck *check,Node *node){
     ReferenceValue(check,node);
 }
 U0 ReferenceValue(ReferenceCheck *check,Node *node){
-    ReferenceLoan *saved, *loan;Node *arg,*item;I64 contract,index;Local *root,*parent;
+    ReferenceLoan *saved, *loan, *before;Node *arg,*item;I64 contract,index;Local *root,*parent;
     if(!node)return;
     if(IsReference(node->type)){
         if(node->kind==N_AGG_LITERAL){if(node->op==1){ReferenceValue(check,node->a);ReferenceAcquire(check,node->origin_source,Shape(node->type)->count,node->token);return;}ReferenceAddress(check,node->a);ReferenceAcquire(check,node->a,Shape(node->type)->count,node->token);return;}
@@ -82,14 +82,22 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     if(node->kind==N_MOVE){ReferenceAddress(check,node->a);ReferenceAccess(check,node->a,TRUE);return;}
     if(node->kind==N_LOCAL_ADDRESS || node->kind==N_FIELD_ADDRESS || node->kind==N_INDEX_ADDRESS || node->kind==N_OWN_ADDRESS){ReferenceAddress(check,node);ReferenceAccess(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);return;}
     if(node->kind==N_CALL){
-        saved=check->loans;for(arg=node->a;arg;arg=arg->next)ReferenceValue(check,arg);
+        saved=check->loans;contract=0;
         if(IsReference(node->type)){
             contract=functions[node->slot].borrow_contract;
             if(!contract || (contract & (contract-1)))ErrorAt(node->token,"reference return requires exactly one borrows source");
-            index=0;arg=node->a;while(!(contract & (1<<index))){arg=arg->next;index++;}
-            root=NULL;parent=NULL;if(arg->kind==N_AGG_LITERAL){if(arg->op==1)parent=BorrowRoot(arg->origin_source);else parent=BorrowRoot(arg->a);}else parent=BorrowRoot(arg);
-            if(parent)root=ReferenceRoot(check,parent);
-            if(!root)ErrorAt(node->token,"reference return requires a named or direct borrowed argument");
+        }
+        root=NULL;parent=NULL;index=0;
+        for(arg=node->a;arg;arg=arg->next){
+            before=check->loans;ReferenceValue(check,arg);
+            if(contract & (1<<index)){
+                if(!IsReference(arg->type) || check->loans==before)ErrorAt(node->token,"reference return requires a tracked reference argument");
+                root=check->loans->root;parent=check->loans->parent;
+            }
+            index++;
+        }
+        if(IsReference(node->type)){
+            if(!root)ErrorAt(node->token,"reference return requires a tracked reference argument");
             ReferenceRelease(check,saved);loan=CAlloc(sizeof(ReferenceLoan));loan->root=root;loan->parent=parent;loan->exclusive=Shape(node->type)->count;loan->next=check->loans;check->loans=loan;
         }return;
     }
