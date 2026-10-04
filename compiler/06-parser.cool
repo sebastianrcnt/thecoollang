@@ -1157,22 +1157,6 @@ t59 = v_t12;
 t60 = cast[*u8]("slicing requires an array or slice");
 ErrorAt(t59, t60);
 }
-t61 = v_n14;
-t62 = AggregateAddress(t61);
-t63 = t62;
-t64 = OwnerPlace(t63);
-if ((t64 != i8(0))) {
-t65 = v_t12;
-t66 = cast[*u8]("borrowing a slice from owned storage requires a scoped exclusive loan");
-ErrorAt(t65, t66);
-}
-t67 = v_element1;
-t68 = Owned(t67);
-if ((t68 != i8(0))) {
-t69 = v_t12;
-t70 = cast[*u8]("slices of owners require exclusive borrow tracking");
-ErrorAt(t69, t70);
-}
 t71 = v_element1;
 t72 = Borrowed(t71);
 if ((t72 != i8(0))) {

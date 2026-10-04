@@ -218,3 +218,10 @@ test: loan-layers-test
 exclusive-storage-test: build/cool-compiler
 	python3 tools/test_exclusive_storage.py
 test: exclusive-storage-test
+
+.PHONY: slice-loans-test slice-loans-sanitize-test
+slice-loans-test: build/cool-compiler
+	python3 tools/test_slice_loans.py
+slice-loans-sanitize-test: build/cool-compiler
+	python3 tools/test_slice_loans.py --sanitize
+test: slice-loans-test

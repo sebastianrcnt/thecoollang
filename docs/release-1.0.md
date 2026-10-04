@@ -329,11 +329,31 @@ through ordinary evaluation or library use.
   Owned/nested stored lifetimes, borrowed slices and reassignment remain
   required; this does not close G2/G4/G5.
 
+- Slice/reference integration: function-body `[]T` values now retain exclusive
+  lexical source loans through copies, reslicing, aggregate storage, calls and
+  owned moves. Element references can reborrow slices; arrays can be used again
+  after the view's scope ends. The whole-function slice/reference exclusion and
+  guards against owned-array/owning-element views are replaced by tracked loans.
+  Slice assignment preserves possible roots at the destination's declaration
+  scope, checks deeper local escapes and avoids cyclic self-reslicing ancestry.
+  This intentionally tightens pre-1.0 plain-array aliasing rules inside functions.
+  All 96 independent source-set queries and 29 rejection cases pass on both
+  frontends. Five engines/O2, instrumented Cool ASan plus C ASan/UBSan, imported
+  `std/slice` integration and executable documentation pass. Full `make test
+  bootstrap-check` passes; self-host IR and native binaries converge (IR SHA256
+  `95c309ecf2e3fc997edf96b1931b6235f4a10208e7cf2219fb238cb96a3bb0a8`).
+  Legacy REPL views of persistent plain arrays are preserved; owned views are
+  explicitly rejected with verified rollback until persistent loans are added.
+  References to slice descriptors, borrowed slice elements, general stored
+  reference lifetimes and REPL integration remain release work; G2/G6 stay open.
+
 ## Next implementation checkpoints
 
-- Extend stored lifetimes to owned/nested storage and slice aliases; keep
-  unsafe raw pointers separate and add rejection regressions before removing
-  restrictions.
+- Extend reference-containing owned/nested storage and references to slice
+  descriptors; keep unsafe raw pointers separate and add rejection regressions
+  before removing restrictions.
+- Integrate persistent REPL loans and converge its array-view rules with checked
+  function bodies while preserving runtime-error recovery.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

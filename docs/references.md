@@ -75,15 +75,17 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 - Shared and exclusive references can be stored in non-owning, slice-free
   structs, arrays and enums. A stored reference's pointee must not itself contain
   borrowed storage. Reference-containing owned allocations and aggregates mixing
-  references with owners/slices remain rejected. Reassignment of borrowed
-  bindings/fields, general nested stored lifetimes and borrowed slices need
-  further tracking.
-- Existing mutable slices cannot share a root with references within one
-  function, even in disjoint scopes. References into aliasable slice storage are
-  rejected. Slice and reference provenance must be integrated before relaxing
-  these restrictions.
-- REPL statement submissions containing references are rejected because loans
-  are not yet retained across submissions. Compiled function bodies are checked.
+  references with owners/slices remain rejected. Reassignment of reference
+  bindings/fields and general nested stored lifetimes need further tracking.
+- Function-body slices use the same lexical provenance as references. A slice
+  exclusively borrows its elements; element references reborrow it, and disjoint
+  lexical scopes can reuse the source. References to a slice descriptor and
+  slice elements containing borrowed storage remain unsupported.
+- REPL statement submissions containing references or owned slices are rejected
+  because loans are not yet retained across submissions. Legacy views of
+  persistent plain arrays remain available there with their existing aliasing
+  behavior. Compiled function bodies use the lexical rules described here;
+  persistent REPL loan integration is still required for 1.0.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
   or borrow-aware replacement for every collection API.
   [Methods](methods.md) use the same scoped loans.
@@ -182,8 +184,8 @@ they do not become unrelated roots of the reference being bound.
 `make reference-sets-test` validates these cases on both frontends, five engines
 and optimized native output. It includes 28 explicit rejection cases and an
 independent finite-set oracle with 216 seeded mutation queries, plus repeated
-union deduplication. Stored shared references extend this model below; borrowed
-slice integration and persistent REPL loans remain separate work.
+union deduplication. Stored shared references and slices extend this model below; persistent REPL
+loans remain separate work.
 
 
 ## Stored shared references
@@ -293,8 +295,8 @@ to advance. The source vector remains immutable until all its loans end.
 
 Fields within one container still share a conservative physical root. References
 returned from a locally bound iterator cannot escape its scope, even if the
-source outlives it: `next` explicitly borrows `self`. Borrowed slice integration,
-general stored lifetimes and lifetime-aware replacement remain necessary for
+source outlives it: `next` explicitly borrows `self`. General stored lifetimes
+and lifetime-aware reference replacement remain necessary for
 the complete borrowing design; this API does not close that release gate.
 
 `make nested-references-test` covers container receiver mutation, reborrows,
@@ -439,3 +441,70 @@ empty/exhausted iterators and 26 rejection cases. Its sanitizer mode instruments
 Cool memory accesses and C runtime operations. `make owner-evaluation-test`
 includes six further reference-mediated pending-owner rejection cases and valid
 reads/updates through named and returned owner references.
+
+
+## Tracked slices
+
+Inside checked function bodies, `[]T` is an exclusive lexical view of contiguous
+array storage. Its representation remains a pointer and length (16 bytes on
+the supported host); borrowing does not allocate or copy elements. This is a
+pre-1.0 change: code that reads or replaces the original array while its slice
+is live now receives a conflict diagnostic. Use the slice during its scope,
+then use the original after the scope ends.
+
+```cool
+fn tail(values: []i64) -> []i64 borrows(values) {
+    return values[1:];
+}
+fn main() {
+    var values = [3]i64{10, 20, 30};
+    {
+        let view = values[:];
+        {
+            let item = &mut view[1];
+            assert(len(view) == 3);
+            *item = 21;
+        }
+        {
+            let rest = tail(view);
+            rest[0] = 22;
+        }
+        view[2] = 31;
+    }
+    assert(values[1] == 22 && values[2] == 31);
+}
+```
+
+Copying, passing and reslicing reborrow all possible source roots. Shared
+`&view[index]` and exclusive `&mut view[index]` references retain those roots;
+the parent resumes when their scopes end. `len` of a named slice observes only
+its descriptor and is allowed while an element loan lives. A returned slice
+requires a `borrows(...)` contract; multiple declared sources are conservatively
+retained. Structs/enums/arrays containing slices follow the same rules, and
+moving a value with owning fields must retain its contained slice provenance.
+Slice elements still cannot contain borrowed storage.
+
+Slices may borrow owned arrays and arrays of owners. The source cannot be moved
+or freed while the slice lives. Elements may be moved out and replaced through
+the slice with explicit `move`, just as through an exclusive element reference.
+A pending pointer into an owning element prevents moving/replacing that owner
+while evaluating an index or assignment RHS. A slice of a shared array reference
+cannot grant write permission and is rejected; there is no separate read-only
+slice type yet.
+
+Slice variables and slice-containing local fields can be reassigned. The checker
+conservatively retains both previous and new possible roots through the target
+binding's lexical scope, including assignments inside a branch or loop. Assigning
+a source whose local storage is nested more deeply than the destination is
+rejected. Self-reslicing (`view = view[1:]`) preserves its original ancestry;
+it does not introduce a cyclic parent loan. Replacing a slice with an empty
+value does not end earlier loans. Lifetime-aware release of individual replaced
+sources and mutable reference-field replacement remain future work.
+
+`make slice-loans-test` checks 96 independently modeled source-set queries,
+29 rejection cases, owned arrays/elements, computed element references,
+self-reslicing, nested/branch/loop assignment, moved owning containers and
+scope resumption. Both frontends and all five engines plus optimized native
+output are exercised. `make slice-loans-sanitize-test` additionally instruments
+Cool LLVM accesses with ASan and the C runtime with ASan/UBSan. The REPL test
+checks explicit rejection and rollback for currently unsupported owned views.

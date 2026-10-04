@@ -78,9 +78,9 @@ NEGATIVE=[
  ('let p=new[i64](1);*identity(identity(&mut *p))=consume(move p);', 'conflicts'),
  ('let p=new[i64](1);hold(identity(identity(&mut *p)),consume(move p));', 'conflicts'),
  ('var x=1;defer set(identity(identity(&mut x)));x=2;', 'conflicts'),
- ('var a=[2]i64{1,2};let s=a[:];let r=&mut a[0];', 'slices cannot share'),
- ('var a=[2]i64{1,2};let s=a[:];let r=&mut s[0];', 'aliasable slice'),
- ('var a=[2]i64{1,2};let r=&mut a[0];let s=a[:];', 'slices cannot share'),
+ ('var a=[2]i64{1,2};let s=a[:];let r=&mut a[0];', 'conflicts'),
+ ('var a=[2]i64{1,2};let s=a[:];let r=&mut s[0];s[0]=3;', 'conflicts'),
+ ('var a=[2]i64{1,2};let r=&mut a[0];let s=a[:];', 'conflicts'),
  ('var x=1;let r=&mut x;unsafe{let p=&raw x;}', 'conflicts'),
 ]
 WHOLE_NEGATIVE=[

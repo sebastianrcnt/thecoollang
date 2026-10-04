@@ -994,17 +994,6 @@ ErrorAt(t11, t12);
 t13 = v_type23;
 t14 = Shape(t13);
 if (((t14).kind == 3)) {
-t15 = v_type23;
-t16 = Shape(t15);
-t17 = (t16).element;
-t18 = Owned(t17);
-if ((t18 != i8(0))) {
-t19 = v_type23;
-t20 = Shape(t19);
-t21 = (t20).token;
-t22 = cast[*u8]("slices of owners require exclusive borrow tracking");
-ErrorAt(t21, t22);
-}
 t23 = v_type23;
 t24 = Shape(t23);
 t25 = (t24).element;

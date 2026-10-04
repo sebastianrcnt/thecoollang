@@ -10,7 +10,7 @@ packages are bundled sources and need no module download.
 | `std/mem` | unsafe `alloc`, `free`, `copy`; diagnostic `owner_count` |
 | `std/result` | `Result[T,E]`, `is_ok`, `value_or` |
 | `std/option` | `Option[T]`, `is_some`, `value_or` |
-| `std/slice` | generic `fill`, `reverse`, `tail`, `take`; checked return borrow contracts |
+| `std/slice` | generic `fill`, `reverse`, `tail`, `take`; lexical exclusive views and checked return borrow contracts |
 | `std/strings` | UTF-8 byte `length`, `byte_at`, `equal`, `starts_with`, `ends_with`; checked decimal `parse_i64` |
 | `std/text` | owning UTF-8 `Text`, strict validation, byte/scalar lengths, scalar access, append/clone/clear, byte conversion, ordering/prefix/suffix |
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
@@ -361,3 +361,10 @@ for example `values.append(42)`, `*values.at(0)`, `word.scalar_len()` and
 `map.at(&key).scalar_len()`. Factories remain package functions. Method calls
 use the same receiver loans and owning transfers as the free-function forms;
 see [declarations, generics and supported chains](../docs/methods.md).
+
+Slices in checked functions exclusively borrow their source. `std/slice` calls
+reborrow their arguments, and `tail`/`take` return views under declared lifetime
+contracts. Scope returned views before reusing the parent; use `&view[i]` or
+`&mut view[i]` for element access through checked references. Owned arrays and
+owning elements are supported. See [tracked slices](../docs/references.md#tracked-slices)
+for examples, reassignment semantics and the remaining REPL restrictions.

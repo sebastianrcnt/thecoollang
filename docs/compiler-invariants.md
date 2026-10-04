@@ -223,8 +223,9 @@ Nested-reference returns preserve nested argument layers; other anchors are
 conservative in both layers. Ordinary borrowed returns combine selected roots.
 This avoids inventing an exclusive source-vector loan when mutating an iterator,
 while keeping physical receiver aliases and all referent invalidations checked.
-Mixed owner/slice/reference aggregates, arbitrary nested stored lifetimes,
-integrated slice loans and persistent REPL references remain unsupported. Do not remove
+Aggregates mixing scoped references with owner/slice fields, arbitrary nested
+stored reference lifetimes, references to slice descriptors and persistent REPL
+loans remain unsupported. Do not remove
 their rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).
@@ -242,6 +243,23 @@ moving/replacing an owner through another use of the same reference while a
 pointee address is pending. Plain loads release address-evaluation loans after
 access; owner loads keep them for surrounding projections. Never exempt another
 argument or a merely similar expression from these pins.
+
+Slice values participate through `TrackedBorrow`, while `ContainsReference`
+continues to enforce reference-specific storage and reassignment restrictions.
+Slices request exclusive mode; constructing an array view acquires its source
+before evaluating bounds. Slice index addresses observe a named descriptor
+without creating a spurious exclusive copy, and element references reborrow
+its source loans. Slice call results, projections, aggregates and owned moves
+retain the same source sets. `len` of a named slice reads only its descriptor.
+
+Each tracked binding has a rootless lifetime marker. Markers are not source
+loans and acquisition must skip them. Slice reassignment inserts retained source
+loans below the destination's marker, so an inner block's ordinary temporary
+release cannot free them prematurely. Sources accumulate conservatively across
+branches and loops; deeper local roots cannot escape into an outer binding.
+Reassignment through a descendant normalizes ancestry to the destination's
+previous parent, preventing self-reslicing cycles. Original loans are not
+removed during this analysis, which keeps saved list boundaries stable.
 
 ## Backends, replacement and recovery
 

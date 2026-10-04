@@ -95,7 +95,6 @@ U0 ValidateBorrowedElements(I64 type) {
     Layout(type);
     if (Shape(type)->kind == A_OWNER) { if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "owned storage cannot contain borrowed references"); }
     else if (Shape(type)->kind == A_SLICE) {
-        if (Owned(Shape(type)->element)) ErrorAt(Shape(type)->token, "slices of owners require exclusive borrow tracking");
         if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "slice elements cannot contain borrowed slices until lifetime analysis exists");
     } else if (Shape(type)->kind == A_ARRAY) ValidateBorrowedElements(Shape(type)->element);
     else for (field = Shape(type)->fields; field; field = field->next) ValidateBorrowedElements(field->type);

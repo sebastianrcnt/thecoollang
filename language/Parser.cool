@@ -233,8 +233,6 @@ Node *Primary() {
             if (kind) element = Shape(n->type)->element; else element = n->type-T_PTR;
             if (Take(':')) {
                 if (!kind) ErrorAt(t, "slicing requires an array or slice");
-                if (OwnerPlace(AggregateAddress(n))) ErrorAt(t, "borrowing a slice from owned storage requires a scoped exclusive loan");
-                if (Owned(element)) ErrorAt(t, "slices of owners require exclusive borrow tracking");
                 if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");
                 if (kind == A_ARRAY && !mutable) ErrorAt(t, "mutable slice requires a var array");
                 high = NULL; if (At()->kind != ']') { high = Expr(1); if (!Integer(high->type)) ErrorAt(t, "slice bound must be an integer"); }
