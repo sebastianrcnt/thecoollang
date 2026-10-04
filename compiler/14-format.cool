@@ -325,6 +325,7 @@ if (!((v_source7 != null))) {
 t4 = 2;
 NativeExit(t4);
 }
+ValidateInput(v_source7,v_size2,v_path3);
 t5 = v_source7;
 t6 = v_path3;
 LexSource(t5, t6);

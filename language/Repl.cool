@@ -103,6 +103,7 @@ U0 ReplRestore() {
 U0 ReplStep(Text *text) {
     I64 start = ntok, result, register_id, i; Node *statement, *call, *arg; Function *f; I64 *grown;
     repl_executing = FALSE; repl_keep_tokens=FALSE;repl_token_end=0;
+    ValidateInput(text->data,text->len,"<repl>");
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
     if(ReplLoanCommand())return;
@@ -143,8 +144,8 @@ U0 Repl(Bool prompt) {
     while (TRUE) {
         if (prompt) Out("cool> ");
         text = Submission(); if (!text) break;
-        if (Eq(text->data, ":quit\n") || Eq(text->data, ":quit")) break;
-        if (Eq(text->data, ":stats\n")) {
+        if (StrLen(text->data)==text->len && (Eq(text->data, ":quit\n") || Eq(text->data, ":quit"))) break;
+        if (StrLen(text->data)==text->len && Eq(text->data, ":stats\n")) {
             stats = TextNew(); compiled = 0;
             for (i = 1; i < nfun; i++) if (functions[i].bytecode) compiled++;
             Append(stats, "functions="); Number(stats, nfun - 1); Append(stats, " compiled="); Number(stats, compiled);

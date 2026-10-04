@@ -835,6 +835,24 @@ through ordinary evaluation or library use.
   evaluation contract and its conformance mapping; a partial draft is not a
   substitute for that gate.
 
+- External input-length audit: reproduced both frontends silently accepting a
+  valid program followed by NUL and invalid trailing source. Both now validate
+  actual byte lengths before source/format/bundle/REPL package parsing and REPL
+  execution. Embedded NUL inside comments or literals is also rejected. Raw
+  REPL command matching cannot treat a truncated `:quit` prefix as a command;
+  recovery preserves existing state without executing a submission prefix.
+  Seven placements pass rejection across check/scan/tree/bytecode/JIT, formatter
+  source/destination preservation, native JSON byte ranges, bundle rejection,
+  and REPL recovery on both frontends and the compiler-instrumented ASan build.
+  LSP tests verify the offending UTF-16 range after emoji and CRLF handling.
+  Full `make test bootstrap-check`, exact self-host convergence, instrumented
+  input/LSP checks, and installed Neovim/distribution validation pass.
+  IR SHA256 is
+  `723fd207fd318b78c2c0ec2fa56539513e3baf20af11f3dd7d14fe2ca0b9e63e`.
+  Evidence: `build/release-audit/input-bytes-{focused,regression,sanitize,distribution}.log`.
+  This closes the demonstrated truncation defect, not the full encoding audit
+  or G1/G2/G4/G9 release gates; remote CI remains unobserved.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

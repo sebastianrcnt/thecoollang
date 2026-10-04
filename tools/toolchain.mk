@@ -306,3 +306,10 @@ test: integer-tokens-test
 .PHONY: integer-tokens-sanitize-test
 integer-tokens-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_integer_tokens.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: input-bytes-test input-bytes-sanitize-test
+input-bytes-test: build/cool-compiler build/language.BIN
+	python3 tools/test_input_bytes.py
+test: input-bytes-test
+input-bytes-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_input_bytes.py --frontend build/repl-loans-asan/cool-compiler

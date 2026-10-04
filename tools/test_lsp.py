@@ -216,6 +216,12 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             client.send('textDocument/didClose',{'textDocument':{'uri':liburi}})
             client.barrier()
 
+            nul_text='package main;\nfn main(){let emoji="🙂";}\x00ignored'
+            client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':completion.version},'contentChanges':[{'text':nul_text}]})
+            nul_error=client.barrier()[uri]['diagnostics'][0]
+            assert 'embedded NUL byte' in nul_error['message'],nul_error
+            nul_offset=len(nul_text[:nul_text.index('\x00')].encode())
+            assert nul_error['range']=={'start':byte_position(nul_text,nul_offset),'end':byte_position(nul_text,nul_offset+1)},nul_error
             client.send('textDocument/didClose',{'textDocument':{'uri':uri}})
             assert client.barrier()[uri]['diagnostics']==[]
             client.close()

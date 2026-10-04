@@ -545,3 +545,15 @@ before exiting the isolated process. The driver may tolerate a missing package
 header only for the requested completion source; other files and ordinary
 checking/diagnostics retain normal package rules. This is not a change to the
 language's package requirements.
+
+## External input lengths
+
+ValidateInput must run on the actual byte length before lexing external source,
+formatting input, interpreting bundle/package manifests, or evaluating a REPL
+submission. A zero byte inside that length is invalid; the allocated trailing
+sentinel is outside the length. Do not replace length checks with StrLen.
+Raw REPL commands must also check that their C-string length equals Text.len,
+so they cannot bypass validation and recovery with a truncated command prefix.
+Package loading keeps input buffers registered with the recovery scratch owner
+before validation can raise an error. The diagnostic uses the offending byte's
+file/range/line/column and consumes its temporary Token synchronously.

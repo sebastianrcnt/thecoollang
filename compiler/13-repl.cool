@@ -321,6 +321,7 @@ t0 = (v_text5).data;
 t1 = cast[*u8]("<repl>");
 ctx.v_repl_keep_tokens = false;
 ctx.v_repl_token_end = 0;
+ValidateInput(v_text5.data,v_text5.len,t1);
 LexSource(t0, t1);
 ctx.v_pos = v_start3;
 if (ReplLoanCommand()) { return; }
@@ -687,6 +688,7 @@ if (pc == 26) {
 t34 = (v_text6).data;
 t35 = cast[*u8](":stats\n");
 t36 = Eq(t34, t35);
+if(StrLen(v_text6.data)!=v_text6.len){t36=i8(0);}
 if ((t36 != i8(0))) { pc = 44; } else { pc = 25; }
 continue;
 }
@@ -812,7 +814,7 @@ t42 = cast[*u8](":quit");
 t43 = Eq(t41, t42);
 t40 = (i64(t43) != i64(0));
 }
-if (t40) { pc = 46; } else { pc = 26; }
+if (t40 && StrLen(v_text6.data)==v_text6.len) { pc = 46; } else { pc = 26; }
 continue;
 }
 if (pc == 46) {

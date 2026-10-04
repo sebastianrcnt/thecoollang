@@ -17,11 +17,13 @@
 U0 ReadSource(U8 *file) {
     I64 size; U8 *src = FileRead(file, &size, NULL);
     if (!src) { Out("cannot read source\n"); NativeExit(2); }
+    ValidateInput(src,size,file);
     LexSource(src, file);
 }
 U0 ReadBundle(U8 *file) {
     I64 size, i = 0, start; U8 *data = FileRead(file, &size, NULL), *path;
     if (!data) NativeExit(2);
+    ValidateInput(data,size,file);
     while (data[i]) {
         start = i; while (data[i] && data[i] != '\t') i++;
         if (!data[i]) NativeExit(2);

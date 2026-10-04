@@ -6,12 +6,13 @@ U0 ReplPackagesRestore(){ReplPackage *item;Alias *alias;while(repl_packages!=rep
 U0 ReplReadPackages(U8 *manifest,Token *token){
     ReplPackage *previous=repl_packages,*existing,*package;I64 size=0,at=0,field,begin;U8 *fields[4],*source,*data=ScratchOwn(FileRead(manifest,&size,NULL));
     if(!data)ErrorAt(token,"cannot read resolved package manifest");
+    ValidateInput(data,size,manifest);
     while(data[at]){
         for(field=0;field<4;field++){begin=at;while(data[at] && data[at]!='\t' && data[at]!='\n')at++;if((field<3 && data[at]!='\t') || (field==3 && data[at]!='\n'))ErrorAt(token,"invalid resolved package manifest");fields[field]=ScratchOwn(Slice(data,begin,at++));}
         existing=ReplFindPackage(repl_packages,fields[0]);if(existing && !Eq(existing->fingerprint,fields[1]))ErrorAt(token,"loaded package changed; start a new session");
         if(!ReplFindPackage(previous,fields[0])){
             if(!existing){package=CAlloc(sizeof(ReplPackage));package->name=LiteralString(fields[0]);package->fingerprint=StrNew(fields[1]);package->next=repl_packages;repl_packages=package;}
-            source=ScratchOwn(FileRead(fields[3],&size,NULL));if(!source)ErrorAt(token,"cannot read resolved package source");lex_package=LiteralString(fields[0]);LexSource(source,LiteralString(fields[2]));
+            source=ScratchOwn(FileRead(fields[3],&size,NULL));if(!source)ErrorAt(token,"cannot read resolved package source");ValidateInput(source,size,fields[2]);lex_package=LiteralString(fields[0]);LexSource(source,LiteralString(fields[2]));
         }
     }ScratchRelease(data);
 }

@@ -23,6 +23,7 @@ Bool FAtom(I64 kind) { return kind == K_ID || kind == K_INT || kind == K_STRING 
 U0 FormatFile(U8 *path, U8 *output) {
     U8 *source; I64 size, i, last = 0, kind, prev = 0, parens = 0, brackets = 0, count, second, j; Token *t, *a, *b;
     source = FileRead(path, &size, NULL); if (!source) NativeExit(2);
+    ValidateInput(source,size,path);
     LexSource(source, path); count = ntok; formatted = TextNew();
     for (i = 0; i < count; i++) {
         t = &tokens[i]; kind = t->kind; FComments(source, last, t->start); last = t->end;

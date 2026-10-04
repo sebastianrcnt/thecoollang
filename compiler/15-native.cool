@@ -23,6 +23,7 @@ Out(t4);
 t5 = 2;
 NativeExit(t5);
 }
+ValidateInput(v_src2,v_size3,v_file1);
 t6 = v_src2;
 t7 = v_file1;
 LexSource(t6, t7);
@@ -71,6 +72,7 @@ if (!((v_data != null))) {
 t4 = 2;
 NativeExit(t4);
 }
+ValidateInput(v_data,v_size4,v_file2);
 while (true) {
 if (!(((v_data)[v_i31] != u8(0)))) { break; }
 v_start5 = v_i31;

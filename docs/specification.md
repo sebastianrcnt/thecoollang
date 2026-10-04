@@ -14,6 +14,17 @@ that every keyword spelling is valid as a binding in every grammatical position.
 Spaces, tabs, CR and LF separate tokens. `//` comments extend to the next newline;
 `/* ... */` comments end at the first closing delimiter and do not nest.
 
+External source and REPL submissions are interpreted using their actual byte
+length. An embedded NUL byte is an error anywhere in the input, including inside
+comments and string literals; it never terminates a source file early. Bundle
+and REPL package manifests follow the same rule. REPL rejection happens before
+executing any prefix, and command matching cannot treat `:quit` followed by a
+NUL and extra bytes as a quit command. Native diagnostic offsets are zero-based
+byte ranges; native line and column numbers are one-based, with byte columns.
+The editor translates these ranges to UTF-16 positions. This rule does not imply
+whole-input UTF-8 validation. `make input-bytes-test` covers rejection, formatter
+file preservation, byte ranges and REPL recovery on both frontends.
+
 A string literal is enclosed in double quotes. Supported escapes are `\n`, `\t`,
 `\r`, `\\` and `\"`. A newline inside a string, an unknown escape, or a missing
 closing quote is a compile-time error. Runtime `string` values denote immutable
