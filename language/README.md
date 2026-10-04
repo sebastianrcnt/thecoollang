@@ -1,5 +1,9 @@
 # New-language compiler
 
+The [versioned specification draft](../docs/specification.md) and
+[compatibility policy](../docs/compatibility.md) are being audited for 1.0.
+This implementation overview does not replace those contracts.
+
 The lexer, parser, type checker, interpreter and LLVM emitter are written in
 bootstrap Cool (`*.cool`). `runtime.c` supplies LLVM program IO, numeric checks and raw memory services;
 `ffi.h` adapts scalar/pointer C calls through libffi. No source-to-C compilation is used.
@@ -24,9 +28,9 @@ currently refer to immutable literals; no ownership claim is made.
 on normal block exit, return, break and continue. Panic/runtime failure terminates
 the process and does not promise cleanup.
 
-This is an implementation stage, not the full language: the complete standard
-library covers core collections, text, checked arithmetic, files and process
-arguments, with additional domains still pending.
+This remains a development toolchain. The current standard library covers
+collections, owned text, checked arithmetic, JSON, files, paths, process arguments
+and subprocesses; additional domains and release audits remain open.
 This directory retains the bootstrap frontend. The production frontend in
 `compiler/` directory package uses new syntax and compiles itself; `make selfhost-check`
 verifies both IR and native binary convergence.
@@ -63,10 +67,12 @@ Call sites dispatch through stable function IDs, so a changed callee is replaced
 without recompiling callers. No inlining is done by this baseline tier.
 
 Invalid declarations roll back the symbol table and token cursor. Runtime side
-effects are not transactional. Signature changes require a new session. External
-package loading inside REPL, aggregate layout changes, concurrent redefinition,
-completion and source-history memory reclamation are not implemented yet. The
-session currently has explicit token/function/depth limits.
+effects are not transactional. Signature changes require a new session. External packages use normal offline/frozen resolution. Obsolete function
+artifacts, parser scratch and unreferenced source/token history are reclaimed;
+package, type and alias roots may retain their source. Aggregate layout changes,
+concurrent redefinition and interactive REPL completion remain unsupported.
+`:forget name` releases persistent bindings subject to active loans. The session
+has explicit token/function/depth limits; the final resource audit remains open.
 
 ## Numeric and developer tools coverage
 
@@ -82,12 +88,13 @@ against the operand width.
 relexes its output before writing, and is idempotence-tested. `cool test` discovers
 `test_` functions in directory packages including `_test.cool` files; `--backend
 jit` runs them under native JIT. `cool doc` prints public typed function signatures.
-Documentation comments, a full documentation site and language-server services
-remain outstanding.
+Documentation comments and a full documentation site remain outstanding.
+`cool lsp` supplies native diagnostics, definitions and completion; see
+[editor integration](../docs/editor.md) for exact limits and Neovim setup.
 
 ## Raw memory and C interoperability
 
-Typed `*T` pointers, `null`, `cast[*T](value)`, `&variable`, dereference and pointer indexing
+Typed `*T` pointers, `null`, `cast[*T](value)`, `&raw variable`, dereference and pointer indexing
 are implemented across all execution paths. Pointer arithmetic scales by element
 size. Raw loads/stores check null, but do not promise allocation bounds or lifetime
 safety. `std/mem` exposes alloc/free/copy. Unsafe operations require a lexical
@@ -187,7 +194,8 @@ and REPL behavior in addition to the differential cases in `language-test`.
 functions, structs and enums specialize for explicit type arguments. Recursive
 specializations reuse their concrete identity; generic REPL redefinition requires
 a new session. `std/result`, `std/option`, `std/slice`, `std/vector`, `std/strings`, `std/math`,
-`std/fs` and `std/os` are source packages.
+`std/fs`, `std/os`, `std/text`, `std/map`, `std/json`, `std/path` and
+`std/process` are source packages.
 
 `new[T](value)` produces `own[T]`; `new[T]()` zero-initializes its storage.
 Owners and aggregates containing owners are move-only: use `move value` when
@@ -208,9 +216,10 @@ existing bindings but release owners in aborted call frames and new submission
 storage. Persistent owners survive successful submissions and drop on session
 exit. Runtime process termination outside REPL does not unwind user defers.
 
-The borrow checker is deliberately conservative: owned storage cannot contain
-borrowed slices, and safe slices of owners or views into owned storage are
-rejected until exclusive scoped loans are implemented. Unsafe raw pointers do
+The borrow checker remains conservative: owned storage containing borrowed
+values and several nested-storage combinations remain rejected. Safe slices of
+owners and views into owned arrays now use tracked exclusive loans. See
+[references](../docs/references.md) for the precise supported combinations. Unsafe raw pointers do
 not carry lifetime proofs. `make ownership-test` covers all five engines, LLVM
 O0/O2, nested cleanup, Result/Option transfers, invalid moves and REPL recovery.
 

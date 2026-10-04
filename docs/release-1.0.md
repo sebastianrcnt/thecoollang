@@ -24,7 +24,7 @@ implement parsing, type analysis, interpretation or code generation.
 
 | Gate | Acceptance evidence | Status |
 | --- | --- | --- |
-| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open |
+| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/specification and compatibility drafts started; full semantic audit pending) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
@@ -812,6 +812,28 @@ through ordinary evaluation or library use.
   Evidence: `build/release-audit/completion-declarations-{focused,editor,regression,sanitize,distribution}.log`.
   Broader statement recovery and uninstantiated generic/import-path contexts
   remain documented limitations; this does not close the full release audit.
+
+- Versioned language-contract audit: added `specification.md` (1.0 draft 1)
+  with the audited integer-token rules and explicit remaining grammar/semantic
+  work, plus `compatibility.md` covering source behavior, bug fixes, tool/module
+  interfaces, internal artifacts, C ABI and target boundaries. Neither document
+  claims that 1.0 is released or the full specification is complete. Corrected
+  stale implementation summaries that described methods, scoped loans, REPL
+  imports/source reclamation and LSP services as absent, and corrected raw
+  address spelling to `&raw`. The original required end state is preserved.
+  The lexical audit reproduced both frontends accepting digitless `0x___` and
+  `0b_` tokens as zero. Both lexers now count actual base digits and reject
+  such tokens. Existing nonempty separator spellings retain their behavior.
+  `make integer-tokens-test` compares 101 values with a Python integer oracle
+  under tree/bytecode/native JIT and rejects 40 malformed tokens on both
+  frontends; the instrumented ASan frontend also passes. Full `make test
+  bootstrap-check`, exact self-host convergence and installed Neovim/distribution
+  validation pass. IR SHA256 is
+  `8d3f0d56f9b8c93f81b16f719d7d6731069dd0c734aeb04171bb4dbcd836ce29`.
+  Evidence: `build/release-audit/integer-tokens-{focused,regression,sanitize,distribution}.log`.
+  G1 remains open for the complete versioned grammar, numeric/encoding/layout/
+  evaluation contract and its conformance mapping; a partial draft is not a
+  substitute for that gate.
 
 ## Next implementation checkpoints
 

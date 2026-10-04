@@ -1,7 +1,7 @@
 Bool Alpha(I64 ch) { return ('a' <= ch <= 'z') || ('A' <= ch <= 'Z') || ch == '_'; }
 Bool Digit(I64 ch) { return '0' <= ch <= '9'; }
 U0 LexSource(U8 *src, U8 *file) {
-    I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok, comment_start;
+    I64 i = 0, line = 1, col = 1, start, ch, next, base, d, ok, comment_start, digits;
     Token *t; Text *text; Bool emitted; U8 *number;
     if (!tokens) tokens = CAlloc(MAX_TOKENS * sizeof(Token));
     while (src[i]) {
@@ -28,7 +28,7 @@ U0 LexSource(U8 *src, U8 *file) {
         if (Digit(ch)) {
             t->kind = K_INT; base = 10;
             if (ch == '0' && (next == 'x' || next == 'b')) { base = 16; if (next == 'b') base = 2; i += 2; col += 2; }
-            start = i;
+            start = i; digits=0;
             while (src[i]) {
                 ch = src[i]; d = -1;
                 if (Digit(ch)) d = ch - '0';
@@ -37,7 +37,7 @@ U0 LexSource(U8 *src, U8 *file) {
                 if (ch == '_') { i++; col++; goto digit_next; }
                 if (d < 0 || d >= base) break;
                 if (t->val(U64) > (0xFFFFFFFFFFFFFFFF - d)(U64) / base(U64)) ErrorAt(t, "integer literal exceeds u64 range");
-                t->val = t->val * base + d; i++; col++;
+                digits++;t->val = t->val * base + d; i++; col++;
 digit_next:;
             }
             if (base == 10 && ((src[i] == '.' && Digit(src[i+1])) || src[i] == 'e' || src[i] == 'E')) {
@@ -51,7 +51,7 @@ digit_next:;
                 if (!ok) ErrorAt(t, "floating literal out of range or invalid");
                 t->kind = K_FLOAT;
             }
-            if (i == start || Alpha(src[i]) || Digit(src[i])) ErrorAt(t, "invalid integer literal");
+            if (digits == 0 || Alpha(src[i]) || Digit(src[i])) ErrorAt(t, "invalid integer literal");
             goto lex_next;
         }
         if (ch == '"') {

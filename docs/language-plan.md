@@ -27,30 +27,27 @@ the end state is complete.
 
 ## Current implementation checkpoint
 
-The three follow-up areas have working, tested implementations:
+The production compiler is new-syntax Cool and compiles itself to LLVM IR and a
+native executable. The bootstrap frontend remains in `language/`; C/assembly
+supply platform/runtime services. No source-to-C transpilation is used.
 
-1. Concrete enum payload layouts, exhaustive match, and explicit monomorphized
-   function/struct/enum generics; imported Result and Option packages.
-2. Move-only owners, managed allocation, nested deterministic destruction across
-   all five engines, conservative branch/loop checks, modular borrowed-return
-   contracts and REPL error recovery. Exclusive scoped loans and tracked slices
-   (including owned arrays/elements) work in functions and persist across REPL
-   inputs. REPL imports share normal module resolution and checksum policy.
-   Bounded session resources and general nested borrowed storage remain
-   explicit release work.
-3. Source packages for slices, strings, checked arithmetic, owning chunked vectors,
-   binary files and process arguments. The production compiler now uses new
-   syntax and compiles itself: three generations of LLVM IR and two generations
-   of native executables are byte-identical. The copied executable works without
-   a legacy loader or seed. C is limited to platform/runtime services.
+Implemented and tested areas include methods, explicit generic specialization,
+move-only owners, shared/exclusive loans, tracked slices and collection iteration,
+core text/vector/map/JSON/file/path/process libraries, module resolution, persistent
+REPL package imports, same-signature replacement and transactional reclamation.
+The native LSP supplies diagnostics, definition lookup and scoped/member/declaration
+completion, with protocol tests and a real Neovim-client integration suite.
 
-Validation: `make test`, `make bootstrap-check`, `make selfhost-check`, and
-`make stdlib-test` pass. The legacy suite includes 1,703 ARM64/x86-64 executable
-comparisons; the new-language suite includes 34 differential programs at LLVM
-O0/O2 plus ownership, C ABI, standard-library, package and REPL coverage.
+This is a checkpoint, not a completion claim. General nested borrowed storage,
+some temporary receivers, final resource-lifetime audits, broader editor recovery,
+representative performance validation and release hardening remain open. The
+[release contract](release-1.0.md) is the current gate-by-gate authority;
+[references](references.md) and [editor support](editor.md) state precise limits.
+The [versioned specification draft](specification.md) and
+[compatibility policy](compatibility.md) are not yet frozen.
 
-This does not close every item in the broader required end state above. Methods,
-full scoped loan tracking, language-server services, Go-scale standard-library
-coverage, module proxies/pseudo-versions, non-macOS new-language hosts and lower
-CLI orchestration overhead remain separate outstanding work. There is no claim
-that raw pointers or C interop are memory-safe.
+`docs/release-1.0.md` records verification per milestone, including full regression,
+both bootstrap chains, sanitizer and external installation results. Historical
+pass reports do not certify later source changes or close unverified gates.
+Broader ecosystem exclusions for the first release are explicitly listed there;
+they do not remove the required end state above.

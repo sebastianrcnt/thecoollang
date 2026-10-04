@@ -53,6 +53,7 @@ var completion_comment_start: i64 = 0;
 var v_line: i64 = i64(0);
 var v_col: i64 = i64(0);
 var v_start1: i64 = i64(0);
+var literal_digits: i64 = 0;
 var v_ch3: i64 = i64(0);
 var v_next: i64 = i64(0);
 var v_base: i64 = i64(0);
@@ -591,7 +592,7 @@ pc = 2;
 continue;
 }
 if (pc == 69) {
-t41 = (v_i2 == v_start1);
+t41 = (literal_digits == 0);
 if (!t41) {
 t42 = i64((v_src)[v_i2]);
 t43 = Alpha(t42);
@@ -790,6 +791,7 @@ pc = 95;
 continue;
 }
 if (pc == 97) {
+literal_digits=literal_digits+1;
 (v_t8).val = (((v_t8).val * v_base) + v_d1);
 pc = 96;
 continue;
@@ -885,6 +887,7 @@ pc = 112;
 continue;
 }
 if (pc == 114) {
+literal_digits=0;
 v_start1 = v_i2;
 pc = 93;
 continue;

@@ -297,3 +297,12 @@ editor-client-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_neovim.py --nvim "$(NVIM)" --frontend build/repl-loans-asan/cool-compiler --report-name neovim-sanitize
 editor-distribution-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_distribution.py --nvim "$(NVIM)"
+
+.PHONY: integer-tokens-test
+integer-tokens-test: build/cool-compiler build/language.BIN
+	python3 tools/test_integer_tokens.py
+test: integer-tokens-test
+
+.PHONY: integer-tokens-sanitize-test
+integer-tokens-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_integer_tokens.py --frontend build/repl-loans-asan/cool-compiler
