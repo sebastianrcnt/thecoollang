@@ -14,6 +14,7 @@ extern U0 ReplTrimStorage();
 #include "ReplLoans.cool"
 #include "ReplPackages.cool"
 #include "ReplFunctions.cool"
+#include "ReplSource.cool"
 U0 ReplFreeNodes() {
     ReferenceLoan *loan;ReplNode *allocation,*next;
     for(loan=repl_loans;loan;loan=loan->next)loan->expression=NULL;
@@ -33,7 +34,7 @@ U0 ReplReclaimLocals() {
 U0 ReplFinishTokens() {
     I64 i,end=ntok;if(repl_token_end>end)end=repl_token_end;
     if(lex_pending){Free(lex_pending->data);Free(lex_pending);lex_pending=NULL;}
-    if(repl_keep_tokens)return;
+    if(repl_keep_tokens){ReplReclaimSource();return;}
     for(i=repl_saved_ntok;i<end;i++){Free(tokens[i].text);Free(tokens[i].raw);MemSet(&tokens[i],0,sizeof(Token));}
     MemSet(&tokens[end],0,sizeof(Token));ntok=repl_saved_ntok;pos=ntok;
 }

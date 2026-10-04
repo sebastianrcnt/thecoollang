@@ -29,6 +29,11 @@ with tempfile.TemporaryDirectory(prefix='cool REPL 한글 ') as tmp:
  fronts=[ROOT/'build/cool-compiler',bootstrap]
  if args.frontend:fronts.append(args.frontend.resolve())
  for front in fronts:
+  relocation = 'fn before()->i64{return 0;}\nimport vector "std/vector";\nimport m "example.test/app/math";\n'
+  relocation += 'm.answer()\n'*4
+  relocation += 'fn before()->i64{return 1;}\n'*128
+  relocation += 'var bytes=vector.create[u8]();\nbytes.append(42);\n*bytes.at(0)\nlet number=m.Number{value:9};\nnumber.read()\nm.answer()\n:quit\n'
+  p=run(project,front,relocation,'--offline');assert (p.returncode,p.stdout,p.stderr)==(0,'42\n'*5+'9\n42\n',''),p
   source='''import vector "std/vector";
 var values=vector.create[i64]();
 values.append(42);

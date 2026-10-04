@@ -30,7 +30,7 @@ fn ReplFinishTokens() {
             Free(cast[*u8](ctx.v_lex_pending));
             ctx.v_lex_pending = null;
         }
-        if (ctx.v_repl_keep_tokens) { return; }
+        if (ctx.v_repl_keep_tokens) { ReplReclaimSource(); return; }
         for (var i = ctx.v_repl_saved_ntok; i < end; i = i + 1) {
             Free(ctx.v_tokens[i].text);
             Free(ctx.v_tokens[i].raw);

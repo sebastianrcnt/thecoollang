@@ -563,6 +563,36 @@ through ordinary evaluation or library use.
   `build/release-audit/repl-names-memory.json`. Measurements ran on macOS ARM64
   concurrently with focused tests; no isolated speed claim is made.
 
+- Reclaimable declaration source: successful REPL declarations now form source
+  blocks, marked by current function and AST token references. Blocks introducing
+  nominal types or aliases stay pinned for lazy layout/generic parsing and
+  source-backed names; a mixed batch remains intact while any root survives.
+  After transaction cleanup, dead blocks free their token text/raw buffers and
+  the live tokens compact in place. Function signatures/body ranges, node tokens
+  and nominal type ranges are relocated together. Inline diagnostic tokens and
+  interned function symbols/literals have independent lifetimes. Failed
+  submissions never publish a block, and no source moves during execution or
+  rollback. The existing capacity now bounds live retained source and single
+  submissions instead of all past replaced definitions.
+  Both frontends and compiler ASan pass 40,000 replacements, warm caller reuse,
+  failed redefinition, moved generic/type bodies, JIT error recovery, escaped
+  strings, mixed declaration batches, C declarations and package alias/lazy-
+  specialization relocation. Full `make test bootstrap-check` and
+  `make distribution-test` pass. Self-host
+  IR SHA256: `764a7cfe761450f5b6c27e9bf32b874438131947cbf51c834d6f3a3dda2f1011`.
+  A retained pre-fix
+  `109aab8` executable stopped accepting the same replacements after 23,829,
+  reporting 16,171 token-limit errors; raw result:
+  `build/release-audit/repl-source-old-limit.json`.
+  Three fresh-process trials of `tools/bench_repl_memory.py --workload replacements
+  --counts 2048 40000` (each definition followed by four calls) measured peak RSS
+  medians of 2,293,760 bytes at both sizes. Raw data:
+  `build/release-audit/repl-source-memory.json`. Measurements ran on macOS ARM64
+  alongside regression jobs; this is a workload-specific memory result, not a
+  general speed or complete bounded-memory claim. Pinned mixed batches, distinct
+  immutable text, storage holes and auxiliary parser/package allocations keep
+  G6 open pending the complete lifecycle audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

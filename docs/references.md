@@ -539,7 +539,7 @@ including statement temporaries and failed new bindings. Surviving bindings
 keep stable addresses. Dead session-local metadata is reclaimed, while surviving
 loan roots and parent identities remain live even after their lexical blocks
 end. Ordinary statement tokens are recycled after execution or rejection.
-Interior holes and replaced-function source are not yet fully reclaimed;
+Interior storage holes are not yet reclaimed;
 the existing register limit still applies to each
 submission and its live storage. Raw pointers remain subject to explicit
 unsafe lifetime obligations and must not access forgotten/reused storage.
@@ -584,11 +584,14 @@ declarations can still exceed the token-table limit; it reports an error and
 preserves the session. Normal statement history no longer consumes that limit.
 
 String literals are immutable and remain valid throughout the session, including
-when stored inside owners. Equal literals, including literals in function bodies, share a stable allocation;
-each distinct literal content is retained until session exit. Successful function,
-type and import declarations keep their source for subsequent compilation.
-Repeated body replacement and large sets of distinct literals still require
-further resource work before the full long-session release gate can close.
+when stored inside owners. Equal literals, including literals in function bodies,
+share a stable allocation; each distinct literal content is retained until session
+exit. Live functions, types and import aliases keep the source needed for subsequent
+compilation. Replaced-only declaration blocks are reclaimed and the remaining
+tokens are compacted. A batch containing multiple declarations remains intact
+while any function, type or alias still needs it. Distinct literals and other
+auxiliary state still require a complete lifetime audit before the full
+long-session release gate can close.
 
 
 Function body replacement keeps stable function IDs, including callers already
@@ -601,7 +604,12 @@ require a new session. Escaped string literals remain valid after replacement.
 specialization and ID reuse, batch rollback, owner cleanup and C ABI rejection
 on both frontends. It also exercises 100,000 method calls, unknown methods and
 owner/member prefix collisions. `make repl-functions-sanitize-test` repeats these checks with
-the ASan-instrumented compiler. Retained declaration source still accumulates.
+the ASan-instrumented compiler. `make repl-tokens-test` additionally replaces a
+function 40,000 times beyond the former cumulative token limit, then checks
+failed-replacement recovery, moved generic/type source, runtime diagnostics and
+escaped strings. Package tests load aliases and generic library bodies after a
+soon-to-be-discarded definition, compact that source and execute the imports
+again, including a new specialization.
 
 
 ## Packages in the REPL

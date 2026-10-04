@@ -1,0 +1,39 @@
+// Source compaction runs only after a committed declaration and frame cleanup.
+class ReplSource { I64 begin,end,pinned,live; ReplSource *next; };
+ReplSource *repl_sources;
+U0 ReplMarkSource(Token *token) {
+    I64 offset,index;ReplSource *block;
+    if(!token)return;offset=token(I64)-tokens(I64);
+    if(offset<0 || offset>=ntok*sizeof(Token))return;
+    index=offset/sizeof(Token);
+    for(block=repl_sources;block;block=block->next)if(index>=block->begin && index<block->end){block->live=1;return;}
+}
+Token *ReplSourceToken(Token *token,I64 *positions) {
+    I64 offset;if(!token)return token;offset=token(I64)-tokens(I64);
+    if(offset<0 || offset>=ntok*sizeof(Token))return token;
+    return &tokens[positions[offset/sizeof(Token)]];
+}
+U0 ReplReclaimSource() {
+    ReplSource *added,*block,**tail;I64 i,count=0,*positions;Bool dead=FALSE;Function *f;ReplNode *node;AggregateType *type;
+    if(!repl_sources && repl_saved_ntok>0){repl_sources=CAlloc(sizeof(ReplSource));repl_sources->end=repl_saved_ntok;repl_sources->pinned=1;}
+    added=CAlloc(sizeof(ReplSource));added->begin=repl_saved_ntok;added->end=ntok;
+    if(aliases!=repl_aliases)added->pinned=1;
+    for(i=repl_saved_types;i<naggregates;i++){type=&aggregate_types[i];if((type->kind==A_STRUCT || type->kind==A_ENUM) && !type->origin)added->pinned=1;}
+    tail=&repl_sources;while(*tail)tail=&(*tail)->next;*tail=added;
+    for(block=repl_sources;block;block=block->next)block->live=block->pinned;
+    for(i=1;i<nfun;i++){ReplMarkSource(functions[i].token);for(node=functions[i].nodes;node;node=node->next)ReplMarkSource(node->value.token);}
+    for(block=repl_sources;block;block=block->next)if(!block->live)dead=TRUE;
+    if(!dead)return;
+    positions=CAlloc((ntok+1)*8);
+    for(block=repl_sources;block;block=block->next)for(i=block->begin;i<block->end;i++){positions[i]=count;if(block->live)count++;}
+    positions[ntok]=count;
+    for(i=1;i<nfun;i++){
+        f=&functions[i];f->token=ReplSourceToken(f->token,positions);f->signature=positions[f->signature];f->begin=positions[f->begin];f->end=positions[f->end];
+        for(node=f->nodes;node;node=node->next)node->value.token=ReplSourceToken(node->value.token,positions);
+    }
+    for(i=0;i<naggregates;i++){type=&aggregate_types[i];if(type->kind==A_STRUCT || type->kind==A_ENUM){type->begin=positions[type->begin];type->end=positions[type->end];}type->token=ReplSourceToken(type->token,positions);}
+    for(block=repl_sources;block;block=block->next)for(i=block->begin;i<block->end;i++){if(block->live)tokens[positions[i]]=tokens[i];else{Free(tokens[i].text);Free(tokens[i].raw);}}
+    MemSet(&tokens[count],0,(ntok-count+1)*sizeof(Token));
+    tail=&repl_sources;while(*tail){block=*tail;if(block->live){block->begin=positions[block->begin];block->end=positions[block->end];tail=&block->next;}else{*tail=block->next;Free(block);}}
+    ntok=count;pos=count;Free(positions);
+}

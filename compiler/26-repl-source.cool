@@ -1,0 +1,108 @@
+// Source blocks preserve token addresses until a completed declaration transaction.
+fn ReplMarkSource(token: *Token) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (token == null) { return; }
+        let offset = cast[i64](token) - cast[i64](ctx.v_tokens);
+        if (offset < 0 || offset >= ctx.v_ntok * i64(sizeof(Token))) { return; }
+        let index = offset / i64(sizeof(Token));
+        var block = ctx.v_repl_sources;
+        while (block != null) {
+            if (index >= block.begin && index < block.end) { block.live = 1; return; }
+            block = block.next;
+        }
+    }
+}
+fn ReplSourceToken(token: *Token, positions: *i64) -> *Token {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (token == null) { return token; }
+        let offset = cast[i64](token) - cast[i64](ctx.v_tokens);
+        if (offset < 0 || offset >= ctx.v_ntok * i64(sizeof(Token))) { return token; }
+        return &raw ctx.v_tokens[positions[offset / i64(sizeof(Token))]];
+    }
+}
+fn ReplReclaimSource() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        // The startup imports precede the first submitted declaration.
+        if (ctx.v_repl_sources == null && ctx.v_repl_saved_ntok > 0) {
+            ctx.v_repl_sources = cast[*ReplSource](CAlloc(i64(sizeof(ReplSource))));
+            ctx.v_repl_sources.end = ctx.v_repl_saved_ntok;
+            ctx.v_repl_sources.pinned = 1;
+        }
+        let added = cast[*ReplSource](CAlloc(i64(sizeof(ReplSource))));
+        added.begin = ctx.v_repl_saved_ntok;
+        added.end = ctx.v_ntok;
+        if (ctx.v_aliases != ctx.v_repl_aliases) { added.pinned = 1; }
+        for (var i = ctx.v_repl_saved_types; i < ctx.v_naggregates; i = i + 1) {
+            let type = &raw ctx.v_aggregate_types[i];
+            if ((type.kind == 1 || type.kind == 4) && type.origin == 0) { added.pinned = 1; }
+        }
+        var tail = &raw ctx.v_repl_sources;
+        while (*tail != null) { tail = &raw (*tail).next; }
+        *tail = added;
+        var block = ctx.v_repl_sources;
+        while (block != null) { block.live = block.pinned; block = block.next; }
+        for (var i: i64 = 1; i < ctx.v_nfun; i = i + 1) {
+            ReplMarkSource(ctx.v_functions[i].token);
+            var node = ctx.v_functions[i].nodes;
+            while (node != null) { ReplMarkSource(node.value.token); node = node.next; }
+        }
+        var dead = false;
+        block = ctx.v_repl_sources;
+        while (block != null) { if (block.live == 0) { dead = true; } block = block.next; }
+        if (!dead) { return; }
+        let positions = cast[*i64](CAlloc((ctx.v_ntok + 1) * 8));
+        var count: i64 = 0;
+        block = ctx.v_repl_sources;
+        while (block != null) {
+            for (var i = block.begin; i < block.end; i = i + 1) {
+                positions[i] = count;
+                if (block.live != 0) { count = count + 1; }
+            }
+            block = block.next;
+        }
+        positions[ctx.v_ntok] = count;
+        // Relocate every persisted source coordinate before moving the tokens.
+        for (var i: i64 = 1; i < ctx.v_nfun; i = i + 1) {
+            let function = &raw ctx.v_functions[i];
+            function.token = ReplSourceToken(function.token, positions);
+            function.signature = positions[function.signature];
+            function.begin = positions[function.begin];
+            function.end = positions[function.end];
+            var node = function.nodes;
+            while (node != null) { node.value.token = ReplSourceToken(node.value.token, positions); node = node.next; }
+        }
+        for (var i: i64 = 0; i < ctx.v_naggregates; i = i + 1) {
+            let type = &raw ctx.v_aggregate_types[i];
+            if (type.kind == 1 || type.kind == 4) {
+                type.begin = positions[type.begin];
+                type.end = positions[type.end];
+            }
+            type.token = ReplSourceToken(type.token, positions);
+        }
+        block = ctx.v_repl_sources;
+        while (block != null) {
+            for (var i = block.begin; i < block.end; i = i + 1) {
+                if (block.live != 0) { ctx.v_tokens[positions[i]] = ctx.v_tokens[i]; }
+                else { Free(ctx.v_tokens[i].text); Free(ctx.v_tokens[i].raw); }
+            }
+            block = block.next;
+        }
+        // Copied slots alias retained strings; clear, never free, the old tail.
+        MemSet(cast[*u8](&raw ctx.v_tokens[count]), 0, (ctx.v_ntok - count + 1) * i64(sizeof(Token)));
+        tail = &raw ctx.v_repl_sources;
+        while (*tail != null) {
+            block = *tail;
+            if (block.live != 0) {
+                block.begin = positions[block.begin];
+                block.end = positions[block.end];
+                tail = &raw block.next;
+            } else { *tail = block.next; Free(cast[*u8](block)); }
+        }
+        ctx.v_ntok = count;
+        ctx.v_pos = count;
+        Free(cast[*u8](positions));
+    }
+}

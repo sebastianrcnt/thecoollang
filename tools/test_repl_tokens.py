@@ -23,6 +23,42 @@ def check(front, label, source, output, errors=()):
 
 
 for front in fronts:
+    # Retained source is proportional to live declarations, not their history.
+    source = 'fn answer()->i64{return 0;}\nfn caller()->i64{return answer();}\n'
+    source += 'caller()\n'*4
+    source += ''.join(f'fn answer()->i64{{return {i};}}\n' for i in range(1, 40001))
+    source += 'caller()\nfn answer()->i64{return missing;}\ncaller()'
+    check(front, '40000 replacements exceed the old lifetime token limit', source,
+          '0\n'*4+'40000\n40000\n', ['unknown variable'])
+
+    # A hole before types/templates moves both lazy source and warm AST tokens.
+    source = ('fn discarded()->string{return "retained string";}\n'
+              'let kept=discarded();\n'
+              'struct Box[T]{value:T;}\n'
+              'fn get[T](value:Box[T])->T{return value.value;}\n'
+              'fn Box.read[T](self:Box[T])->T{return self.value;}\n'
+              'fn checked(n:i64)->i64{assert(n>0);return n;}\n'
+              'checked(1)\n')
+    source += 'checked(1)\n'*3
+    source += 'fn discarded()->string{return "new";}\n'*128
+    source += ('get[u8](Box[u8]{value:42})\n'
+               'let box=Box[i64]{value:7};\nbox.read()\n'
+               'checked(0)\nchecked(9)\nkept\ndiscarded()')
+    check(front, 'compacted generic/type source, JIT diagnostics and escaped strings', source,
+          '1\n'*4+'42\n7\n9\nretained string\nnew\n', ['assertion failed'])
+
+    check(front, 'mixed batch remains live until its last function is replaced',
+          'fn first()->i64{return 1;} fn second()->i64{return 2;}\n'
+          'fn first()->i64{return 3;}\nsecond()\n'
+          'fn second()->i64{return 4;}\nfirst()\nsecond()\n'
+          'fn third()->i64{return first()+second();}\nthird()',
+          '2\n3\n4\n7\n')
+    check(front, 'relocated foreign declaration and cached safe wrapper',
+          'fn before()->i64{return 0;}\nextern "C" fn abs(n:i32)->i32;\n'
+          'fn wrapper()->i32{unsafe{return abs(-9);}}\n'
+          + 'wrapper()\n'*4 + 'fn before()->i64{return 1;}\nwrapper()',
+          '9\n'*5)
+
     prefix = '''import "std/mem";
 fn identity[T](value:T)->T{return value;}
 fn answer()->i64{return 41;}

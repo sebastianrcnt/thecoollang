@@ -75,6 +75,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `23-repl-locals.cool` | Session-local allocation registry and loan-rooted reclamation | `Core.cool`, `References.cool`, `Repl.cool` |
 | `24-repl-tokens.cool` | Statement token disposal and session literal interning | `Core.cool`, `Repl.cool` |
 | `25-repl-functions.cool` | Transactional disposal of replaced/rejected function artifacts | `ReplFunctions.cool` |
+| `26-repl-source.cool` | Live declaration source marking, disposal and token relocation | `ReplSource.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -392,7 +393,25 @@ not allocate/intern a name for each call or failed lookup. Method call nodes use
 the canonical declared symbol. Declaration-time composed-name buffers and
 method-owner lookup substrings are temporary and freed. Outside REPL mode,
 function declarations retain their composed-name data for compiler lifetime.
-Statement token reuse does not reclaim successful replaced-function source.
+After a successful declaration, `ReplReclaimSource` records its token span and
+marks source blocks referenced by live functions and every retained AST token.
+Blocks introducing aliases or nominal types are pinned: their token strings,
+field names and lazy generic bodies remain source-backed. The startup import
+block is pinned too. A mixed declaration block stays live as a whole while any
+of these roots survives. Rejected submissions never publish a source block.
+
+After superseded function artifacts and statement nodes have been disposed,
+source cleanup maps each old token index to its compacted index. It relocates
+function signature/body indices and token pointers, every function node's token
+pointer, and nominal type body indices. Inline type diagnostics remain independent
+of the table. Bytecode/JIT retain node objects, so updating those objects preserves
+runtime diagnostics without recompiling callers. Dead blocks free text/raw;
+live tokens move toward the beginning of the stable table. Clear the vacated
+tail without freeing its copied string pointers a second time. Then update block
+boundaries and `ntok`/`pos`; the next transaction takes a fresh snapshot.
+No compaction occurs while frames, parser state or rollback snapshots are live.
+This removes replaced-only declaration history from the token limit. The limit
+still applies to simultaneously retained source and to individual submissions.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes, including foreign/exported C ABI mode changes, require
@@ -408,8 +427,9 @@ also free the builder's offsets, patches and temporary machine-code text.
 Snapshots copy only the active function prefix. Rollback clears discarded tail
 entries before reusing their IDs, including specialization origins and ownership
 fields. Cached callers survive callee replacement and rejected submissions.
-Successful declaration source and some auxiliary allocations still require
-lifetime work; this remains an open release gate.
+Pinned mixed declaration blocks, storage holes, distinct immutable text and
+other auxiliary allocations still require a complete lifetime audit; this
+remains an open release gate.
 
 `NativeRecover` keeps `setjmp` in a live C frame while calling `CoolSubmission`;
 `NativeRaise` can only jump to that active frame. Never move `setjmp` into a

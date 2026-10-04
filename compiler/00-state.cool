@@ -24,6 +24,7 @@ cap: i64;
 }
 
 
+struct ReplSource { begin: i64; end: i64; pinned: i64; live: i64; next: *ReplSource; }
 struct ReplLiteral { text: *u8; next: *ReplLiteral; }
 
 struct Token {
@@ -417,6 +418,7 @@ v_lex_package: *u8;
 v_lex_pending: *Text;
 
 v_repl_literals: [1024]*ReplLiteral;
+v_repl_sources: *ReplSource;
 
 v_functions: *Function;
 
