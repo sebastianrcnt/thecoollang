@@ -208,3 +208,8 @@ tracked-iteration-test: build/cool-compiler
 tracked-iteration-sanitize-test: build/cool-compiler
 	python3 tools/test_tracked_iteration.py --sanitize
 test: nested-references-test tracked-iteration-test
+
+.PHONY: loan-layers-test
+loan-layers-test: build/cool-compiler
+	python3 tools/test_loan_layers.py
+test: loan-layers-test

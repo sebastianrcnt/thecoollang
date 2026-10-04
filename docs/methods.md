@@ -68,8 +68,9 @@ computed exclusive receivers such as `map.at_mut(&key).scalar_len()`. Every
 possible source in a multi-parameter return contract remains protected. Shared
 references can be stored in non-owning aggregates and used with by-value
 receivers. Shared-reference-only containers also support shared/exclusive
-receivers, including `Iterator.next`; the receiver retains all underlying source
-loans. Exclusive reference storage, precise container/referent separation,
+receivers, including `Iterator.next`; its physical storage loan is distinct
+from its underlying shared source loans. Independent iterators can therefore
+advance while sharing a source. Exclusive reference storage,
 slice-loan integration and top-level persistent REPL loans remain open work;
 methods do not bypass these checks. Compiled functions containing methods can
 be used and replaced in the REPL under its existing signature rules.

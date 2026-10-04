@@ -75,8 +75,8 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 - Shared references can be stored in non-owning, slice-free structs, arrays and
   enums, as described below. Stored exclusive references, reference-containing
   owned allocations and aggregates mixing references with owners/slices are
-  still rejected. Borrowing shared-reference-only storage is supported, with
-  conservative whole-root conflicts. Reassignment of borrowed bindings/fields,
+  still rejected. Borrowing shared-reference-only storage tracks its physical
+  container separately from its shared referents. Reassignment of borrowed bindings/fields,
   exclusive reference storage and borrowed slices require further tracking.
 - Existing mutable slices cannot share a root with references within one
   function, even in disjoint scopes. References into aliasable slice storage are
@@ -224,7 +224,8 @@ fields cannot be reassigned, even when declared `var`; ordinary scalar fields
 can be changed when no conflicting loan exists. These restrictions prevent a
 shorter-lived reference from being written into an older container. Shared or
 exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
-source roots. An exclusive container receiver can update ordinary fields, but
+source roots as shared loans while separately borrowing the container's storage.
+An exclusive container receiver can update ordinary fields, but
 cannot replace reference fields or mutate through a contained shared reference.
 Stored `&mut T`, mixed ownership/slice storage and general lifetime-aware
 replacement remain required work for the full stored-reference gate.
@@ -279,14 +280,18 @@ borrows the iterator: storing the `Option` or payload outside the match arm
 prevents the next exclusive call until that result's scope ends. Iterator fields
 are private; safe code cannot forge an anchor or alter the chunk pointers.
 
-Borrowing reference-containing storage currently protects the union of its
-source roots as a whole. Consequently, independently created iterators over the
-same vector, or unrelated shared element loans held during `next`, can cause
-conservative conflicts. References returned from a locally bound iterator
-cannot escape its scope, even if the source outlives it. Separating container
-storage from referent provenance and adding exclusive stored loans remain
-necessary for the complete iteration/borrowing design; this API does not close
-that release gate.
+Container storage and referent storage are separate loan layers. Two iterators
+created from the same vector can advance independently; an ordinary shared
+reference to an element may coexist with their advancement. Copying an iterator
+copies its position and retains shared source loans. Keeping an element result
+from the first iterator freezes that iterator, but permits the second iterator
+to advance. The source vector remains immutable until all its loans end.
+
+Fields within one container still share a conservative physical root. References
+returned from a locally bound iterator cannot escape its scope, even if the
+source outlives it: `next` explicitly borrows `self`. Exclusive stored loans,
+borrowed slice integration and lifetime-aware replacement remain necessary for
+the complete borrowing design; this API does not close that release gate.
 
 `make nested-references-test` covers container receiver mutation, reborrows,
 borrowed arrays, owner lifetimes and escape/conflict rejections on both
@@ -299,3 +304,46 @@ the C runtime with ASan/UBSan and verifies inserted Cool load checks.
 The standard UTF-8 validator now consumes the tracked iterator through safe
 Cool code; raw chunk traversal is confined to the vector implementation. Its
 existing strict UTF-8 oracle corpus and sanitizer checks cover this integration.
+
+
+## Container and referent provenance
+
+A reference to shared-reference storage carries a physical-storage loan and
+shared payload loans. Reborrowing `&mut container` is exclusive only for the
+container. Copying a reference field or copying the referenced container value
+retains the payload loans without retaining its former physical address. Taking
+`&container.scalar_field`, however, protects the container's physical root.
+Computed projections obey the same rules as named values.
+
+```cool
+struct View { source: &i64; position: i64; }
+fn main() {
+    var value = 10;
+    var left = View { source: &value, position: 0 };
+    var right = View { source: &value, position: 0 };
+    let first = &mut left;
+    let second = &mut right;
+    (*first).position = 1;
+    (*second).position = 2;
+    let item = (*first).source;
+    (*first).position = 3;
+    assert(*item == 10);
+    // value remains shared; neither receiver permits changing it.
+}
+```
+
+For a function returning an ordinary reference or borrowed container,
+`borrows(...)` still conservatively combines all selected argument roots. A
+returned reference to borrowed storage preserves the selected nested arguments'
+physical/payload layers. An opaque non-nested anchor conservatively protects
+both layers. These contracts describe possible lifetimes, not precise field
+paths; this does not add field-disjoint borrowing or arbitrary nested mutable
+reference storage.
+
+`make loan-layers-test` covers receiver aliases, container copies, direct and
+computed payload extraction, scalar projections, nested reference returns and
+reference-slot borrowing. Fourteen negative cases and 120 seeded queries
+compare container mutations and referent mutations against an independent
+storage/source-set model on both frontends; valid programs run on five engines
+and optimized native output. The tracked-iteration sanitizer test also covers
+independent/copied iterators and retained shared element references.

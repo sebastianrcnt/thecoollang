@@ -50,7 +50,8 @@ allocation-free shared traversal using `Iterator.next() -> Option[&T]` and
 `remaining()`. The iterator keeps the source borrowed through its lexical scope;
 a retained result prevents further advancement. Scope the iterator before
 mutating or moving the source. See [tracked iteration](../docs/references.md#tracked-vector-iteration)
-for an example and current conservative alias limitations. Raw free-function
+for an example. Independent/copied iterators and ordinary shared element
+references may coexist; retaining a result freezes only its own iterator. Raw free-function
 `cursor`/`next` still require manual lifetime care and unsafe pointer access.
 Chunks cannot contain borrowed references until owned stored-loan support exists.
 

@@ -295,10 +295,23 @@ through ordinary evaluation or library use.
   exclusive stored loans, slices and lifetime-aware replacement remain required.
   G2/G4/G5 are not closed by this step.
 
+- Container/referent provenance: nested loans now distinguish physical container
+  storage from shared payload roots. Direct, copied and independently created
+  iterators can advance over one vector alongside shared element references.
+  A retained result still freezes its own iterator; source mutation remains
+  rejected. Direct/computed payload copies shed physical-container provenance,
+  scalar projections keep it, and nested reference returns preserve the layers.
+  Source acquisitions check both physical access and selected referent loans.
+  A 120-query independent model, 14 explicit rejections and expanded iterator
+  cases validate these rules on both frontends and five engines/O2. The final
+  `make test bootstrap-check` run passes, including both fixed-point checks
+  (new-syntax IR SHA256 begins `815666213c263b4d`). Expanded independent/copy
+  iterator cases pass instrumented Cool ASan plus C ASan/UBSan. The documented
+  container example executes successfully. Exclusive stored references, slices
+  and lifetime-aware reassignment remain required.
+
 ## Next implementation checkpoints
 
-- Separate container-storage loans from contained-reference provenance before
-  relaxing the conservative alias conflicts of nested receiver mutation.
 - Extend stored loans to exclusive references and slice aliases; keep unsafe
   raw pointers separate and add rejection regressions before removing restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and

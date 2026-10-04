@@ -182,7 +182,8 @@ addresses cannot outlive a move during index or assignment-RHS evaluation;
 Borrow regions propagate parameter bits plus a frame bit through source edges.
 A returned borrow must be a subset of the declared `borrows(...)` contract.
 Scoped references additionally maintain loans with root, holder, reborrow parent
-and exclusivity, plus the AST expression that produced the loan. A binding may
+and exclusivity, plus an `indirect` layer and the AST expression that produced
+the loan. A binding may
 hold several root/parent records. Direct and nested reference-returning calls
 keep the union of all declared source arguments, deduplicating equivalent
 records rather than guessing a single root from syntax. Parent ancestry must
@@ -204,14 +205,22 @@ include this binding. Empty enum results may have no loans and `borrows()`.
 Reference-containing arrays/structs cannot be zero initialized or reassigned.
 
 The checker currently treats an entire root as conflicting, not individual
-fields. Borrowing shared-reference-only storage propagates its entire root set,
-including the requested outer exclusivity. This is conservative: independent
-containers sharing a referent can conflict on container mutation. Do not merely
-downgrade those loans to allow aliases; a complete refinement needs separate
-container-storage and referent provenance, with evaluation and escape checks.
+fields. Layer zero is the addressed storage of a reference, or the contained
+reference roots of a by-value aggregate. Layer one retains the shared payload
+referents of a reference to borrowed storage. Taking a container address adds a
+physical local root at layer zero and retains payloads at layer one with shared
+mode. Access through a stored reference selects the payload layer; scalar field
+access and receiver mutation select the physical layer. Named/temporary payload
+loads flatten selected payload loans back to layer zero, leaving evaluation
+loans temporary until the statement ends. Source acquisition checks conflicts
+against the pre-acquisition list as well as the physical place.
+Nested-reference returns preserve nested argument layers; other anchors are
+conservative in both layers. Ordinary borrowed returns combine selected roots.
+This avoids inventing an exclusive source-vector loan when mutating an iterator,
+while keeping physical receiver aliases and all referent invalidations checked.
 Exclusive reference storage, mixed owner/slice/reference aggregates, integrated
-slice loans and persistent REPL references remain unsupported. Do not remove their rejections merely
-because a happy-path example works. Unsafe `borrow_raw` anchors
+slice loans and persistent REPL references remain unsupported. Do not remove
+their rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).
 

@@ -43,9 +43,36 @@ fn owner_case(){
  }}}
  values.clear();assert(values.len()==0);
 }
+fn independent_case(){
+ var values=v.create[i64]();for(var i=0;i<65;i=i+1){values.append(i);}
+ {var left=values.iter();var right=values.iter();let first=values.at(0);
+  var seen=0;
+  while(left.remaining()>0){
+   match(left.next()){
+    o.Option[&i64].None=>{assert(false);}
+    o.Option[&i64].Some(a)=>{
+     match(right.next()){
+      o.Option[&i64].None=>{assert(false);}
+      o.Option[&i64].Some(b)=>{assert(*a==seen && *b==seen);}
+     }
+     // Copying a read-only iterator copies its position, not its source.
+     {var copied=left;assert(copied.remaining()==left.remaining());
+      if(copied.remaining()>0){match(copied.next()){
+       o.Option[&i64].None=>{assert(false);}
+       o.Option[&i64].Some(c)=>{assert(*c==seen+1);}
+      }}
+     }
+     assert(*first==0);seen=seen+1;
+    }
+   }
+  }
+  assert(seen==65 && right.remaining()==0);
+ }
+ values.clear();
+}
 fn main(){
 '''+''.join(f'integer_case({n});assert(mem.owner_count()==0);' for n in (0,1,2,31,32,33,63,64,65,127,128,129))+'''
- owner_case();assert(mem.owner_count()==0);io.println(42);
+ owner_case();assert(mem.owner_count()==0);independent_case();assert(mem.owner_count()==0);io.println(42);
 }
 '''
 # usize subtraction in the zero-length oracle must not underflow.
@@ -94,4 +121,4 @@ with tempfile.TemporaryDirectory(prefix='cool-tracked-iteration-') as tmp:
   source.write_text(body)
   for front in fronts:
    p=run([ROOT/'tools/cool','check',source],env={**os.environ,'COOL_FRONTEND':str(front)});assert p.returncode==2 and error in p.stderr,(body,error,p)
- print(f'tracked iteration: 12 boundary sizes, owner elements, exhaustion, early break and allocation counts; five engines/O2; {len(NEGATIVE)+len(WHOLE)} rejections on both frontends PASS')
+ print(f'tracked iteration: 12 boundary sizes, owner elements, independent/copy iterators, retained shared elements, exhaustion, early break and allocation counts; five engines/O2; {len(NEGATIVE)+len(WHOLE)} rejections on both frontends PASS')

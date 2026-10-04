@@ -5,6 +5,7 @@ struct ReferenceLoan {
     holder: * Local;
     parent: * Local;
     exclusive: i64;
+    indirect: i64;
     expression: * Node;
     next: * ReferenceLoan;
 }
@@ -180,23 +181,52 @@ fn ReferenceHolder(check: * ReferenceCheck, holder: * Local, root: * Local) -> *
         return null;
     }
 }
-fn ReferenceMatches(check: * ReferenceCheck, via: * Local, root: * Local) -> bool {
+// Layer zero protects the storage addressed by a reference. Layer one keeps
+// the shared referents inside that storage alive; mutating a cursor is not an
+// exclusive borrow of the vector stored in its shared source field.
+fn NestedReference(type: i64) -> bool {
     unsafe {
-        if (!ContainsReference(via.type)) {
-            return via == root;
+        return IsReference(type) && Borrowed(Shape(type).element) != i8(0);
+    }
+}
+fn ReferenceThroughStored(place: * Node) -> bool {
+    unsafe {
+        if (place == null) {
+            return false;
         }
-        var found = false;
+        if (place.kind == 30 && IsReference(place.a.type)) {
+            return place.a.kind == 18;
+        }
+        if (place.kind == 18 || place.kind == 24 || place.kind == 25) {
+            return ReferenceThroughStored(place.a);
+        }
+        return false;
+    }
+}
+fn ReferenceMatches(check: * ReferenceCheck, place: * Node, via: * Local, root: * Local) -> bool {
+    unsafe {
+        if (via == root) {
+            return true;
+        }
+        let through = ReferenceThroughStored(place);
+        if (!IsReference(via.type) && !through) {
+            return false;
+        }
+        if (place.kind == 22) {
+            return false;
+        }
+        var layer: i64 = 0;
+        if (NestedReference(via.type) && through) {
+            layer = 1;
+        }
         var loan = check.loans;
         while (loan != null) {
-            if (loan.holder == via) {
-                found = true;
-                if (loan.root == root) {
-                    return true;
-                }
+            if (loan.holder == via && loan.indirect == layer && loan.root == root) {
+                return true;
             }
             loan = loan.next;
         }
-        return ! found && via == root;
+        return false;
     }
 }
 fn ReferenceAncestor(check: * ReferenceCheck, holder: * Local, via: * Local, root: * Local) -> bool {
@@ -221,23 +251,23 @@ fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
         if (via == null) {
             return;
         }
-        if (writing && IsReference(via.type) && Shape(via.type).count == 0) {
+        if (writing && IsReference(via.type) && Shape(via.type).count == 0 && place.kind != 22) {
             ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
         }
         var loan = check.loans;
         while (loan != null) {
-            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, via, loan.root) && !ReferenceAncestor(check, loan.holder, via, loan.root)) {
+            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root) && !ReferenceAncestor(check, loan.holder, via, loan.root)) {
                 ErrorAt(place.token, cast[ * u8]("access conflicts with a live scoped reference"));
             }
             loan = loan.next;
         }
     }
 }
-fn ReferenceNew(root: * Local, parent: * Local, exclusive: i64, expression: * Node, next: * ReferenceLoan) -> * ReferenceLoan {
+fn ReferenceNew(root: * Local, parent: * Local, exclusive: i64, indirect: i64, expression: * Node, next: * ReferenceLoan) -> * ReferenceLoan {
     unsafe {
         var old = next;
         while (old != null && old.expression == expression && old.holder == null) {
-            if (old.root == root && old.parent == parent && old.exclusive == exclusive) {
+            if (old.root == root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
                 return next;
             }
             old = old.next;
@@ -246,6 +276,7 @@ fn ReferenceNew(root: * Local, parent: * Local, exclusive: i64, expression: * No
         loan.root = root;
         loan.parent = parent;
         loan.exclusive = exclusive;
+        loan.indirect = indirect;
         loan.expression = expression;
         loan.next = next;
         return loan;
@@ -268,20 +299,39 @@ fn ReferencePlaceSource(place: * Node) -> * Node {
         return null;
     }
 }
+fn ReferenceSourceAccess(check: * ReferenceCheck, before: * ReferenceLoan, via: * Local, root: * Local, exclusive: i64, token: * Token) {
+    unsafe {
+        var loan = before;
+        while (loan != null) {
+            if (loan.root == root && (exclusive != 0 || loan.exclusive != 0) && !ReferenceAncestor(check, loan.holder, via, root)) {
+                ErrorAt(token, cast[ * u8]("access conflicts with a live scoped reference"));
+            }
+            loan = loan.next;
+        }
+    }
+}
 fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, token: * Token, expression: * Node) {
     unsafe {
         let via = BorrowRoot(place);
+        let nested = NestedReference(expression.type);
         if (via == null) {
-            let source = ReferencePlaceSource(place);
+            let origin = ReferencePlaceSource(place);
             var loan = check.loans;
             var found = false;
             while (loan != null) {
-                if (source != null && loan.expression == source && loan.holder == null) {
-                    if (exclusive > loan.exclusive) {
-                        ErrorAt(token, cast[ * u8]("cannot make an exclusive borrow from a shared reference"));
+                if (origin != null && loan.expression == origin && loan.holder == null) {
+                    if (loan.indirect == 0) {
+                        if (exclusive > loan.exclusive) {
+                            ErrorAt(token, cast[ * u8]("cannot make an exclusive borrow from a shared reference"));
+                        }
+                        loan.exclusive = exclusive;
+                    }
+                    // A scalar projection may retain extra shared roots. Keep
+                    // them conservatively rather than losing the anchor.
+                    if (!nested) {
+                        loan.indirect = 0;
                     }
                     loan.expression = expression;
-                    loan.exclusive = exclusive;
                     found = true;
                 }
                 loan = loan.next;
@@ -295,15 +345,51 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
             ErrorAt(token, cast[ * u8]("cannot borrow through aliasable slice storage"));
         }
         ReferenceAccess(check, place, exclusive != 0);
-        var source = check.loans;
+        let address = expression.kind == 23 && expression.op == 0;
+        let bridge = expression.kind == 23 && expression.op == 1;
+        let through = ReferenceThroughStored(place);
+        let physical = address && !through && (!IsReference(via.type) || place.kind == 22);
+        var layer: i64 = 0;
+        if (NestedReference(via.type) && (through || expression.kind == 18)) {
+            layer = 1;
+        }
+        let preserve = nested && NestedReference(via.type) && !physical && !bridge;
+        let before = check.loans;
         var found = false;
+        if (physical) {
+            if (ReferenceSliceConflict(check.function.body, via)) {
+                ErrorAt(token, cast[ * u8]("scoped references and slices cannot share a root yet"));
+            }
+            check.loans = ReferenceNew(via, via, exclusive, 0, expression, check.loans);
+            found = true;
+        }
+        var source = before;
         while (source != null) {
-            if (source.holder == via) {
-                found = true;
+            if (source.holder == via && (preserve || bridge || source.indirect == layer)) {
                 if (ReferenceSliceConflict(check.function.body, source.root)) {
                     ErrorAt(token, cast[ * u8]("scoped references and slices cannot share a root yet"));
                 }
-                check.loans = ReferenceNew(source.root, via, exclusive, expression, check.loans);
+                if (physical) {
+                    if (nested) {
+                        ReferenceSourceAccess(check, before, via, source.root, 0, token);
+                        check.loans = ReferenceNew(source.root, via, 0, 1, expression, check.loans);
+                    }
+                } else {
+                    var mode = exclusive;
+                    var indirect: i64 = 0;
+                    if (preserve) {
+                        indirect = source.indirect;
+                    }
+                    if (indirect != 0) {
+                        mode = 0;
+                    }
+                    ReferenceSourceAccess(check, before, via, source.root, mode, token);
+                    check.loans = ReferenceNew(source.root, via, mode, indirect, expression, check.loans);
+                    if (nested && !preserve) {
+                        check.loans = ReferenceNew(source.root, via, 0, 1, expression, check.loans);
+                    }
+                    found = true;
+                }
             }
             source = source.next;
         }
@@ -311,7 +397,10 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
             if (ReferenceSliceConflict(check.function.body, via)) {
                 ErrorAt(token, cast[ * u8]("scoped references and slices cannot share a root yet"));
             }
-            check.loans = ReferenceNew(via, via, exclusive, expression, check.loans);
+            check.loans = ReferenceNew(via, via, exclusive, 0, expression, check.loans);
+            if (nested) {
+                check.loans = ReferenceNew(via, via, 0, 1, expression, check.loans);
+            }
         }
     }
 }
@@ -389,7 +478,11 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 var source = check.loans;
                 while (source != before) {
                     if (source.expression == node.origin_source) {
-                        source.expression = node;
+                        // Loading through a reference to borrowed storage copies
+                        // its payload, not the container's physical address.
+                        if (!NestedReference(node.origin_source.type) || source.indirect != 0) {
+                            check.loans = ReferenceNew(source.root, source.parent, mode, 0, node, check.loans);
+                        }
                     }
                     source = source.next;
                 }
@@ -464,7 +557,19 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                             if (IsReference(node.type)) {
                                 mode = Shape(node.type).count;
                             }
-                            results = ReferenceNew(source.root, source.parent, mode, node, results);
+                            var indirect: i64 = 0;
+                            if (NestedReference(node.type) && NestedReference(arg.type)) {
+                                indirect = source.indirect;
+                                if (indirect != 0) {
+                                    mode = 0;
+                                }
+                            }
+                            results = ReferenceNew(source.root, source.parent, mode, indirect, node, results);
+                            // An opaque non-nested anchor may protect both the
+                            // returned storage and its borrowed payloads.
+                            if (NestedReference(node.type) && !NestedReference(arg.type)) {
+                                results = ReferenceNew(source.root, source.parent, 0, 1, node, results);
+                            }
                         }
                         source = source.next;
                     }
