@@ -14,7 +14,7 @@ Node *ReferenceExpression(Token *token) {
 Node *ReferenceForPlace(Node *place,I64 exclusive,Token *token){
     Node *address=NULL,*result;
     if(exclusive && !place->mutable) ErrorAt(token,"exclusive borrow requires a mutable place");
-    if(Borrowed(place->type)) ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");
+    if(Borrowed(place->type) && !SharedReferenceStorage(place->type)) ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");
     if(place->kind==N_LOCAL){address=NewNode(N_LOCAL_ADDRESS,token);address->slot=place->slot;address->local_ref=place->local_ref;address->type=T_PTR+place->type;}
     else {if(place->kind!=N_LOAD)ErrorAt(token,"reference operand must be a stable place");address=place->a;}
     if(!BorrowRoot(address) && !ReferencePlaceSource(address))ErrorAt(token,"reference requires a tracked local or parameter root");
@@ -46,7 +46,7 @@ Bool SharedReferenceStorage(I64 type){
     return TRUE;
 }
 U0 ValidateReferenceStorage(I64 type,Token *token){
-    if(IsReference(type)){if(Borrowed(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
+    if(IsReference(type)){if(Borrowed(Shape(type)->element) && !SharedReferenceStorage(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
     else if(ContainsReference(type) && !SharedReferenceStorage(type))ErrorAt(token,"stored references currently require shared, non-owning, slice-free aggregate storage");
 }
 U0 ReferenceMatchBinding(Node *binding){

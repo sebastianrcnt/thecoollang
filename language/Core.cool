@@ -243,6 +243,7 @@ extern Bool IsReference(I64 type);
 extern I64 ReferenceType(Token *token);
 extern Node *ReferenceExpression(Token *token);
 extern Node *ReferenceLoad(Node *value, Token *token);
+extern Bool SharedReferenceStorage(I64 type);
 extern U0 ReferenceMatchBinding(Node *binding);
 extern U0 ValidateReferenceStorage(I64 type, Token *token);
 extern U0 AnalyzeReferences(Function *function);

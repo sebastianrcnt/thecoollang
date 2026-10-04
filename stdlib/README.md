@@ -14,7 +14,7 @@ packages are bundled sources and need no module download.
 | `std/strings` | UTF-8 byte `length`, `byte_at`, `equal`, `starts_with`, `ends_with`; checked decimal `parse_i64` |
 | `std/text` | owning UTF-8 `Text`, strict validation, byte/scalar lengths, scalar access, append/clone/clear, byte conversion, ordering/prefix/suffix |
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
-| `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`; raw `cursor`/`next` |
+| `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`, `iter`, `Iterator.remaining`/`next`; raw `cursor`/`next` |
 | `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
 | `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
@@ -45,9 +45,14 @@ cleanup also releases the chain and elements.
 Mutating collection APIs accept exclusive references; length and read-only
 indexing accept shared references. `at`/`at_mut` return checked element loans
 that prevent incompatible access, vector movement, removal or clear. These
-ordinary operations require no `unsafe`. Raw `cursor`/`next` still require
-manual lifetime care and unsafe pointer access. Chunks cannot contain borrowed
-references until stored-loan support is implemented.
+ordinary operations require no `unsafe`. `values.iter()` provides O(n),
+allocation-free shared traversal using `Iterator.next() -> Option[&T]` and
+`remaining()`. The iterator keeps the source borrowed through its lexical scope;
+a retained result prevents further advancement. Scope the iterator before
+mutating or moving the source. See [tracked iteration](../docs/references.md#tracked-vector-iteration)
+for an example and current conservative alias limitations. Raw free-function
+`cursor`/`next` still require manual lifetime care and unsafe pointer access.
+Chunks cannot contain borrowed references until owned stored-loan support exists.
 
 `Result`/`Option` helpers take values by value. An owning argument requires
 `move`; an unused fallback or consumed payload is released. Generic arithmetic

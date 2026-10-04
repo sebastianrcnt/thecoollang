@@ -74,7 +74,7 @@ NEGATIVE += [
  ('struct Bad{r:&i64;bytes:[]u8;}fn main(){}','aggregate storage'),
  ('struct Bad{r:&i64;p:own[i64];}fn main(){}','aggregate storage'),
  ('fn main(){var x=1;let p=new[View](pair(&x,&x));}','owned storage'),
- ('fn main(){var x=1;let v=pair(&x,&x);let r=&v;}','nested borrowed'),
+ ('fn main(){var x=1;let v=pair(&x,&x);let r=&v;x=2;}','conflicts'),
  ('fn main(){var x=1;var a=[2]&i64{&x,&x};let s=a[:];}','slice elements'),
  ('fn main(){var x=1;var y=2;let arr=array(&x,&y);let r=arr[index(&mut x)];}','conflicts'),
 ]

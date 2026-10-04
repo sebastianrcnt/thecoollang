@@ -204,9 +204,13 @@ include this binding. Empty enum results may have no loans and `borrows()`.
 Reference-containing arrays/structs cannot be zero initialized or reassigned.
 
 The checker currently treats an entire root as conflicting, not individual
-fields. Exclusive reference storage, mixed owner/slice/reference aggregates,
-borrowing reference-containing storage, integrated slice loans and persistent
-REPL references remain unsupported. Do not remove their rejections merely
+fields. Borrowing shared-reference-only storage propagates its entire root set,
+including the requested outer exclusivity. This is conservative: independent
+containers sharing a referent can conflict on container mutation. Do not merely
+downgrade those loans to allow aliases; a complete refinement needs separate
+container-storage and referent provenance, with evaluation and escape checks.
+Exclusive reference storage, mixed owner/slice/reference aggregates, integrated
+slice loans and persistent REPL references remain unsupported. Do not remove their rejections merely
 because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).

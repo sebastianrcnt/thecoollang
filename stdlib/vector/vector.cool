@@ -143,3 +143,30 @@ pub fn Vector.at[T](self: & Vector[T], index: usize) -> & T borrows(self) {
 pub fn Vector.at_mut[T](self: & mut Vector[T], index: usize) -> & mut T borrows(self) {
     return at_mut[T](self, index);
 }
+// A tracked cursor keeps its source borrowed for the iterator's lexical scope.
+// Raw chunk links never escape the safe API. Returned element references also
+// borrow the iterator, so next() cannot run while an element result is retained.
+pub struct Iterator[T] {
+    source: & Vector[T];
+    position: Cursor[T];
+}
+pub fn iter[T](source: & Vector[T]) -> Iterator[T]borrows(source) {
+    return Iterator[T] {
+        source: source, position: cursor[T](source)
+    };
+}
+pub fn Iterator.remaining[T](self: & Iterator[T]) -> usize {
+    return ( * self).position.remaining;
+}
+pub fn Iterator.next[T](self: & mut Iterator[T]) -> option.Option[ & T]borrows(self) {
+    unsafe {
+        let pointer = next[T]( & raw( * self).position);
+        if (pointer == null) {
+            return option.Option[ & T].None;
+        }
+        return option.Option[ & T].Some(borrow_raw[ & T](pointer, self));
+    }
+}
+pub fn Vector.iter[T](self: & Vector[T]) -> Iterator[T]borrows(self) {
+    return iter[T](self);
+}

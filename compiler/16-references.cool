@@ -41,7 +41,7 @@ fn ReferenceForPlace(place: * Node, exclusive: i64, token: * Token) -> * Node {
         if (exclusive != 0 && place.mutable == 0) {
             ErrorAt(token, cast[ * u8]("exclusive borrow requires a mutable place"));
         }
-        if (Borrowed(place.type) != i8(0)) {
+        if (Borrowed(place.type) != i8(0) && !SharedReferenceStorage(place.type)) {
             ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
         }
         var address: * Node = null;
@@ -139,7 +139,7 @@ fn SharedReferenceStorage(type: i64) -> bool {
 fn ValidateReferenceStorage(type: i64, token: * Token) {
     unsafe {
         if (IsReference(type)) {
-            if (Borrowed(Shape(type).element) != i8(0)) {
+            if (Borrowed(Shape(type).element) != i8(0) && !SharedReferenceStorage(Shape(type).element)) {
                 ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
             }
         } else {

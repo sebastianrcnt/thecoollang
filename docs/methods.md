@@ -67,7 +67,9 @@ not implemented. Reference-returning calls can chain directly, including shared 
 computed exclusive receivers such as `map.at_mut(&key).scalar_len()`. Every
 possible source in a multi-parameter return contract remains protected. Shared
 references can be stored in non-owning aggregates and used with by-value
-receivers. Exclusive reference storage, borrowing reference-containing receivers,
+receivers. Shared-reference-only containers also support shared/exclusive
+receivers, including `Iterator.next`; the receiver retains all underlying source
+loans. Exclusive reference storage, precise container/referent separation,
 slice-loan integration and top-level persistent REPL loans remain open work;
 methods do not bypass these checks. Compiled functions containing methods can
 be used and replaced in the REPL under its existing signature rules.

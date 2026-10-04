@@ -199,3 +199,12 @@ test: stored-references-test
 .PHONY: stored-references-sanitize-test
 stored-references-sanitize-test: build/cool-compiler
 	python3 tools/test_stored_references.py --sanitize
+
+.PHONY: nested-references-test tracked-iteration-test tracked-iteration-sanitize-test
+nested-references-test: build/cool-compiler
+	python3 tools/test_nested_references.py
+tracked-iteration-test: build/cool-compiler
+	python3 tools/test_tracked_iteration.py
+tracked-iteration-sanitize-test: build/cool-compiler
+	python3 tools/test_tracked_iteration.py --sanitize
+test: nested-references-test tracked-iteration-test

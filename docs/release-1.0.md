@@ -276,11 +276,31 @@ through ordinary evaluation or library use.
   Exclusive storage, nested borrowing, ownership/slice integration and tracked
   mutable iteration remain required; this does not close G2/G4.
 
+- Nested shared storage and tracked iteration: shared-reference-only containers
+  now accept shared/exclusive receiver borrows, preserving all underlying roots.
+  `Vector.iter` returns a private anchored `Iterator`; `remaining` is O(1), and
+  `next` advances in O(1) with `Option[&T]`, no allocation and no user `unsafe`.
+  Source mutation/movement and advancement with a retained result are rejected.
+  Tests cover nested receiver/array/owner/escape cases, 12 chunk-boundary sizes,
+  owning elements, repeated exhaustion, early break and exact allocation counts.
+  Both frontends, five engines/O2 and instrumented Cool ASan/C ASan+UBSan pass.
+  UTF-8 validation now uses the tracked iterator without an unsafe block; the
+  strict text oracle/sanitizer suite verifies this real library integration.
+  The full regression/legacy bootstrap run passes; new-syntax self-host IR and
+  native binaries converge (IR SHA256 begins `3131095f1f225302`). The subsequent
+  UTF-8 migration passes all five engines/O2 plus ASan/UBSan independently.
+  The documented iterator example executes successfully.
+  Whole-root propagation remains conservative across independent containers
+  sharing a referent; separating container storage from referent provenance,
+  exclusive stored loans, slices and lifetime-aware replacement remain required.
+  G2/G4/G5 are not closed by this step.
+
 ## Next implementation checkpoints
 
-- Extend stored shared loans to exclusive/nested references and slice aliases;
-  keep unsafe raw pointers separate and add rejection regressions before
-  removing restrictions.
+- Separate container-storage loans from contained-reference provenance before
+  relaxing the conservative alias conflicts of nested receiver mutation.
+- Extend stored loans to exclusive references and slice aliases; keep unsafe
+  raw pointers separate and add rejection regressions before removing restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

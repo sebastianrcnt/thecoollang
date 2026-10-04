@@ -75,8 +75,9 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 - Shared references can be stored in non-owning, slice-free structs, arrays and
   enums, as described below. Stored exclusive references, reference-containing
   owned allocations and aggregates mixing references with owners/slices are
-  still rejected. Reassignment of borrowed bindings/fields and references to
-  storage already containing references/slices require further tracking.
+  still rejected. Borrowing shared-reference-only storage is supported, with
+  conservative whole-root conflicts. Reassignment of borrowed bindings/fields,
+  exclusive reference storage and borrowed slices require further tracking.
 - Existing mutable slices cannot share a root with references within one
   function, even in disjoint scopes. References into aliasable slice storage are
   rejected. Slice and reference provenance must be integrated before relaxing
@@ -128,9 +129,10 @@ fn main() {
 ```
 
 `fs.write(path, &bytes)` similarly accepts a shared byte-vector reference.
-Vector `cursor`/`next` remain a raw, manually managed iteration API until stored
-reference support permits a tracked iterator. Cursor advancement still needs
-unsafe raw access and removal/clear/destruction invalidates raw cursors. File
+Vector `iter`/`Iterator.next` provide tracked read-only iteration, as described
+below. The older `cursor`/`next` free functions remain raw, manually managed
+iteration APIs. Their advancement needs unsafe raw access and
+removal/clear/destruction invalidates raw cursors. File
 writing uses that internal linear traversal; it does not repeatedly index the
 chunk chain. Indexed access is O(index / 32); append and pop are O(1).
 
@@ -220,9 +222,12 @@ A reference-containing struct/array requires an explicit full initializer;
 `PairView {}` cannot manufacture null references. Containers and reference
 fields cannot be reassigned, even when declared `var`; ordinary scalar fields
 can be changed when no conflicting loan exists. These restrictions prevent a
-shorter-lived reference from being written into an older container. Nested
-borrows such as `&PairView` and stored `&mut T` remain unsupported, so this is
-not yet the tracked mutable iterator API or full stored-reference gate.
+shorter-lived reference from being written into an older container. Shared or
+exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
+source roots. An exclusive container receiver can update ordinary fields, but
+cannot replace reference fields or mutate through a contained shared reference.
+Stored `&mut T`, mixed ownership/slice storage and general lifetime-aware
+replacement remain required work for the full stored-reference gate.
 
 `make stored-references-test` checks nested structs/arrays/enums, generic
 copies, methods, computed projections, match evaluation, empty results, owner
@@ -234,3 +239,63 @@ plus actual imported `std/option` reference payloads and fallback results.
 functions for ASan, verifies inserted load checks and links the instrumented
 program against the ASan/UBSan C runtime. This checks the executable fixtures;
 it is not a proof of all borrowing rules.
+
+
+## Tracked vector iteration
+
+`values.iter()` (also `vector.iter(&values)`) returns `Iterator[T]`, a non-owning
+value containing a shared source reference and a private raw chunk cursor.
+`remaining()` is O(1). `next()` advances in O(1) and returns `Option[&T]`;
+empty/exhausted iterators return `None` repeatedly. Total traversal is O(n)
+and allocates no storage. An owning element is observed through `&own[T]`,
+without copying or taking ownership of it.
+
+```cool
+import vector "std/vector";
+import option "std/option";
+fn main() {
+    var values = vector.create[i64]();
+    values.append(10);
+    values.append(20);
+    var sum = 0;
+    {
+        var iterator = values.iter();
+        while (iterator.remaining() > 0) {
+            match (iterator.next()) {
+                option.Option[&i64].None => { assert(false); }
+                option.Option[&i64].Some(value) => { sum = sum + *value; }
+            }
+        }
+    }
+    assert(sum == 30);
+    values.clear();
+}
+```
+
+The source remains borrowed through the iterator binding's lexical scope,
+including after exhaustion or an early break. `clear`, `pop`, `append`, `at_mut`
+and moving the source are rejected while the iterator lives. Each result also
+borrows the iterator: storing the `Option` or payload outside the match arm
+prevents the next exclusive call until that result's scope ends. Iterator fields
+are private; safe code cannot forge an anchor or alter the chunk pointers.
+
+Borrowing reference-containing storage currently protects the union of its
+source roots as a whole. Consequently, independently created iterators over the
+same vector, or unrelated shared element loans held during `next`, can cause
+conservative conflicts. References returned from a locally bound iterator
+cannot escape its scope, even if the source outlives it. Separating container
+storage from referent provenance and adding exclusive stored loans remain
+necessary for the complete iteration/borrowing design; this API does not close
+that release gate.
+
+`make nested-references-test` covers container receiver mutation, reborrows,
+borrowed arrays, owner lifetimes and escape/conflict rejections on both
+frontends and five engines/O2. `make tracked-iteration-test` additionally covers
+12 vector sizes around chunk boundaries, owning elements, repeated exhaustion,
+early breaks, unchanged allocation counts and API rejection cases.
+`make tracked-iteration-sanitize-test` instruments generated LLVM with ASan and
+the C runtime with ASan/UBSan and verifies inserted Cool load checks.
+
+The standard UTF-8 validator now consumes the tracked iterator through safe
+Cool code; raw chunk traversal is confined to the vector implementation. Its
+existing strict UTF-8 oracle corpus and sanitizer checks cover this integration.
