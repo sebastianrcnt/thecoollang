@@ -1,0 +1,416 @@
+// Scoped references use a pointer-sized aggregate, never an owning allocation.
+// Numeric AST tags are shared with the bootstrap frontend's Core.cool.
+struct ReferenceLoan {
+    root: * Local;
+    holder: * Local;
+    parent: * Local;
+    exclusive: i64;
+    next: * ReferenceLoan;
+}
+struct ReferenceCheck {
+    loans: * ReferenceLoan;
+    function: * Function;
+}
+fn IsReference(type: i64) -> bool {
+    return AggregateKind(type) == 6;
+}
+fn ReferenceType(token: * Token) -> i64 {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var exclusive: i64 = 0;
+        if (Is(cast[ * u8]("mut")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            exclusive = 1;
+        }
+        return SequenceType(6, ParseType(), exclusive, token);
+    }
+}
+fn ReferenceExpression(token: * Token) -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let exclusive = BoolInt(Is(cast[ * u8]("mut")) != i8(0));
+        if (exclusive != 0) {
+            ctx.v_pos = ctx.v_pos + 1;
+        }
+        let place = Primary();
+        if (exclusive != 0 && place.mutable == 0) {
+            ErrorAt(token, cast[ * u8]("exclusive borrow requires a mutable place"));
+        }
+        if (Borrowed(place.type) != i8(0)) {
+            ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
+        }
+        var address: * Node = null;
+        if (place.kind == 3) {
+            address = NewNode(22, token);
+            address.slot = place.slot;
+            address.local_ref = place.local_ref;
+            address.type = 100000 + place.type;
+        } else {
+            if (place.kind != 18) {
+                ErrorAt(token, cast[ * u8]("reference operand must be a stable place"));
+            }
+            address = place.a;
+        }
+        if (BorrowRoot(address) == null) {
+            ErrorAt(token, cast[ * u8]("reference requires a tracked local or parameter root"));
+        }
+        let result = NewNode(23, token);
+        result.type = SequenceType(6, place.type, exclusive, token);
+        result.storage = Storage(result.type);
+        result.a = address;
+        result.origin_source = address;
+        return result;
+    }
+}
+fn ReferenceLoad(value: * Node, token: * Token) -> * Node {
+    unsafe {
+        let address = NewNode(30, token);
+        address.a = value;
+        address.type = 100000 + Shape(value.type).element;
+        let load = NewNode(18, token);
+        load.a = address;
+        load.origin_source = value;
+        load.type = Shape(value.type).element;
+        load.mutable = Shape(value.type).count;
+        if (Aggregate(load.type) != i8(0)) {
+            load.storage = Storage(load.type);
+        }
+        return load;
+    }
+}
+fn ContainsReference(type: i64) -> bool {
+    unsafe {
+        if (IsReference(type)) {
+            return true;
+        }
+        if (Aggregate(type) == i8(0)) {
+            return false;
+        }
+        Layout(type);
+        let shape = Shape(type);
+        if (shape.kind == 2 || shape.kind == 3) {
+            return ContainsReference(shape.element);
+        }
+        if (shape.kind == 5) {
+            return false;
+        }
+        var field = shape.fields;
+        while (field != null) {
+            if (ContainsReference(field.type)) {
+                return true;
+            }
+            field = field.next;
+        }
+        return false;
+    }
+}
+fn ValidateReferenceStorage(type: i64, token: * Token) {
+    unsafe {
+        if (IsReference(type)) {
+            if (Borrowed(Shape(type).element) != i8(0)) {
+                ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
+            }
+        } else {
+            if (ContainsReference(type)) {
+                ErrorAt(token, cast[ * u8]("references in aggregate storage are not yet supported"));
+            }
+        }
+    }
+}
+fn ReferenceHolder(check: * ReferenceCheck, holder: * Local) -> * ReferenceLoan {
+    unsafe {
+        var loan = check.loans;
+        while (loan != null) {
+            if (holder != null && loan.holder == holder) {
+                return loan;
+            }
+            loan = loan.next;
+        }
+        return null;
+    }
+}
+fn ReferenceAncestor(check: * ReferenceCheck, holder: * Local, via: * Local) -> bool {
+    unsafe {
+        var current = via;
+        while (current != null) {
+            if (current == holder) {
+                return true;
+            }
+            let loan = ReferenceHolder(check, current);
+            if (loan == null) {
+                return false;
+            }
+            current = loan.parent;
+        }
+        return false;
+    }
+}
+fn ReferenceRoot(check: * ReferenceCheck, local: * Local) -> * Local {
+    unsafe {
+        let loan = ReferenceHolder(check, local);
+        if (loan != null) {
+            return loan.root;
+        }
+        return local;
+    }
+}
+fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
+    unsafe {
+        let via = BorrowRoot(place);
+        if (via == null) {
+            return;
+        }
+        if (writing && IsReference(via.type) && Shape(via.type).count == 0) {
+            ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
+        }
+        let root = ReferenceRoot(check, via);
+        var loan = check.loans;
+        while (loan != null) {
+            if (loan.root == root && !ReferenceAncestor(check, loan.holder, via) && (writing || loan.exclusive != 0)) {
+                ErrorAt(place.token, cast[ * u8]("access conflicts with a live scoped reference"));
+            }
+            loan = loan.next;
+        }
+    }
+}
+fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, token: * Token) {
+    unsafe {
+        let via = BorrowRoot(place);
+        if (via == null) {
+            ErrorAt(token, cast[ * u8]("reference result requires a tracked root"));
+        }
+        if (Borrowed(via.type) != i8(0) && !IsReference(via.type)) {
+            ErrorAt(token, cast[ * u8]("cannot borrow through aliasable slice storage"));
+        }
+        if (ReferenceSliceConflict(check.function.body, ReferenceRoot(check, via))) {
+            ErrorAt(token, cast[ * u8]("scoped references and slices cannot share a root yet"));
+        }
+        ReferenceAccess(check, place, exclusive != 0);
+        let loan = cast[ * ReferenceLoan](CAlloc(i64(sizeof(ReferenceLoan))));
+        loan.root = ReferenceRoot(check, via);
+        loan.parent = via;
+        loan.exclusive = exclusive;
+        loan.next = check.loans;
+        check.loans = loan;
+    }
+}
+fn ReferenceRelease(check: * ReferenceCheck, stop: * ReferenceLoan) {
+    unsafe {
+        while (check.loans != stop) {
+            let old = check.loans;
+            check.loans = old.next;
+            Free(cast[ * u8](old));
+        }
+    }
+}
+// Evaluate indices and address bases without mistaking an address for a read.
+fn ReferenceAddress(check: * ReferenceCheck, node: * Node) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        if (node.kind == 22) {
+            return;
+        }
+        if (node.kind == 24) {
+            ReferenceAddress(check, node.a);
+            return;
+        }
+        if (node.kind == 25) {
+            ReferenceAddress(check, node.a);
+            ReferenceValue(check, node.b);
+            return;
+        }
+        if (node.kind == 30) {
+            if (IsReference(node.a.type)) {
+                ReferenceAccess(check, node.a, false);
+            } else {
+                ReferenceValue(check, node.a);
+            }
+            return;
+        }
+        ReferenceValue(check, node);
+    }
+}
+fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        if (IsReference(node.type)) {
+            if (node.kind == 23) {
+                ReferenceAddress(check, node.a);
+                ReferenceAcquire(check, node.a, Shape(node.type).count, node.token);
+                return;
+            }
+            if (node.kind == 3) {
+                ReferenceAcquire(check, node, Shape(node.type).count, node.token);
+                return;
+            }
+            if (node.kind != 4) {
+                ErrorAt(node.token, cast[ * u8]("unsupported scoped reference expression"));
+            }
+        }
+        if (node.kind == 3) {
+            ReferenceAccess(check, node, false);
+            return;
+        }
+        if (node.kind == 18) {
+            ReferenceAddress(check, node.a);
+            ReferenceAccess(check, node.a, false);
+            return;
+        }
+        if (node.kind == 29) {
+            ReferenceAddress(check, node.a);
+            ReferenceAccess(check, node.a, true);
+            return;
+        }
+        if (node.kind == 22 || node.kind == 24 || node.kind == 25 || node.kind == 30) {
+            ReferenceAddress(check, node);
+            ReferenceAccess(check, node, true);
+            return;
+        }
+        if (node.kind == 4) {
+            let saved = check.loans;
+            var arg = node.a;
+            while (arg != null) {
+                ReferenceValue(check, arg);
+                arg = arg.next;
+            }
+            if (IsReference(node.type)) {
+                // Until union-valued roots are supported, reject ambiguous contracts.
+                let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+                let contract = ctx.v_functions[node.slot].borrow_contract;
+                if (contract == 0 || (contract & (contract - 1)) != 0) {
+                    ErrorAt(node.token, cast[ * u8]("reference return requires exactly one borrows source"));
+                }
+                var index: i64 = 0;
+                arg = node.a;
+                while ((contract & (1 << index)) == 0) {
+                    arg = arg.next;
+                    index = index + 1;
+                }
+                var root: * Local = null;
+                var parent: * Local = null;
+                if (arg.kind == 23) {
+                    parent = BorrowRoot(arg.a);
+                } else {
+                    parent = BorrowRoot(arg);
+                }
+                if (parent != null) {
+                    root = ReferenceRoot(check, parent);
+                }
+                if (root == null) {
+                    ErrorAt(node.token, cast[ * u8]("reference return requires a named or direct borrowed argument"));
+                }
+                ReferenceRelease(check, saved);
+                let loan = cast[ * ReferenceLoan](CAlloc(i64(sizeof(ReferenceLoan))));
+                loan.root = root;
+                loan.parent = parent;
+                loan.exclusive = Shape(node.type).count;
+                loan.next = check.loans;
+                check.loans = loan;
+            }
+            // Argument loans last through the containing expression.
+            return;
+        }
+        if (node.kind == 23) {
+            var item = node.a;
+            while (item != null) {
+                ReferenceValue(check, item);
+                item = item.next;
+            }
+            return;
+        }
+        ReferenceValue(check, node.a);
+        ReferenceValue(check, node.b);
+        ReferenceValue(check, node.c);
+    }
+}
+fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        let saved = check.loans;
+        if (node.kind == 12) {
+            var statement = node.a;
+            while (statement != null) {
+                ReferenceStatement(check, statement);
+                statement = statement.next;
+            }
+            ReferenceRelease(check, saved);
+            return;
+        }
+        if (node.kind == 7 && IsReference(node.type)) {
+            ReferenceValue(check, node.a);
+            var loan = check.loans;
+            while (loan != saved) {
+                loan.holder = node.local_ref;
+                loan = loan.next;
+            }
+            return;
+        }
+        if (node.kind == 8) {
+            if (IsReference(node.type)) {
+                ErrorAt(node.token, cast[ * u8]("scoped reference bindings cannot be reassigned"));
+            }
+            ReferenceValue(check, node.a);
+            ReferenceAccess(check, node, true);
+        } else {
+            if (node.kind == 19) {
+                ReferenceAddress(check, node.a);
+                ReferenceValue(check, node.b);
+                ReferenceAccess(check, node.a, true);
+            } else {
+                if (node.kind == 10 || node.kind == 11 || node.kind == 21) {
+                    ReferenceValue(check, node.a);
+                    ReferenceRelease(check, saved);
+                    ReferenceStatement(check, node.b);
+                    ReferenceStatement(check, node.c);
+                } else {
+                    ReferenceValue(check, node.a);
+                }
+            }
+        }
+        if (node.kind != 15) {
+            ReferenceRelease(check, saved);
+        }
+    }
+}
+fn AnalyzeReferences(function: * Function) {
+    unsafe {
+        var check = ReferenceCheck {
+        };
+        check.function = function;
+        ReferenceStatement( & raw check, function.body);
+        ReferenceRelease( & raw check, null);
+    }
+}
+fn RejectReplReferences(node: * Node) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        if (IsReference(node.type)) {
+            ErrorAt(node.token, cast[ * u8]("scoped references in REPL submissions require persistent loan tracking"));
+        }
+        RejectReplReferences(node.a);
+        RejectReplReferences(node.b);
+        RejectReplReferences(node.c);
+        RejectReplReferences(node.next);
+    }
+}
+// Legacy slices are mutable aliases. Until both systems share a loan graph,
+// prevent a reference from coexisting with any slice of the same root.
+fn ReferenceSliceConflict(node: * Node, root: * Local) -> bool {
+    unsafe {
+        if (node == null) {
+            return false;
+        }
+        if (node.kind == 26 && BorrowRoot(node.a) == root) {
+            return true;
+        }
+        return ReferenceSliceConflict(node.a, root) || ReferenceSliceConflict(node.b, root) || ReferenceSliceConflict(node.c, root) || ReferenceSliceConflict(node.next, root);
+    }
+}

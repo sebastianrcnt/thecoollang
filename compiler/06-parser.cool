@@ -1,5 +1,6 @@
 fn ParseType() -> i64 {
 unsafe {
+if(Take(38)!=i8(0)){return ReferenceType(At());}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_t9: i64 = i64(0);
 var v_count3: i64 = i64(0);
@@ -1421,6 +1422,7 @@ continue;
 if (pc == 16) {
 t7 = v_f7;
 AnalyzeBorrows(t7);
+AnalyzeReferences(t7);
 pc = 15;
 continue;
 }
@@ -1955,6 +1957,7 @@ t0 = v_type29;
 Layout(t0);
 t1 = v_type29;
 ValidateBorrowedElements(t1);
+ValidateReferenceStorage(t1,At());
 t2 = 46;
 t3 = cast[*u8]("enum construction requires a variant");
 Need(t2, t3);
@@ -2730,6 +2733,7 @@ return v_n18;
 t131 = 38;
 t132 = Take(t131);
 if ((t132 != i8(0))) {
+if(Is(cast[*u8]("raw"))==i8(0)){return ReferenceExpression(v_t13);}
 if (Is(cast[*u8]("raw")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
 if (!((ctx.v_unsafe_depth != i64(0)))) {
 t133 = v_t13;
@@ -2768,6 +2772,7 @@ t147 = NewNode(t145, t146);
 v_n18 = t147;
 t148 = Primary();
 (v_n18).a = t148;
+if(IsReference(t148.type)){return ReferenceLoad(t148,v_t13);}
 t149 = ((v_n18).a).type;
 t150 = AggregateKind(t149);
 if ((t150 == 5)) {
@@ -4884,7 +4889,7 @@ t47 = !(((v_f8).has_contract != i64(0)));
 }
 if (t47) {
 t48 = (v_f8).token;
-t49 = cast[*u8]("returning borrowed slices requires a borrows(parameter) contract");
+t49 = cast[*u8]("returning borrowed values requires a borrows(parameter) contract");
 ErrorAt(t48, t49);
 }
 }
@@ -5150,6 +5155,7 @@ continue;
 if (pc == 10) {
 t7 = v_f9;
 AnalyzeBorrows(t7);
+AnalyzeReferences(t7);
 pc = 9;
 continue;
 }

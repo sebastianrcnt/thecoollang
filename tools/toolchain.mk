@@ -122,3 +122,8 @@ test: collection-fuzz-test
 raw-address-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_raw_address.py
 test: raw-address-test
+
+.PHONY: references-test
+references-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_references.py
+test: references-test

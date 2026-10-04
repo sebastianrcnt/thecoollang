@@ -1,5 +1,6 @@
 fn Region(arg_v_n6: *Node) -> i64 {
 unsafe {
+if(arg_v_n6!=null && IsReference(arg_v_n6.type) && arg_v_n6.kind==23){return PlaceRegion(arg_v_n6.a);}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_n6: *Node = arg_v_n6;
 var v_result: i64 = i64(0);
@@ -95,6 +96,7 @@ return i64(0);
 
 fn PlaceRegion(arg_v_n7: *Node) -> i64 {
 unsafe {
+if(arg_v_n7!=null && arg_v_n7.kind==30 && IsReference(arg_v_n7.a.type)){return Region(arg_v_n7.a);}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_n7: *Node = arg_v_n7;
 var t0: bool = false;

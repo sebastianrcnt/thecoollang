@@ -50,7 +50,7 @@ U0 Layout(I64 type) {
     if (a->state == 2) return;
     if (a->state == 1) ErrorAt(a->token, "recursive aggregate requires a pointer");
     a->state = 1; a->align = 1;
-    if (a->kind == A_OWNER) { a->size = a->align = 8; }
+    if (a->kind == A_OWNER || a->kind == 6) { a->size = a->align = 8; }
     else if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }
     else if (a->kind == A_ARRAY) { a->size = ByteSize(a->element) * a->count; a->align = Alignment(a->element); }
     else {
@@ -83,13 +83,14 @@ Bool Borrowed(I64 type) {
     Field *f;
     if (!Aggregate(type)) return FALSE;
     Layout(type);
-    if (Shape(type)->kind == A_SLICE) return TRUE;
+    if (Shape(type)->kind == A_SLICE || Shape(type)->kind == 6) return TRUE;
     if (Shape(type)->kind == A_ARRAY) return Borrowed(Shape(type)->element);
     for (f = Shape(type)->fields; f; f = f->next) if (Borrowed(f->type)) return TRUE;
     return FALSE;
 }
 U0 ValidateBorrowedElements(I64 type) {
     Field *field;
+    ValidateReferenceStorage(type,At());
     if (!Aggregate(type)) return;
     Layout(type);
     if (Shape(type)->kind == A_OWNER) { if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "owned storage cannot contain borrowed references"); }
@@ -131,6 +132,7 @@ U0 CollectTypes() {
 }
 U0 AppendType(Text *text, I64 type) {
     U8 *name = NULL; I64 i; AggregateType *a;
+    if(IsReference(type)){Append(text,"&");if(Shape(type)->count)Append(text,"mut ");AppendType(text,Shape(type)->element);return;}
     if (Pointer(type)) { Char(text, '*'); AppendType(text, type-T_PTR); return; }
     if (Aggregate(type)) {
         if (Shape(type)->kind == A_STRUCT || Shape(type)->kind == A_ENUM) {

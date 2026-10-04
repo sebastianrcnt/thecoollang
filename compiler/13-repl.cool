@@ -396,6 +396,7 @@ Error(t31);
 }
 t32 = Statement();
 v_statement1 = t32;
+RejectReplReferences(v_statement1);
 t33 = At();
 if (((t33).kind != i64(0))) {
 t34 = cast[*u8]("one statement per submission; use a block for multiple statements");

@@ -238,3 +238,10 @@ U0 Coerce(Node *n, I64 type) {
     }
     ErrorAt(n->token, "incompatible types; use an explicit cast for narrowing conversions");
 }
+
+extern Bool IsReference(I64 type);
+extern I64 ReferenceType(Token *token);
+extern Node *ReferenceExpression(Token *token);
+extern Node *ReferenceLoad(Node *value, Token *token);
+extern U0 ValidateReferenceStorage(I64 type, Token *token);
+extern U0 AnalyzeReferences(Function *function);

@@ -96,19 +96,32 @@ through ordinary evaluation or library use.
 - Reference preparation: added explicit `&raw place` for unsafe raw-pointer
   construction in both frontends and migrated compiler and library internals.
   It retains existing mutability and unsafe checks; it does not establish a
-  loan or lifetime guarantee. `&place` remains a transitional raw-address alias
-  until scoped references land, and must not be documented as a safe reference.
+  loan or lifetime guarantee. The subsequent scoped-reference implementation
+  replaces the transitional `&place` alias with shared-reference construction.
   Five-engine behavior, formatter preservation, negative cases and exact
   self-host convergence pass. G2/G4 remain open.
 
+- Scoped-reference foundation: both frontends now implement `&T`/`&mut T`,
+  `&place`/`&mut place`, lexical shared/exclusive loans, reborrowing, argument
+  evaluation conflicts, borrowed-return provenance and deferred-call retention.
+  Safe shared references cannot mutate or move pointees; live loans protect
+  owning roots. References use pointer-sized values with no runtime allocation.
+  Existing raw address expressions in tests were migrated to `&raw place`.
+  Tests cover five engines, O2, both frontends, formatter, 27 rejection cases
+  and REPL rejection rollback. Full `make test` and the legacy three-generation
+  `make bootstrap-check` pass. Ownership/library/REPL/model suites and exact self-host convergence
+  pass. See `docs/references.md` for explicit remaining restrictions. G2/G4 are
+  still open: aggregate-stored references, shared slice/loan analysis, persistent
+  REPL loans and complete collection APIs are not implemented.
+
 ## Next implementation checkpoints
 
-- Audit mutable loans and stored borrowed values before designing `&T`/`&mut T`
-  syntax; preserve explicit unsafe raw pointers as a separate type family.
+- Extend scoped loans to stored references and slice aliases; keep unsafe raw
+  pointers separate and add rejection regressions before removing restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Document shared typed AST/slot layout and new-frontend bootstrap maintenance.
   Production source is `compiler/*.cool`; `language/*.cool` is the bootstrap
   frontend, and changes to shared semantics must keep its seed path valid.
-- Implement scoped references and method calls, then migrate collection APIs
+- Complete scoped references and method calls, then migrate collection APIs
   off raw-pointer-only usage. Do not suppress existing owner checks to do this.

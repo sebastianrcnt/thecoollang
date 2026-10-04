@@ -1,0 +1,86 @@
+# Scoped references (development)
+
+A shared `&T` provides read access. An exclusive `&mut T` permits mutation.
+`&value` and `&mut value` borrow a stable local, field, array element or owned
+pointee. The exclusive form requires a mutable place. Neither allocates memory
+or takes ownership. Both occupy eight bytes on the supported 64-bit host.
+
+```cool
+fn increment(value: &mut i64) { *value = *value + 1; }
+fn read(value: &i64) -> i64 { return *value; }
+fn main() {
+    var number = 40;
+    {
+        let writable = &mut number;
+        increment(writable);
+    }
+    let readable = &number;
+    assert(read(readable) == 41);
+}
+```
+
+A reference binding holds its loan through the enclosing lexical block.
+Several shared loans may coexist. A live exclusive loan rejects other access
+through its root; any live loan rejects incompatible writes, moves or owner
+replacement. Conflict checks conservatively treat all projections of one local
+as the same root, so two different fields are not yet independently borrowable.
+Calls retain argument loans while later arguments are evaluated. Temporary
+loans ordinarily end with the statement; `defer` retains captured loans through
+its enclosing block. Owner destruction still follows normal scope cleanup.
+
+Passing or binding an existing reference reborrows it. A child exclusive loan
+suspends parent access; a shared child prevents parent writes. After the child
+block ends, the parent can be used again. Reference bindings currently cannot
+be reassigned. `move` of a reference is also a reborrow, not ownership transfer.
+Moving an owning pointee requires an exclusive reference and leaves its owner
+slot empty, just as a direct owner move does.
+
+Generic code can exchange owning values without raw pointers:
+
+```cool
+fn swap[T](left: &mut T, right: &mut T) {
+    let old = move *left;
+    *left = move *right;
+    *right = move old;
+}
+```
+
+A function returning a reference declares `borrows(parameter)` and may only
+return storage rooted in that parameter. Returning a local or local owner is
+rejected. Callers currently require one declared source and a named reference
+or direct borrow as that argument. A returned field reference keeps the entire
+source root borrowed.
+
+```cool
+struct Pair { value: i64; }
+fn field(pair: &mut Pair) -> &mut i64 borrows(pair) {
+    return &mut (*pair).value;
+}
+```
+
+Raw pointers remain `*T`, constructed with `unsafe { &raw place }`. Bare `&`
+now always constructs a shared reference, including inside `unsafe`; it is no
+longer a raw-address alias. The usual raw-pointer lifetime obligations remain
+with unsafe code. There is no implicit reference-to-pointer conversion.
+
+## Remaining implementation work
+
+This is a development foundation, not completion of the 1.0 borrowing gate.
+
+- References stored in structs, arrays, enums or owning storage are rejected.
+  References to storage already containing borrowed slices/references are also
+  rejected. These require a complete graph of stored loans and escape checks.
+- Existing mutable slices cannot share a root with references within one
+  function, even in disjoint scopes. References into aliasable slice storage are
+  rejected. Slice and reference provenance must be integrated before relaxing
+  these restrictions.
+- REPL statement submissions containing references are rejected because loans
+  are not yet retained across submissions. Compiled function bodies are checked.
+- Reference calls with multiple return sources or nested computed return-source
+  arguments are rejected. References need richer provenance sets for these.
+- There is no automatic field dereference, reference coercion, lifetime syntax,
+  method receiver syntax or borrow-aware replacement for every collection API.
+
+`make references-test` exercises both frontends, all five execution engines,
+optimized native output, generic owner exchange, diagnostics, formatting and
+REPL rollback. `make selfhost-check` separately proves bootstrap convergence.

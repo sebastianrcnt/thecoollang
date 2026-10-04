@@ -18,11 +18,11 @@ def generate(seed, steps):
     expected = []
 
     def check():
-        lines.append(f'assert(v.len[own[i64]](&xs)=={len(model)});')
+        lines.append(f'assert(v.len[own[i64]](&raw xs)=={len(model)});')
         lines.append(f'assert(mem.owner_count()=={len(model)+(len(model)+31)//32});')
         for index in sorted(set([0, len(model)//2, len(model)-1])):
             if index >= 0 and model:
-                lines.append(f'assert(**v.at[own[i64]](&xs,{index})=={model[index]});')
+                lines.append(f'assert(**v.at[own[i64]](&raw xs,{index})=={model[index]});')
 
     # Repeatedly cross chunk boundaries before the random state-machine walk.
     operations = ['append'] * 70 + ['pop'] * 40
@@ -33,30 +33,30 @@ def generate(seed, steps):
         lines.append(f'// seed {seed}, operation {number}: {operation}')
         if operation == 'append':
             model.append(value)
-            lines.append(f'v.append[own[i64]](&xs,new[i64]({value}));')
+            lines.append(f'v.append[own[i64]](&raw xs,new[i64]({value}));')
         elif operation == 'pop':
             result = model.pop() if model else -2000000
-            lines.append('{let result=o.value_or[own[i64]](v.pop[own[i64]](&xs),new[i64](-2000000));'
+            lines.append('{let result=o.value_or[own[i64]](v.pop[own[i64]](&raw xs),new[i64](-2000000));'
                          f'assert(*result=={result});' + '}')
         elif operation in ('replace', 'mutate') and model:
             index = rng.randrange(len(model))
             model[index] = value
             if operation == 'replace':
-                lines.append(f'*v.at[own[i64]](&xs,{index})=new[i64]({value});')
+                lines.append(f'*v.at[own[i64]](&raw xs,{index})=new[i64]({value});')
             else:
-                lines.append(f'**v.at[own[i64]](&xs,{index})={value};')
+                lines.append(f'**v.at[own[i64]](&raw xs,{index})={value};')
         elif operation == 'move':
             lines.append('{let transfer=move xs;xs=move transfer;}')
         elif operation == 'clear':
             model.clear()
-            lines.append('v.clear[own[i64]](&xs);')
+            lines.append('v.clear[own[i64]](&raw xs);')
         check()
     # Check every element with an independent traversal API too.
-    lines.append('var cursor=v.cursor[own[i64]](&xs);')
+    lines.append('var cursor=v.cursor[own[i64]](&raw xs);')
     for value in model:
-        lines.append('io.println(**v.next[own[i64]](&cursor));')
+        lines.append('io.println(**v.next[own[i64]](&raw cursor));')
         expected.append(str(value))
-    lines += ['assert(v.next[own[i64]](&cursor)==null);', '} } assert(mem.owner_count()==0);io.println(1234567);}']
+    lines += ['assert(v.next[own[i64]](&raw cursor)==null);', '} } assert(mem.owner_count()==0);io.println(1234567);}']
     expected.append('1234567')
     return '\n'.join(lines)+'\n', '\n'.join(expected)+'\n'
 

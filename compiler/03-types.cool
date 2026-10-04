@@ -149,7 +149,7 @@ ErrorAt(t4, t5);
 }
 (v_a3).state = 1;
 (v_a3).align = 1;
-if (((v_a3).kind == 5)) {
+if (((v_a3).kind == 5 || (v_a3).kind == 6)) {
 (v_a3).align = 8;
 (v_a3).size = (v_a3).align;
 } else {
@@ -894,7 +894,7 @@ t2 = v_type22;
 Layout(t2);
 t3 = v_type22;
 t4 = Shape(t3);
-if (((t4).kind == 3)) {
+if (((t4).kind == 3 || (t4).kind == 6)) {
 return i8(1);
 }
 t5 = v_type22;
@@ -926,6 +926,7 @@ return i8(0);
 
 fn ValidateBorrowedElements(arg_v_type23: i64) {
 unsafe {
+ValidateReferenceStorage(arg_v_type23,At());
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_type23: i64 = arg_v_type23;
 var v_field: *Field = null;
@@ -1405,6 +1406,7 @@ return;
 
 fn AppendType(arg_v_text1: *Text, arg_v_type26: i64) {
 unsafe {
+if(IsReference(arg_v_type26)){Append(arg_v_text1,cast[*u8]("&"));if(Shape(arg_v_type26).count!=0){Append(arg_v_text1,cast[*u8]("mut "));}AppendType(arg_v_text1,Shape(arg_v_type26).element);return;}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_text1: *Text = arg_v_text1;
 var v_type26: i64 = arg_v_type26;

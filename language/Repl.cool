@@ -64,7 +64,7 @@ U0 ReplStep(Text *text) {
         tokens[ntok] = tokens[ntok-1]; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
     }
     if (Is("return") || Is("defer")) Error("top-level return/defer requires an explicit function or block");
-    statement = Statement(); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
+    statement = Statement(); RejectReplReferences(statement); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
     if (statement->kind == N_EXPR && statement->a->type != T_VOID && !Aggregate(statement->a->type)) {
         arg = statement->a; call = NewNode(N_CALL, arg->token); call->name = "println"; call->slot = -1; call->value = 1; call->type = T_VOID; call->a = arg;
         statement->a = call;

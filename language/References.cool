@@ -1,0 +1,117 @@
+// Scoped lexical loans. Keep semantics aligned with compiler/16-references.cool.
+class ReferenceLoan { Local *root, *holder, *parent; I64 exclusive; ReferenceLoan *next; };
+class ReferenceCheck { ReferenceLoan *loans; Function *function; };
+extern Bool ReferenceSliceConflict(Node *node,Local *root);
+Bool IsReference(I64 type) { return AggregateKind(type)==6; }
+I64 ReferenceType(Token *token) {
+    I64 exclusive=0;
+    if(Is("mut")){pos++;exclusive=1;}
+    return SequenceType(6,ParseType(),exclusive,token);
+}
+Node *ReferenceExpression(Token *token) {
+    I64 exclusive=Is("mut"); Node *place, *address=NULL, *result;
+    if(exclusive)pos++; place=Primary();
+    if(exclusive && !place->mutable) ErrorAt(token,"exclusive borrow requires a mutable place");
+    if(Borrowed(place->type)) ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");
+    if(place->kind==N_LOCAL){address=NewNode(N_LOCAL_ADDRESS,token);address->slot=place->slot;address->local_ref=place->local_ref;address->type=T_PTR+place->type;}
+    else {if(place->kind!=N_LOAD)ErrorAt(token,"reference operand must be a stable place");address=place->a;}
+    if(!BorrowRoot(address))ErrorAt(token,"reference requires a tracked local or parameter root");
+    result=NewNode(N_AGG_LITERAL,token);result->type=SequenceType(6,place->type,exclusive,token);
+    result->storage=Storage(result->type);result->a=address;result->origin_source=address;return result;
+}
+Node *ReferenceLoad(Node *value,Token *token){
+    Node *address=NewNode(N_OWN_ADDRESS,token), *load=NewNode(N_LOAD,token);
+    address->a=value;address->type=T_PTR+Shape(value->type)->element;
+    load->a=address;load->origin_source=value;load->type=Shape(value->type)->element;load->mutable=Shape(value->type)->count;
+    if(Aggregate(load->type))load->storage=Storage(load->type);return load;
+}
+Bool ContainsReference(I64 type){
+    AggregateType *shape;Field *field;
+    if(IsReference(type))return TRUE;if(!Aggregate(type))return FALSE;
+    Layout(type);shape=Shape(type);
+    if(shape->kind==A_ARRAY || shape->kind==A_SLICE)return ContainsReference(shape->element);
+    if(shape->kind==A_OWNER)return FALSE;
+    for(field=shape->fields;field;field=field->next)if(ContainsReference(field->type))return TRUE;
+    return FALSE;
+}
+U0 ValidateReferenceStorage(I64 type,Token *token){
+    if(IsReference(type)){if(Borrowed(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
+    else if(ContainsReference(type))ErrorAt(token,"references in aggregate storage are not yet supported");
+}
+ReferenceLoan *ReferenceHolder(ReferenceCheck *check,Local *holder){
+    ReferenceLoan *loan;for(loan=check->loans;loan;loan=loan->next)if(holder && loan->holder==holder)return loan;return NULL;
+}
+Bool ReferenceAncestor(ReferenceCheck *check,Local *holder,Local *via){
+    Local *current=via;ReferenceLoan *loan;
+    while(current){if(current==holder)return TRUE;loan=ReferenceHolder(check,current);if(!loan)return FALSE;current=loan->parent;}return FALSE;
+}
+Local *ReferenceRoot(ReferenceCheck *check,Local *local){ReferenceLoan *loan=ReferenceHolder(check,local);if(loan)return loan->root;return local;}
+U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing){
+    Local *via=BorrowRoot(place), *root;ReferenceLoan *loan;if(!via)return;
+    if(writing && IsReference(via->type) && !Shape(via->type)->count)ErrorAt(place->token,"cannot mutate or move through a shared reference");
+    root=ReferenceRoot(check,via);
+    for(loan=check->loans;loan;loan=loan->next)if(loan->root==root && !ReferenceAncestor(check,loan->holder,via) && (writing || loan->exclusive))ErrorAt(place->token,"access conflicts with a live scoped reference");
+}
+U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token){
+    Local *via=BorrowRoot(place);ReferenceLoan *loan;
+    if(!via)ErrorAt(token,"reference result requires a tracked root");
+    if(Borrowed(via->type) && !IsReference(via->type))ErrorAt(token,"cannot borrow through aliasable slice storage");
+    if(ReferenceSliceConflict(check->function->body,ReferenceRoot(check,via)))ErrorAt(token,"scoped references and slices cannot share a root yet");
+    ReferenceAccess(check,place,exclusive!=0);
+    loan=CAlloc(sizeof(ReferenceLoan));loan->root=ReferenceRoot(check,via);loan->parent=via;loan->exclusive=exclusive;loan->next=check->loans;check->loans=loan;
+}
+U0 ReferenceRelease(ReferenceCheck *check,ReferenceLoan *stop){ReferenceLoan *old;while(check->loans!=stop){old=check->loans;check->loans=old->next;Free(old);}}
+extern U0 ReferenceValue(ReferenceCheck *check,Node *node);
+U0 ReferenceAddress(ReferenceCheck *check,Node *node){
+    if(!node)return;if(node->kind==N_LOCAL_ADDRESS)return;
+    if(node->kind==N_FIELD_ADDRESS){ReferenceAddress(check,node->a);return;}
+    if(node->kind==N_INDEX_ADDRESS){ReferenceAddress(check,node->a);ReferenceValue(check,node->b);return;}
+    if(node->kind==N_OWN_ADDRESS){if(IsReference(node->a->type))ReferenceAccess(check,node->a,FALSE);else ReferenceValue(check,node->a);return;}
+    ReferenceValue(check,node);
+}
+U0 ReferenceValue(ReferenceCheck *check,Node *node){
+    ReferenceLoan *saved, *loan;Node *arg,*item;I64 contract,index;Local *root,*parent;
+    if(!node)return;
+    if(IsReference(node->type)){
+        if(node->kind==N_AGG_LITERAL){ReferenceAddress(check,node->a);ReferenceAcquire(check,node->a,Shape(node->type)->count,node->token);return;}
+        if(node->kind==N_LOCAL){ReferenceAcquire(check,node,Shape(node->type)->count,node->token);return;}
+        if(node->kind!=N_CALL)ErrorAt(node->token,"unsupported scoped reference expression");
+    }
+    if(node->kind==N_LOCAL){ReferenceAccess(check,node,FALSE);return;}
+    if(node->kind==N_LOAD){ReferenceAddress(check,node->a);ReferenceAccess(check,node->a,FALSE);return;}
+    if(node->kind==N_MOVE){ReferenceAddress(check,node->a);ReferenceAccess(check,node->a,TRUE);return;}
+    if(node->kind==N_LOCAL_ADDRESS || node->kind==N_FIELD_ADDRESS || node->kind==N_INDEX_ADDRESS || node->kind==N_OWN_ADDRESS){ReferenceAddress(check,node);ReferenceAccess(check,node,TRUE);return;}
+    if(node->kind==N_CALL){
+        saved=check->loans;for(arg=node->a;arg;arg=arg->next)ReferenceValue(check,arg);
+        if(IsReference(node->type)){
+            contract=functions[node->slot].borrow_contract;
+            if(!contract || (contract & (contract-1)))ErrorAt(node->token,"reference return requires exactly one borrows source");
+            index=0;arg=node->a;while(!(contract & (1<<index))){arg=arg->next;index++;}
+            root=NULL;parent=NULL;if(arg->kind==N_AGG_LITERAL)parent=BorrowRoot(arg->a);else parent=BorrowRoot(arg);
+            if(parent)root=ReferenceRoot(check,parent);
+            if(!root)ErrorAt(node->token,"reference return requires a named or direct borrowed argument");
+            ReferenceRelease(check,saved);loan=CAlloc(sizeof(ReferenceLoan));loan->root=root;loan->parent=parent;loan->exclusive=Shape(node->type)->count;loan->next=check->loans;check->loans=loan;
+        }return;
+    }
+    if(node->kind==N_AGG_LITERAL){for(item=node->a;item;item=item->next)ReferenceValue(check,item);return;}
+    ReferenceValue(check,node->a);ReferenceValue(check,node->b);ReferenceValue(check,node->c);
+}
+U0 ReferenceStatement(ReferenceCheck *check,Node *node){
+    ReferenceLoan *saved,*loan;Node *statement;if(!node)return;saved=check->loans;
+    if(node->kind==N_BLOCK){for(statement=node->a;statement;statement=statement->next)ReferenceStatement(check,statement);ReferenceRelease(check,saved);return;}
+    if(node->kind==N_BIND && IsReference(node->type)){ReferenceValue(check,node->a);for(loan=check->loans;loan!=saved;loan=loan->next)loan->holder=node->local_ref;return;}
+    if(node->kind==N_ASSIGN){if(IsReference(node->type))ErrorAt(node->token,"scoped reference bindings cannot be reassigned");ReferenceValue(check,node->a);ReferenceAccess(check,node,TRUE);}
+    else if(node->kind==N_STORE){ReferenceAddress(check,node->a);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);}
+    else if(node->kind==N_IF || node->kind==N_WHILE || node->kind==N_FOR){ReferenceValue(check,node->a);ReferenceRelease(check,saved);ReferenceStatement(check,node->b);ReferenceStatement(check,node->c);}
+    else ReferenceValue(check,node->a);
+    if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
+}
+U0 AnalyzeReferences(Function *function){ReferenceCheck check;check.loans=NULL;check.function=function;ReferenceStatement(&check,function->body);ReferenceRelease(&check,NULL);}
+U0 RejectReplReferences(Node *node){
+    if(!node)return;if(IsReference(node->type))ErrorAt(node->token,"scoped references in REPL submissions require persistent loan tracking");
+    RejectReplReferences(node->a);RejectReplReferences(node->b);RejectReplReferences(node->c);RejectReplReferences(node->next);
+}
+Bool ReferenceSliceConflict(Node *node,Local *root){
+    if(!node)return FALSE;if(node->kind==N_SLICE && BorrowRoot(node->a)==root)return TRUE;
+    return ReferenceSliceConflict(node->a,root) || ReferenceSliceConflict(node->b,root) || ReferenceSliceConflict(node->c,root) || ReferenceSliceConflict(node->next,root);
+}
