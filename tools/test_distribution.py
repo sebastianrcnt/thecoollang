@@ -63,6 +63,18 @@ fn test_answer(){assert(m.value()==42);}
     assert 'pub fn value()' in run([cli,'doc',library],cwd=project,env=env).stdout
     executable=project/'native program';run([cli,'build','--release','-o',executable],cwd=project,env=env)
     assert run([executable],cwd=root,env=env).stdout=='42\n'
+    tally=root/'tally';shutil.copytree(installed/'examples/tally',tally)
+    report=root/'tally.json'
+    for backend in ('auto','llvm'):
+        assert run([cli,'run','--backend',backend,'.','--',report,'한글','apple','한글',''],cwd=tally,env=env).stdout=='4\n'
+        assert json.loads(report.read_text())=={'한글':2,'apple':1,'':1}
+    tally_binary=root/'tally-native';run([cli,'build','--release','-o',tally_binary],cwd=tally,env=env)
+    assert run([tally_binary,report,'apple','apple'],cwd=root,env=env).stdout=='2\n'
+    assert json.loads(report.read_text())=={'apple':2}
+    session='import ledger "example.test/tally/ledger";\nimport "std/mem";\nvar book=ledger.create();\n'
+    session+='{let count=ledger.add(&mut book,"한글",1);}\n'*256
+    session+='ledger.total(&book)\n:forget book\nmem.owner_count()\n:quit\n'
+    assert run([cli,'repl','--offline','--frozen'],cwd=tally,env=env,input=session).stdout=='256\n0\n'
     p=run([cli,'legacy'],cwd=root,env=env,code=2);assert 'source checkout' in p.stderr
     # Restore permissions for removal, preserving the installed launcher's mode.
     installed.chmod(0o755)

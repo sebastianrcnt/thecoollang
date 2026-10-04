@@ -61,3 +61,20 @@ An isolated runtime rebuild changes native program behavior while preserving
 object mtime and verifies that the cached binary is invalidated. Project tests
 also exercise package visibility, import cycles, dependency changes, MVS,
 offline checksums and LLVM execution.
+
+
+## Stateful project workload
+
+`tools/test_repl_project.py` uses the shipped Tally directory module and compares
+its map updates and JSON files to an independent seeded Python model. It keeps
+user state while replacing a called function, warming JIT callers, rejecting
+invalid definitions/borrow conflicts and recovering from runtime errors after
+writes. Every frontend must release all user owners when the state is forgotten.
+
+On macOS, `--rss-output report.json` measures the frontend process with `time -l`,
+excluding the Python package resolver. `--rounds 128` performs 4,096 updates;
+`--rounds 1024` performs 32,768. Each report contains a single fresh-process
+observation per frontend, including cold compilation. Repeat whole runs to obtain
+a distribution; do not describe one report as a median or an isolated speed test.
+The optional `--frontend` adds an instrumented compiler; its memory must be
+reported separately from the production and bootstrap frontends.

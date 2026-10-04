@@ -29,7 +29,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
-| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans/packages and ordinary submission reclamation verified) |
+| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
@@ -656,6 +656,37 @@ through ordinary evaluation or library use.
   overlapped regression jobs and support workload-specific memory results.
   G6 stays open pending the complete session-lifetime audit and sustained
   real-project validation; accepted immutable text still has session lifetime.
+
+- Sustained project integration: added the checked-in `examples/tally` directory
+  module. Its separate ledger package composes owned UTF-8 text, a sorted map,
+  bounded recent-update vector and JSON snapshots; the CLI accepts argv labels
+  and writes a JSON count report. It rejects invalid UTF-8 and failed writes.
+  Python Counter/JSON results match both frontend checks, all five engines and
+  an optimized standalone executable outside the checkout. Formatter and public
+  API documentation checks pass. The example ships in the checksummed archive;
+  distribution tests copy it from a read-only installation and verify normal
+  execution, LLVM native output and REPL use without a seed or working make.
+  `make repl-project-test` adds 4,096 deterministic modeled updates, 128 function
+  replacements, rejected replacement bodies, runtime errors after committed
+  writes, persistent-loan conflicts, explicit binding release and JSON checkpoints.
+  A longer 32,768-update / 1,024-replacement session passes both frontends and the
+  compiler-instrumented ASan frontend; after forgetting the book every frontend
+  reports zero live user owners. Cached callers remain valid and JIT compilation
+  counters prove the workload exercises hot functions. `make distribution-test`
+  passes with the example included. The new sanitizer target is wired into CI;
+  remote CI has not been observed.
+  Frontend-only macOS `time -l` observations with the final example measure
+  production peak RSS of 9,142,272 bytes at 4,096 updates and 9,125,888 bytes at
+  32,768 updates (about 8.7 MiB in both). These are one fresh process per workload,
+  including cold package compilation, run alongside other verification jobs;
+  they are neither medians nor isolated timing measurements. Bootstrap and ASan
+  samples are recorded separately, not mixed into production results. Reproduce
+  with `tools/test_repl_project.py --rounds 128 --rss-output <report.json>` and
+  `--rounds 1024`; `--frontend build/repl-loans-asan/cool-compiler` adds ASan.
+  Raw reports: `build/release-audit/repl-project-final-rss-128.json` and
+  `build/release-audit/repl-project-final-rss-1024.json`.
+  This strengthens G5/G6/G9/G10 evidence; it does not close the remaining language,
+  resource-lifetime, tooling or release gates.
 
 ## Next implementation checkpoints
 

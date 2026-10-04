@@ -30,6 +30,12 @@ override it. Identical payloads, metadata and epoch produce byte-identical
 archives. This does not promise byte-identical compilation across different
 Clang/SDK versions or a cryptographically signed release.
 
+The archive also includes `examples/tally`, a complete directory-package CLI
+using owned text, maps, vectors, JSON and files. Copy it to a writable directory
+and follow its README with the installed `cool`. Distribution tests copy this
+example from the read-only installed payload and run it through the interpreter,
+LLVM native build and persistent REPL, with the seed and make unavailable.
+
 ## Requirements
 
 - Native Apple Silicon macOS, at least the manifest's `minimum_macos`. This

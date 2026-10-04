@@ -39,6 +39,7 @@ def main():
                'build/cool-compiler','build/language-runtime.o','build/language-runtime.dylib','language/runtime.c','language/numeric.h','language/memory.h','language/args.h']
         files += [str(path.relative_to(ROOT)) for path in sorted((ROOT/'stdlib').rglob('*')) if path.is_file() and path.suffix in ('.cool','.md')]
         files += [str(path.relative_to(ROOT)) for path in sorted((ROOT/'docs').glob('*.md'))]
+        files += [str(path.relative_to(ROOT)) for path in sorted((ROOT/'examples/tally').rglob('*')) if path.is_file() and (path.suffix in ('.cool','.md') or path.name=='cool.mod')]
         for name in files:
             source=ROOT/name
             if source.is_symlink():raise ValueError('release input must not be a symlink: '+name)
@@ -58,6 +59,8 @@ compiler toolchain, Mach-O deployment metadata and file checksums.
 Run `python3 install.py --verify`, then
 `python3 install.py --prefix "$HOME/.local"` and add that prefix's `bin` to PATH.
 Use `cool --version`, `cool doctor`, and `cool run program.cool`.
+Copy `examples/tally` to a writable directory for a complete multi-package CLI
+example; its README covers command-line and REPL use.
 `python3 install.py --uninstall --prefix "$HOME/.local"` removes this exact
 installed version and its launcher only if it is still selected. Other installed
 versions remain intact. `bin/cool` may replace only a managed Cool symlink.

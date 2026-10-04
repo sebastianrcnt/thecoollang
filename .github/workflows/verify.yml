@@ -22,7 +22,7 @@ jobs:
       - name: Compiler, runtime and bootstrap regressions
         run: make test bootstrap-check
       - name: Instrumented storage and library checks
-        run: make collection-sanitize-test text-sanitize-test map-sanitize-test json-sanitize-test process-sanitize-test path-sanitize-test stored-references-sanitize-test tracked-iteration-sanitize-test slice-loans-sanitize-test repl-packages-sanitize-test repl-storage-sanitize-test repl-tokens-sanitize-test repl-functions-sanitize-test repl-types-sanitize-test
+        run: make collection-sanitize-test text-sanitize-test map-sanitize-test json-sanitize-test process-sanitize-test path-sanitize-test stored-references-sanitize-test tracked-iteration-sanitize-test slice-loans-sanitize-test repl-packages-sanitize-test repl-storage-sanitize-test repl-tokens-sanitize-test repl-functions-sanitize-test repl-types-sanitize-test repl-project-sanitize-test
       - name: External distribution validation
         run: make distribution-test
       - name: Package development artifact

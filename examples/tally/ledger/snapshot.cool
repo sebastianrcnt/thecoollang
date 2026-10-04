@@ -1,0 +1,23 @@
+package ledger;
+import map "std/map";
+import text "std/text";
+import vector "std/vector";
+import json "std/json";
+import result "std/result";
+pub fn snapshot(book: & Book) -> text.Text {
+    let document = json.object_value();
+    let names = map.keys[i64]( & ( * book).counts);
+    for (var i: usize = 0; i < vector.len[text.Text]( & names); i = i + 1) {
+        let key = vector.at[text.Text]( & names, i);
+        json.object_insert( & mut * document, text.clone(key), json.integer_value( * map.at[i64]( & ( * book).counts, key)));
+    }
+    match (json.encode( & * document)) {
+        result.Result[text.Text, json.ErrorKind].Ok(encoded) => {
+            return move encoded;
+        }
+        result.Result[text.Text, json.ErrorKind].Err(_) => {
+            assert(false);
+            return text.create();
+        }
+    }
+}

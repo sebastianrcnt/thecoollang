@@ -1,0 +1,24 @@
+package main;
+import ledger "example.test/tally/ledger";
+import fs "std/fs";
+import text "std/text";
+import result "std/result";
+import "std/os";
+import "std/io";
+import "std/mem";
+fn main() {
+    if (os.arg_count() == 0) {
+        io.println("Usage: tally OUTPUT.json [LABEL ...]");
+        return;
+    }
+    {
+        var book = ledger.create();
+        for (var i: usize = 1; i < os.arg_count(); i = i + 1) {
+            ledger.add( & mut book, os.arg(i), 1);
+        }
+        let encoded = ledger.snapshot( & book);
+        assert(result.is_ok[usize, i32](fs.write(os.arg(0), text.as_bytes( & encoded))));
+        io.println(ledger.total( & book));
+    }
+    assert(mem.owner_count() == 0);
+}

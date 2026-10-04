@@ -271,3 +271,10 @@ repl-types-test: build/cool-compiler build/language.BIN
 test: repl-types-test
 repl-types-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_repl_types.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: repl-project-test repl-project-sanitize-test
+repl-project-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_repl_project.py
+test: repl-project-test
+repl-project-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_repl_project.py --frontend build/repl-loans-asan/cool-compiler

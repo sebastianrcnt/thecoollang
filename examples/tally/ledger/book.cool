@@ -1,0 +1,56 @@
+package ledger;
+import map "std/map";
+import text "std/text";
+import vector "std/vector";
+import result "std/result";
+pub struct Book {
+    counts: map.Map[i64];
+    recent: vector.Vector[i64];
+}
+pub fn create() -> Book {
+    return Book {
+    };
+}
+fn label(value: string) -> text.Text {
+    match (text.from_literal(value)) {
+        result.Result[text.Text, text.Utf8Error].Ok(decoded) => {
+            return move decoded;
+        }
+        result.Result[text.Text, text.Utf8Error].Err(_) => {
+            assert(false);
+            return text.create();
+        }
+    }
+}
+pub fn get(book: & Book, name: string) -> i64 {
+    let key = label(name);
+    if (!map.contains[i64]( & ( * book).counts, & key)) {
+        return 0;
+    }
+    return * map.at[i64]( & ( * book).counts, & key);
+}
+pub fn add(book: & mut Book, name: string, amount: i64) -> i64 {
+    let key = label(name);
+    var before: i64 = 0;
+    if (map.contains[i64]( & ( * book).counts, & key)) {
+        before = * map.at[i64]( & ( * book).counts, & key);
+    }
+    let after = before + amount;
+    map.insert[i64]( & mut( * book).counts, move key, after);
+    if (vector.len[i64]( & ( * book).recent) == 64) {
+        vector.clear[i64]( & mut( * book).recent);
+    }
+    vector.append[i64]( & mut( * book).recent, after);
+    return after;
+}
+pub fn view(book: & Book) -> & map.Map[i64]borrows(book) {
+    return & ( * book).counts;
+}
+pub fn total(book: & Book) -> i64 {
+    let names = map.keys[i64]( & ( * book).counts);
+    var sum: i64 = 0;
+    for (var i: usize = 0; i < vector.len[text.Text]( & names); i = i + 1) {
+        sum = sum + * map.at[i64]( & ( * book).counts, vector.at[text.Text]( & names, i));
+    }
+    return sum;
+}
