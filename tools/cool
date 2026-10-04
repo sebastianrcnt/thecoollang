@@ -13,10 +13,11 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from modules import Graph, Manifest, atomic_write, cache_home, find_root, validate_path, version_key, tree_hash as tree_hash_for_vendor
+from driver_common import atomic_write, cache_home, find_root
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = Path(os.environ.get('COOL_FRONTEND', ROOT/'build/cool-compiler')).resolve()
+_FRONTEND_DIGEST = None
 
 def ensure_frontend():
     if 'COOL_FRONTEND' not in os.environ:
@@ -43,14 +44,45 @@ def front(mode, source, *args, capture=False):
                           check=True, text=True, capture_output=capture)
 
 
-def metadata(path):
-    key = hashlib.sha256(FRONTEND.read_bytes() + path.read_bytes()).hexdigest()
-    cache = cache_home() / 'scan' / key
-    if cache.exists():
-        lines = cache.read_text()
-    else:
-        lines = front('scan', path, capture=True).stdout
-        atomic_write(cache, lines.encode())
+def frontend_digest():
+    # One content hash per invocation, shared by all package scans/artifacts.
+    # Do not persist this using mtimes: replacing a binary must invalidate scans.
+    global _FRONTEND_DIGEST
+    if _FRONTEND_DIGEST is None:
+        _FRONTEND_DIGEST = hashlib.sha256(FRONTEND.read_bytes()).digest()
+    return _FRONTEND_DIGEST
+
+
+def metadata_many(paths, work):
+    cached, missing = {}, {}
+    for path in paths:
+        if '\t' in str(path) or '\n' in str(path):
+            raise ValueError('source paths cannot contain tabs or newlines')
+        key = hashlib.sha256(b'cool-scan-v2\0' + frontend_digest() + path.read_bytes()).hexdigest()
+        cache = cache_home() / 'scan' / key
+        if cache.exists():
+            cached[path] = cache.read_text()
+        else:
+            missing[str(path)] = (path, cache)
+    if missing:
+        manifest = work / 'scan.list'
+        manifest.write_text(''.join(f'__scan\t{path}\n' for path in missing))
+        # Language tokens are still scanned by Cool, once for all package files.
+        output = front('scan-bundle', manifest, capture=True).stdout
+        records = {path: [] for path in missing}
+        for line in output.splitlines():
+            path, kind, value = line.split('\t', 2)
+            if path not in records or kind not in ('package', 'import'):
+                raise ValueError('invalid frontend scan record')
+            records[path].append(kind + '\t' + value + '\n')
+        for name, (path, cache) in missing.items():
+            lines = ''.join(records[name])
+            atomic_write(cache, lines.encode())
+            cached[path] = lines
+    return {path: parse_metadata(path, cached[path]) for path in paths}
+
+
+def parse_metadata(path, lines):
     package, imports = None, []
     for line in lines.splitlines():
         kind, value = line.split('\t', 1)
@@ -68,7 +100,10 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
     if not entry.exists():
         raise ValueError(f'input does not exist: {entry}')
     root = find_root(entry)
-    graph = Graph(Manifest.read(root), offline, frozen).resolve() if root else None
+    graph = None
+    if root:
+        from modules import Graph, Manifest
+        graph = Graph(Manifest.read(root), offline, frozen).resolve()
     files, active, done = [], [], set()
 
     def visit(package, location):
@@ -82,8 +117,9 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
         active.append(package)
         declared = set()
         imports = set()
+        scanned = metadata_many(sources, work)
         for source in sources:
-            name, dependencies = metadata(source)
+            name, dependencies = scanned[source]
             if location.is_dir() and name is None:
                 raise ValueError(f'{source}: directory packages require a package declaration')
             declared.add(name)
@@ -116,8 +152,8 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
 
 
 def artifact(files, optimization):
-    digest = hashlib.sha256(b'cool-artifact-v1\0' + optimization.encode())
-    for path in (FRONTEND, ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h', ROOT/'language/args.h'):
+    digest = hashlib.sha256(b'cool-artifact-v2\0' + optimization.encode() + frontend_digest())
+    for path in (ROOT/'language/runtime.c', ROOT/'language/numeric.h', ROOT/'language/memory.h', ROOT/'language/args.h', ROOT/'build/language-runtime.o'):
         digest.update(path.read_bytes())
     digest.update(subprocess.check_output(['clang', '--version']))
     for package, path in files:
@@ -141,6 +177,7 @@ def native(bundle_path, files, optimization):
 
 
 def module_command(args):
+    from modules import Graph, Manifest, validate_path, version_key, tree_hash as tree_hash_for_vendor
     cwd = Path.cwd()
     if args.action == 'init':
         path = cwd/'cool.mod'

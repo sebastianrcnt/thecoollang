@@ -28,11 +28,25 @@ U0 ReadBundle(U8 *file) {
         ReadSource(path);
     }
 }
+U0 ScanMetadataFiles() {
+    I64 i,nesting=0,at;U8 *file=NULL;
+    for(i=0;i<ntok;i++){
+        if(!file || !Eq(file,tokens[i].file)){file=tokens[i].file;nesting=0;}
+        if(!nesting && tokens[i].kind==K_ID && Eq(tokens[i].text,"package") && tokens[i+1].kind==K_ID){Out(file);Out("\tpackage\t");Out(tokens[i+1].text);Out("\n");}
+        if(!nesting && tokens[i].kind==K_ID && Eq(tokens[i].text,"import")){
+            at=i+1;if(tokens[at].kind==K_ID)at++;
+            if(tokens[at].kind!=K_STRING)ErrorAt(&tokens[at],"expected import path string");
+            Out(file);Out("\timport\t");Out(tokens[at].text);Out("\n");
+        }
+        if(tokens[i].kind=='{')nesting++;if(tokens[i].kind=='}')nesting--;
+    }
+}
 U0 LanguageMain() {
     U8 *mode;
     if (NativeArgCount() == 2 && (Eq(NativeArg(1), "repl") || Eq(NativeArg(1), "repl-quiet"))) { Repl(Eq(NativeArg(1), "repl")); return; }
     if (NativeArgCount() < 3) { Out("usage: language.BIN check|run|llvm[-bundle] source [output.ll]\n"); NativeExit(2); }
     mode = NativeArg(1);
+    if(Eq(mode,"scan-bundle")){ReadBundle(NativeArg(2));ScanMetadataFiles();return;}
     if (Eq(mode, "fmt")) { if (NativeArgCount() != 4) NativeExit(2); FormatFile(NativeArg(2), NativeArg(3)); return; }
     if (Eq(mode, "auto") || Eq(mode, "auto-bundle")) execution_mode = 3;
     if (Eq(mode, "bytecode") || Eq(mode, "bytecode-bundle")) execution_mode = 1;

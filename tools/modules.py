@@ -11,12 +11,10 @@ import re
 import shlex
 import shutil
 import subprocess
-import tarfile
 import tempfile
 
 
-def cache_home():
-    return Path(os.environ.get('COOL_CACHE', Path.home() / '.cache/cool'))
+from driver_common import cache_home, atomic_write, find_root
 
 
 def version_key(version):
@@ -112,28 +110,6 @@ class Manifest:
         atomic_write(self.root / 'cool.mod', '\n'.join(lines).encode())
 
 
-def atomic_write(path, data):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as out:
-        temp = Path(out.name)
-        out.write(data)
-    try:
-        temp.replace(path)
-    finally:
-        temp.unlink(missing_ok=True)
-
-
-def find_root(start):
-    start = Path(start).resolve()
-    if start.is_file():
-        start = start.parent
-    for parent in (start, *start.parents):
-        if (parent / 'cool.mod').is_file():
-            return parent
-    return None
-
-
 def tree_hash(root):
     h = hashlib.sha256()
     for base, dirs, files in os.walk(root):
@@ -225,6 +201,7 @@ class Graph:
                                 (('git@' + repository.split('/', 1)[0] + ':' + repository.split('/', 1)[1]) if os.environ.get('COOL_GIT_SSH') == '1' else 'https://' + repository) + '.git', str(temp / 'repo')], check=True)
                 archive = subprocess.check_output(['git', '-C', str(temp/'repo'), 'archive', '--format=tar', 'refs/tags/' + version])
                 unpack = temp / 'source'; unpack.mkdir()
+                import tarfile
                 with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
                     for member in tar:
                         name = Path(member.name)

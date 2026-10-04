@@ -148,3 +148,8 @@ map-sanitize-test: build/cool-compiler build/language-runtime.o build/language-r
 	python3 tools/test_map_api.py
 	python3 tools/test_map.py --sanitize
 test: map-test
+
+.PHONY: driver-cache-test
+driver-cache-test: build/cool-compiler
+	python3 tools/test_driver_cache.py
+test: driver-cache-test

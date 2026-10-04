@@ -159,6 +159,18 @@ through ordinary evaluation or library use.
   requires serialization, path/process utilities and real applications; stored
   references and tracked iterators remain required by G2/G4/G5.
 
+- Driver performance: defer module/archive imports, hash the frontend once per
+  invocation, and batch cold metadata scans per directory through a new Cool
+  `scan-bundle` mode in both frontends. Content-addressed source/frontend keys
+  and normal build checks remain intact; native cache keys now also include
+  the linked runtime object. Cache/concurrency/mtime-preservation tests, project
+  and CLI/tooling suites, and exact self-host convergence pass. Five-sample
+  medians improve the synthetic 257-file cold check from 591.542 to 119.467 ms,
+  warm check from 125.147 to 89.163 ms, and small full-driver execution from
+  97.661 to 83.991 ms. `docs/performance.md` documents raw samples and boundaries.
+  G8 remains open for real applications, additional overhead reduction and
+  incremental workloads; these changes cache metadata, not typechecking/codegen.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

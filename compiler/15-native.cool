@@ -123,6 +123,7 @@ return;
 
 fn LanguageMain() {
 unsafe {
+if(NativeArgCount()>=3 && Eq(NativeArg(1),cast[*u8]("scan-bundle"))!=i8(0)){ReadBundle(NativeArg(2));ScanMetadataFiles();return;}
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_mode: *u8 = null;
 var v_i32: i64 = i64(0);
@@ -1617,3 +1618,23 @@ continue;
 return;
 }
 
+
+fn ScanMetadataFiles() {
+ unsafe {
+  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+  var nesting:i64=0;var file:*u8=null;
+  for(var i:i64=0;i<ctx.v_ntok;i=i+1){
+   let token=&raw ctx.v_tokens[i];
+   if(file==null || Eq(file,token.file)==i8(0)){file=token.file;nesting=0;}
+   if(nesting==0 && token.kind==256 && Eq(token.text,cast[*u8]("package"))!=i8(0) && ctx.v_tokens[i+1].kind==256){
+    Out(file);Out(cast[*u8]("\tpackage\t"));Out(ctx.v_tokens[i+1].text);Out(cast[*u8]("\n"));
+   }
+   if(nesting==0 && token.kind==256 && Eq(token.text,cast[*u8]("import"))!=i8(0)){
+    var at=i+1;if(ctx.v_tokens[at].kind==256){at=at+1;}
+    if(ctx.v_tokens[at].kind!=258){ErrorAt(&raw ctx.v_tokens[at],cast[*u8]("expected import path string"));}
+    Out(file);Out(cast[*u8]("\timport\t"));Out(ctx.v_tokens[at].text);Out(cast[*u8]("\n"));
+   }
+   if(token.kind==123){nesting=nesting+1;}if(token.kind==125){nesting=nesting-1;}
+  }
+ }
+}

@@ -1,0 +1,344 @@
+{
+  "baseline_revision": "c04efde",
+  "note": "Wall-clock samples include process startup. Single-file measurements include make checks. Package comparisons use the same frontend with COOL_FRONTEND set, excluding make. This is metadata caching, not cached typechecking or incremental code generation.",
+  "single_file_before": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "repeats": 5,
+    "workload": "sum integers [0, 10000)",
+    "note": "All measurements include process startup; setup excluded. No in-process latency claim.",
+    "results": {
+      "frontend_check_with_process_startup": {
+        "median_ms": 1.812,
+        "min_ms": 1.615,
+        "samples_ms": [
+          2.316916,
+          1.6935,
+          1.614959,
+          1.812292,
+          1.842208
+        ]
+      },
+      "run_cold_compile_and_execute_with_startup": {
+        "median_ms": 7.08,
+        "min_ms": 6.988,
+        "samples_ms": [
+          7.063333,
+          7.109875,
+          6.987625,
+          7.079584,
+          7.389625
+        ]
+      },
+      "bytecode_cold_compile_and_execute_with_startup": {
+        "median_ms": 11.419,
+        "min_ms": 10.727,
+        "samples_ms": [
+          11.694334,
+          11.393459,
+          11.81475,
+          10.726583,
+          11.418583
+        ]
+      },
+      "jit_cold_compile_and_execute_with_startup": {
+        "median_ms": 1.805,
+        "min_ms": 1.712,
+        "samples_ms": [
+          1.712209,
+          1.813084,
+          1.731542,
+          1.805125,
+          1.851334
+        ]
+      },
+      "auto_cold_compile_and_execute_with_startup": {
+        "median_ms": 11.38,
+        "min_ms": 10.662,
+        "samples_ms": [
+          11.557416,
+          11.710541,
+          11.379833,
+          10.661833,
+          10.866833
+        ]
+      },
+      "adaptive_run_including_driver": {
+        "median_ms": 97.661,
+        "min_ms": 96.097,
+        "samples_ms": [
+          97.064375,
+          96.096542,
+          97.661208,
+          98.544833,
+          98.248708
+        ]
+      },
+      "llvm_ir_emission_with_startup": {
+        "median_ms": 2.052,
+        "min_ms": 1.939,
+        "samples_ms": [
+          2.338584,
+          2.051916,
+          2.222959,
+          1.939458,
+          2.026125
+        ]
+      },
+      "llvm_cold_build_including_driver": {
+        "median_ms": 132.428,
+        "min_ms": 125.846,
+        "samples_ms": [
+          132.427583,
+          132.803,
+          136.808875,
+          131.175375,
+          125.846041
+        ]
+      },
+      "llvm_cached_build_including_driver": {
+        "median_ms": 98.435,
+        "min_ms": 97.797,
+        "samples_ms": [
+          98.978,
+          97.79675,
+          98.26325,
+          98.434667,
+          99.695833
+        ]
+      },
+      "llvm_executable_with_startup": {
+        "median_ms": 1.596,
+        "min_ms": 1.47,
+        "samples_ms": [
+          223.020334,
+          1.882209,
+          1.596166,
+          1.469833,
+          1.571625
+        ]
+      },
+      "repl_compile_hot_replace_and_call_with_startup": {
+        "median_ms": 2.333,
+        "min_ms": 2.25,
+        "samples_ms": [
+          2.37925,
+          2.26975,
+          2.333125,
+          2.250167,
+          2.378625
+        ]
+      }
+    }
+  },
+  "single_file_after": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "repeats": 5,
+    "workload": "sum integers [0, 10000)",
+    "note": "All measurements include process startup; setup excluded. No in-process latency claim.",
+    "results": {
+      "frontend_check_with_process_startup": {
+        "median_ms": 1.779,
+        "min_ms": 1.602,
+        "samples_ms": [
+          1.956125,
+          1.9545,
+          1.736084,
+          1.778708,
+          1.601833
+        ]
+      },
+      "run_cold_compile_and_execute_with_startup": {
+        "median_ms": 6.75,
+        "min_ms": 6.423,
+        "samples_ms": [
+          6.713708,
+          6.858291,
+          6.423167,
+          6.749958,
+          6.778541
+        ]
+      },
+      "bytecode_cold_compile_and_execute_with_startup": {
+        "median_ms": 10.805,
+        "min_ms": 10.284,
+        "samples_ms": [
+          11.323917,
+          10.804833,
+          11.383875,
+          10.625625,
+          10.2845
+        ]
+      },
+      "jit_cold_compile_and_execute_with_startup": {
+        "median_ms": 1.747,
+        "min_ms": 1.685,
+        "samples_ms": [
+          1.6845,
+          1.807709,
+          1.720917,
+          1.747375,
+          1.998209
+        ]
+      },
+      "auto_cold_compile_and_execute_with_startup": {
+        "median_ms": 10.897,
+        "min_ms": 10.153,
+        "samples_ms": [
+          10.153042,
+          11.219458,
+          10.62125,
+          11.654459,
+          10.896709
+        ]
+      },
+      "adaptive_run_including_driver": {
+        "median_ms": 83.991,
+        "min_ms": 83.179,
+        "samples_ms": [
+          89.054042,
+          84.306,
+          83.991042,
+          83.422792,
+          83.178541
+        ]
+      },
+      "llvm_ir_emission_with_startup": {
+        "median_ms": 1.798,
+        "min_ms": 1.573,
+        "samples_ms": [
+          2.14425,
+          1.798084,
+          1.787041,
+          1.841917,
+          1.572834
+        ]
+      },
+      "llvm_cold_build_including_driver": {
+        "median_ms": 112.819,
+        "min_ms": 112.212,
+        "samples_ms": [
+          112.212292,
+          113.817375,
+          112.389042,
+          113.441417,
+          112.819458
+        ]
+      },
+      "llvm_cached_build_including_driver": {
+        "median_ms": 87.132,
+        "min_ms": 86.254,
+        "samples_ms": [
+          88.201041,
+          86.489417,
+          87.283833,
+          86.254083,
+          87.132166
+        ]
+      },
+      "llvm_executable_with_startup": {
+        "median_ms": 5.68,
+        "min_ms": 4.199,
+        "samples_ms": [
+          430.882875,
+          7.604542,
+          5.679666,
+          4.69125,
+          4.199375
+        ]
+      },
+      "repl_compile_hot_replace_and_call_with_startup": {
+        "median_ms": 4.429,
+        "min_ms": 3.845,
+        "samples_ms": [
+          6.002792,
+          5.685375,
+          4.429333,
+          4.075792,
+          3.844584
+        ]
+      }
+    }
+  },
+  "package_before": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "source_files": 257,
+    "repeats": 5,
+    "driver": "baseline snapshot",
+    "note": "Synthetic directory package: integer loops in each file. Includes process startup, metadata and frontend check; explicit COOL_FRONTEND excludes make. Setup excluded. Changed file is rechecked, not incremental code generation.",
+    "results": {
+      "cold_metadata": {
+        "median_ms": 591.542,
+        "samples_ms": [
+          818.278917,
+          600.5395,
+          591.541958,
+          580.603291,
+          586.963208
+        ]
+      },
+      "warm_metadata": {
+        "median_ms": 125.147,
+        "samples_ms": [
+          121.5835,
+          126.111375,
+          123.681459,
+          131.648584,
+          125.146542
+        ]
+      },
+      "one_file_changed": {
+        "median_ms": 124.956,
+        "samples_ms": [
+          127.514708,
+          124.956458,
+          123.909083,
+          123.353834,
+          125.385875
+        ]
+      }
+    }
+  },
+  "package_after": {
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "source_files": 257,
+    "repeats": 5,
+    "driver": "current tools/cool",
+    "note": "Synthetic directory package: integer loops in each file. Includes process startup, metadata and frontend check; explicit COOL_FRONTEND excludes make. Setup excluded. Changed file is rechecked, not incremental code generation.",
+    "results": {
+      "cold_metadata": {
+        "median_ms": 119.467,
+        "samples_ms": [
+          115.34525,
+          117.755583,
+          119.467416,
+          121.117625,
+          124.044084
+        ]
+      },
+      "warm_metadata": {
+        "median_ms": 89.163,
+        "samples_ms": [
+          91.241834,
+          89.162666,
+          88.850291,
+          90.442958,
+          87.760583
+        ]
+      },
+      "one_file_changed": {
+        "median_ms": 90.026,
+        "samples_ms": [
+          90.8,
+          89.307667,
+          89.255667,
+          90.447042,
+          90.026042
+        ]
+      }
+    }
+  }
+}
