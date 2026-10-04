@@ -78,6 +78,21 @@ through ordinary evaluation or library use.
   pass on five engines. Ownership, libraries and exact three-generation
   self-host convergence also pass. G2 remains open.
 
+- Collection property testing: `make collection-fuzz-test` compares generated
+  owning-vector programs against an independent Python list model on tree,
+  bytecode, native JIT, LLVM O0, LLVM JIT and LLVM O2. Seeds 7, 42 and 2026 each
+  exercise 230 operations, including chunk boundaries, replacement, pointee
+  mutation, ownership transfer, empty pops and clear. Every operation checks
+  live allocation count, length and selected elements; final traversal checks
+  all remaining values and scope exit must leave zero owners. Generated inputs
+  and expected output remain in `build/collection-fuzz/` for reproduction.
+  `make collection-sanitize-test` additionally instruments generated LLVM
+  loads/stores with ASan and the C runtime with ASan/UBSan; it verifies that the
+  LLVM sanitizer pass actually inserted checks. All three seeds pass. UBSan
+  does not validate Cool language semantics, and this bounded corpus is not a
+  proof of memory safety; G2/G9 remain open. Expand with
+  `python3 tools/test_collection_fuzz.py --seeds 1,2,3 --steps 500 --sanitize`.
+
 ## Next implementation checkpoints
 
 - Audit mutable loans and stored borrowed values before designing `&T`/`&mut T`

@@ -110,3 +110,10 @@ test: stdlib-test
 owner-evaluation-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_owner_evaluation.py
 test: owner-evaluation-test
+
+.PHONY: collection-fuzz-test collection-sanitize-test
+collection-fuzz-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_collection_fuzz.py
+collection-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_collection_fuzz.py --sanitize
+test: collection-fuzz-test
