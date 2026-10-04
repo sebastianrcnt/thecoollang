@@ -356,6 +356,7 @@ Node *Statement() {
             initial = Statement();
             if (initial->kind != N_BIND && initial->kind != N_ASSIGN && initial->kind != N_EXPR) ErrorAt(t, "invalid for initializer");
         }
+        moves = MoveSnapshot(); MoveJoin(moves);
         loop_depth++; n = NewNode(N_FOR, t);
         if (Take(';')) { n->a = NewNode(N_INT, t); n->a->type = T_BOOL; n->a->value = 1; }
         else { n->a = Expr(1); Need(';', "expected ';' after for condition"); }
@@ -373,7 +374,7 @@ Node *Statement() {
             }
             n->c = post; Need(')', "expected ')' after for update");
         }
-        n->b = Block(); loop_depth--; depth--; locals = saved;
+        MoveRestore(moves); n->b = Block(); MoveJoin(moves); MoveFinish(moves); loop_depth--; depth--; locals = saved;
         if (initial) { block->a = initial; if (initial->kind == N_BIND && Owned(initial->type)) { initial->next = OwnerDefer(initial->slot, initial->type, initial->token); initial->next->next = n; } else initial->next = n; } else block->a = n;
         return block;
     }
@@ -382,7 +383,7 @@ Node *Statement() {
         if (mutable) loop_depth++;
         Need('(', "expected '(' before condition"); n->a = Expr(1); Need(')', "expected ')' after condition");
         if (n->a->type != T_BOOL) ErrorAt(t, "condition must have type bool");
-        moves = MoveSnapshot(); n->b = Block(); MoveJoin(moves);
+        moves = MoveSnapshot(); if (mutable) MoveJoin(moves); n->b = Block(); MoveJoin(moves);
         if (!mutable) MoveRestore(moves);
         if (mutable) loop_depth--;
         else if (Is("else")) { pos++; if (Is("if")) n->c = Statement(); else n->c = Block(); }

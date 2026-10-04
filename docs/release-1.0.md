@@ -71,6 +71,13 @@ through ordinary evaluation or library use.
   library suites, native self-host convergence, REPL, C exports and developer
   tools pass. G3 remains open for invariant documentation and further cleanup.
 
+- Loop ownership audit: preserve the zero-iteration path when joining `while`
+  and `for` move states, and prevent the syntactically earlier `for` update
+  expression from reviving an owner on the first body iteration. Rejection
+  cases pass on both frontends; valid branch and initializer reinitialization
+  pass on five engines. Ownership, libraries and exact three-generation
+  self-host convergence also pass. G2 remains open.
+
 ## Next implementation checkpoints
 
 - Audit mutable loans and stored borrowed values before designing `&T`/`&mut T`

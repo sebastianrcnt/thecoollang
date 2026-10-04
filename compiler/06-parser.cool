@@ -3803,6 +3803,8 @@ t72 = cast[*u8]("invalid for initializer");
 ErrorAt(t71, t72);
 }
 }
+v_moves = MoveSnapshot();
+MoveJoin(v_moves);
 t73 = ctx.v_loop_depth;
 ctx.v_loop_depth = ctx.v_loop_depth + i64(1);
 t74 = 21;
@@ -3898,8 +3900,11 @@ t116 = 41;
 t117 = cast[*u8]("expected ')' after for update");
 Need(t116, t117);
 }
+MoveRestore(v_moves);
 t118 = Block();
 (v_n19).b = t118;
+MoveJoin(v_moves);
+MoveFinish(v_moves);
 t119 = ctx.v_loop_depth;
 ctx.v_loop_depth = ctx.v_loop_depth - i64(1);
 t120 = ctx.v_depth;
@@ -3969,6 +3974,7 @@ ErrorAt(t146, t147);
 }
 t148 = MoveSnapshot();
 v_moves = t148;
+if (v_mutable2 != 0) { MoveJoin(v_moves); }
 t149 = Block();
 (v_n19).b = t149;
 t150 = v_moves;

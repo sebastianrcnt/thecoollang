@@ -11,6 +11,11 @@ NEGATIVE=[
  'struct S { items:[2]i64; } fn consume(p:own[S])->i64{return 0;} fn main(){let p=new[S](); let x=(*p).items[consume(move p)];}',
  'struct S { item:i64; } fn consume(p:own[S])->i64{return 9;} fn main(){let p=new[S](); (*p).item=consume(move p);}',
 ]
+LOOP_NEGATIVE=[
+ 'while(false){p=new[i64](2);}',
+ 'for(var i=0;i<0;i=i+1){p=new[i64](2);}',
+ 'for(var i=0;i<1;p=new[i64](2)){let invalid=*p;break;}',
+]
 POSITIVE='''import "std/io";
 fn consume(p:own[i64])->i64{return *p;}
 fn main(){
@@ -18,6 +23,12 @@ fn main(){
   io.println((*a)[consume(move b)]);
   let p=new[i64](2); let q=new[i64](3); *p=consume(move q); io.println(*p);
   var r=new[i64](4); r=move r; io.println(*r);
+  var restored=new[i64](0); let previous=move restored;
+  if (true) {restored=new[i64](5);} else {restored=new[i64](6);}
+  assert(*restored==5);
+  let previous_again=move restored;
+  for(restored=new[i64](7);false;) {}
+  assert(*restored==7);
 }
 '''
 with tempfile.TemporaryDirectory(prefix='cool-owner-evaluation-') as tmp:
@@ -27,8 +38,13 @@ with tempfile.TemporaryDirectory(prefix='cool-owner-evaluation-') as tmp:
   for front in FRONTS:
    run=subprocess.run([*front,'check',p],capture_output=True,text=True,timeout=10)
    assert run.returncode==2 and 'owner moved while an access' in run.stderr,(source,front,run)
+ for loop in LOOP_NEGATIVE:
+  p.write_text('fn main(){var p=new[i64](1);let q=move p;'+loop+'let invalid=*p;}')
+  for front in FRONTS:
+   run=subprocess.run([*front,'check',p],capture_output=True,text=True,timeout=10)
+   assert run.returncode==2 and 'moved value' in run.stderr,(loop,front,run)
  p.write_text(POSITIVE)
  for mode in ('tree','interp','jit','llvm','llvm-jit'):
   run=subprocess.run([ROOT/'tools/cool','run','--backend',mode,p],capture_output=True,text=True,timeout=30)
   assert (run.returncode,run.stdout,run.stderr)==(0,'20\n3\n4\n',''),(mode,run)
-print('owner evaluation: pending index/store moves rejected by both frontends; unrelated moves and reinitialization across five engines PASS')
+print('owner evaluation: pending index/store moves and zero-iteration/for-update liveness rejected by both frontends; unrelated moves and reinitialization across five engines PASS')
