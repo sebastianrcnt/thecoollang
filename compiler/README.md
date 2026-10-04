@@ -61,3 +61,10 @@ shared representations; self-host convergence alone cannot validate semantics.
 It clones the lexical check state per submission, filters committed holders
 on success or partial runtime failure, and frees superseded loan records. The
 session driver in `13-repl.cool` invokes it at checking/recovery boundaries.
+
+`20-repl-packages.cool` discovers session imports and parses immutable resolved
+package snapshots. `tools/repl_driver.py` reuses the normal module graph through
+a private framed channel; it does not parse or check Cool declarations. The C
+adapter in `language/repl_io.h` is shared with the bootstrap loader. Package
+fingerprints, aliases, definitions and the lexical namespace participate in
+REPL rollback. Loaded package bodies cannot silently change under live callers.

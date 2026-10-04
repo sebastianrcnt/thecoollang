@@ -492,6 +492,10 @@ v_repl_loans: *ReferenceLoan;
 
 v_repl_candidate: *ReferenceCheck;
 
+v_repl_packages: *ReplPackage;
+
+v_repl_saved_packages: *ReplPackage;
+
 v_formatted: *Text;
 
 v_format_indent: i64;
@@ -551,6 +555,7 @@ extern "C" fn NativeArg(a0: i64) -> *u8;
 
 
 extern "C" fn NativeGetChar() -> i64;
+extern "C" fn NativeReplResolve(package: *u8) -> *u8;
 
 
 extern "C" fn NativeParseFloat(a0: *u8, a1: *i64) -> i64;

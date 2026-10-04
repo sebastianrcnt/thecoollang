@@ -99,7 +99,7 @@ def parse_metadata(path, lines):
     return package, imports
 
 
-def bundle(entry, work, offline=False, frozen=False, include_tests=False):
+def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, import_path=None):
     entry = Path(entry).resolve()
     if not entry.exists():
         raise ValueError(f'input does not exist: {entry}')
@@ -133,21 +133,29 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False):
         if len(declared) != 1:
             raise ValueError(f'mixed package declarations in {location}')
         for dependency in sorted(imports):
-            if dependency in ('std/io', 'std/mem'):
-                continue
-            if dependency.startswith('std/'):
-                standard = ROOT/'stdlib'/dependency[4:]
-                if not standard.is_dir() or '..' in Path(dependency).parts:
-                    raise ValueError(f'unknown standard package: {dependency}')
-                visit(dependency, standard)
-                continue
-            if graph is None:
-                raise ValueError(f'import {dependency} requires cool.mod')
-            visit(dependency, graph.package(dependency))
+            visit_import(dependency)
         files.extend((package, source) for source in sources)
         active.pop(); done.add(package)
 
-    visit('__main', entry)
+    def visit_import(dependency):
+        if dependency in ('__main','__scan'):
+            raise ValueError(f'reserved package identity: {dependency}')
+        if dependency in ('std/io', 'std/mem'):
+            return
+        if dependency.startswith('std/'):
+            standard = ROOT/'stdlib'/dependency[4:]
+            if not standard.is_dir() or '..' in Path(dependency).parts:
+                raise ValueError(f'unknown standard package: {dependency}')
+            visit(dependency, standard)
+            return
+        if graph is None:
+            raise ValueError(f'import {dependency} requires cool.mod')
+        visit(dependency, graph.package(dependency))
+
+    if import_path is None:
+        visit('__main', entry)
+    else:
+        visit_import(import_path)
     manifest = work / 'sources.list'
     manifest.write_text(''.join(f'{package}\t{path}\n' for package, path in files))
     if graph:
@@ -275,7 +283,7 @@ def main():
         if name in ('run', 'build'):
             p.add_argument('--release', action='store_true')
     sub.add_parser('doctor')
-    sub.add_parser('repl')
+    p = sub.add_parser('repl'); p.add_argument('--offline',action='store_true'); p.add_argument('--frozen',action='store_true')
     p = sub.add_parser('test'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--backend', choices=('interp', 'jit'), default='interp'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
     p = sub.add_parser('doc'); p.add_argument('source', nargs='?', default='.'); p.add_argument('--offline', action='store_true'); p.add_argument('--frozen', action='store_true')
     p = sub.add_parser('fmt'); p.add_argument('paths', nargs='*', default=['.']); p.add_argument('--check', action='store_true'); p.add_argument('--diff', action='store_true')
@@ -331,7 +339,12 @@ def main():
             raise SystemExit(1)
         return
     if args.command == 'repl':
-        subprocess.run([FRONTEND, 'repl' if sys.stdin.isatty() else 'repl-quiet'], check=True)
+        from repl_driver import run_repl
+        with tempfile.TemporaryDirectory(prefix='cool-repl-') as tmp:
+            work=Path(tmp)
+            def resolve(package):
+                return bundle(Path.cwd(),work,args.offline,args.frozen,import_path=package)[1]
+            run_repl(FRONTEND,sys.stdin.isatty(),work,resolve)
         return
     if args.command == 'build' or (args.command == 'run' and args.backend == 'llvm'):
         ensure('build/language-runtime.o')

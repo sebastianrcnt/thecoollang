@@ -22,6 +22,7 @@ import I64 NativeArgCount();
 import U0 NativeSetProgramArgs(I64 start);
 import U8 *NativeArg(I64 index);
 import I64 NativeGetChar();
+import U8 *NativeReplResolve(U8 *package);
 import I64 NativeParseFloat(U8 *text, I64 *ok);
 import I64 NativeNumericCast(I64 bits, I64 from, I64 to, I64 *ok);
 import U0 NativePrintFloat(I64 bits);

@@ -12,6 +12,8 @@
 #include <pthread.h>
 #include "../language/ffi.h"
 #include "../language/memory.h"
+#include "../language/repl_io.h"
+const char *NativeReplResolve(const char *package) { return cool_repl_resolve(package); }
 static void host_fail(const char *message) { fprintf(stderr,"cool-host: %s\n",message); exit(70); }
 void *CAlloc(int64_t size) { if(size<0)host_fail("negative allocation"); void *p=calloc(1,size ? (size_t)size : 1); if(!p)host_fail("allocation failed"); return p; }
 void *MAlloc(int64_t size) { return CAlloc(size); }

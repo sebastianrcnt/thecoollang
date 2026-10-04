@@ -183,6 +183,7 @@ var t9: *u8 = null;
 var t10: bool = false;
 v_retained_slots = ((ctx.v_functions)[0]).slots;
 ReplLoansFinish(ctx.v_repl_executing != i8(0), ctx.v_repl_locals);
+ReplPackagesRestore();
 if ((ctx.v_repl_executing != i8(0))) {
 while (true) {
 if (!((ctx.v_active_frame != null))) { break; }
@@ -360,6 +361,7 @@ t22 = Is(t21);
 t20 = (i64(t22) != i64(0));
 }
 if (t20) {
+ReplLoadImports(v_start3);
 ParseProgram();
 return;
 }
@@ -659,6 +661,7 @@ pc = 19;
 continue;
 }
 if (pc == 21) {
+ctx.v_repl_saved_packages = ctx.v_repl_packages;
 ctx.v_repl_saved_types = ctx.v_naggregates;
 pc = 20;
 continue;

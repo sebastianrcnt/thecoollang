@@ -69,6 +69,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `17-calls.cool` | Named expressions, builtins and function-call resolution | `Parser.cool: Atom` |
 | `18-methods.cool` | Nominal method declaration, receiver adaptation and call lowering | `Methods.cool` |
 | `19-repl-loans.cool` | Persistent loan transactions, recovery filtering and explicit binding release | `ReplLoans.cool` |
+| `20-repl-packages.cool` | Import discovery, immutable package staging and rollback | `ReplPackages.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -288,6 +289,24 @@ It drops owning storage, removes the binding from name lookup, and frees its
 held loans. Cleared owner slots remain harmless in the final drop list. Slots,
 AST/local metadata and tokens are not reclaimed by this command; general
 bounded session storage remains an explicit release requirement.
+
+REPL imports use a private length-framed driver channel. The frontend recognizes
+import tokens; the driver only reuses package graph resolution, metadata scans,
+checksums and file snapshots. `ReplLoadImports` preserves an EOF separator after
+the submitted declaration, appends imported source tokens, parses the new
+packages, then restores the submission position and `__main` lexical namespace.
+Never overwrite a package's first token with the submission separator: generic
+bodies retain token indices. Original paths remain the alias/diagnostic file
+identity, while file bytes come from immutable per-request snapshots.
+
+Package fingerprints include length-framed filenames and contents. Already
+loaded packages must match; newly staged records roll back with aliases,
+function snapshots and aggregate counts after any import error. Several files
+in a newly loaded package are all read, while a package loaded by an earlier
+request is skipped. The driver may delete the previous request's snapshots
+only after receiving the next request: the frontend has consumed them into
+its own token storage by then. A malformed/closed channel reports an import
+error rather than discarding existing session values or loan state.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

@@ -29,7 +29,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
-| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans and explicit binding release verified) |
+| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans, explicit release and package loading verified) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
@@ -365,13 +365,30 @@ through ordinary evaluation or library use.
   compiler metadata. External REPL package loading and bounded long-session
   resource reclamation remain mandatory; G6 stays open.
 
+- Package-aware REPL: ordinary imports now request the same module graph,
+  MVS/checksum/workspace/vendor resolution as builds through a private framed
+  driver channel. Cool parses all imports and declarations. Packages are staged
+  transactionally, pinned by content fingerprints and restored on failure with
+  the session namespace and existing loans intact. The driver retains only the
+  current request's source snapshots on disk. Both frontends pass standard/local
+  and transitive package use, methods/generics, aliases/visibility, offline and
+  frozen checksums, cache tampering, closed-channel recovery, failed-load retry
+  and changed-loaded-package rejection. These sessions also pass on the
+  ASan-instrumented self-hosted compiler with C host/runtime ASan/UBSan. Full
+  regression and both bootstraps pass; the fixed-point IR SHA256 is
+  `a54f66e912cd220330494065a2281769e1b16b56193b5fe565e4636fb2cd08dd`.
+  Read-only external installation tests exercise dynamic project/standard REPL
+  imports without a seed or working make. CI includes the new sanitizer target;
+  remote CI is not yet verified. In-memory tokens, code and value slots still
+  need bounded reclamation, so G6 remains open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
   descriptors; keep unsafe raw pointers separate and add rejection regressions
   before removing restrictions.
-- Complete external package loading in the REPL and bounded/reclaimable session
-  resources while preserving persistent loans and runtime-error recovery.
+- Complete bounded/reclaimable REPL session resources while preserving loaded
+  packages, persistent loans and runtime-error recovery.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include "../../language/memory.h"
+#include "../../language/repl_io.h"
 #include "../../language/ffi.h"
 
 #ifdef WARM_PROGRAM_HEADER
@@ -455,6 +456,7 @@ static void register_host_symbols(Module *m) {
     HOST("NativeSetProgramArgs", host_program_args);
     HOST("NativeArg", host_arg);
     HOST("NativeGetChar", host_get_char);
+    HOST("NativeReplResolve", cool_repl_resolve);
     HOST("NativeParseFloat", host_parse_float);
     HOST("NativeNumericCast", cool_numeric_cast);
     HOST("NativePrintFloat", host_print_float);

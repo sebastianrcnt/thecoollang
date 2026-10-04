@@ -62,7 +62,7 @@ C로 트랜스파일하지 않습니다. Cool로 작성된 프런트엔드가 �
 
 ## 패키지
 
-디렉터리가 패키지입니다. `pub` 함수·타입·필드를 외부에 공개하며 순환 import는 거부합니다. `cool.mod`와 `cool.sum`, MVS 버전 선택, 로컬 replace와 `cool.work`, 오프라인·동결 해석을 지원합니다.
+디렉터리가 패키지입니다. `pub` 함수·타입·필드를 외부에 공개하며 순환 import는 거부합니다. `cool.mod`와 `cool.sum`, MVS 버전 선택, 로컬 replace와 `cool.work`, 오프라인·동결 해석을 지원합니다. 프로젝트 디렉터리에서 `cool repl --offline --frozen`을 실행하면 같은 규칙으로 패키지를 import할 수 있습니다. 로딩한 패키지가 바뀌면 새 세션이 필요합니다. [REPL 패키지 규칙](docs/references.md#packages-in-the-repl)을 참고하세요.
 
 ```sh
 cool mod init example.com/team/demo

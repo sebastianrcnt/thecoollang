@@ -1,0 +1,99 @@
+// Package graph resolution stays in the driver; every declaration is parsed
+// and checked here. Imported code is immutable within a running session.
+struct ReplPackage { name: *u8; fingerprint: *u8; next: *ReplPackage; }
+fn ReplFindPackage(head: *ReplPackage, name: *u8) -> *ReplPackage {
+    unsafe {
+        var item = head;
+        while (item != null) {
+            if (Eq(item.name, name) != i8(0)) { return item; }
+            item = item.next;
+        }
+        return null;
+    }
+}
+fn ReplPackagesRestore() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_repl_packages != ctx.v_repl_saved_packages) {
+            let item = ctx.v_repl_packages;
+            ctx.v_repl_packages = item.next;
+            Free(cast[*u8](item));
+        }
+        ctx.v_lex_package = cast[*u8]("__main");
+    }
+}
+fn ReplReadPackages(manifest: *u8, token: *Token) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let previous = ctx.v_repl_packages;
+        var size: i64 = 0;
+        let data = FileRead(manifest, &raw size, null);
+        if (data == null) { ErrorAt(token, cast[*u8]("cannot read resolved package manifest")); }
+        var at: i64 = 0;
+        while (data[at] != 0) {
+            var fields = [4]*u8{};
+            var field: i64 = 0;
+            while (field < 4) {
+                let begin = at;
+                while (data[at] != 0 && data[at] != 9 && data[at] != 10) { at = at + 1; }
+                if ((field < 3 && data[at] != 9) || (field == 3 && data[at] != 10)) {
+                    ErrorAt(token, cast[*u8]("invalid resolved package manifest"));
+                }
+                fields[field] = Slice(data, begin, at);
+                at = at + 1;
+                field = field + 1;
+            }
+            let existing = ReplFindPackage(ctx.v_repl_packages, fields[0]);
+            if (existing != null && Eq(existing.fingerprint, fields[1]) == i8(0)) {
+                ErrorAt(token, cast[*u8]("loaded package changed; start a new session"));
+            }
+            if (ReplFindPackage(previous, fields[0]) == null) {
+                if (existing == null) {
+                    let package = cast[*ReplPackage](CAlloc(i64(sizeof(ReplPackage))));
+                    package.name = fields[0]; package.fingerprint = fields[1];
+                    package.next = ctx.v_repl_packages; ctx.v_repl_packages = package;
+                }
+                let source = FileRead(fields[3], &raw size, null);
+                if (source == null) { ErrorAt(token, cast[*u8]("cannot read resolved package source")); }
+                ctx.v_lex_package = fields[0];
+                LexSource(source, fields[2]);
+            }
+        }
+        Free(data);
+    }
+}
+fn ReplLoadImports(start: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let end = ctx.v_ntok;
+        var nesting: i64 = 0;
+        var at = start;
+        var reserved = false;
+        while (at < end) {
+            let token = &raw ctx.v_tokens[at];
+            if (nesting == 0 && token.kind == 256 && Eq(token.text, cast[*u8]("import")) != i8(0)) {
+                var path_index = at + 1;
+                if (ctx.v_tokens[path_index].kind == 256) { path_index = path_index + 1; }
+                if (ctx.v_tokens[path_index].kind != 258) { ErrorAt(token, cast[*u8]("expected import path string")); }
+                let path = ctx.v_tokens[path_index].text;
+                if (Eq(path, cast[*u8]("std/io")) == i8(0) && Eq(path, cast[*u8]("std/mem")) == i8(0)) {
+                    let response = NativeReplResolve(path);
+                    if (response[0] != 111 || response[1] != 107 || response[2] != 9) {
+                        ErrorAt(token, response + 6);
+                    }
+                    if (!reserved) { ctx.v_ntok = end + 1; reserved = true; }
+                    ReplReadPackages(response + 3, token);
+                }
+            }
+            if (token.kind == 123) { nesting = nesting + 1; }
+            if (token.kind == 125) { nesting = nesting - 1; }
+            at = at + 1;
+        }
+        if (reserved) {
+            if (ctx.v_ntok > end + 1) { ctx.v_pos = end + 1; ParseProgram(); }
+            else { ctx.v_ntok = end; }
+        }
+        ctx.v_lex_package = cast[*u8]("__main");
+        ctx.v_pos = start;
+    }
+}

@@ -84,7 +84,7 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 - REPL submissions retain reference and slice loans across inputs under the
   same checking rules as functions. Top-level bindings stay live until
   `:forget name` or session exit. See the persistent-loan and recovery rules
-  below; package loading and bounded session-resource reclamation remain work.
+  below; bounded session-resource reclamation remains work.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
   or borrow-aware replacement for every collection API.
   [Methods](methods.md) use the same scoped loans.
@@ -554,5 +554,62 @@ cleanup and JIT/body replacement. Ten focused sessions and 288 independent
 read/write permission queries run on both frontends. With
 `make repl-loans-sanitize-test`, the self-hosted compiler's own LLVM loads/stores
 are ASan-instrumented and its C host/runtime use ASan/UBSan, then the same tests
-run against that compiler. These checks do not prove bounded metadata use or
-complete external-package support in long sessions; both remain release work.
+run against that compiler. These checks do not prove bounded metadata use in
+long sessions, which remains release work. Package loading is described below.
+
+
+## Packages in the REPL
+
+Run `cool repl` from the project directory and use ordinary imports. The driver
+uses the same package graph, MVS selection, workspaces/local replacements,
+checksums and vendoring rules as `cool run`/`cool check`. `cool repl --offline`
+forbids fetching missing modules; `--frozen` also requires existing checksums.
+Standard packages work without `cool.mod`. Directory packages still require a
+consistent package declaration, and only public symbols can cross packages.
+
+```text
+cool> import vector "std/vector";
+cool> var values = vector.create[i64]();
+cool> values.append(42);
+cool> let item = values.at(0);
+cool> *item
+42
+cool> :forget item
+cool> values.append(7);
+cool> values.len()
+2
+```
+
+Imports load on demand. The Cool frontend recognizes imports and parses/checks
+all declarations; the Python driver resolves paths and supplies verified source
+snapshots. Loading a package does not call its `main` or other functions.
+Imported methods, generic types/functions and transitive dependencies work in
+the persistent session. A second alias can refer to the same package without
+loading its declarations twice.
+
+A loaded package's content fingerprint is fixed for the session. Importing a
+changed loaded package or dependency is rejected with a request to start a new
+session; existing callables keep their previous definitions. Session-defined
+function bodies retain their ordinary compatible-replacement rules. Failed
+imports roll back newly staged packages, aliases, types and functions while
+preserving existing variables and loans. Fixing a package that never loaded
+successfully allows a later retry. Module resolution may still update
+`cool.sum`, just as for an ordinary build/check; that verification record is
+independent of whether source type checking succeeds.
+
+Compiler binaries invoked directly support builtin `std/io` and `std/mem`
+imports. Other packages require the `cool` driver and its private resolver
+channel. Channel errors produce a recoverable import diagnostic. Source
+snapshots retain original file paths for diagnostics and only one resolver
+request's files remain on disk; the frontend owns the token storage needed for
+later generic specialization. Loaded compiler metadata still occupies memory
+until session end; this feature does not close the long-session resource gate.
+
+`make repl-packages-test` covers standard/local packages, multiple files and
+aliases, public/private visibility, methods/generics, MVS, offline/frozen and
+tampered caches, closed-channel recovery, failed-load retry, changed source
+rejection, JIT calls and restoration of the session namespace on both frontends.
+`make repl-packages-sanitize-test` repeats the package sessions with an
+ASan-instrumented self-hosted compiler and sanitized C host/runtime. Distribution
+tests exercise project and standard imports from a read-only installed prefix
+with no seed or working `make` command.

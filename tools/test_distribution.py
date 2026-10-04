@@ -12,8 +12,8 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 
 
-def run(args,*,cwd,env=None,code=0):
-    p=subprocess.run([str(x) for x in args],cwd=cwd,env=env,capture_output=True,text=True,timeout=180)
+def run(args,*,cwd,env=None,code=0,input=None):
+    p=subprocess.run([str(x) for x in args],cwd=cwd,env=env,capture_output=True,text=True,timeout=180,input=input)
     assert p.returncode==code,(args,p.returncode,p.stdout,p.stderr)
     return p
 
@@ -56,6 +56,8 @@ fn test_answer(){assert(m.value()==42);}
 ''')
     for backend in ('tree','interp','jit','llvm','llvm-jit'):
         assert run([cli,'run','--backend',backend,'.'],cwd=project,env=env).stdout=='42\n'
+    session='import m "example.com/distribution/math";\nimport v "std/vector";\nvar values=v.create[i64]();\nvalues.append(m.value());\nlet r=values.at(0);\n*r\n:forget r\nvalues.append(7);\nvalues.len()\n:quit\n'
+    assert run([cli,'repl','--offline'],cwd=project,env=env,input=session).stdout=='42\n2\n'
     run([cli,'fmt','.'],cwd=project,env=env);run([cli,'fmt','--check','.'],cwd=project,env=env)
     assert 'PASS test_answer' in run([cli,'test','.'],cwd=project,env=env).stdout
     assert 'pub fn value()' in run([cli,'doc',library],cwd=project,env=env).stdout

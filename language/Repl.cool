@@ -10,6 +10,7 @@ I64 repl_capacity;
 Bool repl_executing;
 MoveState *repl_moves;
 #include "ReplLoans.cool"
+#include "ReplPackages.cool"
 U0 ReplDropNew(Bool failed) {
     DropSlot *d; Local *l; Bool keep;
     for (d = functions[0].drops; d != repl_snapshot[0].drops; d = d->next) {
@@ -41,6 +42,7 @@ Text *Submission() {
 U0 ReplRestore() {
     I64 retained_slots = functions[0].slots; Frame *frame; DropSlot *d;
     ReplLoansFinish(repl_executing,repl_locals);
+    ReplPackagesRestore();
     if (repl_executing) {
         while (active_frame) {
             frame = active_frame;
@@ -60,7 +62,7 @@ U0 ReplStep(Text *text) {
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
     if(ReplLoanCommand())return;
-    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { ParseProgram(); return; }
+    if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { ReplLoadImports(start); ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {
@@ -107,6 +109,7 @@ U0 Repl(Bool prompt) {
         }
         locals = repl_locals; repl_moves = MoveSnapshot(); repl_executing = FALSE;
         MemCpy(repl_snapshot, functions, MAX_FUNCTIONS * sizeof(Function));
+        repl_saved_packages=repl_packages;
         repl_saved_types = naggregates; repl_saved_nfun = nfun; repl_saved_ntok = ntok; repl_aliases = aliases;
         if (AIWNIOS_SetJmp(repl_context)) ReplRestore();
         else { recovery_context = repl_context; ReplStep(text); }
