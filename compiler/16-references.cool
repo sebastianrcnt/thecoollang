@@ -109,6 +109,33 @@ fn ContainsReference(type: i64) -> bool {
         return false;
     }
 }
+// Stored shared references are copied as loans. Mutable aliases and owning
+// payloads need transfer-aware storage tracking before they can participate.
+fn SharedReferenceStorage(type: i64) -> bool {
+    unsafe {
+        if (IsReference(type)) {
+            return Shape(type).count == 0 && Borrowed(Shape(type).element) == i8(0);
+        }
+        if (Aggregate(type) == i8(0)) {
+            return true;
+        }
+        let shape = Shape(type);
+        if (shape.kind == 3 || shape.kind == 5) {
+            return false;
+        }
+        if (shape.kind == 2) {
+            return SharedReferenceStorage(shape.element);
+        }
+        var field = shape.fields;
+        while (field != null) {
+            if (!SharedReferenceStorage(field.type)) {
+                return false;
+            }
+            field = field.next;
+        }
+        return true;
+    }
+}
 fn ValidateReferenceStorage(type: i64, token: * Token) {
     unsafe {
         if (IsReference(type)) {
@@ -116,10 +143,27 @@ fn ValidateReferenceStorage(type: i64, token: * Token) {
                 ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
             }
         } else {
-            if (ContainsReference(type)) {
-                ErrorAt(token, cast[ * u8]("references in aggregate storage are not yet supported"));
+            if (ContainsReference(type) && !SharedReferenceStorage(type)) {
+                ErrorAt(token, cast[ * u8]("stored references currently require shared, non-owning, slice-free aggregate storage"));
             }
         }
+    }
+}
+// Match evaluates its scrutinee once into anonymous storage. Give borrowed
+// payloads a real loan holder, without exposing a name in the lexical scope.
+fn ReferenceMatchBinding(binding: * Node) {
+    unsafe {
+        if (!ContainsReference(binding.type)) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let local = cast[ * Local](CAlloc(i64(sizeof(Local))));
+        local.type = binding.type;
+        local.slot = binding.slot;
+        local.depth = ctx.v_depth;
+        local.all_next = ctx.v_functions[ctx.v_current_fun].all_locals;
+        ctx.v_functions[ctx.v_current_fun].all_locals = local;
+        binding.local_ref = local;
     }
 }
 // A binding can protect multiple possible roots. Parent ancestry is resolved
@@ -138,7 +182,7 @@ fn ReferenceHolder(check: * ReferenceCheck, holder: * Local, root: * Local) -> *
 }
 fn ReferenceMatches(check: * ReferenceCheck, via: * Local, root: * Local) -> bool {
     unsafe {
-        if (!IsReference(via.type)) {
+        if (!ContainsReference(via.type)) {
             return via == root;
         }
         var found = false;
@@ -247,7 +291,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
             }
             return;
         }
-        if (Borrowed(via.type) != i8(0) && !IsReference(via.type)) {
+        if (Borrowed(via.type) != i8(0) && !ContainsReference(via.type)) {
             ErrorAt(token, cast[ * u8]("cannot borrow through aliasable slice storage"));
         }
         ReferenceAccess(check, place, exclusive != 0);
@@ -311,9 +355,46 @@ fn ReferenceAddress(check: * ReferenceCheck, node: * Node) {
         ReferenceValue(check, node);
     }
 }
+fn ReferenceAddressIndices(check: * ReferenceCheck, node: * Node) {
+    unsafe {
+        if (node == null) {
+            return;
+        }
+        if (node.kind == 25) {
+            ReferenceValue(check, node.b);
+        }
+    }
+}
 fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
     unsafe {
         if (node == null) {
+            return;
+        }
+        if (ContainsReference(node.type) && (node.kind == 3 || node.kind == 18)) {
+            var mode: i64 = 0;
+            if (IsReference(node.type)) {
+                mode = Shape(node.type).count;
+            }
+            if (node.kind == 3) {
+                ReferenceAcquire(check, node, mode, node.token, node);
+                return;
+            }
+            if (BorrowRoot(node.a) != null) {
+                ReferenceAddress(check, node.a);
+                ReferenceAcquire(check, node.a, mode, node.token, node);
+            } else {
+                // A field of a computed aggregate, or a lowered match payload.
+                let before = check.loans;
+                ReferenceValue(check, node.origin_source);
+                var source = check.loans;
+                while (source != before) {
+                    if (source.expression == node.origin_source) {
+                        source.expression = node;
+                    }
+                    source = source.next;
+                }
+                ReferenceAddressIndices(check, node.a);
+            }
             return;
         }
         if (IsReference(node.type)) {
@@ -357,10 +438,10 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         if (node.kind == 4) {
             let saved = check.loans;
             var contract: i64 = 0;
-            if (IsReference(node.type)) {
+            if (ContainsReference(node.type)) {
                 let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
                 contract = ctx.v_functions[node.slot].borrow_contract;
-                if (contract == 0) {
+                if (contract == 0 && IsReference(node.type)) {
                     ErrorAt(node.token, cast[ * u8]("reference return requires at least one borrows source"));
                 }
             }
@@ -371,7 +452,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 let before = check.loans;
                 ReferenceValue(check, arg);
                 if ((contract & (1 << index)) != 0) {
-                    if (!IsReference(arg.type)) {
+                    if (!ContainsReference(arg.type)) {
                         ErrorAt(node.token, cast[ * u8]("reference return requires a tracked reference argument"));
                     }
                     var source = check.loans;
@@ -379,18 +460,22 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                     while (source != before) {
                         if (source.expression == arg) {
                             found = true;
-                            results = ReferenceNew(source.root, source.parent, Shape(node.type).count, node, results);
+                            var mode: i64 = 0;
+                            if (IsReference(node.type)) {
+                                mode = Shape(node.type).count;
+                            }
+                            results = ReferenceNew(source.root, source.parent, mode, node, results);
                         }
                         source = source.next;
                     }
-                    if (!found) {
+                    if (!found && IsReference(arg.type)) {
                         ErrorAt(node.token, cast[ * u8]("reference return requires a tracked reference argument"));
                     }
                 }
                 index = index + 1;
                 arg = arg.next;
             }
-            if (IsReference(node.type)) {
+            if (ContainsReference(node.type)) {
                 // Argument loans protect later arguments until the call completes.
                 // Replace them with the union selected by the declared contract.
                 ReferenceRelease(check, saved);
@@ -404,9 +489,22 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
             return;
         }
         if (node.kind == 23) {
+            if (ContainsReference(node.type) && node.a == null) {
+                ErrorAt(node.token, cast[ * u8]("reference storage requires an explicit initializer"));
+            }
             var item = node.a;
             while (item != null) {
+                let before = check.loans;
                 ReferenceValue(check, item);
+                if (ContainsReference(node.type)) {
+                    var source = check.loans;
+                    while (source != before) {
+                        if (source.expression == item) {
+                            source.expression = node;
+                        }
+                        source = source.next;
+                    }
+                }
                 item = item.next;
             }
             return;
@@ -431,7 +529,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
             ReferenceRelease(check, saved);
             return;
         }
-        if (node.kind == 7 && IsReference(node.type)) {
+        if (node.kind == 7 && ContainsReference(node.type)) {
             ReferenceValue(check, node.a);
             var link = & raw check.loans;
             while ( * link != saved) {
@@ -447,13 +545,16 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
             return;
         }
         if (node.kind == 8) {
-            if (IsReference(node.type)) {
+            if (ContainsReference(node.type)) {
                 ErrorAt(node.token, cast[ * u8]("scoped reference bindings cannot be reassigned"));
             }
             ReferenceValue(check, node.a);
             ReferenceAccess(check, node, true);
         } else {
             if (node.kind == 19) {
+                if (ContainsReference(node.type)) {
+                    ErrorAt(node.token, cast[ * u8]("stored reference fields cannot be reassigned"));
+                }
                 ReferenceAddress(check, node.a);
                 ReferenceValue(check, node.b);
                 ReferenceAccess(check, node.a, true);
@@ -487,7 +588,7 @@ fn RejectReplReferences(node: * Node) {
         if (node == null) {
             return;
         }
-        if (IsReference(node.type)) {
+        if (ContainsReference(node.type)) {
             ErrorAt(node.token, cast[ * u8]("scoped references in REPL submissions require persistent loan tracking"));
         }
         RejectReplReferences(node.a);

@@ -190,3 +190,12 @@ package-dev: build/cool-compiler build/language-runtime.o build/language-runtime
 reference-sets-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_reference_sets.py
 test: reference-sets-test
+
+.PHONY: stored-references-test
+stored-references-test: build/cool-compiler
+	python3 tools/test_stored_references.py
+test: stored-references-test
+
+.PHONY: stored-references-sanitize-test
+stored-references-sanitize-test: build/cool-compiler
+	python3 tools/test_stored_references.py --sanitize

@@ -95,7 +95,7 @@ WHOLE_NEGATIVE=[
  ('fn bad()->&i64 borrows() {let x=1;return &x;}fn main(){}', 'outlive'),
  ('fn bad(x:&i64)->&i64 borrows(x){let y=1;return &y;}fn main(){}', 'outlive'),
  ('fn id(x:&i64)->&i64 borrows(x){return x;}fn bad(x:&i64)->&i64 borrows(x){let y=1;return id(id(&y));}fn main(){}', 'outlive'),
- ('struct S{r:&i64;}fn main(){}', 'aggregate storage'),
+ ('struct S{r:&mut i64;}fn main(){}', 'aggregate storage'),
  ('fn f(x:&[]i64){}fn main(){}', 'nested borrowed'),
  ('fn main(){var x=1;let p=new[&i64](&x);}', 'owned storage'),
 ]

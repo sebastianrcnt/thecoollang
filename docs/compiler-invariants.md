@@ -195,10 +195,19 @@ temporaries expire at that statement. Reborrowing a computed reference transform
 its temporary result loans after address evaluation, preserving the root set
 and preventing an exclusive upgrade from a shared source.
 
+Shared-reference-only aggregate values use the same provenance sets. Literal
+members relabel their result loans to the container expression; copies and
+projections retain the entire set. Anonymous match storage receives a Local in
+`all_locals` (not the name lookup chain), so payloads reborrow an already
+evaluated scrutinee rather than analyzing its calls again. Borrow-region edges
+include this binding. Empty enum results may have no loans and `borrows()`.
+Reference-containing arrays/structs cannot be zero initialized or reassigned.
+
 The checker currently treats an entire root as conflicting, not individual
-fields. Stored references, integrated slice loans and persistent REPL references
-remain unsupported. Do not remove their
-rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
+fields. Exclusive reference storage, mixed owner/slice/reference aggregates,
+borrowing reference-containing storage, integrated slice loans and persistent
+REPL references remain unsupported. Do not remove their rejections merely
+because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).
 

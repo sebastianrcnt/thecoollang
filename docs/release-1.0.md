@@ -262,10 +262,25 @@ through ordinary evaluation or library use.
   convergence. This is a foundation for stored loans and slice integration,
   which remain required and unimplemented.
 
+- Stored shared references: non-owning, slice-free structs/arrays/enums now
+  retain shared loans across literals, generic copies, field/index projections,
+  calls, returns and by-value methods. Match scrutinees have anonymous holders,
+  preserving single evaluation and loans through all arms. Empty enum results
+  support `borrows()`. Missing initializers, borrowed-storage reassignment,
+  lifetime escapes and conflicting source operations are rejected. Five engines,
+  O2, 40 rejection cases and 144 source-set oracle queries cover this extension.
+  Imported `std/option` reference payloads also pass all five engines. The full
+  `make test bootstrap-check` run and new-syntax self-host convergence pass
+  (IR SHA256 begins `e4eb69ff346b88b5`); instrumented Cool ASan plus C runtime
+  ASan/UBSan fixtures pass. The documented example also executes successfully.
+  Exclusive storage, nested borrowing, ownership/slice integration and tracked
+  mutable iteration remain required; this does not close G2/G4.
+
 ## Next implementation checkpoints
 
-- Extend scoped loans to stored references and slice aliases; keep unsafe raw
-  pointers separate and add rejection regressions before removing restrictions.
+- Extend stored shared loans to exclusive/nested references and slice aliases;
+  keep unsafe raw pointers separate and add rejection regressions before
+  removing restrictions.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

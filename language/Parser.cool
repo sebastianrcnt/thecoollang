@@ -302,7 +302,7 @@ Node *MatchStatement() {
     I64 type, pattern, slot, count = 0, *seen; Field *variant; Local *saved, *local; U8 *name; Bool wildcard = FALSE; MoveState *moves;
     pos++; Need('(', "expected '(' after match"); value = Expr(1); Transfer(value); Need(')', "expected ')' after match value"); type = value->type;
     if (AggregateKind(type) != A_ENUM) ErrorAt(token, "match requires an enum"); Layout(type);
-    block = NewNode(N_BLOCK, token); binding = NewNode(N_BIND, token); binding->type = type; binding->a = value; slot = Storage(type); binding->slot = slot; block->a = binding;
+    block = NewNode(N_BLOCK, token); binding = NewNode(N_BIND, token); binding->type = type; binding->a = value; slot = Storage(type); binding->slot = slot; ReferenceMatchBinding(binding); block->a = binding;
     moves = MoveSnapshot(); seen = CAlloc(Shape(type)->count*8); Need('{', "expected match arms");
     while (!Take('}')) {
         if (wildcard) Error("wildcard must be the last match arm");
@@ -311,7 +311,7 @@ Node *MatchStatement() {
         else {
             pattern = ParseType(); if (pattern != type) Error("match pattern has a different enum type"); Need('.', "expected enum variant"); variant = FindField(type, Ident(), token);
             if (seen[variant->tag]) Error("duplicate match arm"); seen[variant->tag] = TRUE; count++;
-            address = NewNode(N_LOCAL_ADDRESS, token); address->slot = slot; address->type = T_PTR+type;
+            address = NewNode(N_LOCAL_ADDRESS, token); address->slot = slot; address->local_ref = binding->local_ref; address->type = T_PTR+type;
             load = NewNode(N_LOAD, token); load->a = address; load->type = T_INT;
             constant = NewNode(N_INT, token); constant->type = T_INT; constant->value = variant->tag;
             test = NewNode(N_BINARY, token); test->op = K_EQ; test->a = load; test->b = constant; test->type = T_BOOL;

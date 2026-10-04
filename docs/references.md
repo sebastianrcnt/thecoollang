@@ -72,9 +72,11 @@ with unsafe code. There is no implicit reference-to-pointer conversion.
 
 This is a development foundation, not completion of the 1.0 borrowing gate.
 
-- References stored in structs, arrays, enums or owning storage are rejected.
-  References to storage already containing borrowed slices/references are also
-  rejected. These require a complete graph of stored loans and escape checks.
+- Shared references can be stored in non-owning, slice-free structs, arrays and
+  enums, as described below. Stored exclusive references, reference-containing
+  owned allocations and aggregates mixing references with owners/slices are
+  still rejected. Reassignment of borrowed bindings/fields and references to
+  storage already containing references/slices require further tracking.
 - Existing mutable slices cannot share a root with references within one
   function, even in disjoint scopes. References into aliasable slice storage are
   rejected. Slice and reference provenance must be integrated before relaxing
@@ -175,5 +177,60 @@ they do not become unrelated roots of the reference being bound.
 `make reference-sets-test` validates these cases on both frontends, five engines
 and optimized native output. It includes 28 explicit rejection cases and an
 independent finite-set oracle with 216 seeded mutation queries, plus repeated
-union deduplication. This does not implement reference-containing aggregates,
-borrowed slice integration or persistent REPL loans.
+union deduplication. Stored shared references extend this model below; borrowed
+slice integration and persistent REPL loans remain separate work.
+
+
+## Stored shared references
+
+Non-owning structs, fixed arrays and enums may contain shared references,
+including through generic and nested aggregate fields. These are ordinary
+pointer-sized fields; storing a reference never allocates or owns its pointee.
+Every copied container retains shared loans to every possible source root.
+Projection is conservative: selecting one field continues to protect the
+container's whole source set, not just the field selected at runtime.
+
+```cool
+struct PairView { first: &i64; second: &i64; }
+fn view(first: &i64, second: &i64) -> PairView borrows(first, second) {
+    return PairView { first: first, second: second };
+}
+fn main() {
+    var first = 10;
+    var second = 20;
+    {
+        let pair = view(&first, &second);
+        let copy = pair;
+        assert(*copy.second == 20);
+        // Neither source can be mutated or moved until these loans end.
+    }
+    first = 30;
+    second = 40;
+}
+```
+
+A function returning a borrowed container must declare `borrows(...)`; the
+region checker rejects local-storage escapes and undeclared parameter sources.
+An empty enum variant can be returned under `borrows()` with no source. Match
+scrutinees have anonymous loan holders: the expression is evaluated once and
+its loans remain live while any arm executes. Payload bindings reborrow that
+holder. By-value methods on borrowed containers obey the same rules.
+
+A reference-containing struct/array requires an explicit full initializer;
+`PairView {}` cannot manufacture null references. Containers and reference
+fields cannot be reassigned, even when declared `var`; ordinary scalar fields
+can be changed when no conflicting loan exists. These restrictions prevent a
+shorter-lived reference from being written into an older container. Nested
+borrows such as `&PairView` and stored `&mut T` remain unsupported, so this is
+not yet the tracked mutable iterator API or full stored-reference gate.
+
+`make stored-references-test` checks nested structs/arrays/enums, generic
+copies, methods, computed projections, match evaluation, empty results, owner
+lifetimes and scope release on both frontends, all five engines and O2. It also
+checks 40 rejection cases and 144 independently modeled source-set queries,
+plus actual imported `std/option` reference payloads and fallback results.
+
+`make stored-references-sanitize-test` additionally marks generated Cool LLVM
+functions for ASan, verifies inserted load checks and links the instrumented
+program against the ASan/UBSan C runtime. This checks the executable fixtures;
+it is not a proof of all borrowing rules.
