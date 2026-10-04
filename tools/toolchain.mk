@@ -320,3 +320,10 @@ expressions-test: build/cool-compiler build/language.BIN
 test: expressions-test
 expressions-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_expressions.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: integer-semantics-test integer-semantics-sanitize-test
+integer-semantics-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_integer_semantics.py
+test: integer-semantics-test
+integer-semantics-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_integer_semantics.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

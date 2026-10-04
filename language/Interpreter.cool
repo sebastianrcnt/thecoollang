@@ -36,13 +36,15 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
         }
         return ConvertNumber(AsBits(z), T_F64, n->type, n->token);
     }
-    if ((op == '/' || op == '%') && (!b || (!unsigned && a == (-0x7FFFFFFFFFFFFFFF - 1) && b == -1))) ErrorAt(n->token, "invalid integer division");
+    if ((op == '/' || op == '%') && (!b || (!unsigned && a == ((-0x7FFFFFFFFFFFFFFF - 1) >> (64 - Width(n->a->type))) && b == -1))) ErrorAt(n->token, "invalid integer division");
     if ((op == K_SHL || op == K_SHR) && (b < 0 || b >= Width(n->a->type))) ErrorAt(n->token, "shift count outside operand width");
     switch (op) {
         case '+': result = a + b; break; case '-': result = a - b; break;
         case '*': result = a * b; break;
         case '/': if (unsigned) result = a(U64) / b(U64); else result = a / b; break;
-        case '%': if (unsigned) result = a(U64) % b(U64); else result = a % b; break;
+        // The retained seed truncates native unsigned remainder to 32 bits.
+        // Quotient/product/subtraction keeps all 64 bits without relying on it.
+        case '%': if (unsigned) result = a(U64) - (a(U64) / b(U64)) * b(U64); else result = a % b; break;
         case '&': result = a & b; break; case '|': result = a | b; break; case '^': result = a ^ b; break;
         case K_SHL: result = a << b; break;
         case K_SHR: if (unsigned) result = a(U64) >> b; else result = a >> b; break;

@@ -872,6 +872,31 @@ through ordinary evaluation or library use.
   statement/type grammar and numeric/layout/cleanup/compatibility contracts;
   this audited expression core is not the complete language specification.
 
+- Fixed-width integer audit: added a Python unbounded-integer oracle for all
+  eight signed/unsigned widths, boundary and deterministic random operands,
+  wrapping arithmetic, bitwise/shift/comparison/unary operations and integer
+  casts. It exposed a real bootstrap discrepancy: large unsigned remainders
+  were truncated to 32 bits by the retained seed's ARM64 lowering. Both language
+  interpreters now compute unsigned remainder from quotient/product/subtraction,
+  preserving the original seed while avoiding its faulty instruction sequence.
+  This does not repair or promise compatibility for the legacy compiler itself.
+  Signed division/remainder overflow is now checked for every operand width;
+  earlier development builds only rejected i64 minimum / -1 and wrapped narrower
+  quotients. LLVM runtime shift diagnostics also now refer to the operand width.
+  Specification draft 3 records these decisions and wrapping/conversion rules.
+  Both frontends pass 2,840 independent results and 19 runtime rejection cases
+  across five engines and optimized binaries. Full regression, exact self-host
+  convergence and installed Neovim/distribution validation pass. IR SHA256 is
+  `0bcc61fc4c98a63e2e5b358f78a9be27b5e538b9c641b23f13d1f1d1453f5c74`.
+  Compiler-instrumented ASan evidence is in
+  `build/release-audit/integer-semantics-sanitize.log`; focused/full/installed logs
+  are `integer-semantics-{focused,regression,distribution}.log` in that directory.
+  The sanitizer target additionally instruments emitted LLVM and the C runtime;
+  `integer-semantics-final-sanitize.log` records all oracle and failure cases
+  passing with those runtime checks enabled. G1/G2/G9 remain open:
+  this audit does not cover all floating conversion/encoding/inference contracts
+  or replace ownership, full grammar and final release acceptance work.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

@@ -888,7 +888,7 @@ t18 = !((v_b4 != i64(0)));
 if (!t18) {
 t19 = !((v_is_unsigned != i8(0)));
 if (t19) {
-t19 = (v_a8 == ((-9223372036854775807) - 1));
+t19 = (v_a8 == (((-9223372036854775807) - 1) >> (64 - Width(v_n24.a.type))));
 }
 t20 = t19;
 if (t20) {
@@ -941,7 +941,8 @@ v_result3 = (v_a8 / v_b4);
 break; } }
 if (t30 == 37) { while (true) {
 if ((v_is_unsigned != i8(0))) {
-v_result3 = i64((u64(v_a8) % u64(v_b4)));
+// Match the bootstrap formula, which avoids the retained seed remainder defect.
+v_result3 = i64(u64(v_a8) - (u64(v_a8) / u64(v_b4)) * u64(v_b4));
 } else {
 v_result3 = (v_a8 % v_b4);
 }

@@ -557,3 +557,20 @@ so they cannot bypass validation and recovery with a truncated command prefix.
 Package loading keeps input buffers registered with the recovery scratch owner
 before validation can raise an error. The diagnostic uses the offending byte's
 file/range/line/column and consumes its temporary Token synchronously.
+
+## Integer execution agreement
+
+Arithmetic, bytecode/native-JIT helpers and LLVM runtime helpers must agree on
+operand width and signedness. Division/remainder must reject zero divisors and
+signed minimum divided by -1 using the actual operand width, not just i64's
+minimum. Shift validation uses that width, and its diagnostic must not imply a
+64-bit count range for narrow operands. Addition/subtraction/multiplication and
+unary negation retain wrapping semantics; do not add LLVM overflow assumptions.
+
+The retained HolyC seed truncates its native unsigned remainder result to 32
+bits. The bootstrap interpreter therefore computes unsigned remainder as
+`a - (a / b) * b`, after checking the divisor. Keep the production interpreter
+formula aligned. This avoids relying on that seed instruction while leaving the
+seed/provenance unchanged; it does not claim the legacy compiler is repaired.
+Use an independent large-u64 oracle, not just cross-engine agreement, to guard
+this boundary. The LLVM runtime's C unsigned remainder remains full-width.

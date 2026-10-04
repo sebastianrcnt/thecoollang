@@ -19,13 +19,13 @@ static void fail(const char *message) {
 }
 void cool_assert(int64_t condition) { if (!condition) fail("assertion failed"); }
 int64_t cool_div(int64_t a, int64_t b, int64_t remainder, int64_t is_unsigned, int64_t width) {
-    (void)width;
-    if (!b || (!is_unsigned && a == INT64_MIN && b == -1)) fail("invalid integer division");
+    int64_t minimum = width == 64 ? INT64_MIN : -(INT64_C(1) << (width - 1));
+    if (!b || (!is_unsigned && a == minimum && b == -1)) fail("invalid integer division");
     if (is_unsigned) return remainder ? (uint64_t)a % (uint64_t)b : (uint64_t)a / (uint64_t)b;
     return remainder ? a % b : a / b;
 }
 int64_t cool_shift(int64_t a, int64_t b, int64_t right, int64_t is_unsigned, int64_t width) {
-    if (b < 0 || b >= width) fail("shift count outside 0..63");
+    if (b < 0 || b >= width) fail("shift count outside operand width");
     if (right && is_unsigned) return (uint64_t)a >> b;
     return right ? (a >> b) : (int64_t)((uint64_t)a << b);
 }

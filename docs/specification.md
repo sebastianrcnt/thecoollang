@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 2
+# Cool language specification — 1.0 draft 3
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -124,8 +124,54 @@ engines and an optimized standalone binary. Existing reference/ownership suites
 cover the separate validity obligations around moves and live destinations.
 This does not yet specify overflow/conversion policy or cleanup timing.
 
+## Fixed-width integer values and operations
+
+Signed integer types `i8`, `i16`, `i32`, `i64` use two's-complement values from
+`-2^(w-1)` through `2^(w-1)-1`. Unsigned `u8`, `u16`, `u32`, `u64` range from zero
+through `2^w-1`. On the supported 64-bit target, `isize` aliases `i64` and `usize`
+aliases `u64`; this does not promise another target's pointer width.
+
+Addition, subtraction, multiplication, unary negation and left shift retain the
+low `w` bits of their mathematical result. Signed results interpret those bits
+as two's complement; overflow in these operations wraps and does not constitute
+undefined behavior. Bitwise operators work on the fixed-width representation.
+Signed right shift propagates the sign bit; unsigned right shift inserts zeroes.
+The shift count must be at least zero and strictly below the left operand's width.
+An invalid count is an error, never a masked count. These rules apply equally in
+interpreted, JIT and optimized builds.
+
+Integer division truncates the mathematical quotient toward zero. For a valid
+division, the remainder satisfies `a = (a / b) * b + a % b` in mathematical
+integers; a nonzero signed remainder has the dividend's sign. Division and
+remainder reject zero divisors. Both also reject signed `MIN / -1` and `MIN % -1`
+at every width, including `i8`, `i16` and `i32`. This checked division-overflow
+rule is separate from the wrapping rules for addition and multiplication.
+Compile-time literal checks may diagnose invalid divisors/counts earlier; inputs
+that pass type checking still undergo the corresponding runtime checks.
+
+An explicit integer-to-integer conversion retains the low destination-width bits
+and interprets them according to the destination's signedness. This includes
+signed-to-unsigned conversion and narrowing. Implicit conversions are narrower:
+representable integer literals can adopt their required type, widening preserves
+signedness, and unsigned-to-signed widening is permitted when the signed type has
+strictly more bits. Other integer narrowing or sign-changing assignments require
+an explicit cast. This paragraph does not specify floating conversions or the
+complete inference algorithm for mixed-type binary expressions.
+
+`make integer-semantics-test` compares fixed boundary and deterministic random
+operands with Python unbounded arithmetic for all eight integer types. It covers
+arithmetic, signed remainder, bitwise operations, comparisons, shifts, unary
+operators and cross-width/sign casts, plus separately executed runtime failures.
+Each frontend runs the same oracle under five engines and an optimized native
+build; the sanitizer target adds a compiler-instrumented frontend and
+ASan-instrumented LLVM linked with the ASan/UBSan C runtime.
+
 ## Draft revisions
 
+- Draft 3: specify fixed-width integer operations and conversions. Signed
+  division/remainder overflow now fails at every width; earlier development
+  builds wrapped the narrow-width quotient. Correct bootstrap `u64` remainder
+  truncation and width-specific runtime shift diagnostics.
 - Draft 2: specify embedded-NUL rejection and byte positions; add the audited
   binary grammar, precedence, associativity and expression sequencing contract.
 - Draft 1: initial integer lexical contract and remaining semantic audit map.
