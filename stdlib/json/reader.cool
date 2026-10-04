@@ -1,0 +1,415 @@
+package json;
+import text "std/text";
+import vector "std/vector";
+import map "std/map";
+import result "std/result";
+import strings "std/strings";
+struct Reader {
+    cursor: vector.Cursor[u8];
+    byte: u8;
+    eof: bool;
+    offset: usize;
+    failed: bool;
+    error_offset: usize;
+    depth_error: bool;
+}
+fn load(reader: * Reader) {
+    unsafe {
+        let next = vector.next[u8]( & raw( * reader).cursor);
+        if (next == null) {
+            ( * reader).eof = true;
+            ( * reader).byte = 0;
+        } else {
+            ( * reader).byte = * next;
+        }
+    }
+}
+fn reader_for(value: & text.Text) -> Reader {
+    var reader = Reader {
+        cursor: vector.cursor[u8](text.as_bytes(value)), byte: 0, eof: false, offset: 0, failed: false, error_offset: 0, depth_error: false
+    };
+    unsafe {
+        load( & raw reader);
+    }
+    return reader;
+}
+fn advance(reader: * Reader) {
+    unsafe {
+        ( * reader).offset = ( * reader).offset + 1;
+        load(reader);
+    }
+}
+fn fail(reader: * Reader) {
+    unsafe {
+        if (!( * reader).failed) {
+            ( * reader).failed = true;
+            ( * reader).error_offset = ( * reader).offset;
+        }
+    }
+}
+fn whitespace(reader: * Reader) {
+    unsafe {
+        while (!( * reader).eof) {
+            let byte = ( * reader).byte;
+            if (byte != 32 && byte != 9 && byte != 10 && byte != 13) {
+                break;
+            }
+            advance(reader);
+        }
+    }
+}
+fn expect(reader: * Reader, byte: u8) {
+    unsafe {
+        if (( * reader).eof || ( * reader).byte != byte) {
+            fail(reader);
+        } else {
+            advance(reader);
+        }
+    }
+}
+// Input Text is validated UTF-8; this cursor decodes one scalar in linear time.
+fn scalar(reader: * Reader) -> u32 {
+    unsafe {
+        let first = ( * reader).byte;
+        advance(reader);
+        var value = u32(first);
+        var remaining: usize = 0;
+        if (first >= 240) {
+            value = value & 7;
+            remaining = 3;
+        } else if (first >= 224) {
+            value = value & 15;
+            remaining = 2;
+        } else if (first >= 192) {
+            value = value & 31;
+            remaining = 1;
+        }
+        for (var i: usize = 0; i < remaining; i = i + 1) {
+            value = (value << 6) | (u32(( * reader).byte) & 63);
+            advance(reader);
+        }
+        return value;
+    }
+}
+fn hex4(reader: * Reader) -> u32 {
+    unsafe {
+        var value: u32 = 0;
+        for (var i = 0; i < 4; i = i + 1) {
+            if (( * reader).eof) {
+                fail(reader);
+                return 0;
+            }
+            let byte = ( * reader).byte;
+            var digit: u32 = 0;
+            if (byte >= 48 && byte <= 57) {
+                digit = u32(byte - 48);
+            } else if (byte >= 65 && byte <= 70) {
+                digit = u32(byte - 65) + 10;
+            } else if (byte >= 97 && byte <= 102) {
+                digit = u32(byte - 97) + 10;
+            } else {
+                fail(reader);
+                return 0;
+            }
+            value = value * 16 + digit;
+            advance(reader);
+        }
+        return value;
+    }
+}
+fn read_string(reader: * Reader) -> text.Text {
+    var out = text.create();
+    unsafe {
+        expect(reader, 34);
+        var closed = false;
+        while (!( * reader).failed && !( * reader).eof) {
+            let byte = ( * reader).byte;
+            if (byte == 34) {
+                advance(reader);
+                closed = true;
+                break;
+            }
+            if (byte < 32) {
+                fail(reader);
+                break;
+            }
+            if (byte != 92) {
+                text.append_scalar( & mut out, scalar(reader));
+                continue;
+            }
+            advance(reader);
+            if (( * reader).eof) {
+                fail(reader);
+                break;
+            }
+            let escaped = ( * reader).byte;
+            advance(reader);
+            if (escaped == 34 || escaped == 92 || escaped == 47) {
+                text.append_scalar( & mut out, u32(escaped));
+            } else if (escaped == 98) {
+                text.append_scalar( & mut out, 8);
+            } else if (escaped == 102) {
+                text.append_scalar( & mut out, 12);
+            } else if (escaped == 110) {
+                text.append_scalar( & mut out, 10);
+            } else if (escaped == 114) {
+                text.append_scalar( & mut out, 13);
+            } else if (escaped == 116) {
+                text.append_scalar( & mut out, 9);
+            } else if (escaped == 117) {
+                var point = hex4(reader);
+                if (point >= 55296 && point <= 56319) {
+                    expect(reader, 92);
+                    expect(reader, 117);
+                    let low = hex4(reader);
+                    if (low < 56320 || low > 57343) {
+                        fail(reader);
+                    } else {
+                        point = 65536 + ((point - 55296) << 10) + (low - 56320);
+                    }
+                } else if (point >= 56320 && point <= 57343) {
+                    fail(reader);
+                }
+                if (!( * reader).failed) {
+                    text.append_scalar( & mut out, point);
+                }
+            } else {
+                fail(reader);
+            }
+        }
+        if (!closed) {
+            fail(reader);
+        }
+    }
+    return move out;
+}
+fn digit(reader: * Reader) -> bool {
+    unsafe {
+        return ! ( * reader).eof && ( * reader).byte >= 48 && ( * reader).byte <= 57;
+    }
+}
+fn number_byte(reader: * Reader, out: * text.Text) {
+    unsafe {
+        text.append_scalar( & mut * out, u32(( * reader).byte));
+        advance(reader);
+    }
+}
+fn read_number(reader: * Reader) -> own[Value] {
+    var number = text.create();
+    unsafe {
+        if (( * reader).byte == 45) {
+            number_byte(reader, & raw number);
+        }
+        if (!digit(reader)) {
+            fail(reader);
+        } else if (( * reader).byte == 48) {
+            number_byte(reader, & raw number);
+        } else {
+            while (digit(reader)) {
+                number_byte(reader, & raw number);
+            }
+        }
+        if (!( * reader).eof && ( * reader).byte == 46) {
+            number_byte(reader, & raw number);
+            if (!digit(reader)) {
+                fail(reader);
+            }
+            while (digit(reader)) {
+                number_byte(reader, & raw number);
+            }
+        }
+        if (!( * reader).eof && (( * reader).byte == 101 || ( * reader).byte == 69)) {
+            number_byte(reader, & raw number);
+            if (!( * reader).eof && (( * reader).byte == 43 || ( * reader).byte == 45)) {
+                number_byte(reader, & raw number);
+            }
+            if (!digit(reader)) {
+                fail(reader);
+            }
+            while (digit(reader)) {
+                number_byte(reader, & raw number);
+            }
+        }
+    }
+    let node = new[Value]();
+    ( * node).tag = 2;
+    ( * node).literal = move number;
+    return move node;
+}
+fn keyword(reader: * Reader, word: string) {
+    unsafe {
+        let size = strings.length(word);
+        let bytes = cast[ * u8](word);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (( * reader).failed) {
+                break;
+            }
+            expect(reader, bytes[i]);
+        }
+    }
+}
+fn read_array(reader: * Reader, depth: usize) -> own[Value] {
+    let out = array_value();
+    unsafe {
+        let node = & raw * out;
+        advance(reader);
+        whitespace(reader);
+        if (!( * reader).eof && ( * reader).byte == 93) {
+            advance(reader);
+            return move out;
+        }
+        while (!( * reader).failed) {
+            let item = read_value(reader, depth + 1);
+            if (( * reader).failed) {
+                break;
+            }
+            vector.append[own[Value]]( & mut( * node).items, move item);
+            whitespace(reader);
+            if (!( * reader).eof && ( * reader).byte == 93) {
+                advance(reader);
+                break;
+            }
+            expect(reader, 44);
+            whitespace(reader);
+        }
+    }
+    return move out;
+}
+fn read_object(reader: * Reader, depth: usize) -> own[Value] {
+    let out = object_value();
+    unsafe {
+        let node = & raw * out;
+        advance(reader);
+        whitespace(reader);
+        if (!( * reader).eof && ( * reader).byte == 125) {
+            advance(reader);
+            return move out;
+        }
+        while (!( * reader).failed) {
+            if (( * reader).eof || ( * reader).byte != 34) {
+                fail(reader);
+                break;
+            }
+            let key = read_string(reader);
+            whitespace(reader);
+            expect(reader, 58);
+            if (( * reader).failed) {
+                break;
+            }
+            let item = read_value(reader, depth + 1);
+            if (( * reader).failed) {
+                break;
+            }
+            map.insert[own[Value]]( & mut( * node).members, move key, move item);
+            whitespace(reader);
+            if (!( * reader).eof && ( * reader).byte == 125) {
+                advance(reader);
+                break;
+            }
+            expect(reader, 44);
+            whitespace(reader);
+        }
+    }
+    return move out;
+}
+fn read_value(reader: * Reader, depth: usize) -> own[Value] {
+    unsafe {
+        whitespace(reader);
+        if (depth > 128) {
+            fail(reader);
+            ( * reader).depth_error = true;
+            return null_value();
+        }
+        if (( * reader).eof || ( * reader).failed) {
+            fail(reader);
+            return null_value();
+        }
+        let byte = ( * reader).byte;
+        if (byte == 110) {
+            keyword(reader, "null");
+            return null_value();
+        }
+        if (byte == 116) {
+            keyword(reader, "true");
+            return boolean_value(true);
+        }
+        if (byte == 102) {
+            keyword(reader, "false");
+            return boolean_value(false);
+        }
+        if (byte == 34) {
+            return string_value(read_string(reader));
+        }
+        if (byte == 91) {
+            return read_array(reader, depth);
+        }
+        if (byte == 123) {
+            return read_object(reader, depth);
+        }
+        if (byte == 45 || digit(reader)) {
+            return read_number(reader);
+        }
+        fail(reader);
+        return null_value();
+    }
+}
+pub fn parse(input: & text.Text) -> result.Result[own[Value], ParseError] {
+    var reader = reader_for(input);
+    unsafe {
+        let value = read_value( & raw reader, 0);
+        whitespace( & raw reader);
+        if (!reader.eof) {
+            fail( & raw reader);
+        }
+        if (reader.failed) {
+            var kind = ErrorKind.Syntax;
+            if (reader.depth_error) {
+                kind = ErrorKind.DepthLimit;
+            }
+            return result.Result[own[Value], ParseError].Err(ParseError {
+                offset: reader.error_offset, kind: kind
+            }
+            );
+        }
+        return result.Result[own[Value], ParseError].Ok(move value);
+    }
+}
+pub fn parse_bytes(input: vector.Vector[u8]) -> result.Result[own[Value], ParseError] {
+    match (text.from_bytes(move input)) {
+        result.Result[text.Text, text.Utf8Error].Ok(value) => {
+            return parse( & value);
+        }
+        result.Result[text.Text, text.Utf8Error].Err(error) => {
+            match (error) {
+                text.Utf8Error.Invalid(offset) => {
+                    return result.Result[own[Value], ParseError].Err(ParseError {
+                        offset: offset, kind: ErrorKind.InvalidUtf8
+                    }
+                    );
+                }
+                text.Utf8Error.Truncated(offset) => {
+                    return result.Result[own[Value], ParseError].Err(ParseError {
+                        offset: offset, kind: ErrorKind.InvalidUtf8
+                    }
+                    );
+                }
+            }
+        }
+    }
+}
+pub fn number_value(input: text.Text) -> result.Result[own[Value], ParseError] {
+    match (parse( & input)) {
+        result.Result[own[Value], ParseError].Ok(value) => {
+            if (( * value).tag != 2) {
+                return result.Result[own[Value], ParseError].Err(ParseError {
+                    offset: 0, kind: ErrorKind.ExpectedNumber
+                }
+                );
+            }
+            return result.Result[own[Value], ParseError].Ok(move value);
+        }
+        result.Result[own[Value], ParseError].Err(error) => {
+            return result.Result[own[Value], ParseError].Err(error);
+        }
+    }
+}

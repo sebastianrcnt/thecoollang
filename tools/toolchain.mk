@@ -153,3 +153,10 @@ test: map-test
 driver-cache-test: build/cool-compiler
 	python3 tools/test_driver_cache.py
 test: driver-cache-test
+
+.PHONY: json-test json-sanitize-test
+json-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_json.py
+json-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_json.py --sanitize
+test: json-test

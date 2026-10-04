@@ -28,7 +28,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
-| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector and ordered map validated) |
+| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
@@ -170,6 +170,17 @@ through ordinary evaluation or library use.
   97.661 to 83.991 ms. `docs/performance.md` documents raw samples and boundaries.
   G8 remains open for real applications, additional overhead reduction and
   incremental workloads; these changes cache metadata, not typechecking/codegen.
+
+- JSON serialization: `std/json` now owns parsed trees and exposes safe borrowed
+  inspection, nested mutation, key snapshots and deletion. Strict UTF-8 parsing
+  preserves arbitrary JSON number lexemes and NUL/Unicode text, reports byte
+  offsets, replaces duplicate keys safely and bounds nesting. Compact encoding
+  orders keys deterministically and retains number precision. An independent
+  Python/Decimal oracle covers 105 fixed/seeded inputs across all five engines
+  and O2; leak counts, malformed inputs, loan rejection and ASan/UBSan pass.
+  G5 remains open for path/process utilities, tracked collection iteration and
+  real applications; this is JSON support, not general serialization derivation.
+
 
 ## Next implementation checkpoints
 

@@ -1,0 +1,188 @@
+package json;
+import text "std/text";
+import vector "std/vector";
+import map "std/map";
+import option "std/option";
+import result "std/result";
+pub enum Kind {
+    Null;
+    Boolean;
+    Number;
+    String;
+    Array;
+    Object;
+}
+pub enum ErrorKind {
+    Syntax;
+    DepthLimit;
+    InvalidUtf8;
+    ExpectedNumber;
+}
+pub struct ParseError {
+    pub offset: usize;
+    pub kind: ErrorKind;
+}
+// Private alternatives keep owning data intact when callers inspect the tag.
+// Numbers retain their validated JSON lexeme instead of rounding through f64.
+pub struct Value {
+    tag: i64;
+    boolean: bool;
+    literal: text.Text;
+    items: vector.Vector[own[Value]];
+    members: map.Map[own[Value]];
+}
+pub fn null_value() -> own[Value] {
+    return new[Value]();
+}
+pub fn boolean_value(value: bool) -> own[Value] {
+    let node = new[Value]();
+    ( * node).tag = 1;
+    ( * node).boolean = value;
+    return move node;
+}
+pub fn string_value(value: text.Text) -> own[Value] {
+    let node = new[Value]();
+    ( * node).tag = 3;
+    ( * node).literal = move value;
+    return move node;
+}
+pub fn array_value() -> own[Value] {
+    let node = new[Value]();
+    ( * node).tag = 4;
+    return move node;
+}
+pub fn object_value() -> own[Value] {
+    let node = new[Value]();
+    ( * node).tag = 5;
+    return move node;
+}
+pub fn kind(value: & Value) -> Kind {
+    if (( * value).tag == 0) {
+        return Kind.Null;
+    }
+    if (( * value).tag == 1) {
+        return Kind.Boolean;
+    }
+    if (( * value).tag == 2) {
+        return Kind.Number;
+    }
+    if (( * value).tag == 3) {
+        return Kind.String;
+    }
+    if (( * value).tag == 4) {
+        return Kind.Array;
+    }
+    return Kind.Object;
+}
+pub fn as_bool(value: & Value) -> bool {
+    assert(( * value).tag == 1);
+    return ( * value).boolean;
+}
+pub fn as_text(value: & Value) -> & text.Text borrows(value) {
+    assert(( * value).tag == 3);
+    return & ( * value).literal;
+}
+pub fn number_text(value: & Value) -> & text.Text borrows(value) {
+    assert(( * value).tag == 2);
+    return & ( * value).literal;
+}
+pub fn array_len(value: & Value) -> usize {
+    assert(( * value).tag == 4);
+    return vector.len[own[Value]]( & ( * value).items);
+}
+pub fn array_push(value: & mut Value, item: own[Value]) {
+    assert(( * value).tag == 4);
+    kind( & * item);
+    vector.append[own[Value]]( & mut( * value).items, move item);
+}
+pub fn array_at(value: & Value, index: usize) -> & Value borrows(value) {
+    assert(( * value).tag == 4);
+    unsafe {
+        let item = vector.at[own[Value]]( & ( * value).items, index);
+        let pointer = cast[ * own[Value]](item);
+        return borrow_raw[ & Value]( & raw * * pointer, value);
+    }
+}
+pub fn object_len(value: & Value) -> usize {
+    assert(( * value).tag == 5);
+    return map.len[own[Value]]( & ( * value).members);
+}
+pub fn object_contains(value: & Value, key: & text.Text) -> bool {
+    assert(( * value).tag == 5);
+    return map.contains[own[Value]]( & ( * value).members, key);
+}
+pub fn object_insert(value: & mut Value, key: text.Text, item: own[Value]) -> option.Option[own[Value]] {
+    assert(( * value).tag == 5);
+    kind( & * item);
+    return map.insert[own[Value]]( & mut( * value).members, move key, move item);
+}
+pub fn object_at(value: & Value, key: & text.Text) -> & Value borrows(value) {
+    assert(( * value).tag == 5);
+    unsafe {
+        let item = map.at[own[Value]]( & ( * value).members, key);
+        let pointer = cast[ * own[Value]](item);
+        return borrow_raw[ & Value]( & raw * * pointer, value);
+    }
+}
+pub fn integer_value(value: i64) -> own[Value] {
+    var number = text.create();
+    var magnitude = u64(value);
+    if (value < 0) {
+        text.append_scalar( & mut number, 45);
+        magnitude = u64(0) - magnitude;
+    }
+    var digits = [20]u8 {
+    };
+    var count: usize = 0;
+    while (true) {
+        digits[count] = u8(magnitude % 10);
+        count = count + 1;
+        magnitude = magnitude / 10;
+        if (magnitude == 0) {
+            break;
+        }
+    }
+    while (count > 0) {
+        count = count - 1;
+        text.append_scalar( & mut number, u32(digits[count]) + 48);
+    }
+    let node = new[Value]();
+    ( * node).tag = 2;
+    ( * node).literal = move number;
+    return move node;
+}
+// Key snapshots own their text and remain valid after the object changes.
+pub fn object_keys(value: & Value) -> vector.Vector[text.Text] {
+    assert(( * value).tag == 5);
+    return map.keys[own[Value]]( & ( * value).members);
+}
+pub fn object_remove(value: & mut Value, key: & text.Text) -> option.Option[own[Value]] {
+    assert(( * value).tag == 5);
+    return map.remove[own[Value]]( & mut( * value).members, key);
+}
+pub fn array_pop(value: & mut Value) -> option.Option[own[Value]] {
+    assert(( * value).tag == 4);
+    return vector.pop[own[Value]]( & mut( * value).items);
+}
+pub fn array_at_mut(value: & mut Value, index: usize) -> & mut Value borrows(value) {
+    assert(( * value).tag == 4);
+    unsafe {
+        var pointer: * Value = null;
+        {
+            let item = vector.at_mut[own[Value]]( & mut( * value).items, index);
+            pointer = & raw * * cast[ * own[Value]](item);
+        }
+        return borrow_raw[ & mut Value](pointer, value);
+    }
+}
+pub fn object_at_mut(value: & mut Value, key: & text.Text) -> & mut Value borrows(value) {
+    assert(( * value).tag == 5);
+    unsafe {
+        var pointer: * Value = null;
+        {
+            let item = map.at_mut[own[Value]]( & mut( * value).members, key);
+            pointer = & raw * * cast[ * own[Value]](item);
+        }
+        return borrow_raw[ & mut Value](pointer, value);
+    }
+}

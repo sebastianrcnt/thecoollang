@@ -16,6 +16,7 @@ packages are bundled sources and need no module download.
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
 | `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`; raw `cursor`/`next` |
 | `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
+| `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
 | `std/os` | `arg_count`, `arg`; executable/runner flags excluded |
 
@@ -69,7 +70,7 @@ standalone output. Filesystem read errors release intermediate owned buffers;
 write errors and close/flush errors are returned. Paths use the current working
 directory. This is a core library, not a claim of Go standard-library parity:
 networking, async IO and Unicode normalization are outside the first release.
-Serialization and other mandatory core APIs remain in development under
+Additional mandatory core APIs remain in development under
 [the 1.0 release contract](../docs/release-1.0.md).
 
 
@@ -168,3 +169,71 @@ floats, owned values and loan conflicts on five engines plus O2.
 `make map-sanitize-test` also instruments Cool memory accesses with ASan and the
 C runtime with ASan/UBSan. Generated projects remain in `build/map-tests/` for
 reproduction; additional seeds/steps can be supplied to `tools/test_map.py`.
+
+## JSON
+
+`std/json` parses strict UTF-8 JSON into an owning `Value` tree. `parse(&Text)`
+returns `Result[own[Value], ParseError]`; `parse_bytes(Vector[u8])` consumes and
+validates raw bytes first. Parsed strings, numbers and object keys own their
+storage independently of the input. Both success and failure release temporary
+buffers and discarded subtrees. Errors contain a UTF-8 **byte offset** at which
+failure was detected and a `Syntax`, `InvalidUtf8` or `DepthLimit` kind.
+
+```cool
+import json "std/json";
+import text "std/text";
+import result "std/result";
+fn main() {
+    let input = result.value_or[text.Text, text.Utf8Error](
+        text.from_literal("[true,42]"), text.create());
+    let value = result.value_or[own[json.Value], json.ParseError](
+        json.parse(&input), json.null_value());
+    assert(json.array_len(&*value) == 2);
+    {
+        let number = json.array_at(&*value, 1);
+        assert(text.byte_len(json.number_text(number)) == 2);
+    }
+    json.array_push(&mut *value, json.integer_value(99));
+    let encoded = result.value_or[text.Text, json.ErrorKind](
+        json.encode(&*value), text.create());
+    assert(text.byte_len(&encoded) == 12);
+}
+```
+
+`kind` distinguishes Null, Boolean, Number, String, Array and Object. Use
+`as_bool`, `as_text`, `number_text`, `array_len`/`array_at` and
+`object_len`/`object_contains`/`object_at` to inspect matching kinds. Access with
+an incorrect kind, absent key or invalid array index traps. Borrowed child/text
+access prevents mutation or movement of the parent for the loan's scope.
+Reference-returning chains currently need named intermediate references, as in
+the example.
+
+Construct trees with `null_value`, `boolean_value`, `integer_value`,
+`number_value(Text)`, `string_value(Text)`, `array_value` and `object_value`.
+`number_value` validates JSON number syntax and returns a parsing result; it
+accepts surrounding JSON whitespace and rejects a non-number with
+`ExpectedNumber`. JSON number lexemes retain all digits, exponent spelling and
+negative zero; there is no implicit floating-point conversion or rounding.
+
+`array_push` and `object_insert` consume a child owner (empty owners trap).
+`array_pop` and `object_remove` return `Option[own[Value]]`; replacing an existing
+object key returns the previous child. `array_at_mut` and `object_at_mut` lend
+exclusive access to a child, allowing nested array/object edits. `object_keys`
+returns an independent sorted `Vector[Text]` snapshot. Object keys may contain
+NUL, and duplicate keys during parsing use the last value.
+
+`encode` produces compact UTF-8 `Text`, sorting object keys by UTF-8 bytes. It
+escapes quotes, backslashes and control characters; supplementary Unicode and
+escaped surrogate pairs round-trip, while unpaired surrogates are rejected.
+This deterministic encoding is not a canonical JSON signing format: number
+lexemes are deliberately preserved. Nesting is limited to 128 edges from the
+root by both parser and encoder. Encoding an excessively deep constructed tree
+returns `DepthLimit` and frees partial output. Array traversal is linear;
+ordered-object encoding takes O(n log n) key comparisons plus output work.
+
+`make json-test` uses Python's independent JSON decoder with exact Decimal
+numbers on 105 fixed/seeded cases, all five engines and optimized native output.
+It checks malformed syntax/UTF-8, byte offsets, depth limits, NUL/Unicode,
+duplicate-key destruction, tree mutation, safe loan rejection and zero leaked
+owners. `make json-sanitize-test` additionally instruments generated Cool memory
+accesses with ASan and the C runtime with ASan/UBSan.

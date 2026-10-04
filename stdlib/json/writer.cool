@@ -1,0 +1,116 @@
+package json;
+import text "std/text";
+import vector "std/vector";
+import map "std/map";
+import result "std/result";
+import strings "std/strings";
+fn put(out: * text.Text, point: u32) {
+    unsafe {
+        text.append_scalar( & mut * out, point);
+    }
+}
+fn literal(out: * text.Text, value: string) {
+    unsafe {
+        let size = strings.length(value);
+        let bytes = cast[ * u8](value);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            put(out, u32(bytes[i]));
+        }
+    }
+}
+fn quoted(out: * text.Text, value: & text.Text) {
+    put(out, 34);
+    var reader = reader_for(value);
+    unsafe {
+        while (!reader.eof) {
+            let point = scalar( & raw reader);
+            if (point == 34 || point == 92) {
+                put(out, 92);
+                put(out, point);
+            } else if (point < 32) {
+                literal(out, "\\u00");
+                let digits = cast[ * u8]("0123456789abcdef");
+                put(out, u32(digits[point / 16]));
+                put(out, u32(digits[point % 16]));
+            } else {
+                put(out, point);
+            }
+        }
+    }
+    put(out, 34);
+}
+fn write_value(out: * text.Text, value: & Value, depth: usize) -> bool {
+    if (depth > 128) {
+        return false;
+    }
+    if (( * value).tag == 0) {
+        literal(out, "null");
+        return true;
+    }
+    if (( * value).tag == 1) {
+        if (( * value).boolean) {
+            literal(out, "true");
+        } else {
+            literal(out, "false");
+        }
+        return true;
+    }
+    if (( * value).tag == 2) {
+        unsafe {
+            text.append( & mut * out, & ( * value).literal);
+        }
+        return true;
+    }
+    if (( * value).tag == 3) {
+        quoted(out, & ( * value).literal);
+        return true;
+    }
+    if (( * value).tag == 4) {
+        put(out, 91);
+        let size = array_len(value);
+        unsafe {
+            var cursor = vector.cursor[own[Value]]( & ( * value).items);
+            for (var i: usize = 0; i < size; i = i + 1) {
+                if (i > 0) {
+                    put(out, 44);
+                }
+                let slot = vector.next[own[Value]]( & raw cursor);
+                let child = borrow_raw[ & Value]( & raw * * slot, value);
+                if (!write_value(out, child, depth + 1)) {
+                    return false;
+                }
+            }
+        }
+        put(out, 93);
+        return true;
+    }
+    put(out, 123);
+    let keys = map.keys[own[Value]]( & ( * value).members);
+    let size = vector.len[text.Text]( & keys);
+    unsafe {
+        let source = & keys;
+        var cursor = vector.cursor[text.Text](source);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if (i > 0) {
+                put(out, 44);
+            }
+            let key = borrow_raw[ & text.Text](vector.next[text.Text]( & raw cursor), source);
+            quoted(out, key);
+            put(out, 58);
+            if (!write_value(out, object_at(value, key), depth + 1)) {
+                return false;
+            }
+        }
+    }
+    put(out, 125);
+    return true;
+}
+pub fn encode(value: & Value) -> result.Result[text.Text, ErrorKind] {
+    var out = text.create();
+    unsafe {
+        if (!write_value( & raw out, value, 0)) {
+            return result.Result[text.Text, ErrorKind].Err(ErrorKind.DepthLimit);
+        }
+    }
+    return result.Result[text.Text, ErrorKind].Ok(move out);
+}
