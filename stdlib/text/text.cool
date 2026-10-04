@@ -1,0 +1,276 @@
+package text;
+import vector "std/vector";
+import result "std/result";
+import strings "std/strings";
+// Text owns well-formed UTF-8, including embedded NUL bytes. Counts are Unicode
+// scalar values, not grapheme clusters; no normalization is performed.
+pub struct Text {
+    bytes: vector.Vector[u8];
+    scalars: usize;
+}
+pub enum Utf8Error {
+    Invalid(usize);
+    Truncated(usize);
+}
+pub fn create() -> Text {
+    return Text {
+    };
+}
+pub fn byte_len(value: & Text) -> usize {
+    return vector.len[u8]( & ( * value).bytes);
+}
+pub fn scalar_len(value: & Text) -> usize {
+    return ( * value).scalars;
+}
+pub fn as_bytes(value: & Text) -> & vector.Vector[u8]borrows(value) {
+    return & ( * value).bytes;
+}
+pub fn into_bytes(value: Text) -> vector.Vector[u8] {
+    return move value.bytes;
+}
+// Sequential traversal is linear across vector chunks; no repeated indexing.
+pub fn validate(bytes: & vector.Vector[u8]) -> result.Result[usize, Utf8Error] {
+    unsafe {
+        var cursor = vector.cursor[u8](bytes);
+        let size = vector.len[u8](bytes);
+        var index: usize = 0;
+        var count: usize = 0;
+        while (index < size) {
+            let first = * vector.next[u8]( & raw cursor);
+            index = index + 1;
+            var remaining: usize = 0;
+            var low: u8 = 128;
+            var high: u8 = 191;
+            if (first < 128) {
+                count = count + 1;
+                continue;
+            }
+            if (first >= 194 && first <= 223) {
+                remaining = 1;
+            } else if (first >= 224 && first <= 239) {
+                remaining = 2;
+                if (first == 224) {
+                    low = 160;
+                }
+                if (first == 237) {
+                    high = 159;
+                }
+            } else if (first >= 240 && first <= 244) {
+                remaining = 3;
+                if (first == 240) {
+                    low = 144;
+                }
+                if (first == 244) {
+                    high = 143;
+                }
+            } else {
+                return result.Result[usize, Utf8Error].Err(Utf8Error.Invalid(index - 1));
+            }
+            for (var part: usize = 0; part < remaining; part = part + 1) {
+                if (index == size) {
+                    return result.Result[usize, Utf8Error].Err(Utf8Error.Truncated(index));
+                }
+                let next = * vector.next[u8]( & raw cursor);
+                if (next < low || next > high) {
+                    return result.Result[usize, Utf8Error].Err(Utf8Error.Invalid(index));
+                }
+                index = index + 1;
+                low = 128;
+                high = 191;
+            }
+            count = count + 1;
+        }
+        return result.Result[usize, Utf8Error].Ok(count);
+    }
+}
+pub fn from_bytes(bytes: vector.Vector[u8]) -> result.Result[Text, Utf8Error] {
+    match (validate( & bytes)) {
+        result.Result[usize, Utf8Error].Ok(count) => {
+            return result.Result[Text, Utf8Error].Ok(Text {
+                bytes: move bytes, scalars: count
+            }
+            );
+        }
+        result.Result[usize, Utf8Error].Err(error) => {
+            return result.Result[Text, Utf8Error].Err(error);
+        }
+    }
+}
+// Legacy string values are NUL-terminated. Use from_bytes for embedded NULs.
+pub fn from_literal(value: string) -> result.Result[Text, Utf8Error] {
+    var bytes = vector.create[u8]();
+    let size = strings.length(value);
+    unsafe {
+        let source = cast[ * u8](value);
+        for (var index: usize = 0; index < size; index = index + 1) {
+            vector.append[u8]( & mut bytes, source[index]);
+        }
+    }
+    return from_bytes(move bytes);
+}
+pub fn append(target: & mut Text, source: & Text) {
+    unsafe {
+        var cursor = vector.cursor[u8]( & ( * source).bytes);
+        let size = byte_len(source);
+        for (var index: usize = 0; index < size; index = index + 1) {
+            vector.append[u8]( & mut( * target).bytes, * vector.next[u8]( & raw cursor));
+        }
+        ( * target).scalars = ( * target).scalars + ( * source).scalars;
+    }
+}
+pub fn append_literal(target: & mut Text, value: string) -> result.Result[usize, Utf8Error] {
+    match (from_literal(value)) {
+        result.Result[Text, Utf8Error].Ok(source) => {
+            let size = byte_len( & source);
+            append(target, & source);
+            return result.Result[usize, Utf8Error].Ok(size);
+        }
+        result.Result[Text, Utf8Error].Err(error) => {
+            return result.Result[usize, Utf8Error].Err(error);
+        }
+    }
+}
+pub fn clone(value: & Text) -> Text {
+    var copy = create();
+    append( & mut copy, value);
+    return move copy;
+}
+pub fn clear(value: & mut Text) {
+    vector.clear[u8]( & mut( * value).bytes);
+    ( * value).scalars = 0;
+}
+// Invalid Unicode scalars leave the target unchanged.
+pub fn append_scalar(value: & mut Text, scalar: u32) -> bool {
+    if (scalar > 1114111 || (scalar >= 55296 && scalar <= 57343)) {
+        return false;
+    }
+    if (scalar < 128) {
+        vector.append[u8]( & mut( * value).bytes, u8(scalar));
+    } else if (scalar < 2048) {
+        vector.append[u8]( & mut( * value).bytes, u8(192 | (scalar >> 6)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | (scalar & 63)));
+    } else if (scalar < 65536) {
+        vector.append[u8]( & mut( * value).bytes, u8(224 | (scalar >> 12)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | ((scalar >> 6) & 63)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | (scalar & 63)));
+    } else {
+        vector.append[u8]( & mut( * value).bytes, u8(240 | (scalar >> 18)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | ((scalar >> 12) & 63)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | ((scalar >> 6) & 63)));
+        vector.append[u8]( & mut( * value).bytes, u8(128 | (scalar & 63)));
+    }
+    ( * value).scalars = ( * value).scalars + 1;
+    return true;
+}
+pub fn scalar_at(value: & Text, wanted: usize) -> u32 {
+    assert(wanted < ( * value).scalars);
+    unsafe {
+        var cursor = vector.cursor[u8]( & ( * value).bytes);
+        var index: usize = 0;
+        while (index <= wanted) {
+            let first = * vector.next[u8]( & raw cursor);
+            var scalar = u32(first);
+            var remaining: usize = 0;
+            if (first >= 240) {
+                scalar = scalar & 7;
+                remaining = 3;
+            } else if (first >= 224) {
+                scalar = scalar & 15;
+                remaining = 2;
+            } else if (first >= 192) {
+                scalar = scalar & 31;
+                remaining = 1;
+            }
+            for (var part: usize = 0; part < remaining; part = part + 1) {
+                scalar = (scalar << 6) | (u32( * vector.next[u8]( & raw cursor)) & 63);
+            }
+            if (index == wanted) {
+                return scalar;
+            }
+            index = index + 1;
+        }
+    }
+    return 0;
+}
+pub fn equal(left: & Text, right: & Text) -> bool {
+    let size = byte_len(left);
+    if (size != byte_len(right)) {
+        return false;
+    }
+    unsafe {
+        var a = vector.cursor[u8]( & ( * left).bytes);
+        var b = vector.cursor[u8]( & ( * right).bytes);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if ( * vector.next[u8]( & raw a) != * vector.next[u8]( & raw b)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+// Bytewise ordering; equality and ordering do not normalize Unicode.
+pub fn compare(left: & Text, right: & Text) -> i32 {
+    let left_size = byte_len(left);
+    let right_size = byte_len(right);
+    var common = left_size;
+    if (right_size < common) {
+        common = right_size;
+    }
+    unsafe {
+        var a = vector.cursor[u8]( & ( * left).bytes);
+        var b = vector.cursor[u8]( & ( * right).bytes);
+        for (var i: usize = 0; i < common; i = i + 1) {
+            let av = * vector.next[u8]( & raw a);
+            let bv = * vector.next[u8]( & raw b);
+            if (av < bv) {
+                return - 1;
+            }
+            if (av > bv) {
+                return 1;
+            }
+        }
+    }
+    if (left_size < right_size) {
+        return - 1;
+    }
+    if (left_size > right_size) {
+        return 1;
+    }
+    return 0;
+}
+pub fn starts_with(value: & Text, prefix: & Text) -> bool {
+    let size = byte_len(prefix);
+    if (size > byte_len(value)) {
+        return false;
+    }
+    unsafe {
+        var a = vector.cursor[u8]( & ( * value).bytes);
+        var b = vector.cursor[u8]( & ( * prefix).bytes);
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if ( * vector.next[u8]( & raw a) != * vector.next[u8]( & raw b)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+pub fn ends_with(value: & Text, suffix: & Text) -> bool {
+    let size = byte_len(suffix);
+    let total = byte_len(value);
+    if (size > total) {
+        return false;
+    }
+    unsafe {
+        var a = vector.cursor[u8]( & ( * value).bytes);
+        var b = vector.cursor[u8]( & ( * suffix).bytes);
+        for (var i: usize = 0; i < total - size; i = i + 1) {
+            vector.next[u8]( & raw a);
+        }
+        for (var i: usize = 0; i < size; i = i + 1) {
+            if ( * vector.next[u8]( & raw a) != * vector.next[u8]( & raw b)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}

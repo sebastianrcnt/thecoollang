@@ -132,3 +132,10 @@ test: references-test
 safe-vector-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_safe_vector.py
 test: safe-vector-test
+
+.PHONY: text-test text-sanitize-test
+text-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_text.py
+text-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_text.py --sanitize
+test: text-test

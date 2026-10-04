@@ -129,6 +129,17 @@ through ordinary evaluation or library use.
   still require manual lifetime care;
   stored references and tracked iterators remain mandatory work for G2/G4/G5.
 
+- Owned text: added `std/text.Text` with strict UTF-8 validation, Unicode scalar
+  counts/access, NUL-preserving byte ownership, append/clone/clear and bytewise
+  comparisons/prefix/suffix operations. No lifetime-free string view of owned
+  storage is exposed. An independent Python strict-decoder oracle covers 127
+  fixed and seeded inputs, including invalid continuation bytes, overlong forms,
+  surrogates, truncation and maximum scalars. All five engines and O2 pass with
+  12 KiB growth, file round trips and zero remaining owners; instrumented Cool
+  ASan and C-runtime ASan/UBSan also pass. G5 remains open for maps, serialization,
+  additional path/process utilities and real applications; G2 remains open for
+  stored references and tracked iteration.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw
