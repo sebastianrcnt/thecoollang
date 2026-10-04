@@ -92,6 +92,25 @@ local function run()
   wait_for('didClose returns to disk',function() return (publish[uri] or 0)>prior end)
   assert(#vim.diagnostic.get(buffer)==0)
   assert((publish[lib_uri] or 0)>0)
+  -- New module files need declaration candidates before they have a package header.
+  local new_path=vim.fs.dirname(source)..'/new.cool'
+  vim.cmd.edit(vim.fn.fnameescape(new_path))
+  local new_buffer=vim.api.nvim_get_current_buf()
+  local new_uri=vim.uri_from_bufnr(new_buffer)
+  wait_for('new empty file attach',function() return #vim.lsp.get_clients({bufnr=new_buffer,name='cool'})==1 end)
+  wait_for('new empty file diagnostics',function() return (publish[new_uri] or 0)>0 end)
+  assert(#vim.diagnostic.get(buffer)>0, 'normal package validation was suppressed')
+  local new_response,new_error=client:request_sync('textDocument/completion',
+    vim.lsp.util.make_position_params(0,client.offset_encoding),20000,new_buffer)
+  assert(new_response and not new_response.err,vim.inspect(new_response or new_error))
+  local declarations={}
+  for _,candidate in ipairs(new_response.result.items) do declarations[candidate.label]=true end
+  assert(declarations.fn and declarations.package and declarations.struct,vim.inspect(new_response))
+  prior=publish[uri] or 0
+  vim.api.nvim_buf_delete(new_buffer,{force=true})
+  wait_for('new file close/reset',function() return (publish[uri] or 0)>prior end)
+  assert(#vim.diagnostic.get(buffer)==0)
+  assert(vim.uv.fs_stat(new_path)==nil,'empty buffer was written to disk')
   client:stop(false)
   wait_for('graceful shutdown',function() return exit_code~=nil end)
   assert(exit_code==0 and exit_signal==0,vim.inspect({exit_code,exit_signal}))
@@ -117,7 +136,7 @@ local function run()
   wait_for('standalone shutdown',function() return exit_code~=nil end)
   assert(exit_code==0 and exit_signal==0)
   return {version=vim.version(),encoding=client.offset_encoding,diagnostics=true,
-    definition=true,completion_edit=true,unsaved_dependency=true,close_reset=true,standalone=true,shutdown_code=exit_code}
+    definition=true,completion_edit=true,unsaved_dependency=true,close_reset=true,empty_module_file=true,standalone=true,shutdown_code=exit_code}
 end
 local ok,result = xpcall(run,debug.traceback)
 if ok then

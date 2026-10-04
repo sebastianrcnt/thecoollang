@@ -116,6 +116,7 @@ Token *At() { return &tokens[pos]; }
 Bool editor_diagnostics,editor_index;
 Token *completion_token;U8 *completion_prefix,*completion_file;I64 completion_offset;
 extern U0 CompletionExcluded(U8 *file,I64 start,I64 end);
+extern U0 CompletionTopLevel();
 Token **editor_names;I64 editor_capacity;
 extern U0 EditorDiagnostic(Token *token,U8 *message);
 U0 ErrorAt(Token *t, U8 *message) {

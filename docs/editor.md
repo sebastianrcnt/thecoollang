@@ -27,7 +27,8 @@ from invalid code and the documented unsupported contexts remain open for the
   aliases, primitive types, public members, enum variants and receiver methods.
   Candidates respect package visibility, lexical scopes and moved bindings.
   Type positions exclude functions and value bindings; statement positions also
-  offer keywords, with break/continue limited to loops.
+  offer keywords, with break/continue limited to loops. Empty files and top-level
+  declaration positions offer declaration keywords, including after `pub`.
 - Unsaved buffers across package dependencies and newly opened files in an
   existing package. Closing a buffer resumes its disk contents and clears stale
   diagnostics. Saving notifications do not write files on the client's behalf.
@@ -59,14 +60,19 @@ need work before the tooling gate can close.
 fresh unsaved snapshots and returns UTF-16 text edits replacing the identifier at
 the cursor, including its suffix when the cursor is in the middle of a word.
 Candidates are filtered by the typed prefix and deduplicated. Comments and string
-contents produce no candidates.
+contents produce no candidates. Declaration-name positions do not receive unrelated
+statement or declaration keywords.
 
 A separate compiler process inserts a marker into its temporary token stream
 when there is no identifier and closes unfinished blocks for the declaration
 scan. The ordinary expression/type parser then reaches the marker with actual
 locals and receiver types, emits candidates and exits without executing user
 code. This supports partial expressions, empty member selections and unfinished
-function blocks. It does not change files or the diagnostic analysis's AST.
+function blocks. An empty module file can receive declaration candidates before
+it has a package header: only the completion request permits that missing header
+in the target buffer, while ordinary analysis still diagnoses it. Other files
+retain normal package validation. It does not change files or the diagnostic
+analysis's AST.
 
 After collecting declarations and checking signatures, completion checks the
 requested function body first. Errors in other function bodies, including
@@ -75,8 +81,8 @@ report those errors.
 
 This is bounded recovery, not a general error-tolerant parser: errors in earlier
 statements of the requested function, invalid declarations/signatures, missing
-dependencies and lexical errors may prevent the cursor from being reached. Uninstantiated generic bodies,
-top-level declarations and import path strings still need completion support.
+dependencies and lexical errors may prevent the cursor from being reached. Uninstantiated generic bodies and import path strings still need completion
+support.
 The server returns an empty incomplete list when scanning/checking fails. Each
 request uses synchronous analysis with the same native-process timeout; requests
 are not yet cancellable or debounced.
@@ -120,8 +126,9 @@ Ordinary `make test` does not download software. The headless test uses Neovim's
 actual filetype detection, workspace attachment, incremental synchronization,
 UTF-16 conversion, diagnostic store, request client and text-edit application.
 It tests CRLF/emoji positions, cross-package definitions, applying a completion
-edit, shared-client unsaved dependency buffers, close/reset, standalone files
-outside modules and graceful shutdown.
+edit, shared-client unsaved dependency buffers, new empty module files before
+their package header, close/reset, standalone files outside modules and graceful
+shutdown.
 Source and module files must remain unchanged. Config/data/state/cache directories
 are temporary, and user init/runtime overrides are excluded. This is native
 client integration evidence, not a visual popup/UI acceptance test.

@@ -172,6 +172,15 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
                 return result
             completion.version=version
             pre='package main;import l "example.test/editor/lib";fn main(){let prior=1;{let gone=2;}let object=l.Box{value:1};let vault=l.make();'
+            completion('|',{'package','import','fn','struct','enum','pub'},{'let','return'})
+            assert completion.diagnostics[uri]['diagnostics'], 'ordinary missing-package diagnostic was suppressed'
+            completion('   |',{'package','fn'},{'let'})
+            completion('// file header\n|',{'package','fn'},{'let'})
+            completion('package main;f|',{'fn'},{'for'})
+            completion('package main;pub |',{'fn','struct','enum'},{'import','package','pub','let'})
+            completion('package main;pub str|uct Thing{}',{'struct'},{'fn','let'})
+            completion('package main;fn first(){}\n|',{'fn','struct','import'},{'return','let'})
+            assert completion('package main;fn nam|',set())['items']==[]
             completion(pre+'pri|;}',{'prior'},{'gone'})
             completion(pre+'l.|;}',{'answer','Box','Vault','identity','make'},{'secret','Box.hidden','prior'})
             completion(pre+'object.|;}',{'value','read'},{'hidden','answer'})

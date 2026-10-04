@@ -795,6 +795,24 @@ through ordinary evaluation or library use.
   G7 remains open for the documented analysis/recovery gaps, rather than absence
   of an actual editor client test. See [editor setup](editor.md#neovim-setup).
 
+- Empty-file and declaration completion: the native collector recognizes
+  declaration boundaries and `pub` qualifiers, filters typed prefixes, and does
+  not offer declaration keywords in declared-name positions. Empty/whitespace
+  files receive keyword candidates without needing an existing token. Completion
+  alone tolerates a missing package header in its target buffer; other sources
+  and ordinary checking/diagnostics keep the language's package rules. Both
+  frontends pass empty/header-comment files, partial keywords, pub-qualified
+  types, post-function declarations and name-position exclusions. The actual
+  Neovim client opens a new unsaved module file, receives candidates before its
+  package header, observes the ordinary package diagnostic, closes/reset it and
+  verifies no file was written. Full `make test bootstrap-check`, exact self-host
+  convergence, instrumented LSP/Neovim checks and read-only installed editor plus
+  distribution tests pass. IR SHA256 is
+  `40abf0a30d2e0df1651a461beed5085a6f19f2ee13c8d53f3346886ad8ad0a84`.
+  Evidence: `build/release-audit/completion-declarations-{focused,editor,regression,sanitize,distribution}.log`.
+  Broader statement recovery and uninstantiated generic/import-path contexts
+  remain documented limitations; this does not close the full release audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

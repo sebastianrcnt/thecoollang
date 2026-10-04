@@ -47,5 +47,6 @@ with tempfile.TemporaryDirectory(prefix='cool editor 실제 ') as directory:
     actual['frontend']=str(args.frontend.resolve()) if args.frontend else 'default'
     assert all(path.read_bytes()==contents for path,contents in saved.items())
     assert not (project/'cool.sum').exists()
+    assert not (project/'new.cool').exists()
     (audit/(args.report_name+'-report.json')).write_text(json.dumps(actual,indent=2)+'\n')
     print('Neovim client: automatic attach, UTF-16/CRLF diagnostics, unsaved edits, cross-package definition, native completion edit, dependency buffers, close/reset, graceful shutdown and unchanged source files PASS')

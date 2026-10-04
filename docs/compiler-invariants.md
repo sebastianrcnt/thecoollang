@@ -536,3 +536,12 @@ parsing keep their original order because their completion token is null. This
 allows a valid signature in a broken dependency to support candidate lookup;
 it neither accepts the broken program nor suppresses ordinary diagnostics.
 Errors before the cursor in the requested function still abort that request.
+
+Top-level completion is allowed only at declaration boundaries (file start,
+a semicolon or closing brace) or after `pub`. Do not offer declaration keywords
+where the grammar expects a declared name. Empty files have no source token;
+a temporary marker supplies only the completion edit range and is consumed
+before exiting the isolated process. The driver may tolerate a missing package
+header only for the requested completion source; other files and ordinary
+checking/diagnostics retain normal package rules. This is not a change to the
+language's package requirements.

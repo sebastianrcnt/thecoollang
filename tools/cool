@@ -102,7 +102,7 @@ def parse_metadata(path, lines):
     return package, imports
 
 
-def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, import_path=None, overlays=None, editor=False):
+def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, import_path=None, overlays=None, editor=False, completion_source=None):
     overlays = overlays or {}
     entry = Path(entry).resolve()
     if not entry.exists() and entry not in overlays:
@@ -128,13 +128,14 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, imp
         scanned = metadata_many(sources, work, overlays, editor)
         for source in sources:
             name, dependencies = scanned[source]
-            if location.is_dir() and name is None:
+            if location.is_dir() and name is None and source != completion_source:
                 raise ValueError(f'{source}: directory packages require a package declaration')
-            declared.add(name)
+            if name is not None or source != completion_source:
+                declared.add(name)
             imports.update(dependencies)
             if '\t' in str(source) or '\n' in str(source):
                 raise ValueError('source paths cannot contain tabs or newlines')
-        if len(declared) != 1:
+        if len(declared) > 1 or (not declared and completion_source not in sources):
             raise ValueError(f'mixed package declarations in {location}')
         for dependency in sorted(imports):
             visit_import(dependency)

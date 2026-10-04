@@ -114,6 +114,7 @@ extern I64 TypeName(U8 *name);
 U0 CollectTypes() {
     I64 saved = pos, nesting = 0, type; Token *t; U8 *name, *alias, *path; Bool public; I64 j, kind;
     while (At()->kind) {
+        if(!nesting)CompletionTopLevel();
         if (!nesting && Is("import")) {
             t = At(); pos++; alias = NULL; if (At()->kind == K_ID) alias = Ident();
             if (At()->kind != K_STRING) Error("expected import path string"); path = At()->text;

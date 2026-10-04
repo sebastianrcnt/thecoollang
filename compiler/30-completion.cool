@@ -72,7 +72,9 @@ fn CompletionPrepare(file: * u8, number: * u8) {
             i = i + 1;
         }
         if (first < 0) {
-            NativeExit(0);
+            var marker=Token{};marker.start=offset;marker.end=offset;
+            ctx.v_completion_token=&raw marker;ctx.v_completion_prefix=cast[*u8]("");
+            CompletionDeclarations(false);
         }
         // The declaration pass skips function bodies. Close unfinished blocks
         // in this temporary token stream so it can reach the actual body parser.
@@ -324,5 +326,24 @@ fn CompletionOrder(parsed: *i64, count: i64) {
             }
             i = i + 1;
         }
+    }
+}
+fn CompletionDeclarations(public_only: bool) {
+    unsafe {
+        CompletionItem(cast[*u8]("fn"),14); CompletionItem(cast[*u8]("struct"),14); CompletionItem(cast[*u8]("enum"),14);
+        CompletionItem(cast[*u8]("extern"),14); CompletionItem(cast[*u8]("export"),14);
+        if(!public_only){CompletionItem(cast[*u8]("pub"),14);CompletionItem(cast[*u8]("package"),14);CompletionItem(cast[*u8]("import"),14);}
+        NativeExit(0);
+    }
+}
+fn CompletionTopLevel() {
+    unsafe {
+        let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if(ctx.v_completion_token!=null && At().kind==256 && Eq(At().text,cast[*u8]("pub"))!=i8(0) && &raw ctx.v_tokens[ctx.v_pos+1]==ctx.v_completion_token){CompletionDeclarations(true);}
+        if(!CompletionAt()){return;}
+        if(ctx.v_pos==0){CompletionDeclarations(false);}
+        let previous=&raw ctx.v_tokens[ctx.v_pos-1];
+        if(Eq(previous.file,At().file)==i8(0) || previous.kind==59 || previous.kind==125){CompletionDeclarations(false);}
+        if(previous.kind==256 && Eq(previous.text,cast[*u8]("pub"))!=i8(0)){CompletionDeclarations(true);}
     }
 }

@@ -1205,6 +1205,7 @@ v_nesting = 0;
 while (true) {
 t0 = At();
 if (!(((t0).kind != i64(0)))) { break; }
+if(v_nesting==0){CompletionTopLevel();}
 t1 = !((v_nesting != i64(0)));
 if (t1) {
 t2 = cast[*u8]("import");

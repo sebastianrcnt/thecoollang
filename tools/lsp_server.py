@@ -230,7 +230,7 @@ class Server:
                 overlays[original] = snapshot
             try:
                 entry = path.parent if find_root(path) else path
-                manifest,_ = self.bundle(entry,work,True,True,True,overlays=overlays,editor=True)
+                manifest,_ = self.bundle(entry,work,True,True,True,overlays=overlays,editor=True,completion_source=path)
                 result = subprocess.run([self.frontend,'editor-complete-bundle',manifest,overlays.get(path,path),str(offset)],
                     capture_output=True,text=True,timeout=20)
             except (subprocess.CalledProcessError,subprocess.TimeoutExpired,OSError,ValueError):
