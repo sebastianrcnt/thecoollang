@@ -137,13 +137,13 @@ if ((v_j5 != i64(0))) {
 t8 = cast[*u8](", ");
 IR(t8);
 }
-t9 = (&((v_f14).arg_types)[0])[v_j5];
+t9 = (&raw ((v_f14).arg_types)[0])[v_j5];
 t10 = CType(t9);
 t11 = t10;
 IR(t11);
 t12 = cast[*u8](" ");
 IR(t12);
-t13 = (&((v_f14).arg_types)[0])[v_j5];
+t13 = (&raw ((v_f14).arg_types)[0])[v_j5];
 CAttribute(t13);
 t14 = v_j5;
 v_j5 = v_j5 + i64(1);
@@ -240,7 +240,7 @@ var t75: *u8 = null;
 v_j6 = 0;
 while (true) {
 if (!((v_j6 < (v_f15).argc))) { break; }
-v_type45 = (&((v_f15).arg_types)[0])[v_j6];
+v_type45 = (&raw ((v_f15).arg_types)[0])[v_j6];
 t0 = cast[*u8]("  %c");
 IR(t0);
 t1 = v_j6;
@@ -338,7 +338,7 @@ if ((v_j6 != i64(0))) {
 t42 = cast[*u8](", ");
 IR(t42);
 }
-v_type45 = (&((v_f15).arg_types)[0])[v_j6];
+v_type45 = (&raw ((v_f15).arg_types)[0])[v_j6];
 t43 = v_type45;
 t44 = CType(t43);
 t45 = t44;
@@ -545,13 +545,13 @@ if ((v_j7 != i64(0))) {
 t8 = cast[*u8](", ");
 IR(t8);
 }
-t9 = (&((v_f16).arg_types)[0])[v_j7];
+t9 = (&raw ((v_f16).arg_types)[0])[v_j7];
 t10 = CType(t9);
 t11 = t10;
 IR(t11);
 t12 = cast[*u8](" ");
 IR(t12);
-t13 = (&((v_f16).arg_types)[0])[v_j7];
+t13 = (&raw ((v_f16).arg_types)[0])[v_j7];
 CAttribute(t13);
 t14 = cast[*u8]("%in");
 IR(t14);
@@ -565,7 +565,7 @@ IR(t17);
 v_j7 = 0;
 while (true) {
 if (!((v_j7 < (v_f16).argc))) { break; }
-v_type46 = (&((v_f16).arg_types)[0])[v_j7];
+v_type46 = (&raw ((v_f16).arg_types)[0])[v_j7];
 if ((v_type46 == 12)) {
 t18 = cast[*u8]("  %wide");
 IR(t18);

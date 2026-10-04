@@ -1452,8 +1452,8 @@ pc = 19;
 continue;
 }
 if (pc == 22) {
-t12 = (&((v_f7).arg_names)[0])[v_j3];
-t13 = (&((v_f7).arg_types)[0])[v_j3];
+t12 = (&raw ((v_f7).arg_names)[0])[v_j3];
+t13 = (&raw ((v_f7).arg_types)[0])[v_j3];
 t14 = i8(0);
 t15 = AddLocal(t12, t13, t14);
 v_parameter = t15;
@@ -1499,7 +1499,7 @@ pc = 28;
 continue;
 }
 if (pc == 30) {
-t17 = &((v_base2).generic_names)[0];
+t17 = &raw ((v_base2).generic_names)[0];
 t18 = v_types2;
 t19 = v_count6;
 BindTypes(t17, t18, t19);
@@ -1517,7 +1517,7 @@ pc = 31;
 continue;
 }
 if (pc == 33) {
-(&((v_f7).generic_args)[0])[v_j3] = (v_types2)[v_j3];
+(&raw ((v_f7).generic_args)[0])[v_j3] = (v_types2)[v_j3];
 pc = 32;
 continue;
 }
@@ -1560,7 +1560,7 @@ pc = 39;
 continue;
 }
 if (pc == 41) {
-v_f7 = &((ctx.v_functions)[v_id]);
+v_f7 = &raw ((ctx.v_functions)[v_id]);
 pc = 40;
 continue;
 }
@@ -1618,7 +1618,7 @@ pc = 50;
 continue;
 }
 if (pc == 52) {
-if (((&(((ctx.v_functions)[v_i9]).generic_args)[0])[v_j3] != (v_types2)[v_j3])) { pc = 53; } else { pc = 51; }
+if (((&raw (((ctx.v_functions)[v_i9]).generic_args)[0])[v_j3] != (v_types2)[v_j3])) { pc = 53; } else { pc = 51; }
 continue;
 }
 if (pc == 53) {
@@ -1672,7 +1672,7 @@ pc = 61;
 continue;
 }
 if (pc == 63) {
-v_base2 = &((ctx.v_functions)[v_template_id]);
+v_base2 = &raw ((ctx.v_functions)[v_template_id]);
 pc = 62;
 continue;
 }
@@ -2730,6 +2730,7 @@ return v_n18;
 t131 = 38;
 t132 = Take(t131);
 if ((t132 != i8(0))) {
+if (Is(cast[*u8]("raw")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
 if (!((ctx.v_unsafe_depth != i64(0)))) {
 t133 = v_t13;
 t134 = cast[*u8]("taking an address requires unsafe");
@@ -3030,7 +3031,7 @@ t262 = At();
 t261 = ((t262).kind == 91);
 }
 if (t261) {
-t263 = &(v_type_args)[0];
+t263 = &raw (v_type_args)[0];
 t264 = TypeArguments(t263);
 v_type_count = t264;
 }
@@ -3344,7 +3345,7 @@ t391 = cast[*u8]("function is private to its package");
 ErrorAt(t390, t391);
 }
 t392 = v_id1;
-t393 = &(v_type_args)[0];
+t393 = &raw (v_type_args)[0];
 t394 = v_type_count;
 t395 = SpecializeFunction(t392, t393, t394);
 v_id1 = t395;
@@ -3358,7 +3359,7 @@ v_k3 = 0;
 while (true) {
 if (!((v_k3 < v_count8))) { break; }
 t398 = v_arg1;
-t399 = (&(((ctx.v_functions)[v_id1]).arg_types)[0])[v_k3];
+t399 = (&raw (((ctx.v_functions)[v_id1]).arg_types)[0])[v_k3];
 Coerce(t398, t399);
 t400 = v_arg1;
 Transfer(t400);
@@ -4791,15 +4792,15 @@ t7 = cast[*u8]("function argument limit exceeded");
 Error(t7);
 }
 t8 = Ident();
-(&((v_f8).arg_names)[0])[(v_f8).argc] = t8;
+(&raw ((v_f8).arg_names)[0])[(v_f8).argc] = t8;
 t9 = 58;
 t10 = cast[*u8]("expected ':' after parameter");
 Need(t9, t10);
 t11 = ParseType();
-(&((v_f8).arg_types)[0])[(v_f8).argc] = t11;
-t12 = (&((v_f8).arg_types)[0])[(v_f8).argc];
+(&raw ((v_f8).arg_types)[0])[(v_f8).argc] = t11;
+t12 = (&raw ((v_f8).arg_types)[0])[(v_f8).argc];
 ValidateBorrowedElements(t12);
-if (!(((&((v_f8).arg_types)[0])[(v_f8).argc] != i64(0)))) {
+if (!(((&raw ((v_f8).arg_types)[0])[(v_f8).argc] != i64(0)))) {
 t13 = cast[*u8]("parameter cannot be void");
 Error(t13);
 }
@@ -4844,7 +4845,7 @@ v_i10 = 0;
 while (true) {
 if (!((v_i10 < (v_f8).argc))) { break; }
 t32 = v_name16;
-t33 = (&((v_f8).arg_names)[0])[v_i10];
+t33 = (&raw ((v_f8).arg_names)[0])[v_i10];
 t34 = Eq(t32, t33);
 if ((t34 != i8(0))) {
 break;
@@ -4860,7 +4861,7 @@ t37 = (v_f8).result;
 t38 = Borrowed(t37);
 t39 = (i64(t38) != i64(0));
 if (t39) {
-t40 = (&((v_f8).arg_types)[0])[v_i10];
+t40 = (&raw ((v_f8).arg_types)[0])[v_i10];
 t41 = Borrowed(t40);
 t39 = !((t41 != i8(0)));
 }
@@ -5180,8 +5181,8 @@ pc = 13;
 continue;
 }
 if (pc == 16) {
-t12 = (&((v_f9).arg_names)[0])[v_j4];
-t13 = (&((v_f9).arg_types)[0])[v_j4];
+t12 = (&raw ((v_f9).arg_names)[0])[v_j4];
+t13 = (&raw ((v_f9).arg_types)[0])[v_j4];
 t14 = i8(0);
 t15 = AddLocal(t12, t13, t14);
 v_parameter1 = t15;
@@ -5226,12 +5227,12 @@ pc = 2;
 continue;
 }
 if (pc == 24) {
-v_f9 = &((ctx.v_functions)[ctx.v_current_fun]);
+v_f9 = &raw ((ctx.v_functions)[ctx.v_current_fun]);
 pc = 22;
 continue;
 }
 if (pc == 25) {
-ctx.v_current_fun = (&(v_parsed)[0])[v_i11];
+ctx.v_current_fun = (&raw (v_parsed)[0])[v_i11];
 pc = 24;
 continue;
 }
@@ -5486,7 +5487,7 @@ pc = 70;
 continue;
 }
 if (pc == 72) {
-if (((&((v_f9).arg_types)[0])[v_j4] == 3)) { pc = 73; } else { pc = 71; }
+if (((&raw ((v_f9).arg_types)[0])[v_j4] == 3)) { pc = 73; } else { pc = 71; }
 continue;
 }
 if (pc == 73) {
@@ -5521,7 +5522,7 @@ pc = 77;
 continue;
 }
 if (pc == 79) {
-t51 = (&((v_f9).arg_types)[0])[v_j4];
+t51 = (&raw ((v_f9).arg_types)[0])[v_j4];
 t52 = Aggregate(t51);
 if ((t52 != i8(0))) { pc = 80; } else { pc = 78; }
 continue;
@@ -5589,7 +5590,7 @@ pc = 87;
 continue;
 }
 if (pc == 89) {
-if (((&(((ctx.v_functions)[v_k4]).arg_types)[0])[v_j4] != (&((v_f9).arg_types)[0])[v_j4])) { pc = 90; } else { pc = 88; }
+if (((&raw (((ctx.v_functions)[v_k4]).arg_types)[0])[v_j4] != (&raw ((v_f9).arg_types)[0])[v_j4])) { pc = 90; } else { pc = 88; }
 continue;
 }
 if (pc == 90) {
@@ -5724,7 +5725,7 @@ pc = 100;
 continue;
 }
 if (pc == 102) {
-if (((&((v_old).arg_types)[0])[v_j4] != (&((v_f9).arg_types)[0])[v_j4])) { pc = 103; } else { pc = 101; }
+if (((&raw ((v_old).arg_types)[0])[v_j4] != (&raw ((v_f9).arg_types)[0])[v_j4])) { pc = 103; } else { pc = 101; }
 continue;
 }
 if (pc == 103) {
@@ -5804,7 +5805,7 @@ pc = 107;
 continue;
 }
 if (pc == 114) {
-t106 = &((v_f9).generic_names)[0];
+t106 = &raw ((v_f9).generic_names)[0];
 t107 = GenericNames(t106);
 (v_f9).generic_count = t107;
 pc = 113;
@@ -5893,14 +5894,14 @@ pc = 126;
 continue;
 }
 if (pc == 128) {
-v_f9 = &((ctx.v_functions)[v_id2]);
+v_f9 = &raw ((ctx.v_functions)[v_id2]);
 pc = 127;
 continue;
 }
 if (pc == 129) {
 t114 = v_count10;
 v_count10 = v_count10 + i64(1);
-(&(v_parsed)[0])[t114] = v_id2;
+(&raw (v_parsed)[0])[t114] = v_id2;
 pc = 128;
 continue;
 }
@@ -5910,7 +5911,7 @@ continue;
 }
 if (pc == 131) {
 t115 = cast[*u8](v_old);
-t116 = cast[*u8](&((ctx.v_functions)[v_id2]));
+t116 = cast[*u8](&raw ((ctx.v_functions)[v_id2]));
 t117 = i64(sizeof(Function));
 t118 = MemCpy(t115, t116, t117);
 pc = 129;
@@ -5934,7 +5935,7 @@ pc = 133;
 continue;
 }
 if (pc == 135) {
-if (((&(v_parsed)[0])[v_j4] == v_id2)) { pc = 136; } else { pc = 134; }
+if (((&raw (v_parsed)[0])[v_j4] == v_id2)) { pc = 136; } else { pc = 134; }
 continue;
 }
 if (pc == 136) {

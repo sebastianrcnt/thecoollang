@@ -31,7 +31,7 @@ v_l5 = (v_l5).next;
 }
 }
 if (!((v_keep != i8(0)))) {
-t3 = i64(cast[i64](&((ctx.v_repl_values)[(v_d8).slot])));
+t3 = i64(cast[i64](&raw ((ctx.v_repl_values)[(v_d8).slot])));
 t4 = (v_d8).type;
 DropValue(t3, t4);
 }
@@ -189,7 +189,7 @@ v_frame4 = ctx.v_active_frame;
 v_d9 = ((v_frame4).function).drops;
 while (true) {
 if (!((v_d9 != null))) { break; }
-t0 = i64(cast[i64](&(((v_frame4).values)[(v_d9).slot])));
+t0 = i64(cast[i64](&raw (((v_frame4).values)[(v_d9).slot])));
 t1 = (v_d9).type;
 DropValue(t0, t1);
 v_d9 = (v_d9).next;
@@ -362,7 +362,7 @@ ParseProgram();
 return;
 }
 ctx.v_current_fun = 0;
-v_f19 = &((ctx.v_functions)[0]);
+v_f19 = &raw ((ctx.v_functions)[0]);
 ctx.v_locals = ctx.v_repl_locals;
 ctx.v_depth = 0;
 ctx.v_loop_depth = 0;
@@ -569,7 +569,7 @@ pc = 3;
 continue;
 }
 if (pc == 5) {
-t0 = i64(cast[i64](&((ctx.v_repl_values)[(v_d10).slot])));
+t0 = i64(cast[i64](&raw ((ctx.v_repl_values)[(v_d10).slot])));
 t1 = (v_d10).type;
 DropValue(t0, t1);
 pc = 4;

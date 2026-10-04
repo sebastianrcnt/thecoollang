@@ -4,7 +4,7 @@ var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_bits: i64 = arg_v_bits;
 var v_n: NumberBits = NumberBits{};
 (v_n).bits = v_bits;
-return *(cast[*f64](&(v_n).bits));
+return *(cast[*f64](&raw (v_n).bits));
 }
 return f64(0);
 }
@@ -15,7 +15,7 @@ unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_value: f64 = arg_v_value;
 var v_n1: NumberBits = NumberBits{};
-*(cast[*f64](&(v_n1).bits)) = v_value;
+*(cast[*f64](&raw (v_n1).bits)) = v_value;
 return (v_n1).bits;
 }
 return i64(0);
@@ -166,14 +166,14 @@ if (!((v_v != u64(0)))) { break; }
 t2 = false;
 t3 = v_i;
 v_i = v_i + i64(1);
-(&(v_digits)[0])[t3] = u8((u64(48) + (v_v % u64(10))));
+(&raw (v_digits)[0])[t3] = u8((u64(48) + (v_v % u64(10))));
 v_v = v_v / u64(10);
 }
 while (true) {
 if (!((v_i != i64(0)))) { break; }
 t4 = v_t3;
 v_i = v_i - i64(1);
-t5 = i64((&(v_digits)[0])[v_i]);
+t5 = i64((&raw (v_digits)[0])[v_i]);
 Char(t4, t5);
 }
 }
@@ -248,7 +248,7 @@ return i8(0);
 fn At() -> *Token {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-return &((ctx.v_tokens)[ctx.v_pos]);
+return &raw ((ctx.v_tokens)[ctx.v_pos]);
 }
 return null;
 }
@@ -783,7 +783,7 @@ fn Shape(arg_v_type7: i64) -> *AggregateType {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_type7: i64 = arg_v_type7;
-return &((ctx.v_aggregate_types)[(v_type7 - 1000)]);
+return &raw ((ctx.v_aggregate_types)[(v_type7 - 1000)]);
 }
 return null;
 }

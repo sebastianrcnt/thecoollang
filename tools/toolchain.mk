@@ -117,3 +117,8 @@ collection-fuzz-test: build/cool-compiler build/language-runtime.o build/languag
 collection-sanitize-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_collection_fuzz.py --sanitize
 test: collection-fuzz-test
+
+.PHONY: raw-address-test
+raw-address-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_raw_address.py
+test: raw-address-test

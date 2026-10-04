@@ -171,8 +171,8 @@ ctx.v_type_bindings = null;
 if (((v_a3).origin != i64(0))) {
 t10 = (v_a3).origin;
 t11 = Shape(t10);
-t12 = &((t11).generic_names)[0];
-t13 = &((v_a3).generic_args)[0];
+t12 = &raw ((t11).generic_names)[0];
+t13 = &raw ((v_a3).generic_args)[0];
 t14 = (v_a3).origin;
 t15 = Shape(t14);
 t16 = (t15).generic_count;
@@ -387,7 +387,7 @@ ErrorAt(t0, t1);
 t2 = ctx.v_naggregates;
 ctx.v_naggregates = ctx.v_naggregates + i64(1);
 v_type18 = (1000 + t2);
-t3 = cast[*u8](&((ctx.v_aggregate_types)[(v_type18 - 1000)]));
+t3 = cast[*u8](&raw ((ctx.v_aggregate_types)[(v_type18 - 1000)]));
 t4 = 0;
 t5 = i64(sizeof(AggregateType));
 t6 = MemSet(t3, t4, t5);
@@ -701,7 +701,7 @@ pc = 4;
 continue;
 }
 if (pc == 6) {
-(&((v_a4).generic_args)[0])[v_j1] = (&(v_args)[0])[v_j1];
+(&raw ((v_a4).generic_args)[0])[v_j1] = (&raw (v_args)[0])[v_j1];
 pc = 5;
 continue;
 }
@@ -775,7 +775,7 @@ pc = 18;
 continue;
 }
 if (pc == 20) {
-if (((&(((ctx.v_aggregate_types)[v_i6]).generic_args)[0])[v_j1] != (&(v_args)[0])[v_j1])) { pc = 21; } else { pc = 19; }
+if (((&raw (((ctx.v_aggregate_types)[v_i6]).generic_args)[0])[v_j1] != (&raw (v_args)[0])[v_j1])) { pc = 21; } else { pc = 19; }
 continue;
 }
 if (pc == 21) {
@@ -803,7 +803,7 @@ pc = 23;
 continue;
 }
 if (pc == 26) {
-t13 = &(v_args)[0];
+t13 = &raw (v_args)[0];
 t14 = TypeArguments(t13);
 v_count5 = t14;
 pc = 24;
@@ -1349,7 +1349,7 @@ t63 = v_type25;
 t64 = Shape(t63);
 t65 = v_type25;
 t66 = Shape(t65);
-t67 = &((t66).generic_names)[0];
+t67 = &raw ((t66).generic_names)[0];
 t68 = GenericNames(t67);
 (t64).generic_count = t68;
 t69 = 123;
@@ -1520,7 +1520,7 @@ t22 = 44;
 Char(t21, t22);
 }
 t23 = v_text1;
-t24 = (&((v_a5).generic_args)[0])[v_i7];
+t24 = (&raw ((v_a5).generic_args)[0])[v_i7];
 AppendType(t23, t24);
 t25 = v_i7;
 v_i7 = v_i7 + i64(1);
@@ -1542,7 +1542,7 @@ t31 = 44;
 Char(t30, t31);
 }
 t32 = v_text1;
-t33 = (&((v_a5).generic_names)[0])[v_i7];
+t33 = (&raw ((v_a5).generic_names)[0])[v_i7];
 Append(t32, t33);
 t34 = v_i7;
 v_i7 = v_i7 + i64(1);

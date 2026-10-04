@@ -317,7 +317,7 @@ v_prev = 0;
 v_parens1 = 0;
 v_brackets = 0;
 t0 = v_path3;
-t1 = &(v_size2);
+t1 = &raw (v_size2);
 t2 = null;
 t3 = FileRead(t0, t1, t2);
 v_source7 = t3;
@@ -334,7 +334,7 @@ ctx.v_formatted = t7;
 v_i30 = 0;
 while (true) {
 if (!((v_i30 < v_count12))) { break; }
-v_t17 = &((ctx.v_tokens)[v_i30]);
+v_t17 = &raw ((ctx.v_tokens)[v_i30]);
 v_kind8 = (v_t17).kind;
 t8 = v_source7;
 t9 = v_last1;
@@ -563,8 +563,8 @@ Error(t88);
 v_j9 = 0;
 while (true) {
 if (!((v_j9 < v_count12))) { break; }
-v_a17 = &((ctx.v_tokens)[v_j9]);
-v_b11 = &((ctx.v_tokens)[(v_second + v_j9)]);
+v_a17 = &raw ((ctx.v_tokens)[v_j9]);
+v_b11 = &raw ((ctx.v_tokens)[(v_second + v_j9)]);
 t89 = ((v_a17).kind != (v_b11).kind);
 if (!t89) {
 t90 = (v_a17).raw;

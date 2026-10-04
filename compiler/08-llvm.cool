@@ -2816,14 +2816,14 @@ pc = 25;
 continue;
 }
 if (pc == 27) {
-t21 = (&((v_f17).arg_types)[0])[v_j8];
+t21 = (&raw ((v_f17).arg_types)[0])[v_j8];
 t22 = TypeSlots(t21);
 v_offset2 = v_offset2 + t22;
 pc = 26;
 continue;
 }
 if (pc == 28) {
-t36 = (&((v_f17).arg_types)[0])[v_j8];
+t36 = (&raw ((v_f17).arg_types)[0])[v_j8];
 t37 = Aggregate(t36);
 if ((t37 != i8(0))) { pc = 29; } else { pc = 35; }
 continue;
@@ -2833,7 +2833,7 @@ t23 = v_offset2;
 t24 = SlotAddress(t23);
 t25 = t24;
 t26 = v_parameter2;
-t27 = (&((v_f17).arg_types)[0])[v_j8];
+t27 = (&raw ((v_f17).arg_types)[0])[v_j8];
 EmitCopy(t25, t26, t27);
 pc = 27;
 continue;
@@ -2870,7 +2870,7 @@ continue;
 }
 if (pc == 35) {
 t33 = v_parameter2;
-t34 = (&((v_f17).arg_types)[0])[v_j8];
+t34 = (&raw ((v_f17).arg_types)[0])[v_j8];
 t35 = LocalWrite(t33, t34);
 v_parameter2 = t35;
 pc = 34;
@@ -3110,7 +3110,7 @@ pc = 2;
 continue;
 }
 if (pc == 77) {
-v_f17 = &((ctx.v_functions)[v_i20]);
+v_f17 = &raw ((ctx.v_functions)[v_i20]);
 pc = 75;
 continue;
 }
@@ -3179,7 +3179,7 @@ pc = 85;
 continue;
 }
 if (pc == 90) {
-v_f17 = &((ctx.v_functions)[v_i20]);
+v_f17 = &raw ((ctx.v_functions)[v_i20]);
 pc = 83;
 continue;
 }

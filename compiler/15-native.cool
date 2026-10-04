@@ -13,7 +13,7 @@ var t5: i64 = i64(0);
 var t6: *u8 = null;
 var t7: *u8 = null;
 t0 = v_file1;
-t1 = &(v_size3);
+t1 = &raw (v_size3);
 t2 = null;
 t3 = FileRead(t0, t1, t2);
 v_src2 = t3;
@@ -63,7 +63,7 @@ var t19: i64 = i64(0);
 var t20: *u8 = null;
 v_i31 = 0;
 t0 = v_file2;
-t1 = &(v_size4);
+t1 = &raw (v_size4);
 t2 = null;
 t3 = FileRead(t0, t1, t2);
 v_data = t3;
@@ -668,7 +668,7 @@ continue;
 }
 if (pc == 29) {
 t44 = v_call3;
-t45 = &(v_values2)[0];
+t45 = &raw (v_values2)[0];
 t46 = 0;
 t47 = Invoke(t44, t45, t46);
 pc = 28;
@@ -786,7 +786,7 @@ continue;
 }
 if (pc == 50) {
 t82 = v_line1;
-t83 = (&(((ctx.v_functions)[v_si]).arg_types)[0])[v_sj];
+t83 = (&raw (((ctx.v_functions)[v_si]).arg_types)[0])[v_sj];
 Number(t82, t83);
 pc = 49;
 continue;
@@ -800,7 +800,7 @@ continue;
 }
 if (pc == 52) {
 t86 = v_line1;
-t87 = (&(((ctx.v_functions)[v_si]).arg_names)[0])[v_sj];
+t87 = (&raw (((ctx.v_functions)[v_si]).arg_names)[0])[v_sj];
 Append(t86, t87);
 pc = 51;
 continue;
@@ -956,7 +956,7 @@ continue;
 }
 if (pc == 78) {
 t118 = v_line1;
-t119 = (&(((ctx.v_functions)[v_si]).generic_names)[0])[v_sj];
+t119 = (&raw (((ctx.v_functions)[v_si]).generic_names)[0])[v_sj];
 Append(t118, t119);
 pc = 77;
 continue;
@@ -1311,7 +1311,7 @@ if ((((ctx.v_tokens)[v_at4]).kind != 258)) { pc = 136; } else { pc = 134; }
 continue;
 }
 if (pc == 136) {
-t182 = &((ctx.v_tokens)[v_at4]);
+t182 = &raw ((ctx.v_tokens)[v_at4]);
 t183 = cast[*u8]("expected import path string");
 ErrorAt(t182, t183);
 pc = 134;

@@ -115,6 +115,7 @@ Node *Atom() {
         return n;
     }
     if (Take('&')) {
+        if (Is("raw")) pos++;
         if (!unsafe_depth) ErrorAt(t, "taking an address requires unsafe");
         n = NewNode(N_LOCAL_ADDRESS, t); n->a = Primary();
         if (!n->a->mutable) ErrorAt(t, "cannot take a mutable address of let binding or parameter");

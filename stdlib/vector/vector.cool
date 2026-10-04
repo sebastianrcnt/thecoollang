@@ -25,7 +25,7 @@ pub fn append[T](vector: * Vector[T], value: T) {
         let index = ( * vector).count % 32;
         if (index == 0) {
             let chunk = new[Chunk[T]]();
-            let pointer = & * chunk;
+            let pointer = &raw * chunk;
             ( * pointer).previous = ( * vector).tail;
             if (( * vector).count == 0) {
                 ( * vector).head = move chunk;
@@ -41,13 +41,13 @@ pub fn append[T](vector: * Vector[T], value: T) {
 pub fn at[T](vector: * Vector[T], index: usize) -> * T {
     unsafe {
         assert(index < ( * vector).count);
-        var chunk = & * ( * vector).head;
+        var chunk = &raw * ( * vector).head;
         var block = index / 32;
         while (block > 0) {
-            chunk = & * ( * chunk).next;
+            chunk = &raw * ( * chunk).next;
             block = block - 1;
         }
-        return & ( * chunk).values[index % 32];
+        return &raw ( * chunk).values[index % 32];
     }
 }
 pub fn pop[T](vector: * Vector[T]) -> option.Option[T] {
@@ -88,7 +88,7 @@ pub fn cursor[T](vector: * Vector[T]) -> Cursor[T] {
     unsafe {
         var first: * Chunk[T] = null;
         if (( * vector).count > 0) {
-            first = & * ( * vector).head;
+            first = &raw * ( * vector).head;
         }
         return Cursor[T] {
             chunk: first, index: 0, remaining: ( * vector).count
@@ -100,11 +100,11 @@ pub fn next[T](cursor: * Cursor[T]) -> * T {
         if (( * cursor).remaining == 0) {
             return null;
         }
-        let value = & ( * ( * cursor).chunk).values[( * cursor).index];
+        let value = &raw ( * ( * cursor).chunk).values[( * cursor).index];
         ( * cursor).index = ( * cursor).index + 1;
         ( * cursor).remaining = ( * cursor).remaining - 1;
         if (( * cursor).index == 32 && ( * cursor).remaining > 0) {
-            ( * cursor).chunk = & * ( * ( * cursor).chunk).next;
+            ( * cursor).chunk = &raw * ( * ( * cursor).chunk).next;
             ( * cursor).index = 0;
         }
         return value;

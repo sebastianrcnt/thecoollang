@@ -79,7 +79,7 @@ while (true) {
 if (!((v_pc < (v_f11).code_count))) { break; }
 t0 = v_pc;
 v_pc = v_pc + i64(1);
-v_ins = &((cast[*Instruction]((v_f11).bytecode))[t0]);
+v_ins = &raw ((cast[*Instruction]((v_f11).bytecode))[t0]);
 if (((v_ins).op == 9)) {
 return (v_values)[(v_ins).a];
 }
@@ -120,7 +120,7 @@ fn CodeAt(arg_v_index2: i64) -> *Instruction {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_index2: i64 = arg_v_index2;
-return &((cast[*Instruction]((ctx.v_bc_fun).bytecode))[v_index2]);
+return &raw ((cast[*Instruction]((ctx.v_bc_fun).bytecode))[v_index2]);
 }
 return null;
 }
@@ -1311,33 +1311,33 @@ if (((v_ins2).op == 2)) {
 return v_a16;
 }
 if (((v_ins2).op == 13)) {
-t0 = i64(cast[i64](&((v_values1)[(v_ins2).a])));
+t0 = i64(cast[i64](&raw ((v_values1)[(v_ins2).a])));
 t1 = (v_n41).type;
-t2 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+t2 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t3 = ValueRead(t0, t1, t2);
 return t3;
 }
 if (((v_ins2).op == 15)) {
-return i64(cast[i64](&((v_values1)[(v_ins2).a])));
+return i64(cast[i64](&raw ((v_values1)[(v_ins2).a])));
 }
 if (((v_ins2).op == 14)) {
 t4 = (v_n41).type;
 t5 = Aggregate(t4);
 if ((t5 != i8(0))) {
-t6 = i64(cast[i64](&((v_values1)[(v_n41).slot])));
+t6 = i64(cast[i64](&raw ((v_values1)[(v_n41).slot])));
 t7 = (v_n41).type;
 t8 = v_a16;
 ValueWrite(t6, t7, t8);
 return (v_values1)[(v_n41).slot];
 }
-t9 = i64(cast[i64](&(v_result5)));
+t9 = i64(cast[i64](&raw (v_result5)));
 t10 = (v_n41).type;
 t11 = v_a16;
 NativeMemoryWrite(t9, t10, t11);
 return v_result5;
 }
 if (((v_ins2).op == 23)) {
-t12 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+t12 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t13 = v_a16;
 t14 = (v_n41).type;
 t15 = MoveValue(t12, t13, t14);
@@ -1367,7 +1367,7 @@ DropValue(t21, t22);
 return 0;
 }
 if (((v_ins2).op == 22)) {
-v_result5 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+v_result5 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t23 = v_result5;
 t24 = (v_n41).type;
 DropValue(t23, t24);
@@ -1392,7 +1392,7 @@ ValueWrite(t32, t35, t36);
 return v_result5;
 }
 if (((v_ins2).op == 16)) {
-v_result5 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+v_result5 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t37 = v_result5;
 t38 = (v_n41).type;
 DropValue(t37, t38);
@@ -1433,7 +1433,7 @@ t55 = v_n41;
 t56 = v_a16;
 t57 = v_b10;
 t58 = v_result5;
-t59 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+t59 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t60 = MakeSlice(t55, t56, t57, t58, t59);
 return t60;
 }
@@ -1460,7 +1460,7 @@ v_i22 = v_i22 + i64(1);
 }
 t68 = v_n41;
 t69 = v_args10;
-t70 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+t70 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t71 = Invoke(t68, t69, t70);
 v_result5 = t71;
 t72 = cast[*u8](v_args10);
@@ -1489,7 +1489,7 @@ ErrorAt(t76, t77);
 if (((v_ins2).op == 11)) {
 t78 = v_a16;
 t79 = (v_n41).type;
-t80 = i64(cast[i64](&((v_values1)[(v_n41).storage])));
+t80 = i64(cast[i64](&raw ((v_values1)[(v_n41).storage])));
 t81 = ValueRead(t78, t79, t80);
 return t81;
 }

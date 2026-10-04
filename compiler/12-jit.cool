@@ -249,7 +249,7 @@ Word(t7);
 v_i25 = 0;
 while (true) {
 if (!((v_i25 < (v_f18).code_count))) { break; }
-v_ins3 = &((cast[*Instruction]((v_f18).bytecode))[v_i25]);
+v_ins3 = &raw ((cast[*Instruction]((v_f18).bytecode))[v_i25]);
 (v_offsets)[v_i25] = (ctx.v_machine).len;
 if (((v_ins3).op == 1)) {
 t8 = 0;
@@ -451,7 +451,7 @@ v_i25 = v_i25 + i64(1);
 v_i25 = 0;
 while (true) {
 if (!((v_i25 < (v_f18).code_count))) { break; }
-v_ins3 = &((cast[*Instruction]((v_f18).bytecode))[v_i25]);
+v_ins3 = &raw ((cast[*Instruction]((v_f18).bytecode))[v_i25]);
 t65 = ((v_ins3).op == 7);
 if (!t65) {
 t65 = ((v_ins3).op == 8);

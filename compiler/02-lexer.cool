@@ -651,7 +651,7 @@ t50 = (v_t8).start;
 t51 = v_i2;
 t52 = Slice(t49, t50, t51);
 t53 = t52;
-t54 = &(v_ok);
+t54 = &raw (v_ok);
 t55 = NativeParseFloat(t53, t54);
 (v_t8).val = t55;
 pc = 73;
@@ -1024,7 +1024,7 @@ continue;
 if (pc == 139) {
 t110 = ctx.v_ntok;
 ctx.v_ntok = ctx.v_ntok + i64(1);
-v_t8 = &((ctx.v_tokens)[t110]);
+v_t8 = &raw ((ctx.v_tokens)[t110]);
 pc = 138;
 continue;
 }
@@ -1065,7 +1065,7 @@ if (!(((v_src)[v_i2] != u8(0)))) { pc = 150; } else { pc = 145; }
 continue;
 }
 if (pc == 147) {
-t112 = &((ctx.v_tokens)[ctx.v_ntok]);
+t112 = &raw ((ctx.v_tokens)[ctx.v_ntok]);
 t113 = cast[*u8]("unterminated comment");
 ErrorAt(t112, t113);
 pc = 145;

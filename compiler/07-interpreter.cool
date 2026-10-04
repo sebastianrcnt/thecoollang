@@ -159,14 +159,14 @@ if (((v_n22).kind == 2)) {
 return i64(cast[i64]((v_n22).name));
 }
 if (((v_n22).kind == 3)) {
-t0 = i64(cast[i64](&(((v_frame).values)[(v_n22).slot])));
+t0 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).slot])));
 t1 = (v_n22).type;
-t2 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t2 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t3 = ValueRead(t0, t1, t2);
 return t3;
 }
 if (((v_n22).kind == 22)) {
-return i64(cast[i64](&(((v_frame).values)[(v_n22).slot])));
+return i64(cast[i64](&raw (((v_frame).values)[(v_n22).slot])));
 }
 if (((v_n22).kind == 4)) {
 t4 = v_n22;
@@ -175,7 +175,7 @@ t6 = Arguments(t4, t5);
 v_args1 = t6;
 t7 = v_n22;
 t8 = v_args1;
-t9 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t9 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t10 = Invoke(t7, t8, t9);
 v_result1 = t10;
 t11 = cast[*u8](v_args1);
@@ -187,7 +187,7 @@ t12 = (v_n22).a;
 t13 = v_frame;
 t14 = Eval(t12, t13);
 v_a7 = t14;
-t15 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t15 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t16 = v_a7;
 t17 = (v_n22).type;
 t18 = MoveValue(t15, t16, t17);
@@ -214,7 +214,7 @@ t25 = v_frame;
 t26 = Eval(t24, t25);
 v_a7 = t26;
 }
-v_result1 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+v_result1 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t27 = v_result1;
 t28 = (v_n22).type;
 DropValue(t27, t28);
@@ -239,7 +239,7 @@ ValueWrite(t36, t39, t40);
 return v_result1;
 }
 if (((v_n22).kind == 23)) {
-v_result1 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+v_result1 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t41 = v_result1;
 t42 = (v_n22).type;
 DropValue(t41, t42);
@@ -307,7 +307,7 @@ t80 = v_n22;
 t81 = v_a7;
 t82 = v_b3;
 t83 = v_result1;
-t84 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t84 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t85 = MakeSlice(t80, t81, t82, t83, t84);
 return t85;
 }
@@ -353,7 +353,7 @@ ErrorAt(t104, t105);
 }
 t106 = v_a7;
 t107 = (v_n22).type;
-t108 = i64(cast[i64](&(((v_frame).values)[(v_n22).storage])));
+t108 = i64(cast[i64](&raw (((v_frame).values)[(v_n22).storage])));
 t109 = ValueRead(t106, t107, t108);
 return t109;
 }
@@ -561,7 +561,7 @@ t25 = v_value2;
 ValueWrite(t23, t24, t25);
 break; } }
 if (t0 == 7 || t0 == 8) { while (true) {
-t26 = i64(cast[i64](&(((v_frame1).values)[(v_n23).slot])));
+t26 = i64(cast[i64](&raw (((v_frame1).values)[(v_n23).slot])));
 t27 = (v_n23).type;
 t28 = (v_n23).a;
 t29 = v_frame1;
@@ -705,14 +705,14 @@ if (!((v_value3 != u64(0)))) { break; }
 t0 = false;
 t1 = v_i12;
 v_i12 = v_i12 + i64(1);
-(&(v_digits1)[0])[t1] = u8((u64(48) + (v_value3 % u64(10))));
+(&raw (v_digits1)[0])[t1] = u8((u64(48) + (v_value3 % u64(10))));
 v_value3 = v_value3 / u64(10);
 }
 while (true) {
 if (!((v_i12 != i64(0)))) { break; }
 t2 = v_text2;
 v_i12 = v_i12 - i64(1);
-t3 = i64((&(v_digits1)[0])[v_i12]);
+t3 = i64((&raw (v_digits1)[0])[v_i12]);
 Char(t2, t3);
 }
 }
@@ -761,7 +761,7 @@ return t7;
 t8 = v_value4;
 t9 = v_from;
 t10 = v_to;
-t11 = &(v_ok1);
+t11 = &raw (v_ok1);
 t12 = NativeNumericCast(t8, t9, t10, t11);
 v_result2 = t12;
 if (!((v_ok1 != i64(0)))) {
@@ -1586,14 +1586,14 @@ ErrorAt(t33, t34);
 }
 return 0;
 }
-v_f13 = &((ctx.v_functions)[(v_n28).slot]);
+v_f13 = &raw ((ctx.v_functions)[(v_n28).slot]);
 if (((v_f13).foreign != i64(0))) {
 t35 = (v_f13).name;
 t36 = (v_f13).result;
-t37 = &((v_f13).arg_types)[0];
+t37 = &raw ((v_f13).arg_types)[0];
 t38 = v_args2;
 t39 = (v_f13).argc;
-t40 = &(v_ok2);
+t40 = &raw (v_ok2);
 t41 = NativeForeignCall(t35, t36, t37, t38, t39, t40);
 v_result4 = t41;
 if (!((v_ok2 != i64(0)))) {
@@ -1609,7 +1609,7 @@ t44 = (v_n28).token;
 t45 = cast[*u8]("call depth limit exceeded");
 ErrorAt(t44, t45);
 }
-v_f13 = &((ctx.v_functions)[(v_n28).slot]);
+v_f13 = &raw ((ctx.v_functions)[(v_n28).slot]);
 t46 = i64(sizeof(Frame));
 t47 = CAlloc(t46);
 v_frame2 = cast[*Frame](t47);
@@ -1628,11 +1628,11 @@ t51 = CAlloc(t50);
 v_i14 = 0;
 while (true) {
 if (!((v_i14 < (v_f13).argc))) { break; }
-t52 = i64(cast[i64](&(((v_frame2).values)[v_offset])));
-t53 = (&((v_f13).arg_types)[0])[v_i14];
+t52 = i64(cast[i64](&raw (((v_frame2).values)[v_offset])));
+t53 = (&raw ((v_f13).arg_types)[0])[v_i14];
 t54 = (v_args2)[v_i14];
 ValueWrite(t52, t53, t54);
-t55 = (&((v_f13).arg_types)[0])[v_i14];
+t55 = (&raw ((v_f13).arg_types)[0])[v_i14];
 t56 = TypeSlots(t55);
 v_offset = v_offset + t56;
 t57 = v_i14;
@@ -1789,7 +1789,7 @@ t11 = NewNode(t9, t10);
 v_call1 = t11;
 (v_call1).slot = v_id3;
 t12 = v_call1;
-t13 = &(v_args4)[0];
+t13 = &raw (v_args4)[0];
 t14 = 0;
 t15 = Invoke(t12, t13, t14);
 return t15;

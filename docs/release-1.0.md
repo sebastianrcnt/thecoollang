@@ -93,6 +93,14 @@ through ordinary evaluation or library use.
   proof of memory safety; G2/G9 remain open. Expand with
   `python3 tools/test_collection_fuzz.py --seeds 1,2,3 --steps 500 --sanitize`.
 
+- Reference preparation: added explicit `&raw place` for unsafe raw-pointer
+  construction in both frontends and migrated compiler and library internals.
+  It retains existing mutability and unsafe checks; it does not establish a
+  loan or lifetime guarantee. `&place` remains a transitional raw-address alias
+  until scoped references land, and must not be documented as a safe reference.
+  Five-engine behavior, formatter preservation, negative cases and exact
+  self-host convergence pass. G2/G4 remain open.
+
 ## Next implementation checkpoints
 
 - Audit mutable loans and stored borrowed values before designing `&T`/`&mut T`
