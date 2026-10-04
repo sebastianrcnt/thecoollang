@@ -59,7 +59,7 @@ U0 ValidateReferenceStorage(I64 type,Token *token){
 }
 U0 ReferenceMatchBinding(Node *binding){
     Local *local;if(!TrackedBorrow(binding->type))return;
-    local=CAlloc(sizeof(Local));local->type=binding->type;local->slot=binding->slot;local->depth=depth;
+    local=AllocateLocal();local->type=binding->type;local->slot=binding->slot;local->depth=depth;
     local->all_next=functions[current_fun].all_locals;functions[current_fun].all_locals=local;binding->local_ref=local;
 }
 ReferenceLoan *ReferenceHolder(ReferenceCheck *check,Local *holder,Local *root){

@@ -454,6 +454,32 @@ through ordinary evaluation or library use.
   require reclamation. G6/G8 remain open and this is not a bounded-total-memory
   claim.
 
+- REPL local metadata: named locals and anonymous match holders now enter an
+  allocation registry independent of lexical chains and function snapshots.
+  After node/move cleanup, a linear mark/sweep retains visible bindings and
+  surviving loans' root/holder/parent identities, reclaims other locals and
+  rebuilds the session's all-locals chain. This also recovers partially
+  constructed locals rejected by the storage limit. Out-of-scope parent
+  identities survive both successful assignments and assignments made before
+  runtime failure; cached function locals and lexical strings stay separate.
+  Both frontends and compiler ASan pass repeated allocation/release, hidden
+  parents, anonymous match holders, incomplete declarations and the existing
+  ownership/loan/package cases. Full regression, both bootstraps and external
+  read-only installation pass. Fixed-point IR SHA256:
+  `b493fb69fb3068e135938839c19cb8d7aa49c9cbe901be512268a589658d8be7`.
+  `tools/bench_repl_memory.py --workload bindings` adds a repeated temporary-local
+  workload, `{var scratch=total;total=scratch+1;}`. Against `f8c2f27`, the same
+  fresh-process three-trial methodology gives median peak RSS 31,965,184 to
+  30,425,088 bytes at 16,000 submissions, and 12,025,856 to 11,829,248 at 2,000.
+  Raw data: `build/release-audit/repl-locals-memory.json`. This differs from the
+  preceding scalar-update workload and is not a direct comparison to its RSS;
+  concurrent regression again prevents an isolated timing claim.
+  G6 remains open. A separate 50,000 scalar-update session still exits with
+  code 70 and no diagnostic/output when the fixed token table is exhausted
+  (`build/release-audit/repl-token-limit-baseline.json`). Reusing/reclaiming
+  tokens while preserving literals, types and cached/generic function source
+  is the next mandatory resource fix; increasing the limit alone is insufficient.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

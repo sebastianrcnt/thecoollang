@@ -698,9 +698,7 @@ Error(t4);
 }
 v_l1 = (v_l1).next;
 }
-t5 = i64(sizeof(Local));
-t6 = CAlloc(t5);
-v_res = cast[*Local](t6);
+v_res = AllocateLocal();
 (v_res).name = v_name5;
 (v_res).type = v_type3;
 (v_res).mutable = i64(v_mutable);

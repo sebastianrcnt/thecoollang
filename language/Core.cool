@@ -152,10 +152,11 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_NEW 28
 #define N_MOVE 29
 #define N_OWN_ADDRESS 30
-class Local { U8 *name; I64 type, slot, mutable, depth, region, moved, loop_level; Local *next, *all_next; U8 *sources; };
+class Local { U8 *name; I64 type, slot, mutable, depth, region, moved, loop_level; Local *next, *all_next, *repl_next; I64 repl_mark; U8 *sources; };
 class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
 class ReplNode { Node value; ReplNode *next; };
 ReplNode *repl_nodes;
+Local *repl_allocated_locals;
 class DropSlot { I64 slot, type; DropSlot *next; };
 class ByteAllocation { ByteAllocation *next; };
 class Function {
@@ -169,6 +170,11 @@ Function *functions;
 I64 nfun;
 Local *locals;
 I64 depth, loop_depth, current_fun, unsafe_depth;
+Local *AllocateLocal() {
+    Local *local=CAlloc(sizeof(Local));
+    if(allow_redefinition && current_fun==0){local->repl_next=repl_allocated_locals;repl_allocated_locals=local;}
+    return local;
+}
 Node *AllocateNode() {
     ReplNode *allocation;
     if(!allow_redefinition || current_fun!=0)return CAlloc(sizeof(Node));
@@ -197,7 +203,7 @@ U0 RegisterDrop(I64 slot, I64 type) { DropSlot *d; if (!Owned(type)) return; d =
 Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
-    res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
+    res = AllocateLocal(); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
     res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; RegisterDrop(res->slot, type); res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }

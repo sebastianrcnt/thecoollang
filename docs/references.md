@@ -536,8 +536,9 @@ parent dependencies cannot be forgotten: forget dependent views first. Unknown
 names and malformed commands leave bindings intact. The removed name can then
 be declared again. Dead storage after the last surviving binding is reused,
 including statement temporaries and failed new bindings. Surviving bindings
-keep stable addresses. Interior holes, tokens and AST/compiler metadata are
-not yet fully reclaimed; the existing register limit still applies to each
+keep stable addresses. Dead session-local metadata is reclaimed, while surviving
+loan roots and parent identities remain live even after their lexical blocks
+end. Interior holes, tokens and function caches are not yet fully reclaimed; the existing register limit still applies to each
 submission and its live storage. Raw pointers remain subject to explicit
 unsafe lifetime obligations and must not access forgotten/reused storage.
 The REPL reserves its internal `__session` function: user code cannot redefine

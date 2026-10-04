@@ -71,6 +71,10 @@ next: *Local;
 
 all_next: *Local;
 
+repl_next: *Local;
+
+repl_mark: i64;
+
 sources: *u8;
 
 }
@@ -495,6 +499,8 @@ v_repl_executing: i8;
 v_repl_moves: *MoveState;
 
 v_repl_nodes: *ReplNode;
+
+v_repl_allocated_locals: *Local;
 
 v_repl_loans: *ReferenceLoan;
 

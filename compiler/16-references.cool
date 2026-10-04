@@ -188,7 +188,7 @@ fn ReferenceMatchBinding(binding: * Node) {
             return;
         }
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-        let local = cast[ * Local](CAlloc(i64(sizeof(Local))));
+        let local = AllocateLocal();
         local.type = binding.type;
         local.slot = binding.slot;
         local.depth = ctx.v_depth;

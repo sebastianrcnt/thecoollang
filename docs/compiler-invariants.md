@@ -72,6 +72,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `20-repl-packages.cool` | Import discovery, immutable package staging and rollback | `ReplPackages.cool` |
 | `21-bytecode-memory.cool` | Compilation-owned argument/scope allocation lists and disposal | `Bytecode.cool` |
 | `22-repl-nodes.cool` | Disposable submission node allocation and cleanup | `Core.cool`, `Repl.cool` |
+| `23-repl-locals.cool` | Session-local allocation registry and loan-rooted reclamation | `Core.cool`, `References.cool`, `Repl.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -349,6 +350,20 @@ freed expression address must never match a later allocation. Generic specializa
 switches `current_fun` before building its body, so cached function nodes do not
 enter this disposable pool. Node cleanup does not free lexical strings, tokens,
 Local metadata or function bodies; those have independent lifetimes.
+
+`AllocateLocal` tracks synthetic-session locals independently of the lexical
+`next` chain and the snapshotted function `all_locals` head. Both named locals
+and anonymous match holders use it, including allocations rejected before
+`AddLocal` publishes a binding. After node and move-state disposal,
+`ReplReclaimLocals` marks visible bindings and every surviving loan's root,
+holder and parent, sweeps other session locals and rebuilds `all_locals` from
+survivors. An out-of-scope parent can remain relevant after a slice assignment,
+including an assignment executed before a runtime error; never infer liveness
+only from name lookup. The independent registry survives snapshot restoration.
+Marking and sweeping are linear in registered locals, visible bindings and loans.
+Non-visible survivors have their obsolete lexical `next` cleared. Cached
+function locals are outside this registry; lexical strings/tokens are not
+owned by Local and must not be freed with it.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

@@ -108,6 +108,24 @@ mem.owner_count()''', '2\n44\n77\n1\n0\n')
     source += 'identity[i64](42)\nidentity[f64](2.5)\nword'
     check(front, 'disposable coerced nodes and persistent specializations', source, '42\n2.5\nstill here\n')
 
+    # A surviving slice may remember an intermediate parent whose lexical
+    # block has ended. Local reclamation must follow loan identities, too.
+    source = 'var a=[1]i64{1};\nvar b=[1]i64{2};\n'
+    source += 'var s=a[:];\n{let parent=b[:];s=parent[:];}\n'
+    source += '{var churn=7;assert(churn==7);}\n' * 512
+    source += 's[0]\nb[0]=9;\n:forget s\nb[0]=5;\nb[0]'
+    check(front, 'out-of-scope parent metadata remains live', source, '2\n5\n', ['conflicts'])
+    source = source.replace('{let parent=b[:];s=parent[:];}', '{let parent=b[:];s=parent[:];assert(false);}')
+    check(front, 'runtime rollback retains new parent identities', source, '2\n5\n', ['assertion failed', 'conflicts'])
+    source = 'var survivor=7;\n' + 'var rejected=[32768]i64{};\n' * 160
+    source += 'let view=&mut survivor;\n*view=9;\n*view\n:forget view\nsurvivor'
+    check(front, 'incomplete local allocation rollback', source, '9\n9\n', ['function storage limit exceeded'] * 160)
+    source = 'enum View{None;Some([]i64); }\nvar a=[1]i64{1};\nvar b=[1]i64{4};\nvar s=a[:];\n'
+    source += 'match(View.Some(b[:])){View.None=>{} View.Some(part)=>{s=part[:];}}\n'
+    source += '{var churn=7;}\n' * 512
+    source += 's[0]\n:forget s\nb[0]=7;\nb[0]'
+    check(front, 'anonymous match holder and surviving roots', source, '4\n7\n')
+
     # The restriction belongs to the REPL implementation, not the language's
     # ordinary identifier namespace.
     with tempfile.TemporaryDirectory(prefix='cool-session-name-') as directory:

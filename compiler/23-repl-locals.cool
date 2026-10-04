@@ -1,0 +1,54 @@
+// Registry linkage is independent of Function snapshots and lexical scopes.
+// Even a local rejected before AddLocal finishes must remain recoverable.
+fn AllocateLocal() -> *Local {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let local = cast[*Local](CAlloc(i64(sizeof(Local))));
+        if (ctx.v_allow_redefinition != i8(0) && ctx.v_current_fun == 0) {
+            local.repl_next = ctx.v_repl_allocated_locals;
+            ctx.v_repl_allocated_locals = local;
+        }
+        return local;
+    }
+}
+fn ReplReclaimLocals() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var local = ctx.v_repl_allocated_locals;
+        while (local != null) { local.repl_mark = 0; local = local.repl_next; }
+        local = ctx.v_repl_locals;
+        while (local != null) { local.repl_mark = 1; local = local.next; }
+        var loan = ctx.v_repl_loans;
+        while (loan != null) {
+            if (loan.root != null) { loan.root.repl_mark = loan.root.repl_mark | 2; }
+            if (loan.holder != null) { loan.holder.repl_mark = loan.holder.repl_mark | 2; }
+            if (loan.parent != null) { loan.parent.repl_mark = loan.parent.repl_mark | 2; }
+            loan = loan.next;
+        }
+        ctx.v_functions[0].all_locals = null;
+        var tail = &raw ctx.v_functions[0].all_locals;
+        var link = &raw ctx.v_repl_allocated_locals;
+        while (*link != null) {
+            local = *link;
+            if (local.repl_mark != 0) {
+                if ((local.repl_mark & 1) == 0) { local.next = null; }
+                *tail = local;
+                tail = &raw local.all_next;
+                link = &raw local.repl_next;
+            } else {
+                *link = local.repl_next;
+                // Session provenance lives in persistent loans. Source edges
+                // are normally absent here; free any records without touching
+                // their already-disposed statement nodes.
+                var edge = cast[*BorrowSource](local.sources);
+                while (edge != null) {
+                    let next = edge.next;
+                    Free(cast[*u8](edge));
+                    edge = next;
+                }
+                Free(cast[*u8](local));
+            }
+        }
+        *tail = null;
+    }
+}

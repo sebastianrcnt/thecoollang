@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure fresh-process REPL peak RSS for identical scalar-update workloads (macOS)."""
+"""Measure fresh-process REPL peak RSS for identical scalar-update or local-binding workloads (macOS)."""
 from pathlib import Path
 import argparse
 import json
@@ -14,15 +14,18 @@ parser.add_argument('--baseline', type=Path, required=True)
 parser.add_argument('--candidate', type=Path, default=Path(__file__).resolve().parents[1] / 'build/cool-compiler')
 parser.add_argument('--counts', type=int, nargs='+', default=[2000, 16000])
 parser.add_argument('--trials', type=int, default=3)
+parser.add_argument('--workload', choices=['updates', 'bindings'], default='updates')
 parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 if platform.system() != 'Darwin':
     parser.error('this measurement uses macOS /usr/bin/time -l byte-valued peak RSS')
-if args.trials < 1 or any(count < 1 or count > 30000 for count in args.counts):
-    parser.error('use positive trials and counts from 1 to 30000 (within the current token limit)')
+limit = 30000 if args.workload == 'updates' else 19000
+if args.trials < 1 or any(count < 1 or count > limit for count in args.counts):
+    parser.error(f'use positive trials and counts from 1 to {limit} (within the current token limit)')
 samples = []
 for count in args.counts:
-    source = 'var total=0;\n' + 'total=total+1;\n' * count + 'total\n:quit\n'
+    submission = 'total=total+1;\n' if args.workload == 'updates' else '{var scratch=total;total=scratch+1;}\n'
+    source = 'var total=0;\n' + submission * count + 'total\n:quit\n'
     for label, compiler in [('baseline', args.baseline), ('candidate', args.candidate)]:
         for trial in range(args.trials):
             start = time.monotonic()
@@ -43,7 +46,7 @@ for count in args.counts:
         medians.append(dict(implementation=label, submissions=count,
                             peak_rss_bytes=statistics.median(sample['peak_rss_bytes'] for sample in selected),
                             wall_seconds=statistics.median(sample['wall_seconds'] for sample in selected)))
-report = dict(platform=platform.platform(), baseline=str(args.baseline.resolve()), candidate=str(args.candidate.resolve()),
+report = dict(platform=platform.platform(), workload=args.workload, baseline=str(args.baseline.resolve()), candidate=str(args.candidate.resolve()),
               method='macOS time -l; fresh process per trial, no warmup; wall time includes launch; record concurrent machine load separately',
               samples=samples, medians=medians)
 text = json.dumps(report, indent=2) + '\n'
