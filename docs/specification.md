@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 1
+# Cool language specification — 1.0 draft 2
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -50,6 +50,85 @@ do not extend these integer separator rules to floating literals.
 `make integer-tokens-test` checks independently computed integer values and
 malformed tokens on both frontends, with tree, bytecode and native-JIT execution
 for valid cases. The broader language suite covers LLVM and numerical behavior.
+
+## Expressions: precedence and sequencing
+
+Binary operators below are ordered from lowest to highest precedence. Operators
+in the same row associate left to right. Parentheses override the grouping.
+Grouping and evaluation order are separate rules: the tree implied by precedence
+is evaluated with the left operand before the right operand.
+
+| Level | Operators | Operand category |
+| --- | --- | --- |
+| 1 | `\|\|` | bool; short circuit |
+| 2 | `&&` | bool; short circuit |
+| 3 | `\|` | integer |
+| 4 | `^` | integer |
+| 5 | `&` | integer |
+| 6 | `==`, `!=` | compatible scalar values; no string or aggregate equality |
+| 7 | `<`, `>`, `<=`, `>=` | numeric |
+| 8 | `<<`, `>>` | integer |
+| 9 | `+`, `-` | numeric; permitted raw pointer arithmetic requires unsafe |
+| 10 | `*`, `/`, `%` | numeric; `%` requires integer operands |
+
+The bitwise-or symbol in row 3 is `|`. Unary `-`, `!`, `~`, dereference `*`,
+borrow `&`/`&mut`, raw address `&raw` and `move` consume a primary expression,
+including its member/index suffixes. They bind more tightly than binary
+operators. `!` requires bool, `~` requires integer and unary `-` requires numeric
+input. There is no unary plus, ternary conditional, comma expression, increment
+operator or assignment expression. Assignment is a statement; `a = b = c` is
+not chained assignment. Comparison chaining is not mathematical notation:
+`a < b < c` groups as `(a < b) < c` and fails for integer `c` because the first
+comparison produces bool. `true == false == false` is valid left association.
+
+The following EBNF describes the binary expression core. `primary` includes the
+prefix, literal, name, call, aggregate and postfix forms described above and in
+the semantic contract map; this production does not yet claim their complete
+grammar. Braces in the EBNF mean repetition, not source-language braces.
+
+```ebnf
+expression     = logical_or ;
+logical_or     = logical_and, { "||", logical_and } ;
+logical_and    = bitwise_or, { "&&", bitwise_or } ;
+bitwise_or     = bitwise_xor, { "|", bitwise_xor } ;
+bitwise_xor    = bitwise_and, { "^", bitwise_and } ;
+bitwise_and    = equality, { "&", equality } ;
+equality       = comparison, { ("==" | "!="), comparison } ;
+comparison     = shift, { ("<" | ">" | "<=" | ">="), shift } ;
+shift          = additive, { ("<<" | ">>"), additive } ;
+additive       = multiplicative, { ("+" | "-"), multiplicative } ;
+multiplicative = primary, { ("*" | "/" | "%"), primary } ;
+```
+
+Evaluation obeys these rules, including optimized LLVM builds:
+
+- A binary expression evaluates its left operand first. `&&` skips the right
+  operand when the left is false; `||` skips it when the left is true. All other
+  binary operators evaluate both operands. Both sides must type-check even when
+  runtime evaluation skips one side.
+- Function arguments evaluate left to right. A method receiver evaluates once,
+  before its explicit arguments.
+- Aggregate initializer expressions evaluate in their written order. Named
+  struct fields do not reorder effects into declaration order.
+- Indexing evaluates the base before the index. Slicing evaluates the base,
+  lower bound and explicit upper bound in that order.
+- A store through an indexed/projected place computes its destination before
+  evaluating the value to store. This is not a relaxation of loan/move checks:
+  an invalidated destination must still be rejected statically.
+
+`make expressions-test` checks 19 precedence/association examples, twelve
+rejected forms, and an exact 25-event observable trace covering binary operands,
+short circuiting, argument order, named fields, array elements, indexed stores,
+slice bounds and a temporary method receiver. Each frontend executes all five
+engines and an optimized standalone binary. Existing reference/ownership suites
+cover the separate validity obligations around moves and live destinations.
+This does not yet specify overflow/conversion policy or cleanup timing.
+
+## Draft revisions
+
+- Draft 2: specify embedded-NUL rejection and byte positions; add the audited
+  binary grammar, precedence, associativity and expression sequencing contract.
+- Draft 1: initial integer lexical contract and remaining semantic audit map.
 
 ## Semantic contract map
 

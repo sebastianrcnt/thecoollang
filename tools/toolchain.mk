@@ -313,3 +313,10 @@ input-bytes-test: build/cool-compiler build/language.BIN
 test: input-bytes-test
 input-bytes-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_input_bytes.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: expressions-test expressions-sanitize-test
+expressions-test: build/cool-compiler build/language.BIN
+	python3 tools/test_expressions.py
+test: expressions-test
+expressions-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_expressions.py --frontend build/repl-loans-asan/cool-compiler

@@ -24,7 +24,7 @@ implement parsing, type analysis, interpretation or code generation.
 
 | Gate | Acceptance evidence | Status |
 | --- | --- | --- |
-| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/specification and compatibility drafts started; full semantic audit pending) |
+| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical and binary expression contracts tested; complete grammar and semantic audit pending) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
@@ -852,6 +852,25 @@ through ordinary evaluation or library use.
   Evidence: `build/release-audit/input-bytes-{focused,regression,sanitize,distribution}.log`.
   This closes the demonstrated truncation defect, not the full encoding audit
   or G1/G2/G4/G9 release gates; remote CI remains unobserved.
+
+- Expression-contract audit: specification draft 2 records the ten binary
+  precedence levels, left associativity, binary EBNF and left-to-right expression
+  sequencing. Added independent expected-value cases and an observable event
+  trace rather than relying on equivalent compiler outputs alone. Tests cover
+  arithmetic/logical grouping, short circuiting, function arguments, initializer
+  source order, destination-before-value stores, array-base/index ordering,
+  slice bounds and a once-evaluated method receiver. Rejection cases include
+  non-bool logic, chained numeric comparisons, unsupported operators and unknown
+  calls even in runtime-skipped logical operands. The suite executes each of
+  both frontends plus the compiler-instrumented ASan frontend across five engines
+  and optimized standalone builds: 19 valid cases, 25 ordered events and 12
+  rejected forms pass. `make expressions-test` is part of the normal test suite;
+  `expressions-sanitize-test` is included in CI. Local full regression and
+  bootstrap results are recorded in `build/release-audit/expressions-regression.log`;
+  focused/instrumented evidence is in `expressions-{focused,sanitize,final}.log`.
+  Compiler source is unchanged. G1 remains open for complete primary/declaration/
+  statement/type grammar and numeric/layout/cleanup/compatibility contracts;
+  this audited expression core is not the complete language specification.
 
 ## Next implementation checkpoints
 
