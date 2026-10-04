@@ -538,6 +538,31 @@ through ordinary evaluation or library use.
   Successful declaration source, distinct literals, storage holes and auxiliary
   allocation lifetimes still need work. G6 remains open.
 
+- REPL symbol and literal lifetime: function-body literals and declared function
+  names now use immutable session storage independent of declaration token
+  buffers. Method call nodes refer to the declared symbol. Method lookup compares
+  package/owner/member directly and creates no temporary composed name, including
+  rejected lookups; declaration construction and method-owner lookup free their
+  temporary buffers. This fixes a per-call leak whose Text capacity amplified
+  even short method names. Both frontends pass 100,000 repeated method calls,
+  unknown-name recovery, prefix-collision checks and cached caller replacement.
+  The existing method suite covers package visibility, generic specialization,
+  ownership and five engines plus optimized native output. Compiler ASan runs
+  pass the extended function and token lifetime suites. Full `make test
+  bootstrap-check` passes, with self-host IR SHA256
+  `0e8bf3cb64fabad1b9615ce74bdadf934e65b5b246af7acbc8a78bf389865e7f`.
+  `make distribution-test` also passes. Source reclamation itself
+  is still pending; this makes escaped strings and canonical names independent
+  of the source that will eventually be discarded.
+  Three fresh-process trials against `109aab8` measured peak RSS medians for
+  2,000 method calls of 12,894,208 → 2,310,144 bytes and for 100,000 calls of
+  531,857,408 → 2,310,144 bytes. The candidate is flat for this workload; other
+  session allocation classes remain open. Reproduce with
+  `python3 tools/bench_repl_memory.py --workload methods --counts 2000 100000
+  --baseline <old-compiler> --trials 3`. Raw data:
+  `build/release-audit/repl-names-memory.json`. Measurements ran on macOS ARM64
+  concurrently with focused tests; no isolated speed claim is made.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

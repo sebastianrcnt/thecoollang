@@ -378,13 +378,20 @@ generic specialization. A token-table limit reports a recoverable diagnostic.
 
 Type descriptors own an inline copy of diagnostic coordinates, with text/raw
 cleared, so structural types can outlive their statement tokens. Session-local
-names are copied as described above. `LiteralString` interns statement literals
+names are copied as described above. `LiteralString` interns all REPL literals and declared function symbols
 by bytes into stable session storage; lexical buffers can be discarded even if
-a string value escaped into owning storage or foreign code. Equal literals may
+a string value escaped from a function into owning storage or foreign code.
+Function symbols also survive their declaration token storage. Equal literals may
 share storage and literals remain immutable. Distinct literal contents persist
 until session exit; this pool is not a claim of bounded memory for an unbounded
 set of new literals. Lexer string-construction headers are freed on success and
 unfinished string buffers on recovery; numeric parsing substrings are temporary.
+Method lookup compares package, owner and member directly against declared
+symbols, skipping generic specializations like ordinary function lookup. It must
+not allocate/intern a name for each call or failed lookup. Method call nodes use
+the canonical declared symbol. Declaration-time composed-name buffers and
+method-owner lookup substrings are temporary and freed. Outside REPL mode,
+function declarations retain their composed-name data for compiler lifetime.
 Statement token reuse does not reclaim successful replaced-function source.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported

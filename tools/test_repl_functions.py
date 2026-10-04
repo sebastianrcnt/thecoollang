@@ -22,6 +22,25 @@ def check(front, label, source, output, errors=()):
 
 
 for front in fronts:
+    methods = ('struct Counter{value:i64;}\n'
+               'struct CounterExtra{value:i64;}\n'
+               'fn C()->i64{return 0;}\n'
+               'fn CounterExtra.read(self:CounterExtra)->i64{return 99;}\n'
+               'fn Counter.reader(self:Counter)->i64{return 98;}\n'
+               'fn Counter.read(self:Counter)->i64{return self.value;}\n'
+               'var counter=Counter{value:1};\nvar sum=0;\n')
+    check(front, '100000 method lookups retain no per-call names',
+          methods + 'sum=sum+counter.read();\n'*100000 + 'sum', '100000\n')
+    check(front, 'unknown names do not displace the exact method',
+          methods + ''.join(f'counter.absent{i}();\n' for i in range(256)) + 'counter.read()',
+          '1\n', ['unknown method']*256)
+    check(front, 'cached method caller survives replacement and rejection',
+          methods + 'fn call()->i64{return counter_missing;}\n'
+          + 'fn call()->i64{let value=Counter{value:7};return value.read();}\n'
+          + 'call()\n'*4 + 'fn Counter.read(self:Counter)->i64{return self.value+1;}\n'
+          + 'call()\nfn Counter.read(self:Counter)->i64{return missing;}\ncall()',
+          '7\n'*4+'8\n8\n', ['unknown variable']*2)
+
     source = 'import "std/mem";\nvar total=0;\nfn value()->i64{return 1;}\nfn caller()->i64{return value();}\n'
     source += '{total=caller();total=caller();total=caller();total=caller();}\n'
     expected = ''

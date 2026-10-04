@@ -1,9 +1,11 @@
 // Methods lower to ordinary calls, so every existing ownership/backend rule applies.
-U8 *MethodName(U8 *owner,U8 *member){Text *name=TextNew();Append(name,owner);Char(name,'.');Append(name,member);return name->data;}
-I64 MethodOwner(Function *f){I64 i;for(i=0;f->name[i];i++)if(f->name[i]=='.')return FindType(f->package,Slice(f->name,0,i));return -1;}
+U8 *MethodName(U8 *owner,U8 *member){Text *name=TextNew();U8 *result;Append(name,owner);Char(name,'.');Append(name,member);result=LiteralString(name->data);if(allow_redefinition)Free(name->data);Free(name);return result;}
+// Compare the two components directly: failed lookups must not retain names.
+I64 FindMethod(U8 *package,U8 *owner,U8 *member){I64 i,j;U8 *name;for(i=0;i<nfun;i++){if(!functions[i].origin && Eq(functions[i].package,package)){name=functions[i].name;j=0;while(owner[j] && name[j]==owner[j])j++;if(!owner[j] && name[j]=='.' && Eq(name+j+1,member))return i;}}return -1;}
+I64 MethodOwner(Function *f){I64 i,id;U8 *owner;for(i=0;f->name[i];i++)if(f->name[i]=='.'){owner=Slice(f->name,0,i);id=FindType(f->package,owner);Free(owner);return id;}return -1;}
 U8 *MethodDeclarationName(){
     Token *token=At();U8 *name=Ident();I64 type;
-    if(!Take('.'))return name;
+    if(!Take('.'))return LiteralString(name);
     type=FindType(token->package,name);
     if(type<0 || (AggregateKind(type)!=A_STRUCT && AggregateKind(type)!=A_ENUM))ErrorAt(token,"method owner must be a type declared in this package");
     return MethodName(name,Ident());
@@ -35,8 +37,8 @@ Node *MethodCall(Node *receiver,Token *token){
     if(AggregateKind(type)==A_OWNER || IsReference(type))type=Shape(type)->element;
     if(AggregateKind(type)!=A_STRUCT && AggregateKind(type)!=A_ENUM)ErrorAt(token,"methods require a struct or enum receiver");
     owner=type;if(Shape(type)->origin)owner=Shape(type)->origin;
-    name=MethodName(Shape(owner)->name,member);id=FindFunIn(Shape(owner)->package,name);
-    if(id<0)ErrorAt(token,"unknown method");
+    id=FindMethod(Shape(owner)->package,Shape(owner)->name,member);
+    if(id<0)ErrorAt(token,"unknown method");name=functions[id].name;
     if(!functions[id].public && !Eq(token->package,functions[id].package))ErrorAt(token,"method is private to its package");
     count=Shape(owner)->generic_count;for(i=0;i<count;i++)args[i]=Shape(type)->generic_args[i];
     if(At()->kind=='[')nextra=TypeArguments(extra);

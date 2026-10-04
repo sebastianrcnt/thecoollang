@@ -5,14 +5,21 @@ fn MethodName(owner: * u8, member: * u8) -> * u8 {
         Append(name, owner);
         Char(name, 46);
         Append(name, member);
-        return name.data;
+        let result = LiteralString(name.data);
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_allow_redefinition != i8(0)) { Free(name.data); }
+        Free(cast[*u8](name));
+        return result;
     }
 }
 fn MethodOwner(function: * Function) -> i64 {
     unsafe {
         for (var i: i64 = 0; function.name[i] != u8(0); i = i + 1) {
             if (function.name[i] == u8(46)) {
-                return FindType(function.package, Slice(function.name, 0, i));
+                let owner = Slice(function.name, 0, i);
+                let id = FindType(function.package, owner);
+                Free(owner);
+                return id;
             }
         }
         return - 1;
@@ -23,7 +30,7 @@ fn MethodDeclarationName() -> * u8 {
         let token = At();
         let name = Ident();
         if (Take(46) == i8(0)) {
-            return name;
+            return LiteralString(name);
         }
         let type = FindType(token.package, name);
         if (type < 0 || (AggregateKind(type) != 1 && AggregateKind(type) != 4)) {
@@ -132,11 +139,11 @@ fn MethodCall(receiver: * Node, token: * Token) -> * Node {
         if (Shape(type).origin != 0) {
             owner = Shape(type).origin;
         }
-        let name = MethodName(Shape(owner).name, member);
-        var id = FindFunIn(Shape(owner).package, name);
+        var id = FindMethod(Shape(owner).package, Shape(owner).name, member);
         if (id < 0) {
             ErrorAt(token, cast[ * u8]("unknown method"));
         }
+        let name = ctx.v_functions[id].name;
         if (ctx.v_functions[id].public == 0 && Eq(token.package, ctx.v_functions[id].package) == i8(0)) {
             ErrorAt(token, cast[ * u8]("method is private to its package"));
         }
@@ -214,5 +221,20 @@ fn MethodCall(receiver: * Node, token: * Token) -> * Node {
             call.storage = Storage(call.type);
         }
         return call;
+    }
+}
+
+// No temporary name allocation, including failed lookup and generic templates.
+fn FindMethod(package: *u8, owner: *u8, member: *u8) -> i64 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        for (var i: i64 = 0; i < ctx.v_nfun; i = i + 1) {
+            if (ctx.v_functions[i].origin != 0 || Eq(ctx.v_functions[i].package, package) == i8(0)) { continue; }
+            let name = ctx.v_functions[i].name;
+            var j: i64 = 0;
+            while (owner[j] != u8(0) && name[j] == owner[j]) { j = j + 1; }
+            if (owner[j] == u8(0) && name[j] == u8(46) && Eq(&raw name[j + 1], member) != i8(0)) { return i; }
+        }
+        return -1;
     }
 }

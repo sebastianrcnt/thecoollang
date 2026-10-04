@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure fresh-process REPL peak RSS for identical scalar-update or local-binding workloads (macOS)."""
+"""Measure fresh-process REPL peak RSS for identical update, binding, method-call or replacement workloads (macOS)."""
 from pathlib import Path
 import argparse
 import json
@@ -14,7 +14,7 @@ parser.add_argument('--baseline', type=Path)
 parser.add_argument('--candidate', type=Path, default=Path(__file__).resolve().parents[1] / 'build/cool-compiler')
 parser.add_argument('--counts', type=int, nargs='+', default=[2000, 16000])
 parser.add_argument('--trials', type=int, default=3)
-parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements'], default='updates')
+parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements', 'methods'], default='updates')
 parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 if platform.system() != 'Darwin':
@@ -24,12 +24,16 @@ if args.trials < 1 or any(count < 1 or count > 1000000 for count in args.counts)
 versions = ([('baseline', args.baseline)] if args.baseline else []) + [('candidate', args.candidate)]
 samples = []
 for count in args.counts:
-    if args.workload == 'replacements':
+    prefix = 'var total=0;\n'
+    if args.workload == 'methods':
+        prefix += 'struct Counter{value:i64;}\nfn Counter.read(self:Counter)->i64{return self.value;}\nvar counter=Counter{value:1};\n'
+        body = 'total=total+counter.read();\n' * count
+    elif args.workload == 'replacements':
         body = ''.join(f'fn answer()->i64{{return {value};}}\n{{total=answer();total=answer();total=answer();total=answer();}}\n' for value in range(1, count + 1))
     else:
         submission = 'total=total+1;\n' if args.workload == 'updates' else '{var scratch=total;total=scratch+1;}\n'
         body = submission * count
-    source = 'var total=0;\n' + body + 'total\n:quit\n'
+    source = prefix + body + 'total\n:quit\n'
     for label, compiler in versions:
         for trial in range(args.trials):
             start = time.monotonic()

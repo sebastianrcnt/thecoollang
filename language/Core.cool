@@ -175,7 +175,7 @@ Local *locals;
 I64 depth, loop_depth, current_fun, unsafe_depth;
 U8 *LiteralString(U8 *text) {
     U64 hash=5381;I64 i=0,bucket;ReplLiteral *entry;
-    if(!allow_redefinition || current_fun!=0)return text;
+    if(!allow_redefinition)return text;
     while(text[i])hash=hash*33+text[i++];bucket=hash&1023;
     for(entry=repl_literals[bucket];entry;entry=entry->next)if(Eq(entry->text,text))return entry->text;
     entry=CAlloc(sizeof(ReplLiteral));entry->text=StrNew(text);entry->next=repl_literals[bucket];repl_literals[bucket]=entry;return entry->text;

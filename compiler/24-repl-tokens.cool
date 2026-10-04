@@ -1,9 +1,9 @@
-// Literals have session lifetime, including values retained in owning storage
-// or passed to unsafe foreign code. Equal literal bytes share one stable copy.
+// Literals and declared function symbols have session lifetime, independent of
+// source buffers. Escaped values and equal bytes share stable immutable storage.
 fn LiteralString(text: *u8) -> *u8 {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-        if (ctx.v_allow_redefinition == i8(0) || ctx.v_current_fun != 0) { return text; }
+        if (ctx.v_allow_redefinition == i8(0)) { return text; }
         var hash: u64 = 5381;
         var i: i64 = 0;
         while (text[i] != u8(0)) { hash = hash * u64(33) + u64(text[i]); i = i + 1; }

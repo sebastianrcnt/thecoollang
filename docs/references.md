@@ -584,7 +584,7 @@ declarations can still exceed the token-table limit; it reports an error and
 preserves the session. Normal statement history no longer consumes that limit.
 
 String literals are immutable and remain valid throughout the session, including
-when stored inside owners. Equal statement literals share a stable allocation;
+when stored inside owners. Equal literals, including literals in function bodies, share a stable allocation;
 each distinct literal content is retained until session exit. Successful function,
 type and import declarations keep their source for subsequent compilation.
 Repeated body replacement and large sets of distinct literals still require
@@ -599,7 +599,8 @@ Signature, borrow-contract, generic and foreign/exported C ABI mode changes
 require a new session. Escaped string literals remain valid after replacement.
 `make repl-functions-test` exercises repeated warm/cold replacement, failed generic
 specialization and ID reuse, batch rollback, owner cleanup and C ABI rejection
-on both frontends. `make repl-functions-sanitize-test` repeats these checks with
+on both frontends. It also exercises 100,000 method calls, unknown methods and
+owner/member prefix collisions. `make repl-functions-sanitize-test` repeats these checks with
 the ASan-instrumented compiler. Retained declaration source still accumulates.
 
 
