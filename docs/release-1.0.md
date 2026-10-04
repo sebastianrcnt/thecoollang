@@ -509,6 +509,35 @@ through ordinary evaluation or library use.
   reclamation, and distinct immutable literal contents have session lifetime.
   G6 stays open for these remaining lifecycle requirements.
 
+- Transactional function artifact lifetime: successful REPL replacement now frees
+  superseded node/local/borrow-source/drop records, bytecode pools and JIT mappings;
+  failed submissions dispose staged artifacts before restoring prior functions.
+  Cleanup runs after user frames unwind and does not repeat value destruction.
+  Existing JIT callers continue dispatching by stable function ID. JIT builder
+  scratch is released on success and recovery. Parser signature snapshots use
+  stack storage, and foreign/exported C ABI mode changes require a new session.
+  Active-prefix function snapshots replace full-capacity copies on every input;
+  rollback clears newly discarded entries before their IDs are reused.
+  `make repl-functions-test` covers warmed replacement, failed specialization/ID
+  reuse, compile/runtime recovery, owner accounting, escaped literals, batch
+  rollback and C ABI rejection on both frontends. The compiler-instrumented
+  ASan suite passes, alongside persistent loan/storage/token/package sanitizers.
+  Full `make test bootstrap-check` and `make distribution-test` pass. Self-host
+  IR SHA256: `811d85f600fa604a63310f4523a30c282d3a7726ceca15ebbb12670da4d1e467`.
+  Against `b480eea`, 2,048 replacements reduce peak RSS from 56,377,344 to
+  4,571,136 bytes (three fresh-process trials, medians, concurrent regression
+  activity). After our test jobs finished, five fresh-process trials of 100,000
+  scalar updates measured median wall time 4.632 → 0.467 seconds and peak RSS
+  9,142,272 → 2,211,840 bytes on macOS ARM64. Timing includes process launch;
+  no system-wide idle guarantee or general compiler speed claim is implied.
+  Reproduce with `tools/bench_repl_memory.py --baseline <old-compiler>
+  --counts 100000 --trials 5`; replacement measurements use `--workload
+  replacements --counts 256 2048`. Raw reports are
+  `build/release-audit/repl-functions-memory.json` and
+  `build/release-audit/repl-functions-snapshot-isolated.json`.
+  Successful declaration source, distinct literals, storage holes and auxiliary
+  allocation lifetimes still need work. G6 remains open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

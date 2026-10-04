@@ -163,9 +163,9 @@ Local *repl_allocated_locals;
 class DropSlot { I64 slot, type; DropSlot *next; };
 class ByteAllocation { ByteAllocation *next; };
 class Function {
-    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, exported, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals; DropSlot *drops;
+    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, exported, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals,*allocated_locals; ReplNode *nodes; DropSlot *drops;
     U8 *generic_names[8]; I64 generic_args[8];
-    U8 *bytecode, *machine; ByteAllocation *byte_allocations; I64 code_count, code_capacity, registers, calls;
+    U8 *bytecode, *machine; ByteAllocation *byte_allocations; I64 code_count, code_capacity, registers, calls, machine_size;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
 };
 #define MAX_FUNCTIONS 4096
@@ -182,13 +182,14 @@ U8 *LiteralString(U8 *text) {
 }
 Local *AllocateLocal() {
     Local *local=CAlloc(sizeof(Local));
-    if(allow_redefinition && current_fun==0){local->repl_next=repl_allocated_locals;repl_allocated_locals=local;}
+    if(allow_redefinition){if(current_fun==0){local->repl_next=repl_allocated_locals;repl_allocated_locals=local;}else{local->repl_next=functions[current_fun].allocated_locals;functions[current_fun].allocated_locals=local;}}
     return local;
 }
 Node *AllocateNode() {
     ReplNode *allocation;
-    if(!allow_redefinition || current_fun!=0)return CAlloc(sizeof(Node));
-    allocation=CAlloc(sizeof(ReplNode));allocation->next=repl_nodes;repl_nodes=allocation;
+    if(!allow_redefinition)return CAlloc(sizeof(Node));
+    allocation=CAlloc(sizeof(ReplNode));
+    if(current_fun==0){allocation->next=repl_nodes;repl_nodes=allocation;}else{allocation->next=functions[current_fun].nodes;functions[current_fun].nodes=allocation;}
     return &allocation->value;
 }
 Node *NewNode(I64 kind, Token *t) { Node *n = AllocateNode(); n->kind = kind; n->token = t; n->slot = -1; return n; }

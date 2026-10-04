@@ -1,8 +1,10 @@
 // Baseline ARM64 JIT. Arithmetic/branches emit native instructions directly;
 // calls and checked operations share the bytecode runtime helpers.
 import U8 *NativeJitAlloc(I64 size);
+import U0 NativeJitFree(U8 *code,I64 size);
 import U0 NativeJitCommit(U8 *code, U8 *scratch, I64 size);
 Text *machine;
+I64 *jit_offsets,*jit_patches;
 I64 jit_compilations;
 U0 Word(I64 value) { I64 i; for (i = 0; i < 4; i++) Char(machine, (value >> (i * 8)) & 255); }
 U0 Immediate(I64 register_id, U64 value) {
@@ -21,6 +23,7 @@ U0 NormalizeReg(I64 type) {
 U0 CompileNative(Function *f) {
     I64 *offsets = CAlloc((f->code_count + 1) * 8), *patches = CAlloc((f->code_count + 1) * 8);
     I64 i, op, encoded, cond, delta, at; Instruction *ins;
+    jit_offsets=offsets;jit_patches=patches;
     jit_compilations++;
     machine = TextNew();
     Word(0xA9BF7BF3); // stp x19, x30, [sp, #-16]!
@@ -74,8 +77,8 @@ U0 CompileNative(Function *f) {
             machine->data[at+2] = encoded >> 16; machine->data[at+3] = encoded >> 24;
         }
     }
-    f->machine = NativeJitAlloc(machine->len); NativeJitCommit(f->machine, machine->data, machine->len);
-    Free(offsets); Free(patches); Free(machine->data); Free(machine);
+    f->machine_size=machine->len;f->machine = NativeJitAlloc(machine->len); NativeJitCommit(f->machine, machine->data, machine->len);
+    Free(offsets); Free(patches); Free(machine->data); Free(machine);jit_offsets=jit_patches=NULL;machine=NULL;
 }
 I64 RunNative(Function *f, I64 *registers) {
     I64 (*entry)(I64 *values);

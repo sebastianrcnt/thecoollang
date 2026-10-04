@@ -257,3 +257,10 @@ repl-tokens-test: build/cool-compiler build/language.BIN
 test: repl-tokens-test
 repl-tokens-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_repl_tokens.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: repl-functions-test repl-functions-sanitize-test
+repl-functions-test: build/cool-compiler build/language.BIN
+	python3 tools/test_repl_functions.py
+test: repl-functions-test
+repl-functions-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_repl_functions.py --frontend build/repl-loans-asan/cool-compiler

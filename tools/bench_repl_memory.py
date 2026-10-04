@@ -14,7 +14,7 @@ parser.add_argument('--baseline', type=Path)
 parser.add_argument('--candidate', type=Path, default=Path(__file__).resolve().parents[1] / 'build/cool-compiler')
 parser.add_argument('--counts', type=int, nargs='+', default=[2000, 16000])
 parser.add_argument('--trials', type=int, default=3)
-parser.add_argument('--workload', choices=['updates', 'bindings'], default='updates')
+parser.add_argument('--workload', choices=['updates', 'bindings', 'replacements'], default='updates')
 parser.add_argument('--output', type=Path)
 args = parser.parse_args()
 if platform.system() != 'Darwin':
@@ -24,8 +24,12 @@ if args.trials < 1 or any(count < 1 or count > 1000000 for count in args.counts)
 versions = ([('baseline', args.baseline)] if args.baseline else []) + [('candidate', args.candidate)]
 samples = []
 for count in args.counts:
-    submission = 'total=total+1;\n' if args.workload == 'updates' else '{var scratch=total;total=scratch+1;}\n'
-    source = 'var total=0;\n' + submission * count + 'total\n:quit\n'
+    if args.workload == 'replacements':
+        body = ''.join(f'fn answer()->i64{{return {value};}}\n{{total=answer();total=answer();total=answer();total=answer();}}\n' for value in range(1, count + 1))
+    else:
+        submission = 'total=total+1;\n' if args.workload == 'updates' else '{var scratch=total;total=scratch+1;}\n'
+        body = submission * count
+    source = 'var total=0;\n' + body + 'total\n:quit\n'
     for label, compiler in versions:
         for trial in range(args.trials):
             start = time.monotonic()

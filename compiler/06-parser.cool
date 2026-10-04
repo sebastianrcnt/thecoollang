@@ -4243,6 +4243,7 @@ unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_f9: *Function = null;
 var v_old: *Function = null;
+var previous = Function{};
 var v_name17: *u8 = null;
 var v_alias1: *u8 = null;
 var v_path2: *u8 = null;
@@ -5088,6 +5089,7 @@ pc = 100;
 continue;
 }
 if (pc == 105) {
+if (v_old.foreign != v_f9.foreign || v_old.exported != v_f9.exported) { ErrorAt(v_f9.token, cast[*u8]("C ABI change requires a new session")); }
 t97 = ((v_old).argc != (v_f9).argc);
 if (!t97) {
 t97 = ((v_old).result != (v_f9).result);
@@ -5239,6 +5241,10 @@ continue;
 }
 if (pc == 127) {
 (v_f9).drops = null;
+v_f9.allocated_locals = null;
+v_f9.nodes = null;
+v_f9.body = null;
+v_f9.machine_size = 0;
 pc = 126;
 continue;
 }
@@ -5267,9 +5273,7 @@ pc = 129;
 continue;
 }
 if (pc == 132) {
-t119 = i64(sizeof(Function));
-t120 = CAlloc(t119);
-v_old = cast[*Function](t120);
+v_old = &raw previous;
 pc = 131;
 continue;
 }

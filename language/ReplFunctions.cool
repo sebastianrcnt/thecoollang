@@ -1,0 +1,20 @@
+// Disposal compares ownership with the opposite side of the transaction.
+// Call only after user frames have returned/unwound; callers use stable IDs.
+U0 FreeFunctionChanges(Function *discard,Function *retain) {
+    Local *local,*next_local;BorrowSource *edge,*next_edge;ReplNode *node,*next_node;DropSlot *drop,*next_drop;
+    if(discard->machine!=retain->machine){NativeJitFree(discard->machine,discard->machine_size);discard->machine=NULL;discard->machine_size=0;}
+    if(discard->bytecode!=retain->bytecode || discard->byte_allocations!=retain->byte_allocations)FreeBytecode(discard);
+    if(discard->allocated_locals!=retain->allocated_locals){
+        for(local=discard->allocated_locals;local;local=next_local){next_local=local->repl_next;for(edge=local->sources;edge;edge=next_edge){next_edge=edge->next;Free(edge);}Free(local);}
+        discard->allocated_locals=discard->all_locals=NULL;
+    }
+    if(discard->nodes!=retain->nodes){for(node=discard->nodes;node;node=next_node){next_node=node->next;Free(node);}discard->nodes=NULL;discard->body=NULL;}
+    if(discard->drops!=retain->drops){for(drop=discard->drops;drop;drop=next_drop){next_drop=drop->next;Free(drop);}discard->drops=NULL;}
+}
+U0 ReplRollbackFunctions() {
+    Function empty,*retained;I64 i;MemSet(&empty,0,sizeof(Function));
+    Free(jit_offsets);Free(jit_patches);jit_offsets=jit_patches=NULL;
+    if(machine){Free(machine->data);Free(machine);machine=NULL;}
+    for(i=1;i<nfun;i++){retained=&empty;if(i<repl_saved_nfun)retained=&repl_snapshot[i];FreeFunctionChanges(&functions[i],retained);}
+}
+U0 ReplCommitFunctions() {I64 i;for(i=1;i<repl_saved_nfun;i++)FreeFunctionChanges(&repl_snapshot[i],&functions[i]);}

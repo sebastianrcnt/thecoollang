@@ -74,6 +74,7 @@ static void fail(const char *message);
 static void add_symbol(Module *m, const char *name, uintptr_t value);
 static void *NativeJitAlloc(int64_t size);
 static void NativeJitCommit(void *code, const void *scratch, int64_t size);
+static void NativeJitFree(void *code, int64_t size);
 extern int64_t AIWNIOS_SetJmp(int64_t *context);
 extern void AIWNIOS_LongJmp(int64_t *context);
 static Module *active_module;
@@ -416,6 +417,7 @@ static void register_host_symbols(Module *m) {
 #define HOST(name, fn) add_symbol(m, name, (uintptr_t)(fn))
 #endif
     HOST("NativeJitAlloc", NativeJitAlloc);
+    HOST("NativeJitFree", NativeJitFree);
     HOST("NativeJitCommit", NativeJitCommit);
     HOST("MAlloc", host_alloc);
     HOST("CAlloc", host_calloc);
@@ -537,6 +539,11 @@ static void *NativeJitAlloc(int64_t size) {
         exit(1);
     }
     return code;
+}
+
+static void NativeJitFree(void *code, int64_t size) {
+    if (!code) return;
+    if (size <= 0 || munmap(code,(size_t)size) != 0) fail("JIT release");
 }
 
 static void NativeJitCommit(void *code, const void *scratch, int64_t size) {

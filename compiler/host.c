@@ -50,6 +50,10 @@ void *NativeJitAlloc(int64_t size) {
     void *p=mmap(NULL,size>0 ? (size_t)size : 1,PROT_READ|PROT_WRITE|PROT_EXEC,MAP_PRIVATE|MAP_ANON|MAP_JIT,-1,0);
     if(p==MAP_FAILED)host_fail("JIT allocation"); return p;
 }
+void NativeJitFree(void *code,int64_t size) {
+    if (!code) return;
+    if (size <= 0 || munmap(code,(size_t)size) != 0) host_fail("JIT release");
+}
 void NativeJitCommit(void *code,const void *scratch,int64_t size) {
     if(size<0)host_fail("JIT length"); pthread_jit_write_protect_np(0); memcpy(code,scratch,(size_t)size);
     __builtin___clear_cache(code,(char *)code+size); pthread_jit_write_protect_np(1);

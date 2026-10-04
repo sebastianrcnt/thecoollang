@@ -3,12 +3,17 @@
 fn AllocateNode() -> *Node {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-        if (ctx.v_allow_redefinition == i8(0) || ctx.v_current_fun != 0) {
+        if (ctx.v_allow_redefinition == i8(0)) {
             return cast[*Node](CAlloc(i64(sizeof(Node))));
         }
         let allocation = cast[*ReplNode](CAlloc(i64(sizeof(ReplNode))));
-        allocation.next = ctx.v_repl_nodes;
-        ctx.v_repl_nodes = allocation;
+        if (ctx.v_current_fun == 0) {
+            allocation.next = ctx.v_repl_nodes;
+            ctx.v_repl_nodes = allocation;
+        } else {
+            allocation.next = ctx.v_functions[ctx.v_current_fun].nodes;
+            ctx.v_functions[ctx.v_current_fun].nodes = allocation;
+        }
         return &raw allocation.value;
     }
 }

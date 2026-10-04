@@ -464,7 +464,7 @@ I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
     pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
 }
 U0 ParseProgram() {
-    Function *f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign, exported; Token *t;
+    Function previous,*f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign, exported; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
     CollectTypes();
     while (At()->kind) {
@@ -494,20 +494,21 @@ U0 ParseProgram() {
                 if (!allow_redefinition) Error("duplicate function declaration");
                 if (id == 0) Error("internal session function cannot be redefined");
                 for (j = 0; j < count; j++) if (parsed[j] == id) Error("duplicate declaration in submission");
-                old = CAlloc(sizeof(Function)); MemCpy(old, &functions[id], sizeof(Function));
+                old = &previous; MemCpy(old, &functions[id], sizeof(Function));
             } else {
                 if (nfun >= MAX_FUNCTIONS) Error("function limit exceeded");
                 id = nfun++;
             }
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
-            f->drops = NULL; f->all_locals = NULL; f->bytecode = NULL; f->byte_allocations = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
+            f->drops = NULL; f->all_locals = NULL; f->allocated_locals=NULL;f->nodes=NULL;f->body=NULL;f->machine_size=0; f->bytecode = NULL; f->byte_allocations = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
             f->foreign = foreign; f->exported = exported; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); ValidateMethodTemplate(f); f->signature = pos;
             if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); while (At()->kind && At()->kind != '{') pos++; }
             else FunctionSignature(f);
             if (old) {
+                if(old->foreign!=f->foreign || old->exported!=f->exported)ErrorAt(f->token,"C ABI change requires a new session");
                 if (old->argc != f->argc || old->result != f->result || old->borrow_contract != f->borrow_contract) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
             }

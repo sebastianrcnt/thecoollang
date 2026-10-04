@@ -1,0 +1,76 @@
+// Called only after all user frames have returned or been unwound. Retained
+// callers dispatch by function ID; they do not own the callee's compilation.
+fn FreeFunctionChanges(discard: *Function, retain: *Function) {
+    unsafe {
+        if (discard.machine != retain.machine) {
+            NativeJitFree(discard.machine, discard.machine_size);
+            discard.machine = null;
+            discard.machine_size = 0;
+        }
+        if (discard.bytecode != retain.bytecode || discard.byte_allocations != retain.byte_allocations) { FreeBytecode(discard); }
+        if (discard.allocated_locals != retain.allocated_locals) {
+            var local = discard.allocated_locals;
+            while (local != null) {
+                let next = local.repl_next;
+                var edge = cast[*BorrowSource](local.sources);
+                while (edge != null) {
+                    let following = edge.next;
+                    Free(cast[*u8](edge));
+                    edge = following;
+                }
+                // Function names/parameters refer to retained declaration tokens.
+                Free(cast[*u8](local));
+                local = next;
+            }
+            discard.allocated_locals = null;
+            discard.all_locals = null;
+        }
+        if (discard.nodes != retain.nodes) {
+            var node = discard.nodes;
+            while (node != null) {
+                let next = node.next;
+                Free(cast[*u8](node));
+                node = next;
+            }
+            discard.nodes = null;
+            discard.body = null;
+        }
+        if (discard.drops != retain.drops) {
+            var drop = discard.drops;
+            while (drop != null) {
+                let next = drop.next;
+                Free(cast[*u8](drop));
+                drop = next;
+            }
+            discard.drops = null;
+        }
+    }
+}
+fn ReplRollbackFunctions() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        Free(cast[*u8](ctx.v_jit_offsets));
+        Free(cast[*u8](ctx.v_jit_patches));
+        ctx.v_jit_offsets = null;
+        ctx.v_jit_patches = null;
+        if (ctx.v_machine != null) {
+            Free(ctx.v_machine.data);
+            Free(cast[*u8](ctx.v_machine));
+            ctx.v_machine = null;
+        }
+        var empty = Function{};
+        for (var i: i64 = 1; i < ctx.v_nfun; i = i + 1) {
+            var retained = &raw empty;
+            if (i < ctx.v_repl_saved_nfun) { retained = &raw ctx.v_repl_snapshot[i]; }
+            FreeFunctionChanges(&raw ctx.v_functions[i], retained);
+        }
+    }
+}
+fn ReplCommitFunctions() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        for (var i: i64 = 1; i < ctx.v_repl_saved_nfun; i = i + 1) {
+            FreeFunctionChanges(&raw ctx.v_repl_snapshot[i], &raw ctx.v_functions[i]);
+        }
+    }
+}

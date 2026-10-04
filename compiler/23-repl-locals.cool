@@ -4,9 +4,14 @@ fn AllocateLocal() -> *Local {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         let local = cast[*Local](CAlloc(i64(sizeof(Local))));
-        if (ctx.v_allow_redefinition != i8(0) && ctx.v_current_fun == 0) {
-            local.repl_next = ctx.v_repl_allocated_locals;
-            ctx.v_repl_allocated_locals = local;
+        if (ctx.v_allow_redefinition != i8(0)) {
+            if (ctx.v_current_fun == 0) {
+                local.repl_next = ctx.v_repl_allocated_locals;
+                ctx.v_repl_allocated_locals = local;
+            } else {
+                local.repl_next = ctx.v_functions[ctx.v_current_fun].allocated_locals;
+                ctx.v_functions[ctx.v_current_fun].allocated_locals = local;
+            }
         }
         return local;
     }

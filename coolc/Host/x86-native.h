@@ -63,7 +63,7 @@ static uintptr_t x86_missing_import(size_t id) {
 
 static uintptr_t x86_host_import(const char *name, uintptr_t fn) {
     static const struct { const char *name; unsigned argc; } arities[] = {
-        {"NativeJitAlloc",1}, {"NativeJitCommit",3}, {"MAlloc",2}, {"CAlloc",2},
+        {"NativeJitAlloc",1}, {"NativeJitFree",2}, {"NativeJitCommit",3}, {"MAlloc",2}, {"CAlloc",2},
         {"Free",1}, {"MSize",1}, {"StrNew",2}, {"MAllocIdent",2}, {"Fs",0},
         {"SetFs",1}, {"__Fs",0}, {"Bt",2}, {"Bts",2}, {"Btr",2}, {"LBts",2},
         {"LBtr",2}, {"Bsf",1}, {"Bsr",1}, {"MemCpy",3}, {"MemSet",3},

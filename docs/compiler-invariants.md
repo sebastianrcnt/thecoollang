@@ -74,6 +74,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `22-repl-nodes.cool` | Disposable submission node allocation and cleanup | `Core.cool`, `Repl.cool` |
 | `23-repl-locals.cool` | Session-local allocation registry and loan-rooted reclamation | `Core.cool`, `References.cool`, `Repl.cool` |
 | `24-repl-tokens.cool` | Statement token disposal and session literal interning | `Core.cool`, `Repl.cool` |
+| `25-repl-functions.cool` | Transactional disposal of replaced/rejected function artifacts | `ReplFunctions.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -331,12 +332,10 @@ Bytecode argument vectors and scope/defer records belong to a function's
 list header followed by zeroed payload. Deferred calls may emit several
 instructions sharing the same argument vector, so never free instruction `args`
 independently. `FreeBytecode` walks the allocation list exactly once and clears
-the instruction buffer and counts. Currently it disposes only the completed or
-rejected REPL submission (function zero), after execution/unwind and before a
-snapshot restore. Function zero is never JIT-compiled. Do not dispose ordinary
-cached bytecode while any live JIT code or frame could reference its instructions.
-This recovers submission compilation buffers, not token or replaced-function
-caches. Bytecode invocation argument values use native stack scratch with the
+the instruction buffer and counts. It disposes completed/rejected submission
+code and obsolete/staged function code after all user frames return or unwind.
+Function zero is never JIT-compiled. Ordinary functions retain their current
+caches; callers dispatch by stable function ID. Bytecode invocation argument values use native stack scratch with the
 language's 32-argument bound; nonlocal runtime recovery cannot leak that vector.
 Argument scratch contains borrowed value representations, never ownership of
 the referenced aggregate storage.
@@ -348,9 +347,10 @@ submission execution or recovery, after bytecode disposal and move-state cleanup
 It first clears persistent loans' expression pointers: these identify expressions
 only during checking, whereas Local identities, modes and ancestry persist. A
 freed expression address must never match a later allocation. Generic specialization
-switches `current_fun` before building its body, so cached function nodes do not
-enter this disposable pool. Node cleanup does not free lexical strings, tokens,
-Local metadata or function bodies; those have independent lifetimes.
+switches `current_fun` before building its body. Nonzero functions own separate
+node and local allocation lists, reclaimed when their artifacts are discarded.
+Node cleanup does not free lexical strings or tokens; those have independent
+lifetimes.
 
 `AllocateLocal` tracks synthetic-session locals independently of the lexical
 `next` chain and the snapshotted function `all_locals` head. Both named locals
@@ -388,9 +388,21 @@ unfinished string buffers on recovery; numeric parsing substrings are temporary.
 Statement token reuse does not reclaim successful replaced-function source.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
-signature/generic changes require a new session. Compilation-product pointers
-are invalidated on replacement; that does **not** currently prove old AST,
-bytecode or JIT-page memory is fully reclaimed. This is an open release gate.
+signature/generic changes, including foreign/exported C ABI mode changes, require
+a new session. Each function owns its node/local lists, borrow-source records,
+drop metadata, bytecode pool and JIT mapping. `FreeFunctionChanges` compares
+current and snapshotted ownership pointers: commit disposes superseded artifacts,
+rollback disposes staged artifacts before restoring the snapshot. Never drop
+user values from this metadata cleanup; frame unwinding already handles them.
+Function local names still refer to retained source tokens. JIT mappings record
+their emitted byte length for `NativeJitFree`; successful generation and rollback
+also free the builder's offsets, patches and temporary machine-code text.
+
+Snapshots copy only the active function prefix. Rollback clears discarded tail
+entries before reusing their IDs, including specialization origins and ownership
+fields. Cached callers survive callee replacement and rejected submissions.
+Successful declaration source and some auxiliary allocations still require
+lifetime work; this remains an open release gate.
 
 `NativeRecover` keeps `setjmp` in a live C frame while calling `CoolSubmission`;
 `NativeRaise` can only jump to that active frame. Never move `setjmp` into a

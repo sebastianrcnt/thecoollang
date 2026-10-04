@@ -170,6 +170,10 @@ has_contract: i64;
 
 all_locals: *Local;
 
+allocated_locals: *Local;
+
+nodes: *ReplNode;
+
 drops: *DropSlot;
 
 generic_names: [8]*u8;
@@ -181,6 +185,8 @@ bytecode: *u8;
 byte_allocations: *ByteAllocation;
 
 machine: *u8;
+
+machine_size: i64;
 
 code_count: i64;
 
@@ -482,6 +488,10 @@ v_bc_done: i8;
 
 v_machine: *Text;
 
+v_jit_offsets: *i64;
+
+v_jit_patches: *i64;
+
 v_jit_compilations: i64;
 
 v_repl_context: *i64;
@@ -609,6 +619,7 @@ extern "C" fn NativeRaise(a0: *i64);
 
 
 extern "C" fn NativeJitAlloc(a0: i64) -> *u8;
+extern "C" fn NativeJitFree(a0: *u8, a1: i64);
 
 
 extern "C" fn NativeJitCommit(a0: *u8, a1: *u8, a2: i64);

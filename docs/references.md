@@ -539,7 +539,7 @@ including statement temporaries and failed new bindings. Surviving bindings
 keep stable addresses. Dead session-local metadata is reclaimed, while surviving
 loan roots and parent identities remain live even after their lexical blocks
 end. Ordinary statement tokens are recycled after execution or rejection.
-Interior holes and replaced-function source/caches are not yet fully reclaimed;
+Interior holes and replaced-function source are not yet fully reclaimed;
 the existing register limit still applies to each
 submission and its live storage. Raw pointers remain subject to explicit
 unsafe lifetime obligations and must not access forgotten/reused storage.
@@ -571,7 +571,7 @@ and its argument/scope allocations are reclaimed, including shared deferred
 argument vectors. Submission AST nodes and coercion clones are reclaimed after
 checking/execution; cached function/generic bodies and literal strings survive.
 Bytecode call argument scratch uses the native stack, including error recovery.
-Ordinary function caches remain live. `make repl-storage-sanitize-test` repeats
+Current function caches remain live; obsolete or rejected artifacts are reclaimed. `make repl-storage-sanitize-test` repeats
 these checks on the ASan-instrumented compiler. Package loading is described
 below.
 
@@ -589,6 +589,18 @@ each distinct literal content is retained until session exit. Successful functio
 type and import declarations keep their source for subsequent compilation.
 Repeated body replacement and large sets of distinct literals still require
 further resource work before the full long-session release gate can close.
+
+
+Function body replacement keeps stable function IDs, including callers already
+compiled by the JIT. Successful replacement releases the old AST, local metadata,
+bytecode and JIT mapping after user frames finish. Failed parsing/compilation or
+execution releases newly staged artifacts and preserves previous function code.
+Signature, borrow-contract, generic and foreign/exported C ABI mode changes
+require a new session. Escaped string literals remain valid after replacement.
+`make repl-functions-test` exercises repeated warm/cold replacement, failed generic
+specialization and ID reuse, batch rollback, owner cleanup and C ABI rejection
+on both frontends. `make repl-functions-sanitize-test` repeats these checks with
+the ASan-instrumented compiler. Retained declaration source still accumulates.
 
 
 ## Packages in the REPL

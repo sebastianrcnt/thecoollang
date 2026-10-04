@@ -238,6 +238,8 @@ v_offsets = cast[*i64](t1);
 t2 = (((v_f18).code_count + 1) * 8);
 t3 = CAlloc(t2);
 v_patches = cast[*i64](t3);
+ctx.v_jit_offsets = v_offsets;
+ctx.v_jit_patches = v_patches;
 t4 = ctx.v_jit_compilations;
 ctx.v_jit_compilations = ctx.v_jit_compilations + i64(1);
 t5 = TextNew();
@@ -481,6 +483,7 @@ v_encoded = (i64(u64(3019898880)) | ((v_delta & 524287) << 5));
 t69 = v_i25;
 v_i25 = v_i25 + i64(1);
 }
+v_f18.machine_size = ctx.v_machine.len;
 t70 = (ctx.v_machine).len;
 t71 = NativeJitAlloc(t70);
 (v_f18).machine = t71;
@@ -496,6 +499,9 @@ t77 = (ctx.v_machine).data;
 Free(t77);
 t78 = cast[*u8](ctx.v_machine);
 Free(t78);
+ctx.v_jit_offsets = null;
+ctx.v_jit_patches = null;
+ctx.v_machine = null;
 }
 return;
 }

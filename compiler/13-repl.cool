@@ -213,11 +213,13 @@ ReplDiscardNewDrops(false, true);
 t5 = ctx.v_repl_moves;
 MoveRestore(t5);
 }
+ReplRollbackFunctions();
 FreeBytecode(&raw ctx.v_functions[0]);
 t6 = cast[*u8](ctx.v_functions);
 t7 = cast[*u8](ctx.v_repl_snapshot);
-t8 = i64((u64(4096) * sizeof(Function)));
+t8 = ctx.v_repl_saved_nfun * i64(sizeof(Function));
 t9 = MemCpy(t6, t7, t8);
+if (ctx.v_nfun > ctx.v_repl_saved_nfun) { MemSet(cast[*u8](&raw ctx.v_functions[ctx.v_repl_saved_nfun]), 0, (ctx.v_nfun - ctx.v_repl_saved_nfun) * i64(sizeof(Function))); }
 ctx.v_nfun = ctx.v_repl_saved_nfun;
 ctx.v_ntok = ctx.v_repl_saved_ntok;
 ctx.v_naggregates = ctx.v_repl_saved_types;
@@ -611,7 +613,7 @@ pc = 8;
 continue;
 }
 if (pc == 10) {
-if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1; }
+if ((ctx.v_repl_moves != null)) { pc = 13; } else { ReplCommitFunctions(); ReplFreeNodes(); ReplReclaimLocals(); ReplFinishTokens(); pc = 1; }
 continue;
 }
 if (pc == 11) {
@@ -675,7 +677,7 @@ continue;
 if (pc == 22) {
 t7 = cast[*u8](ctx.v_repl_snapshot);
 t8 = cast[*u8](ctx.v_functions);
-t9 = i64((u64(4096) * sizeof(Function)));
+t9 = ctx.v_nfun * i64(sizeof(Function));
 t10 = MemCpy(t7, t8, t9);
 pc = 21;
 continue;
