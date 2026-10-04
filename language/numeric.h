@@ -25,6 +25,12 @@ static inline int cool_width(int64_t type) {
 }
 static inline int64_t cool_numeric_cast(int64_t bits, int64_t from, int64_t to, int64_t *ok) {
     *ok = 1;
+    if (to == 12 && from < 11) {
+        // Convert the integer directly: an intermediate double can erase which
+        // side of a binary32 midpoint the original integer was on.
+        float n = cool_unsigned(from) ? (float)(uint64_t)bits : (float)bits;
+        return cool_bits((double)n);
+    }
     if (to == 11 || to == 12) {
         double n = from >= 11 ? cool_double(bits) : cool_unsigned(from) ? (double)(uint64_t)bits : (double)bits;
         if (to == 12) n = (double)(float)n;

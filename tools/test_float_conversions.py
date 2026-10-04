@@ -3,6 +3,7 @@
 import argparse
 import math
 import os
+import random
 from pathlib import Path
 import shlex
 import struct
@@ -20,6 +21,18 @@ def literal(value):
     return text if '.' in text or 'e' in text else text+'.0'
 def single(value):
     return struct.unpack('f',struct.pack('f',value))[0]
+def integer_single(value):
+    # Round the exact integer to 24 significant binary digits. No float is
+    # involved until the rounded integer is exactly representable in binary32.
+    magnitude=abs(value)
+    shift=max(0,magnitude.bit_length()-24)
+    if shift:
+        quotient,remainder=divmod(magnitude,1<<shift)
+        halfway=1<<(shift-1)
+        if remainder>halfway or (remainder==halfway and quotient%2):quotient+=1
+        magnitude=quotient<<shift
+    return float(-magnitude if value<0 else magnitude)
+
 for signed in (True,False):
     for width in (8,16,32,64):
         ty=('i' if signed else 'u')+str(width)
@@ -37,7 +50,7 @@ for signed in (True,False):
         for value in [-(2**(width-1)) if signed else 0,2**(width-int(signed))-1]:
             for target in ('f64','f32'):
                 converted=float(value)
-                if target=='f32':converted=single(converted)
+                if target=='f32':converted=integer_single(value)
                 valid.append((f'{target}({ty}({value}))',format(converted,'.17g')))
 # Exact tie-to-even rounding at binary32's integer precision boundary.
 for value in [16777215.0,16777216.0,16777217.0,16777218.0,16777219.0,-16777217.0]:
@@ -47,6 +60,22 @@ invalid += [('i64','0.0/0.0'),('i64','1.0/0.0'),('u64','-1.0/0.0'),('i8','f32(12
 for value in (1e-310,5e-324,-5e-324):
     valid.append((literal(value),format(value,'.17g')))
 valid.append(('f32(1e-45)',format(single(1e-45),'.17g')))
+# Probe both sides of exact binary32 midpoints, including those finer than
+# binary64 can retain. Odd/even significands distinguish both tie directions.
+integers={0,1,-1,2**64-1,-2**63}
+for exponent in (24,31,53,54,62,63):
+    spacing=1<<(exponent-23)
+    for significand_offset in (0,1,2):
+        midpoint=(1<<exponent)+significand_offset*spacing+spacing//2
+        for delta in (-1,0,1):
+            value=midpoint+delta
+            if value<2**64:integers.add(value)
+            if value<=2**63:integers.add(-value)
+rng=random.Random(20261007)
+integers.update(rng.randrange(-2**63,2**64) for _ in range(64))
+for value in sorted(integers):
+    source='i64' if value<2**63 else 'u64'
+    valid.append((f'f32({source}({value}))',format(integer_single(value),'.17g')))
 program='import "std/io";fn main(){'+''.join(f'io.println({expression});' for expression,_ in valid)+'}'
 expected=''.join(value+'\n' for _,value in valid)
 

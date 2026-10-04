@@ -918,6 +918,27 @@ through ordinary evaluation or library use.
   That issue, complete floating-token grammar and the arithmetic contract remain
   mandatory pre-freeze work. G1/G9 stay open; this is not a completed numeric audit.
 
+- Direct integer-to-f32 rounding: resolved the double-rounding issue recorded in
+  the preceding conversion audit. The shared numeric boundary converts signed
+  and unsigned integers directly to binary32, widening only the already-rounded
+  value into the compiler's internal representation. Specification draft 5 now
+  requires direct rounding. Expanded conversion coverage from 105 to 269 oracle
+  values: exact integer quotient/remainder and even-significand tie handling
+  determine expected f32 results independently of Python's float conversion.
+  Midpoint neighbors cover exponents 24, 31, 53, 54, 62 and 63, both signs,
+  odd/even significands and 64 deterministic random integers. The expanded suite
+  demonstrably failed before the fix (`float-rounding-before.log`). All existing
+  21 checked conversion failures and two literal range rejections remain in the
+  suite. Evidence is recorded under `build/release-audit/float-rounding-` with
+  `regression.log`, `sanitize.log` and `distribution.log`; the sanitizer run
+  includes the instrumented compiler and emitted LLVM plus runtime float-cast-
+  overflow checks. All cases pass, along with full regression, self-host/bootstrap
+  convergence and installed Neovim/distribution checks. Remote CI is unobserved.
+  No Cool compiler IR changed; the self-host IR SHA256 remains
+  `0bcc61fc4c98a63e2e5b358f78a9be27b5e538b9c641b23f13d1f1d1453f5c74`.
+  Full floating-token grammar and arithmetic, inference and release-wide audits
+  remain open. Resolving this concrete rounding defect does not close G1/G9.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

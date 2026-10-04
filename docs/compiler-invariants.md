@@ -585,3 +585,11 @@ The lexer owns token grammar; this adapter only converts an already selected
 numeric spelling. Float-to-integer casts must check finiteness and the half-open
 destination range before executing the host cast; sanitizer tests explicitly
 enable float-cast-overflow in addition to undefined/address checks.
+
+Integer-to-f32 conversion must cast the integer directly to float, then widen
+that rounded value only for the internal double-bit representation. Casting to
+double before float loses which side of a binary32 midpoint a large integer
+occupies. Signed and unsigned inputs require their respective integer casts.
+Expected values for this boundary must be computed with exact integer quotient,
+remainder and even-significand tie handling, not float(value) followed by f32,
+which would duplicate the defect in the oracle.

@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 4
+# Cool language specification — 1.0 draft 5
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -184,20 +184,18 @@ the interval fail with a checked conversion error. There is no saturation or
 unchecked host float-to-integer cast for such inputs. An input originating in
 `f32` follows the same rules using its represented value.
 
-Integer-to-`f64` conversion rounds to binary64. The current implementation of
-integer-to-`f32` conversion passes through binary64 before rounding to binary32;
-this double-rounding behavior is explicitly still a pre-freeze design
-issue. For example, converting integer `9223372586610589697` currently produces
-`9223372036854775808`, whereas directly rounding to the nearest binary32 value
-would produce `9223373136366403584`. This discrepancy must be resolved before
-freezing the numeric contract. `f64` to `f32` rounds to binary32, and widening a finite `f32` to `f64`
+Integer-to-`f64` conversion rounds to binary64. Integer-to-`f32` rounds directly
+to binary32, without an intermediate binary64 rounding. For example, converting
+integer `9223372586610589697` to `f32` produces `9223373136366403584`.
+`f64` to `f32` rounds to binary32, and widening a finite `f32` to `f64`
 preserves its value exactly. Signed zero is preserved across float conversions.
 The supported default floating environment rounds halfway cases to even; unsafe
 foreign changes to that environment are outside this audited contract.
 
 `make float-conversions-test` checks adjacent representable binary64 values at
 all integer-width boundaries, signed zero, fractional truncation, f32 precision
-ties, widening/narrowing, representable subnormals, and NaN/infinite/out-of-range
+ties, exact-integer midpoint neighbors, widening/narrowing, representable
+subnormals, and NaN/infinite/out-of-range
 rejections across both frontends, five engines and optimized binaries. The
 sanitizer target additionally checks the compiler with ASan and generated LLVM
 with ASan, linking the runtime with UBSan and float-cast-overflow checks enabled.
@@ -205,6 +203,9 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 5: integer-to-f32 conversion rounds directly to binary32. Removed the
+  binary64 intermediary that gave incorrect results near large-integer midpoints;
+  exact integer tie-to-even oracle cases cover both signs and tie directions.
 - Draft 4: specify float-to-integer checks and subnormal literal acceptance;
   record remaining float arithmetic and integer-to-f32 rounding work.
 - Draft 3: specify fixed-width integer operations and conversions. Signed
