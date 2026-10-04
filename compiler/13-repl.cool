@@ -1,46 +1,50 @@
-fn ReplDropNew(arg_v_failed: i8) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_failed: i8 = arg_v_failed;
-var v_d8: *DropSlot = null;
-var v_l5: *Local = null;
-var v_keep: i8 = i8(0);
-var t0: bool = false;
-var t1: i64 = i64(0);
-var t2: i8 = i8(0);
-var t3: i64 = i64(0);
-var t4: i64 = i64(0);
-v_d8 = ((ctx.v_functions)[0]).drops;
-while (true) {
-if (!((v_d8 != ((ctx.v_repl_snapshot)[0]).drops))) { break; }
-v_keep = i8(0);
-if (!((v_failed != i8(0)))) {
-v_l5 = ctx.v_locals;
-while (true) {
-if (!((v_l5 != null))) { break; }
-t0 = ((v_l5).slot == (v_d8).slot);
-if (t0) {
-t1 = (v_l5).type;
-t2 = Owned(t1);
-t0 = (i64(t2) != i64(0));
+// New storage has no initialized values until execution begins.
+fn ReplDiscardNewDrops(executed: bool, failed: bool) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var link = &raw ctx.v_functions[0].drops;
+        while (*link != ctx.v_repl_snapshot[0].drops) {
+            let drop = *link;
+            var keep = false;
+            if (!failed) {
+                var local = ctx.v_locals;
+                while (local != null) {
+                    if (local.slot == drop.slot && local.type == drop.type) { keep = true; }
+                    local = local.next;
+                }
+            }
+            if (keep) { link = &raw drop.next; }
+            else {
+                if (executed) { DropValue(i64(cast[i64](&raw ctx.v_repl_values[drop.slot])), drop.type); }
+                *link = drop.next;
+                Free(cast[*u8](drop));
+            }
+        }
+    }
 }
-if (t0) {
-v_keep = i8(1);
+fn ReplTrimStorage() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var end: i64 = 0;
+        var local = ctx.v_repl_locals;
+        while (local != null) {
+            let last = local.slot + TypeSlots(local.type);
+            if (last > end) { end = last; }
+            local = local.next;
+        }
+        // Values were already dropped; prune their old type descriptors before
+        // reusing storage. Interior holes remain and live addresses never move.
+        var link = &raw ctx.v_functions[0].drops;
+        while (*link != null) {
+            let drop = *link;
+            local = ctx.v_repl_locals;
+            while (local != null && (local.slot != drop.slot || local.type != drop.type)) { local = local.next; }
+            if (local != null) { link = &raw drop.next; }
+            else { *link = drop.next; Free(cast[*u8](drop)); }
+        }
+        ctx.v_functions[0].slots = end;
+    }
 }
-v_l5 = (v_l5).next;
-}
-}
-if (!((v_keep != i8(0)))) {
-t3 = i64(cast[i64](&raw ((ctx.v_repl_values)[(v_d8).slot])));
-t4 = (v_d8).type;
-DropValue(t3, t4);
-}
-v_d8 = (v_d8).next;
-}
-}
-return;
-}
-
 
 fn Submission() -> *Text {
 unsafe {
@@ -167,7 +171,6 @@ return null;
 fn ReplRestore() {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_retained_slots: i64 = i64(0);
 var v_frame4: *Frame = null;
 var v_d9: *DropSlot = null;
 var t0: i64 = i64(0);
@@ -181,7 +184,6 @@ var t7: *u8 = null;
 var t8: i64 = i64(0);
 var t9: *u8 = null;
 var t10: bool = false;
-v_retained_slots = ((ctx.v_functions)[0]).slots;
 ReplLoansFinish(ctx.v_repl_executing != i8(0), ctx.v_repl_locals);
 ReplPackagesRestore();
 if ((ctx.v_repl_executing != i8(0))) {
@@ -203,8 +205,9 @@ t3 = cast[*u8](v_frame4);
 Free(t3);
 }
 t4 = i8(1);
-ReplDropNew(t4);
+ReplDiscardNewDrops(true, true);
 } else {
+ReplDiscardNewDrops(false, true);
 t5 = ctx.v_repl_moves;
 MoveRestore(t5);
 }
@@ -212,13 +215,6 @@ t6 = cast[*u8](ctx.v_functions);
 t7 = cast[*u8](ctx.v_repl_snapshot);
 t8 = i64((u64(4096) * sizeof(Function)));
 t9 = MemCpy(t6, t7, t8);
-t10 = (i64(ctx.v_repl_executing) != i64(0));
-if (t10) {
-t10 = (v_retained_slots > ((ctx.v_functions)[0]).slots);
-}
-if (t10) {
-((ctx.v_functions)[0]).slots = v_retained_slots;
-}
 ctx.v_nfun = ctx.v_repl_saved_nfun;
 ctx.v_ntok = ctx.v_repl_saved_ntok;
 ctx.v_naggregates = ctx.v_repl_saved_types;
@@ -486,9 +482,10 @@ t63 = ctx.v_repl_values;
 t64 = RunBytecode(t62, t63);
 v_result6 = t64;
 t65 = i8(0);
-ReplDropNew(t65);
+ReplDiscardNewDrops(true, false);
 ReplLoansFinish(true, ctx.v_locals);
 ctx.v_repl_locals = ctx.v_locals;
+ReplTrimStorage();
 }
 return;
 }

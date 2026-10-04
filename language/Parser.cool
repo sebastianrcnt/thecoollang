@@ -198,6 +198,7 @@ Node *Atom() {
         }
         id = FindFunIn(package, name);
         if (id < 0) ErrorAt(t, "unknown function");
+        if (allow_redefinition && id == 0) ErrorAt(t, "internal session function is not callable");
         if (functions[id].foreign && !unsafe_depth) ErrorAt(t, "foreign calls require unsafe");
         if (qualified && !functions[id].public) ErrorAt(t, "function is private to its package");
         id = SpecializeFunction(id, type_args, type_count);
@@ -491,6 +492,7 @@ U0 ParseProgram() {
             id = FindFunIn(At()->package, name); old = NULL;
             if (id >= 0) {
                 if (!allow_redefinition) Error("duplicate function declaration");
+                if (id == 0) Error("internal session function cannot be redefined");
                 for (j = 0; j < count; j++) if (parsed[j] == id) Error("duplicate declaration in submission");
                 old = CAlloc(sizeof(Function)); MemCpy(old, &functions[id], sizeof(Function));
             } else {

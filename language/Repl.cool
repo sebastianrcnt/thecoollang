@@ -9,15 +9,27 @@ I64 *repl_values;
 I64 repl_capacity;
 Bool repl_executing;
 MoveState *repl_moves;
+extern U0 ReplTrimStorage();
 #include "ReplLoans.cool"
 #include "ReplPackages.cool"
-U0 ReplDropNew(Bool failed) {
-    DropSlot *d; Local *l; Bool keep;
-    for (d = functions[0].drops; d != repl_snapshot[0].drops; d = d->next) {
-        keep = FALSE;
-        if (!failed) for (l = locals; l; l = l->next) if (l->slot == d->slot && Owned(l->type)) keep = TRUE;
-        if (!keep) DropValue(&repl_values[d->slot], d->type);
+// Only records added by this submission may be discarded on rollback.
+// Rejected code has never initialized its slots: never drop those values.
+U0 ReplDiscardNewDrops(Bool executed, Bool failed) {
+    DropSlot **link=&functions[0].drops,*d;Local *l;Bool keep;
+    while(*link!=repl_snapshot[0].drops){
+        d=*link;keep=FALSE;
+        if(!failed)for(l=locals;l;l=l->next)if(l->slot==d->slot && l->type==d->type)keep=TRUE;
+        if(keep)link=&d->next;
+        else {if(executed)DropValue(&repl_values[d->slot],d->type);*link=d->next;Free(d);}
     }
+}
+U0 ReplTrimStorage() {
+    Local *l;I64 end=0,last;DropSlot **link=&functions[0].drops,*d;
+    for(l=repl_locals;l;l=l->next){last=l->slot+TypeSlots(l->type);if(last>end)end=last;}
+    // Values have already been dropped. Remove stale type descriptors before
+    // their slots can hold a different type. Live bindings never move.
+    while(*link){d=*link;l=repl_locals;while(l && (l->slot!=d->slot || l->type!=d->type))l=l->next;if(l)link=&d->next;else{*link=d->next;Free(d);}}
+    functions[0].slots=end;
 }
 
 Text *Submission() {
@@ -40,7 +52,7 @@ Text *Submission() {
     Reserve(text, 0); return text;
 }
 U0 ReplRestore() {
-    I64 retained_slots = functions[0].slots; Frame *frame; DropSlot *d;
+    Frame *frame; DropSlot *d;
     ReplLoansFinish(repl_executing,repl_locals);
     ReplPackagesRestore();
     if (repl_executing) {
@@ -49,10 +61,9 @@ U0 ReplRestore() {
             for (d = frame->function->drops; d; d = d->next) DropValue(&frame->values[d->slot], d->type);
             active_frame = frame->parent; Free(frame->values); Free(frame);
         }
-        ReplDropNew(TRUE);
-    } else MoveRestore(repl_moves);
+        ReplDiscardNewDrops(TRUE,TRUE);
+    } else {ReplDiscardNewDrops(FALSE,TRUE);MoveRestore(repl_moves);}
     MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
-    if (repl_executing && retained_slots > functions[0].slots) functions[0].slots = retained_slots;
     nfun = repl_saved_nfun; ntok = repl_saved_ntok; naggregates = repl_saved_types;
     aliases = repl_aliases; locals = repl_locals; call_depth = 0; type_bindings = NULL; specialization_depth = 0;
 }
@@ -86,7 +97,7 @@ U0 ReplStep(Text *text) {
     for (i = repl_snapshot[0].slots; i < f->slots; i++) repl_values[i] = 0;
     // The session's locals remain live; expression temporaries are regenerated.
     repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
-    ReplDropNew(FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals;
+    ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage();
 }
 U0 Repl(Bool prompt) {
     Text *text, *stats; I64 i, compiled; DropSlot *d; MoveState *move;

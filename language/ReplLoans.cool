@@ -21,6 +21,6 @@ U0 ReplForget(U8 *name){
     for(loan=repl_loans;loan;loan=loan->next)if(loan->holder!=local && (loan->root==local || loan->parent==local))Error("cannot forget a binding with live dependent loans");
     if(Owned(local->type))DropValue(&repl_values[local->slot],local->type);
     link=&repl_loans;while(*link){loan=*link;if(loan->holder==local){*link=loan->next;Free(loan);}else link=&loan->next;}
-    binding=&repl_locals;while(*binding!=local)binding=&(*binding)->next;*binding=local->next;locals=repl_locals;
+    binding=&repl_locals;while(*binding!=local)binding=&(*binding)->next;*binding=local->next;locals=repl_locals;ReplTrimStorage();
 }
 Bool ReplLoanCommand(){U8 *name;if(!Take(':'))return FALSE;if(!Is("forget"))Error("unknown session command");pos++;name=Ident();Take(';');if(At()->kind)Error("expected one binding after :forget");ReplForget(name);return TRUE;}

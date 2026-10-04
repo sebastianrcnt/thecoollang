@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""Long REPL sessions reuse dead tail storage without moving surviving values."""
+from pathlib import Path
+import argparse
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--frontend', type=Path)
+args = parser.parse_args()
+fronts = [[ROOT / 'build/cool-compiler'],
+          [ROOT / 'build/coolc', '--run', ROOT / 'build/language.BIN']]
+if args.frontend:
+    fronts.append([args.frontend.resolve()])
+
+
+def check(front, name, source, output, errors=()):
+    result = subprocess.run([*front, 'repl-quiet'], input=source + '\n:quit\n',
+                            text=True, capture_output=True, timeout=120)
+    assert result.returncode == 0 and result.stdout == output, (name, front, result)
+    assert result.stderr.count('error:') == len(errors), (name, result.stderr)
+    for diagnostic in set(errors):
+        assert result.stderr.count(diagnostic) == errors.count(diagnostic), (name, result.stderr)
+
+
+for front in fronts:
+    check(front, 'reserved session identity', '''var x=7;
+fn __session(){}
+var y=9;
+x
+__session()
+fn caller(){__session();}
+pub fn __session(){}
+extern "C" fn __session();
+fn __session[T](){}
+x+y''', '7\n16\n',
+          ['internal session function cannot be redefined'] * 4 +
+          ['internal session function is not callable'] * 2)
+
+    # Each former bump-only session exceeded 65536 slots. A persistent view
+    # pins old storage throughout allocation, cleanup and failed submissions.
+    start = 'import "std/mem";\nvar a=[2]i64{7,8};\nlet r=&mut a[1];\n'
+    blocks = '\n'.join('{var scratch=[512]i64{};scratch[511]=99;}' for _ in range(160))
+    check(front, 'temporary arrays', start + blocks + '\n*r=42;\n*r\n:forget r\na[0]+a[1]', '42\n49\n')
+    bindings = '\n'.join('var scratch=[512]i64{};\nscratch[511]=99;\n:forget scratch' for _ in range(160))
+    check(front, 'forgotten arrays', start + bindings + '\n*r=42;\n*r\n:forget r\na[0]+a[1]', '42\n49\n')
+
+    # Forgetting an interior owner must remove its drop descriptor even though
+    # its hole cannot yet be reused. Later reuse stores a non-owner there.
+    check(front, 'interior owner descriptor', '''import "std/mem";
+var first=new[i64](11);
+var middle=new[[2]i64]([2]i64{22,33});
+var last=new[i64](44);
+let view=&*last;
+:forget middle
+mem.owner_count()
+*view
+:forget view
+:forget last
+var number=77;
+number
+mem.owner_count()
+:forget first
+mem.owner_count()''', '2\n44\n77\n1\n0\n')
+
+    owners = '\n'.join('var scratch=[512]own[i64]{};\nscratch[511]=new[i64](99);\n:forget scratch\nvar scalar=123;\n:forget scalar' for _ in range(160))
+    check(front, 'owner descriptors and type changes', start + owners + '\n*r\nmem.owner_count()', '8\n0\n')
+
+    # Compile failures must discard descriptors without dropping uninitialized
+    # slots. Runtime failures must drop initialized owners and discard new loans.
+    failures = '\n'.join('{var scratch=[512]own[i64]{};scratch[511]=new[i64](99);assert(false);}' for _ in range(160))
+    check(front, 'runtime rollback storage', start + failures + '\n*r=42;\n*r\nmem.owner_count()',
+          '42\n0\n', ['assertion failed'] * 160)
+    failures = '\n'.join('let rejected=new[[512]i64]([512]i64{}); extra;' for _ in range(160))
+    check(front, 'compile rollback descriptors', start + failures + '\nvar scalar=123;\nscalar\n*r\nmem.owner_count()',
+          '123\n8\n0\n', ['one statement per submission'] * 160)
+
+    # The restriction belongs to the REPL implementation, not the language's
+    # ordinary identifier namespace.
+    with tempfile.TemporaryDirectory(prefix='cool-session-name-') as directory:
+        source = Path(directory) / 'main.cool'
+        source.write_text('import "std/io";fn __session()->i64{return 42;}fn main(){io.println(__session());}')
+        result = subprocess.run([*front, 'run', source], text=True, capture_output=True, timeout=30)
+        assert (result.returncode, result.stdout, result.stderr) == (0, '42\n', ''), result
+print('REPL storage: reserved identity, stable live references, tail reuse, mixed owner types and compile/runtime rollback on all frontends PASS')

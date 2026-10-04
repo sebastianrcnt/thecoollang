@@ -382,6 +382,25 @@ through ordinary evaluation or library use.
   remote CI is not yet verified. In-memory tokens, code and value slots still
   need bounded reclamation, so G6 remains open.
 
+- REPL storage lifetime audit: redefining the synthetic `__session` function
+  reset live slot metadata and changed an existing variable from 7 to 9 when
+  a new variable reused its slot. Both frontends now reject redefinition and
+  calls of that internal function in REPL mode; ordinary source identifiers
+  remain unaffected. Dead trailing storage is reclaimed after statements and
+  `:forget`, without relocating live bindings. Compile rollback removes new
+  drop metadata without touching uninitialized values; runtime rollback drops
+  initialized new owners and restores the old storage boundary. Dead owner
+  descriptors are removed before slots can hold another type. Repeated large
+  temporary/forgotten arrays exceed the former cumulative slot limit while
+  preserving live references, mixed owner/scalar reuse and error recovery.
+  Both frontends and the ASan-instrumented compiler pass these regressions.
+  `make test bootstrap-check` and external read-only installation pass; the
+  self-host fixed-point IR SHA256 is
+  `0e3c643ab04bde18bc3825b579f4b1870b5d76ba68ddb7d6c7a8f6be51ea255d`.
+  CI includes the storage sanitizer target; remote CI is still unverified.
+  Interior holes and in-memory AST/token/code reclamation remain open, so this
+  does not close G6 or declare bounded total session memory.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

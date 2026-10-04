@@ -534,9 +534,14 @@ cool> value
 are destroyed immediately and exactly once. A binding with live source or
 parent dependencies cannot be forgotten: forget dependent views first. Unknown
 names and malformed commands leave bindings intact. The removed name can then
-be declared again. This command does not reuse old value slots or reclaim all
-compiler metadata yet; the session's existing register limit still applies.
-Raw pointers remain subject to explicit unsafe lifetime obligations.
+be declared again. Dead storage after the last surviving binding is reused,
+including statement temporaries and failed new bindings. Surviving bindings
+keep stable addresses. Interior holes, tokens and AST/compiler metadata are
+not yet fully reclaimed; the existing register limit still applies to each
+submission and its live storage. Raw pointers remain subject to explicit
+unsafe lifetime obligations and must not access forgotten/reused storage.
+The REPL reserves its internal `__session` function: user code cannot redefine
+or call it. Ordinary source files may still use that identifier.
 
 Input checking uses a copy of the live loan list. Syntax/type/checking failure
 discards that copy and preserves existing bindings and loans. Successful
@@ -555,7 +560,12 @@ read/write permission queries run on both frontends. With
 `make repl-loans-sanitize-test`, the self-hosted compiler's own LLVM loads/stores
 are ASan-instrumented and its C host/runtime use ASan/UBSan, then the same tests
 run against that compiler. These checks do not prove bounded metadata use in
-long sessions, which remains release work. Package loading is described below.
+long sessions, which remains release work. `make repl-storage-test` additionally
+checks repeated large temporary/forgotten arrays beyond the former cumulative
+slot limit, stable references, mixed owning/non-owning slot reuse and compile/
+runtime rollback on both frontends. `make repl-storage-sanitize-test` repeats
+these checks on the ASan-instrumented compiler. Package loading is described
+below.
 
 
 ## Packages in the REPL

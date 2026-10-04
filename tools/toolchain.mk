@@ -243,3 +243,10 @@ test: repl-packages-test
 .PHONY: repl-packages-sanitize-test
 repl-packages-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_repl_packages.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: repl-storage-test repl-storage-sanitize-test
+repl-storage-test: build/cool-compiler build/language.BIN
+	python3 tools/test_repl_storage.py
+test: repl-storage-test
+repl-storage-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_repl_storage.py --frontend build/repl-loans-asan/cool-compiler

@@ -5298,6 +5298,7 @@ pc = 133;
 continue;
 }
 if (pc == 138) {
+if (ctx.v_allow_redefinition != i8(0) && v_id2 == 0) { Error(cast[*u8]("internal session function cannot be redefined")); }
 if (!((ctx.v_allow_redefinition != i8(0)))) { pc = 139; } else { pc = 137; }
 continue;
 }

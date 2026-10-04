@@ -63,8 +63,8 @@ fn ReplForget(name: *u8) {
             }
             loan = loan.next;
         }
-        // All validation precedes mutation. Forgotten owner slots are cleared
-        // by DropValue and remain harmless in the final session drop list.
+        // All validation precedes mutation. Drop the owner before removing its
+        // binding and reclaiming trailing storage.
         if (Owned(local.type) != i8(0)) {
             DropValue(i64(cast[i64](&raw ctx.v_repl_values[local.slot])), local.type);
         }
@@ -78,6 +78,7 @@ fn ReplForget(name: *u8) {
         while (*binding != local) { binding = &raw (*binding).next; }
         *binding = local.next;
         ctx.v_locals = ctx.v_repl_locals;
+        ReplTrimStorage();
     }
 }
 fn ReplLoanCommand() -> bool {

@@ -286,9 +286,23 @@ candidate check records are freed on replacement and exit.
 
 `:forget` validates source/parent dependencies and syntax before any mutation.
 It drops owning storage, removes the binding from name lookup, and frees its
-held loans. Cleared owner slots remain harmless in the final drop list. Slots,
-AST/local metadata and tokens are not reclaimed by this command; general
-bounded session storage remains an explicit release requirement.
+held loans. `ReplTrimStorage` removes dead drop descriptors and reduces the
+slot high-water mark to the maximum end of a visible binding; live bindings
+never move. Dead statement temporaries and forgotten trailing bindings can
+then reuse storage. Never retain a dead drop descriptor across reuse: its
+former owner type could interpret a new scalar as an owned pointer. Interior
+holes and AST/local metadata/tokens still require general bounded reclamation.
+
+`ReplDiscardNewDrops` traverses only records above the saved drop-list head.
+Execution failure drops new initialized owners before restoring the old
+function snapshot; compile failure frees descriptors without touching values
+because the new slots were never initialized. Safe persistent references
+require surviving tracked roots, so failed new local storage cannot escape
+and does not need a permanent slot reservation. Unsafe pointers remain the
+caller's lifetime responsibility. The synthetic function ID zero must never
+be redefined or called by source in REPL mode; otherwise its slot/drop metadata
+can be reset underneath live session values. This restriction does not apply
+to ordinary compilation.
 
 REPL imports use a private length-framed driver channel. The frontend recognizes
 import tokens; the driver only reuses package graph resolution, metadata scans,

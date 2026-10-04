@@ -149,6 +149,9 @@ fn NamedAtom(token: * Token) -> * Node {
             if (id < 0) {
                 ErrorAt(token, cast[ * u8]("unknown function"));
             }
+            if (ctx.v_allow_redefinition != i8(0) && id == 0) {
+                ErrorAt(token, cast[*u8]("internal session function is not callable"));
+            }
             if (ctx.v_functions[id].foreign != 0 && ctx.v_unsafe_depth == 0) {
                 ErrorAt(token, cast[ * u8]("foreign calls require unsafe"));
             }
