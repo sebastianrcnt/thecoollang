@@ -28,3 +28,10 @@ MoveState *MoveSnapshot() {
 U0 MoveRestore(MoveState *s) { while (s) { s->local->moved = s->before; s = s->next; } }
 U0 MoveJoin(MoveState *s) { while (s) { s->joined |= s->local->moved; s = s->next; } }
 U0 MoveFinish(MoveState *s) { while (s) { s->local->moved = s->joined; s = s->next; } }
+
+// A place must remain live until its delayed load/store completes. Index and
+// RHS evaluation may consume its owner after the address has been computed.
+U0 CheckLivePlace(Node *place) {
+    Local *root = BorrowRoot(place);
+    if (root && Owned(root->type) && root->moved) ErrorAt(place->token, "owner moved while an access to its storage is pending");
+}

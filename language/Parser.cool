@@ -221,6 +221,7 @@ Node *Primary() {
             if (kind != A_ARRAY && kind != A_SLICE && (!Pointer(n->type) || n->type == T_PTR)) ErrorAt(t, "indexing requires an array, slice or typed pointer");
             if (!kind && !unsafe_depth) ErrorAt(t, "raw pointer indexing requires unsafe");
             if (At()->kind == ':') { index = NewNode(N_INT, t); index->type = T_INT; } else index = Expr(1);
+            CheckLivePlace(n);
             if (!Integer(index->type)) ErrorAt(t, "index must be an integer");
             if (kind) element = Shape(n->type)->element; else element = n->type-T_PTR;
             if (Take(':')) {
@@ -367,7 +368,7 @@ Node *Statement() {
                     l = FindLocal(post->a->name); if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
                     post->kind = N_ASSIGN; post->local_ref = l; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type); Transfer(post->a); l->moved = FALSE;
                 } else if (post->a->kind == N_LOAD) {
-                    post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type); Transfer(post->b);
+                    post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type); Transfer(post->b); CheckLivePlace(post->a);
                 } else ErrorAt(t, "invalid for update assignment");
             }
             n->c = post; Need(')', "expected ')' after for update");
@@ -409,7 +410,7 @@ Node *Statement() {
         if (n->a->kind != N_LOAD) ErrorAt(t, "invalid assignment target");
         if (!n->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
         n->kind = N_STORE; n->type = n->a->type; n->a = n->a->a;
-        n->b = Expr(1); Coerce(n->b, n->type); Transfer(n->b);
+        n->b = Expr(1); Coerce(n->b, n->type); Transfer(n->b); CheckLivePlace(n->a);
     }
     Need(';', "expected ';'"); return n;
 }

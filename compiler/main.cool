@@ -6356,6 +6356,7 @@ t49 = 1;
 t50 = Expr(t49);
 v_index = t50;
 }
+CheckLivePlace(v_n14);
 t51 = (v_index).type;
 t52 = Integer(t51);
 if (!((t52 != i8(0)))) {
@@ -9102,6 +9103,7 @@ t112 = (v_post).type;
 Coerce(t111, t112);
 t113 = (v_post).b;
 Transfer(t113);
+CheckLivePlace((v_post).a);
 } else {
 t114 = v_t14;
 t115 = cast[*u8]("invalid for update assignment");
@@ -9348,6 +9350,7 @@ t222 = (v_n19).type;
 Coerce(t221, t222);
 t223 = (v_n19).b;
 Transfer(t223);
+CheckLivePlace((v_n19).a);
 }
 t224 = 59;
 t225 = cast[*u8]("expected ';'");
@@ -22859,3 +22862,13 @@ ctx.v_repl_context = cast[*i64](CAlloc(24 * i64(sizeof(i64))));
 LanguageMain();
 
 } }
+
+// Pending projection addresses cannot survive an intervening move of their owner.
+fn CheckLivePlace(place: *Node) {
+    unsafe {
+        let root = BorrowRoot(place);
+        if (root != null && Owned(root.type) != 0 && root.moved != 0) {
+            ErrorAt(place.token, cast[*u8]("owner moved while an access to its storage is pending"));
+        }
+    }
+}

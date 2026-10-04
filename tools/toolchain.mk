@@ -102,3 +102,8 @@ test: export-test selfhost-check
 stdlib-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_stdlib.py
 test: stdlib-test
+
+.PHONY: owner-evaluation-test
+owner-evaluation-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_owner_evaluation.py
+test: owner-evaluation-test

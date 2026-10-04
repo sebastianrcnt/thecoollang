@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""A pending address must not outlive its owner during index/RHS evaluation."""
+from pathlib import Path
+import subprocess
+import tempfile
+ROOT=Path(__file__).resolve().parents[1]
+FRONTS=[[ROOT/'build/cool-compiler'],[ROOT/'build/coolc','--run',ROOT/'build/language.BIN']]
+NEGATIVE=[
+ 'fn consume(p: own[[2]i64]) -> i64 { return 0; } fn main(){let p=new[[2]i64]([2]i64{1,2}); let x=(*p)[consume(move p)];}',
+ 'fn consume(p: own[i64]) -> i64 { return 9; } fn main(){let p=new[i64](1); *p=consume(move p);}',
+ 'struct S { items:[2]i64; } fn consume(p:own[S])->i64{return 0;} fn main(){let p=new[S](); let x=(*p).items[consume(move p)];}',
+ 'struct S { item:i64; } fn consume(p:own[S])->i64{return 9;} fn main(){let p=new[S](); (*p).item=consume(move p);}',
+]
+POSITIVE='''import "std/io";
+fn consume(p:own[i64])->i64{return *p;}
+fn main(){
+  let a=new[[2]i64]([2]i64{10,20}); let b=new[i64](1);
+  io.println((*a)[consume(move b)]);
+  let p=new[i64](2); let q=new[i64](3); *p=consume(move q); io.println(*p);
+  var r=new[i64](4); r=move r; io.println(*r);
+}
+'''
+with tempfile.TemporaryDirectory(prefix='cool-owner-evaluation-') as tmp:
+ p=Path(tmp)/'main.cool'
+ for source in NEGATIVE:
+  p.write_text(source)
+  for front in FRONTS:
+   run=subprocess.run([*front,'check',p],capture_output=True,text=True,timeout=10)
+   assert run.returncode==2 and 'owner moved while an access' in run.stderr,(source,front,run)
+ p.write_text(POSITIVE)
+ for mode in ('tree','interp','jit','llvm','llvm-jit'):
+  run=subprocess.run([ROOT/'tools/cool','run','--backend',mode,p],capture_output=True,text=True,timeout=30)
+  assert (run.returncode,run.stdout,run.stderr)==(0,'20\n3\n4\n',''),(mode,run)
+print('owner evaluation: pending index/store moves rejected by both frontends; unrelated moves and reinitialization across five engines PASS')
