@@ -182,15 +182,22 @@ addresses cannot outlive a move during index or assignment-RHS evaluation;
 Borrow regions propagate parameter bits plus a frame bit through source edges.
 A returned borrow must be a subset of the declared `borrows(...)` contract.
 Scoped references additionally maintain loans with root, holder, reborrow parent
-and exclusivity. Direct and nested reference-returning calls must keep the
-selected argument's actual loan provenance, not guess a root from syntax.
+and exclusivity, plus the AST expression that produced the loan. A binding may
+hold several root/parent records. Direct and nested reference-returning calls
+keep the union of all declared source arguments, deduplicating equivalent
+records rather than guessing a single root from syntax. Parent ancestry must
+be resolved for the specific root being checked.
 Argument loans remain active while later arguments are evaluated. Temporary
 loans normally end at the statement; named/deferred loans remain through scope.
-A child loan can restrict its parent until that child's scope ends.
+A child loan can restrict its parent until that child's scope ends. Binding a
+reference retains only the resulting expression's loans; index-computation
+temporaries expire at that statement. Reborrowing a computed reference transforms
+its temporary result loans after address evaluation, preserving the root set
+and preventing an exclusive upgrade from a shared source.
 
 The checker currently treats an entire root as conflicting, not individual
-fields. Stored references, integrated slice loans, multiple reference-return
-sources and persistent REPL references remain unsupported. Do not remove their
+fields. Stored references, integrated slice loans and persistent REPL references
+remain unsupported. Do not remove their
 rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).

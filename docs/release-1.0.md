@@ -250,6 +250,18 @@ through ordinary evaluation or library use.
   is prepared but not remotely run. This is explicitly `0.1.0-dev`; G10 remains
   open for remote CI evidence and the final 1.0 release process/notes.
 
+- Reference provenance sets: calls with multiple `borrows` sources now preserve
+  all possible roots with root-specific reborrow ancestry. Expression markers
+  distinguish returned loans from index/argument temporaries; equivalent records
+  are deduplicated. Computed exclusive references can be safely reborrowed as
+  shared, enabling chains such as `map.at_mut(&key).scalar_len()`. Five engines,
+  O2, 28 negative cases and 216 deterministic finite-set oracle queries pass on
+  both frontends, alongside existing reference/method/evaluation regressions and
+  self-host convergence (IR SHA256 begins `5342aa758b3f62f1`). The complete
+  `make test bootstrap-check` run also passes, including legacy generation
+  convergence. This is a foundation for stored loans and slice integration,
+  which remain required and unimplemented.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw

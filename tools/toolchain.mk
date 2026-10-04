@@ -185,3 +185,8 @@ distribution-test: build/cool-compiler build/language-runtime.o build/language-r
 	python3 tools/test_distribution.py
 package-dev: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/package_release.py
+
+.PHONY: reference-sets-test
+reference-sets-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_reference_sets.py
+test: reference-sets-test

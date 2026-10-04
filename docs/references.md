@@ -47,12 +47,14 @@ fn swap[T](left: &mut T, right: &mut T) {
 
 A function returning a reference declares `borrows(parameter)` and may only
 return storage rooted in that parameter. Returning a local or local owner is
-rejected. Calls require one declared source; its argument may be a named
-reference, a direct borrow or another reference-returning call. Nested calls
-retain the selected argument's original root and reborrow parent, including
-when the source is not the first parameter. Argument loans protect evaluation
-of later arguments; the result loan remains live through its enclosing binding
-or expression. A returned field reference keeps the entire source root borrowed.
+rejected. A contract can name multiple reference parameters, such as
+`borrows(left, right)`. The caller conservatively protects the union of possible
+roots, even when a literal selector appears to choose only one branch. Arguments
+may be named references, direct borrows or reference-returning calls; nested
+calls and reborrows retain every root and its corresponding parent. Argument
+loans protect evaluation of later arguments, and result loans remain live through
+their enclosing binding or expression. A returned field reference keeps the
+entire source root borrowed.
 
 ```cool
 struct Pair { value: i64; }
@@ -79,8 +81,6 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
   these restrictions.
 - REPL statement submissions containing references are rejected because loans
   are not yet retained across submissions. Compiled function bodies are checked.
-- Reference calls with multiple return sources are rejected. These require
-  richer provenance sets; nested calls with one declared source are supported.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
   or borrow-aware replacement for every collection API.
   [Methods](methods.md) use the same scoped loans.
@@ -135,3 +135,45 @@ chunk chain. Indexed access is O(index / 32); append and pop are O(1).
 `make safe-vector-test` executes an owning-vector and binary-file program with
 no `unsafe` blocks on five engines and rejects conflicting element-loan use.
 The seeded collection model also exercises the reference APIs under ASan.
+
+
+## Multiple sources and computed reborrows
+
+```cool
+fn choose(first: bool, left: &i64, right: &i64)
+    -> &i64 borrows(left, right) {
+    if (first) { return left; }
+    return right;
+}
+fn main() {
+    var left = 1;
+    var right = 2;
+    {
+        let selected = choose(false, &left, &right);
+        assert(*selected == 2);
+        // Neither left nor right can be changed while selected remains live.
+    }
+    left = 3;
+    right = 4;
+}
+```
+
+The same rule applies to exclusive results. A reborrow through a union-valued
+binding carries the whole root set; changing or moving any candidate root is
+rejected. Root-specific parent relationships allow a parent to resume use after
+its child scope ends. Repeated occurrences of the same root/parent combination
+are deduplicated rather than expanding exponentially.
+
+An address projection through a computed reference also retains the actual
+result loans. `&*choose_mut(...)` may reborrow an exclusive result as shared;
+it cannot upgrade a shared result to exclusive. This enables chains such as
+`map.at_mut(&key).scalar_len()` without an intermediate reference variable.
+Indices and later arguments still execute while the original storage is
+protected. Temporary loans used only to compute an index end after the statement;
+they do not become unrelated roots of the reference being bound.
+
+`make reference-sets-test` validates these cases on both frontends, five engines
+and optimized native output. It includes 28 explicit rejection cases and an
+independent finite-set oracle with 216 seeded mutation queries, plus repeated
+union deduplication. This does not implement reference-containing aggregates,
+borrowed slice integration or persistent REPL loans.

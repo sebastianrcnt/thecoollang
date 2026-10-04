@@ -63,7 +63,7 @@ fn tests(){
  var word=text("한글");assert(word.scalar_len()==2);word.append_scalar(128578);assert(word.byte_len()==10);
  let clone=word.clone();assert(word.equal(&clone));assert(word.compare(&clone)==0);assert(word.as_bytes().len()==10);
  var map=m.create[t.Text]();map.insert(text("key"),move word);let key=text("key");assert(map.contains(&key));assert(map.at(&key).scalar_len()==3);
- map.at_mut(&key).append_literal("!");assert(map.at(&key).scalar_len()==4);
+ map.at_mut(&key).append_literal("!");assert(map.at(&key).scalar_len()==4);assert(map.at_mut(&key).scalar_len()==4);
  let names=map.keys();assert(names.len()==1);map.remove(&key);map.clear();assert(map.len()==0);
 }
 fn main(){tests();assert(mem.owner_count()==0);io.println(42);}

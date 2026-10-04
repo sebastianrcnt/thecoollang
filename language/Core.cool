@@ -255,3 +255,5 @@ extern U0 ValidateMethodTemplate(Function *f);
 extern U0 ValidateMethodSignature(Function *f);
 extern Bool MethodAhead();
 extern Node *MethodCall(Node *receiver,Token *token);
+
+extern Node *ReferencePlaceSource(Node *place);
