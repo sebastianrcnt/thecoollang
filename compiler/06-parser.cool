@@ -4592,6 +4592,7 @@ pc = 24;
 continue;
 }
 if (pc == 26) {
+CompletionOrder(&raw v_parsed[0], v_count10);
 v_i11 = 0;
 pc = 4;
 continue;

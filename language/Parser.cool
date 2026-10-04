@@ -542,6 +542,7 @@ U0 ParseProgram() {
 declaration_next:;
         }
     }
+    CompletionOrder(parsed,count);
     for (i = 0; i < count; i++) {
         current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign || f->generic_count) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
         for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }

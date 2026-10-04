@@ -67,9 +67,14 @@ locals and receiver types, emits candidates and exits without executing user
 code. This supports partial expressions, empty member selections and unfinished
 function blocks. It does not change files or the diagnostic analysis's AST.
 
-This is bounded recovery, not a general error-tolerant parser: unrelated earlier
-syntax/type errors, malformed declarations, missing dependencies and lexical
-errors may prevent the cursor from being reached. Uninstantiated generic bodies,
+After collecting declarations and checking signatures, completion checks the
+requested function body first. Errors in other function bodies, including
+dependency bodies, therefore do not prevent completion. Normal diagnostics still
+report those errors.
+
+This is bounded recovery, not a general error-tolerant parser: errors in earlier
+statements of the requested function, invalid declarations/signatures, missing
+dependencies and lexical errors may prevent the cursor from being reached. Uninstantiated generic bodies,
 top-level declarations and import path strings still need completion support.
 The server returns an empty incomplete list when scanning/checking fails. Each
 request uses synchronous analysis with the same native-process timeout; requests

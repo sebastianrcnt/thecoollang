@@ -308,3 +308,21 @@ fn CompletionStatement() {
         CompletionGeneral(false);
     }
 }
+// All declarations/signatures are already collected. Check the requested body
+// first so an unrelated body's error does not prevent reaching the cursor.
+fn CompletionOrder(parsed: *i64, count: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_completion_token == null) { return; }
+        let position = (cast[i64](ctx.v_completion_token) - cast[i64](ctx.v_tokens)) / i64(sizeof(Token));
+        var i: i64 = 0;
+        while (i < count) {
+            let function = &raw ctx.v_functions[parsed[i]];
+            if (function.foreign == 0 && function.generic_count == 0 && function.begin <= position && position < function.end) {
+                let previous = parsed[0]; parsed[0] = parsed[i]; parsed[i] = previous;
+                return;
+            }
+            i = i + 1;
+        }
+    }
+}

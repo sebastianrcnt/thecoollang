@@ -528,3 +528,11 @@ ranges; strings and other literal interiors cannot become completion markers.
 Reaching the marker emits results and exits before executing user code. Failures
 before the cursor can still prevent completion; this path does not certify a
 whole incomplete program or replace the normal checker.
+
+After declaration collection, completion may swap the requested non-generic
+function to the front of the body-checking order. It must preserve the complete
+function list and all signature/layout validation. Normal checking and REPL
+parsing keep their original order because their completion token is null. This
+allows a valid signature in a broken dependency to support candidate lookup;
+it neither accepts the broken program nor suppresses ordinary diagnostics.
+Errors before the cursor in the requested function still abort that request.

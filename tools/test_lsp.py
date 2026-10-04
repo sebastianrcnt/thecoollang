@@ -159,7 +159,7 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             def completion(marked,wanted,excluded=()):
                 prefix,suffix=marked.split('|');text=prefix+suffix
                 client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':completion.version},'contentChanges':[{'text':text}]})
-                completion.version+=1;client.barrier()
+                completion.version+=1;completion.diagnostics=client.barrier()
                 identifier='completion'+str(completion.version)
                 client.send('textDocument/completion',{'textDocument':{'uri':uri},'position':byte_position(text,len(prefix.encode()))},identifier=identifier)
                 response,_=client.until(identifier)
@@ -188,12 +188,25 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             completion(pre+'   |',{'prior','object','let','var','return'},{'gone','break','continue'})
             completion(pre+'ret|',{'return'})
             completion('package main;fn helper(parameter:i64){par|}',{'parameter'})
+            completion('package main;fn broken(){missing;}fn main(){let visible=1;vis|}',{'visible'},{'missing'})
+            completion('package main;fn broken(){let bad:bool=1;}fn main(){let visible=1;vis|}',{'visible'},{'bad'})
+            failed=completion('package main;fn main(){let bad:bool=1;let visible=1;vis|}',set())
+            assert failed['isIncomplete'] and failed['items']==[]
             completion('package main;import io "std/io";fn main(){io.pr|}',{'print','println'})
             completion(pre+'while(true){br|;}}',{'break'})
             completion(pre+'/* finished */pri|',{'prior'})
             assert completion(pre+'// pri|\n}',set())['items']==[]
             assert completion(pre+'/* pri| */}',set())['items']==[]
             assert completion(pre+'let text="pri|";}',set())['items']==[]
+            # Broken dependency bodies remain diagnostics, but their valid
+            # signatures do not prevent completing a different function.
+            client.send('textDocument/didOpen',{'textDocument':{'uri':liburi,'languageId':'cool','version':3,'text':libtext.replace('return 7;','return missing;')}})
+            assert client.barrier()[liburi]['diagnostics']
+            completion(pre+'object.re|',{'read'},{'hidden'})
+            assert completion.diagnostics[liburi]['diagnostics']
+            client.send('textDocument/didClose',{'textDocument':{'uri':liburi}})
+            client.barrier()
+
             client.send('textDocument/didClose',{'textDocument':{'uri':uri}})
             assert client.barrier()[uri]['diagnostics']==[]
             client.close()

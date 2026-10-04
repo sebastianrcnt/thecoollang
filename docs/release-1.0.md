@@ -756,6 +756,22 @@ through ordinary evaluation or library use.
   uninstantiated generic bodies/top-level/import paths need support, and wider
   error recovery, cancellation and editor integration still need validation.
 
+- Completion isolation from unrelated body errors: after collecting declarations
+  and validating signatures, the completion process checks the requested
+  non-generic function body first. Errors in earlier functions or dependency
+  bodies no longer block its candidates. Normal diagnostics still report those
+  errors; ordinary checking and REPL body order are unchanged. Tests on both
+  frontends and the compiler-instrumented ASan frontend cover unknown names and
+  type mismatches in other bodies, broken dependencies with valid signatures,
+  and continued rejection when a type error precedes the cursor in the requested
+  body. The installed read-only distribution also completes through an unrelated
+  body error. Full `make test bootstrap-check`, self-host IR/native convergence,
+  ASan checks and distribution tests pass. IR SHA256 is
+  `9f02e62820c6c9c524327a60340c1be1c164de09dc7654596951f2b6df039dda`.
+  Evidence: `build/release-audit/completion-order-{focused,regression,sanitize,distribution}.log`.
+  This is a checking-order improvement, not general syntax or statement recovery;
+  G7 remains open for the documented unsupported contexts and editor validation.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
