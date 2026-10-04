@@ -334,3 +334,10 @@ float-conversions-test: build/cool-compiler build/language.BIN build/language-ru
 test: float-conversions-test
 float-conversions-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_float_conversions.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: float-literals-test float-literals-sanitize-test
+float-literals-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_float_literals.py
+test: float-literals-test
+float-literals-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_float_literals.py --frontend build/repl-loans-asan/cool-compiler

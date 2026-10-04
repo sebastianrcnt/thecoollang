@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 5
+# Cool language specification — 1.0 draft 6
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -43,9 +43,33 @@ including the special representable minimum signed-i64 case.
 The current draft permits repeated, leading-after-prefix and trailing integer
 underscores when at least one real digit exists: `0x_FF_`, `0b_10__01_`, and
 `1__234_` have values 255, 9, and 1234. This permissive separator placement is an
-explicit pre-freeze decision to review, not an undocumented assumption. Decimal
-floating literals and conversions require a separate numerical grammar audit;
-do not extend these integer separator rules to floating literals.
+explicit pre-freeze decision to review, not an undocumented assumption.
+
+Decimal floating tokens use the following grammar. `digit` is an ASCII decimal
+digit; brackets mean an optional production and braces mean repetition.
+
+```ebnf
+digits         = digit, { digit } ;
+exponent       = ("e" | "E"), [ "+" | "-" ], digits ;
+floating_token = digits, ".", digits, [ exponent ]
+               | digits, exponent ;
+```
+
+Leading zeroes are allowed. Both sides of the decimal point require a digit;
+`.5`, `1.` and `1.e2` are not floating tokens. An exponent requires digits after
+its optional sign. Floating tokens do not permit underscores, type suffixes,
+hexadecimal/binary significands or hexadecimal exponents. A leading minus is a
+separate unary operator. Examples are `0.0`, `001.25`, `1e3`, and `1.5E-2`.
+The complete token's finite binary64 value determines its range validity, not
+the size of an integer prefix: `18446744073709551616.0` is valid even though
+`18446744073709551616` is outside the integer literal range. The lexer must finish
+classifying the token before reporting integer accumulator overflow. The
+[floating range rules](#floating-conversions-and-literal-range) include subnormals
+and rejection of nonzero underflow to zero or overflow to infinity.
+
+`make float-literals-test` covers this grammar, integer/float classification,
+long decimal significands with compensating exponents, integer overflow
+rejection, all execution engines and formatter preservation on both frontends.
 
 `make integer-tokens-test` checks independently computed integer values and
 malformed tokens on both frontends, with tree, bytecode and native-JIT execution
@@ -173,7 +197,7 @@ subnormal value, including the smallest nonzero binary64 value (`5e-324` rounds
 to that value). A nonzero literal whose conversion underflows to zero is an
 error, as is overflow to infinity. Zero itself is valid. These rules apply to
 source conversion; runtime arithmetic and explicit float narrowing may produce
-zero, infinity or NaN. Complete floating-token grammar remains under audit.
+zero, infinity or NaN. The decimal token grammar is defined in the lexical core.
 
 A floating-to-integer conversion requires a finite input in a half-open interval:
 `[-2^(w-1), 2^(w-1))` for signed destinations and `[0, 2^w)` for unsigned
@@ -203,6 +227,8 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 6: define the decimal floating-token grammar; defer integer overflow
+  diagnostics until token classification so long finite float spellings work.
 - Draft 5: integer-to-f32 conversion rounds directly to binary32. Removed the
   binary64 intermediary that gave incorrect results near large-integer midpoints;
   exact integer tie-to-even oracle cases cover both signs and tie directions.
@@ -237,7 +263,7 @@ a link is not proof that a release gate is closed.
 
 ## Work required before freezing this specification
 
-1. Complete the source-encoding/control-byte and floating-token audit, then
+1. Complete the source-encoding/control-byte audit, then
    publish complete EBNF for declarations, statements, types, expressions and
    precedence, including explicit generic arguments, methods and borrow contracts.
 2. Define inference/coercion, integer/float operations and every runtime failure

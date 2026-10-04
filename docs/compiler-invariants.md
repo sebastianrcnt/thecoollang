@@ -593,3 +593,10 @@ occupies. Signed and unsigned inputs require their respective integer casts.
 Expected values for this boundary must be computed with exact integer quotient,
 remainder and even-significand tie handling, not float(value) followed by f32,
 which would duplicate the defect in the oracle.
+
+Numeric token scanning records accumulator overflow without reporting it until
+the token is classified. Once overflow is recorded, stop accumulating integer
+bits but keep scanning the spelling. Decimal tokens with a fraction or exponent
+are converted from the complete source spelling; their integer prefix need not
+fit u64. Only a token that remains K_INT reports integer overflow. Reset the
+flag for every number; it must not leak into later literals or REPL submissions.

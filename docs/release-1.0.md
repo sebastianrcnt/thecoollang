@@ -939,6 +939,25 @@ through ordinary evaluation or library use.
   Full floating-token grammar and arithmetic, inference and release-wide audits
   remain open. Resolving this concrete rounding defect does not close G1/G9.
 
+- Decimal floating-token grammar: reproduced valid finite decimal spellings
+  such as `18446744073709551616.0` being rejected as overflowing integers by
+  both lexers. Scanning now records overflow, stops integer accumulation and
+  continues classifying the full token; only a remaining integer token reports
+  integer overflow. Float conversion uses the complete source spelling. Draft 6
+  publishes decimal fraction/exponent EBNF, digit/sign/separator/suffix rules and
+  range behavior. The new suite checks 28 Python-oracle values, including
+  2,000-digit significands with compensating exponents, 19 malformed/range cases,
+  and formatting followed by execution. Both frontends and the ASan frontend
+  pass five engines and optimized native builds. Full regression, self-host/
+  bootstrap convergence and installed Neovim/distribution checks pass. Remote
+  CI is unobserved. Logs are
+  `build/release-audit/float-literals-{focused,regression,sanitize,distribution}.log`.
+  The new test is in the ordinary test target and sanitizer CI configuration.
+  Self-host IR SHA256 is
+  `bea50524842a2150db96ec7a07dada92f8b027fabaa74a3219c8de515b99699c`.
+  This completes the audited decimal floating-token grammar; it does not close
+  the complete language grammar, encoding, floating arithmetic or release audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
