@@ -6,15 +6,15 @@ pub enum Option[T] {
 }
 
 pub fn is_some[T](value: Option[T]) -> bool {
-    match (value) {
+    match (move value) {
         Option[T].None => { return false; }
         Option[T].Some(_) => { return true; }
     }
 }
 
 pub fn value_or[T](value: Option[T], fallback: T) -> T borrows(value, fallback) {
-    match (value) {
-        Option[T].None => { return fallback; }
-        Option[T].Some(result) => { return result; }
+    match (move value) {
+        Option[T].None => { return move fallback; }
+        Option[T].Some(result) => { return move result; }
     }
 }

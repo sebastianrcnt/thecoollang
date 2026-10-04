@@ -24,8 +24,8 @@ currently refer to immutable literals; no ownership claim is made.
 on normal block exit, return, break and continue. Panic/runtime failure terminates
 the process and does not promise cleanup.
 
-This is an implementation stage, not the full language: generic specialization,
-ownership checking and the complete runtime are still pending.
+This is an implementation stage, not the full language: the complete standard
+library and new-syntax bootstrap are still pending.
 The new frontend is
 written in existing Cool; new-syntax self-hosting is not yet achieved.
 
@@ -159,8 +159,8 @@ fn main() {
   Current limits are 512 KiB per aggregate and 65,536 storage slots per function;
   baseline JIT falls back to bytecode for large register files.
 - Slices borrow storage; no GC or reference counting was introduced. Function
-  parameters may accept slices, but returning a slice or a value containing one
-  is rejected until lifetime analysis exists. Mutable slice elements cannot contain
+  parameters may accept slices; returning borrowed values requires an explicit
+  `borrows(parameter, ...)` contract, checked against local storage and all assignment paths. Mutable slice elements cannot contain
   further slices, which prevents storing a local borrow into caller-owned storage.
   Slice growth/append, dynamic arrays
   and owning containers are not implemented. Unsafe pointers retain manual
@@ -176,3 +176,36 @@ fn main() {
 `examples/aggregates.cool` demonstrates independent array copies and shared slice
 views. `make aggregate-test` checks bounds, package visibility, LLVM JIT, tools
 and REPL behavior in addition to the differential cases in `language-test`.
+
+## Enums, generics and ownership
+
+`enum Result[T,E] { Ok(T); Err(E); }` has tagged payloads and exhaustive
+`match (value) { Result[i64,string].Ok(n) => { ... } ... }` arms. Generic
+functions, structs and enums specialize for explicit type arguments. Recursive
+specializations reuse their concrete identity; generic REPL redefinition requires
+a new session. `std/result`, `std/option` and `std/slice` are source packages.
+
+`new[T](value)` produces `own[T]`; `new[T]()` zero-initializes its storage.
+Owners and aggregates containing owners are move-only: use `move value` when
+binding, passing or returning an existing owner. Safe dereference uses `*owner`.
+Moving a field conservatively invalidates the whole local. Branches join moved
+state, and moving an outer owner inside a loop is rejected. Reinitializing a
+mutable owner releases its previous allocation. There is no implicit reference
+counting or garbage collector.
+
+Owners release nested owned fields, array elements and the active enum payload
+on block exit, return, break and continue. Explicit defer captures can consume
+owners. Results transfer to caller storage before callee cleanup. Discarded
+owning expressions are released. Raw allocation via `std/mem` remains manual.
+`std/mem.owner_count()` reports live managed allocations for diagnostics.
+
+REPL parse failures restore move state; runtime failures retain effects on
+existing bindings but release owners in aborted call frames and new submission
+storage. Persistent owners survive successful submissions and drop on session
+exit. Runtime process termination outside REPL does not unwind user defers.
+
+The borrow checker is deliberately conservative: owned storage cannot contain
+borrowed slices, and safe slices of owners or views into owned storage are
+rejected until exclusive scoped loans are implemented. Unsafe raw pointers do
+not carry lifetime proofs. `make ownership-test` covers all five engines, LLVM
+O0/O2, nested cleanup, Result/Option transfers, invalid moves and REPL recovery.

@@ -19,6 +19,11 @@
 #define BC_INDEX_ADDRESS 19
 #define BC_SLICE 20
 #define BC_LENGTH 21
+#define BC_NEW 22
+#define BC_MOVE 23
+#define BC_OWN_ADDRESS 24
+#define BC_DROP 25
+#define BC_RETURN_PREP 26
 class Instruction { I64 op, dst, a, b, value, target; I64 *args; Node *node; };
 class BDefer { Node *call; I64 *args; BDefer *next; };
 class BScope { BDefer *calls; BScope *parent; };
@@ -58,11 +63,14 @@ I64 ByteExpr(Node *n) {
         if (n->kind == N_STRING) CodeAt(at)->value = n->name; return r;
     }
     if (n->kind == N_CALL) { args = ByteArgs(n); r = Slot(); at = InstructionNew(BC_CALL, r, 0, 0, n); CodeAt(at)->args = args; return r; }
+    if (n->kind == N_NEW) { a = Slot(); InstructionNew(BC_CONST, a); if (n->a) a = ByteExpr(n->a); r = Slot(); InstructionNew(BC_NEW, r, a, 0, n); return r; }
     if (n->kind == N_AGG_LITERAL) {
         r = Slot(); InstructionNew(BC_AGG_INIT, r, 0, 0, n);
         for (item = n->a; item; item = item->next) { b = ByteExpr(item); InstructionNew(BC_AGG_FIELD, Slot(), r, b, item); } return r;
     }
     a = ByteExpr(n->a); r = Slot();
+    if (n->kind == N_MOVE) { InstructionNew(BC_MOVE, r, a, 0, n); return r; }
+    if (n->kind == N_OWN_ADDRESS) { InstructionNew(BC_OWN_ADDRESS, r, a, 0, n); return r; }
     if (n->kind == N_FIELD_ADDRESS) { InstructionNew(BC_FIELD_ADDRESS, r, a, 0, n); return r; }
     if (n->kind == N_LENGTH) { InstructionNew(BC_LENGTH, r, a, 0, n); return r; }
     if (n->kind == N_INDEX_ADDRESS) { b = ByteExpr(n->b); InstructionNew(BC_INDEX_ADDRESS, r, a, b, n); return r; }
@@ -98,9 +106,10 @@ U0 ByteStmt(Node *n) {
         case N_STORE:
             r = ByteExpr(n->a); at = ByteExpr(n->b); InstructionNew(BC_STORE, Slot(), r, at, n); break;
         case N_BIND: case N_ASSIGN: r = ByteExpr(n->a); InstructionNew(BC_LOCAL_WRITE, n->slot, r, 0, n); break;
-        case N_EXPR: ByteExpr(n->a); break;
+        case N_EXPR: r = ByteExpr(n->a); if (Owned(n->a->type)) InstructionNew(BC_DROP, Slot(), r, 0, n->a); break;
         case N_RETURN:
             r = Slot(); InstructionNew(BC_CONST, r); if (n->a) r = ByteExpr(n->a);
+            if (n->a && Aggregate(n->a->type)) { at = Slot(); InstructionNew(BC_RETURN_PREP, at, r, 0, n->a); r = at; }
             ByteCleanup(NULL); InstructionNew(BC_RETURN, 0, r); bc_done = TRUE; break;
         case N_IF:
             r = ByteExpr(n->a); branch = InstructionNew(BC_JZERO, 0, r); ByteStmt(n->b); left_done = bc_done;
@@ -130,6 +139,7 @@ U0 CompileBytecode(Function *f) {
     ByteStmt(f->body);
     // Also supplies valid dead branch targets after terminal conditionals.
     zero = Slot(); InstructionNew(BC_CONST, zero); InstructionNew(BC_RETURN, 0, zero);
+    for (zero = 0; zero < f->code_count; zero++) if (CodeAt(zero)->op == BC_RETURN_PREP) CodeAt(zero)->value = f->registers;
 }
 I64 Compute(Instruction *ins, I64 *values) {
     I64 a = values[ins->a], b = values[ins->b], op, result = 0, i, *args; Node *n = ins->node;
@@ -138,7 +148,12 @@ I64 Compute(Instruction *ins, I64 *values) {
     if (ins->op == BC_LOCAL_READ) return ValueRead(&values[ins->a], n->type, &values[n->storage]);
     if (ins->op == BC_LOCAL_ADDRESS) return &values[ins->a];
     if (ins->op == BC_LOCAL_WRITE) { if (Aggregate(n->type)) { ValueWrite(&values[n->slot], n->type, a); return values[n->slot]; } NativeMemoryWrite(&result, n->type, a); return result; }
-    if (ins->op == BC_AGG_INIT) { result = &values[n->storage]; MemSet(result(U8 *), 0, ByteSize(n->type)); return result; }
+    if (ins->op == BC_MOVE) return MoveValue(&values[n->storage], a, n->type);
+    if (ins->op == BC_RETURN_PREP) { result = values[ins->value]; ValueWrite(result, n->type, a); return result; }
+    if (ins->op == BC_OWN_ADDRESS) { result = a(I64 *)[0]; if (!result) ErrorAt(n->token, "empty or moved owner"); return result; }
+    if (ins->op == BC_DROP) { DropValue(a, n->type); return 0; }
+    if (ins->op == BC_NEW) { result = &values[n->storage]; DropValue(result, n->type); b = CAlloc(ByteSize(Shape(n->type)->element)); owner_live++; result(I64 *)[0] = b; if (n->a) ValueWrite(b, Shape(n->type)->element, a); return result; }
+    if (ins->op == BC_AGG_INIT) { result = &values[n->storage]; DropValue(result, n->type); MemSet(result(U8 *), 0, ByteSize(n->type)); return result; }
     if (ins->op == BC_AGG_FIELD) { ValueWrite(a+n->offset, n->type, b); return 0; }
     if (ins->op == BC_FIELD_ADDRESS) return a+n->value;
     if (ins->op == BC_INDEX_ADDRESS) return IndexAddress(n, a, b);

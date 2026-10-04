@@ -1,0 +1,30 @@
+U0 Transfer(Node *n) {
+    if (!Owned(n->type)) return;
+    if (n->kind != N_MOVE && n->kind != N_NEW && n->kind != N_CALL && n->kind != N_AGG_LITERAL) ErrorAt(n->token, "owning values require an explicit move");
+}
+Bool OwnerPlace(Node *n) {
+    if (!n) return FALSE;
+    if (n->kind == N_OWN_ADDRESS) return TRUE;
+    if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS || n->kind == N_INDEX_ADDRESS) return OwnerPlace(n->a);
+    return FALSE;
+}
+Node *OwnerDefer(I64 slot, I64 type, Token *token) {
+    Node *statement = NewNode(N_DEFER, token), *call = NewNode(N_CALL, token), *address = NewNode(N_LOCAL_ADDRESS, token);
+    address->slot = slot; address->type = T_PTR+type;
+    call->slot = -7; call->value = 1; call->op = type; call->type = T_VOID; call->a = address; statement->a = call; return statement;
+}
+U0 InjectDrops(Function *f) {
+    DropSlot *d; Node *block, *tail = NULL, *deferred;
+    if (!f->drops) return;
+    block = NewNode(N_BLOCK, f->token);
+    for (d = f->drops; d; d = d->next) { deferred = OwnerDefer(d->slot, d->type, f->token); if (tail) tail->next = deferred; else block->a = deferred; tail = deferred; }
+    tail->next = f->body; f->body = block;
+}
+class MoveState { Local *local; I64 before, joined; MoveState *next; };
+MoveState *MoveSnapshot() {
+    MoveState *head = NULL, *s; Local *l;
+    for (l = locals; l; l = l->next) { s = CAlloc(sizeof(MoveState)); s->local = l; s->before = l->moved; s->next = head; head = s; } return head;
+}
+U0 MoveRestore(MoveState *s) { while (s) { s->local->moved = s->before; s = s->next; } }
+U0 MoveJoin(MoveState *s) { while (s) { s->joined |= s->local->moved; s = s->next; } }
+U0 MoveFinish(MoveState *s) { while (s) { s->local->moved = s->joined; s = s->next; } }

@@ -50,7 +50,8 @@ U0 Layout(I64 type) {
     if (a->state == 2) return;
     if (a->state == 1) ErrorAt(a->token, "recursive aggregate requires a pointer");
     a->state = 1; a->align = 1;
-    if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }
+    if (a->kind == A_OWNER) { a->size = a->align = 8; }
+    else if (a->kind == A_SLICE) { a->size = 16; a->align = 8; }
     else if (a->kind == A_ARRAY) { a->size = ByteSize(a->element) * a->count; a->align = Alignment(a->element); }
     else {
         saved = pos; saved_bindings = type_bindings; type_bindings = NULL; if (a->origin) BindTypes(Shape(a->origin)->generic_names, a->generic_args, Shape(a->origin)->generic_count); pos = a->begin; a->fields = NULL; a->count = 0;
@@ -72,6 +73,12 @@ U0 Layout(I64 type) {
     if (a->size > 524288) ErrorAt(a->token, "aggregate exceeds 512 KiB implementation limit");
     a->state = 2;
 }
+Bool Owned(I64 type) {
+    Field *f; if (!Aggregate(type)) return FALSE; Layout(type);
+    if (Shape(type)->kind == A_OWNER) return TRUE;
+    if (Shape(type)->kind == A_ARRAY) return Owned(Shape(type)->element);
+    for (f = Shape(type)->fields; f; f = f->next) if (Owned(f->type)) return TRUE; return FALSE;
+}
 Bool Borrowed(I64 type) {
     Field *f;
     if (!Aggregate(type)) return FALSE;
@@ -85,7 +92,9 @@ U0 ValidateBorrowedElements(I64 type) {
     Field *field;
     if (!Aggregate(type)) return;
     Layout(type);
-    if (Shape(type)->kind == A_SLICE) {
+    if (Shape(type)->kind == A_OWNER) { if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "owned storage cannot contain borrowed references"); }
+    else if (Shape(type)->kind == A_SLICE) {
+        if (Owned(Shape(type)->element)) ErrorAt(Shape(type)->token, "slices of owners require exclusive borrow tracking");
         if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "slice elements cannot contain borrowed slices until lifetime analysis exists");
     } else if (Shape(type)->kind == A_ARRAY) ValidateBorrowedElements(Shape(type)->element);
     else for (field = Shape(type)->fields; field; field = field->next) ValidateBorrowedElements(field->type);
@@ -129,6 +138,7 @@ U0 AppendType(Text *text, I64 type) {
             if (a->origin) { Char(text, '['); for (i = 0; i < Shape(a->origin)->generic_count; i++) { if (i) Char(text, ','); AppendType(text, a->generic_args[i]); } Char(text, ']'); }
             else if (a->generic_count) { Char(text, '['); for (i = 0; i < a->generic_count; i++) { if (i) Char(text, ','); Append(text, a->generic_names[i]); } Char(text, ']'); }
         }
+        else if (Shape(type)->kind == A_OWNER) { Append(text, "own["); AppendType(text, Shape(type)->element); Char(text, ']'); }
         else { Char(text, '['); if (Shape(type)->kind == A_ARRAY) Number(text, Shape(type)->count); Char(text, ']'); AppendType(text, Shape(type)->element); }
         return;
     }

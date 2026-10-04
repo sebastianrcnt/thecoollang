@@ -36,13 +36,15 @@ I64 LocalWrite(I64 r, I64 type) {
     n = Fresh(); IR("  %double"); RI(n); IR(" = bitcast i64 "); Reg(r); IR(" to double\n  %single"); RI(n); IR(" = fptrunc double %double"); RI(n); IR(" to float\n  %raw"); RI(n); IR(" = bitcast float %single"); RI(n); IR(" to i32\n  "); Reg(n); IR(" = zext i32 %raw"); RI(n); IR(" to i64\n"); return n;
 }
 I64 SlotAddress(I64 slot) { I64 r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr %v"); RI(slot); IR(" to i64\n"); return r; }
-U0 EmitCopy(I64 destination, I64 source, I64 type) { IR("  call void @cool_copy(i64 "); Reg(destination); IR(", i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); }
+extern U0 EmitDrop(I64 address, I64 type);
+U0 EmitCopy(I64 destination, I64 source, I64 type) { EmitDrop(destination, type); IR("  call void @cool_copy(i64 "); Reg(destination); IR(", i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); if (Owned(type)) { IR("  call void @cool_zero(i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); } }
 U0 EmitWrite(I64 destination, I64 source, I64 type) {
     if (Aggregate(type)) { EmitCopy(destination, source, type); return; }
     IR("  call void @cool_store(i64 "); Reg(destination); IR(", i64 "); RI(type); IR(", i64 "); Reg(source); IR(")\n");
 }
 I64 EmitRead(I64 address, I64 type, I64 storage) {
     I64 r;
+    if (Owned(type)) return address;
     if (Aggregate(type)) { r = SlotAddress(storage); EmitCopy(r, address, type); return r; }
     r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_load(i64 "); Reg(address); IR(", i64 "); RI(type); IR(")\n"); return r;
 }
@@ -60,6 +62,8 @@ I64 EmitCall(Node *n, I64 *args) {
     if (n->slot == -1) {
         IR("  call void @cool_print(i64 "); Reg(args[0]); IR(", i64 "); RI(n->a->type); IR(", i64 "); RI(Eq(n->name, "println")); IR(")\n"); return Constant(0);
     }
+    if (n->slot == -6) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_owner_count()\n"); return r; }
+    if (n->slot == -7) { EmitDrop(args[0], n->op); return Constant(0); }
     if (n->slot == -3) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_alloc(i64 "); Reg(args[0]); IR(")\n"); return r; }
     if (n->slot == -4) { IR("  call void @cool_free(i64 "); Reg(args[0]); IR(")\n"); return Constant(0); }
     if (n->slot == -5) { IR("  call void @cool_copy(i64 "); Reg(args[0]); IR(", i64 "); Reg(args[1]); IR(", i64 "); Reg(args[2]); IR(")\n"); return Constant(0); }
@@ -82,14 +86,21 @@ I64 EmitExpr(Node *n) {
         for (i = 0; n->name[i]; i++) { ch = n->name[i]; Char(globals, '\\'); Char(globals, hex[ch >> 4]); Char(globals, hex[ch & 15]); }
         Append(globals, "\\00\"\n"); r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr @s"); RI(id); IR(" to i64\n"); return r;
     }
+    if (n->kind == N_NEW) {
+        if (n->a) a = EmitExpr(n->a); r = SlotAddress(n->storage); EmitDrop(r, n->type);
+        b = Fresh(); IR("  "); Reg(b); IR(" = call i64 @cool_owner_alloc(i64 "); RI(ByteSize(Shape(n->type)->element)); IR(")\n"); EmitWrite(r, b, T_INT);
+        if (n->a) EmitWrite(b, a, Shape(n->type)->element); return r;
+    }
     if (n->kind == N_AGG_LITERAL) {
-        r = SlotAddress(n->storage); IR("  call void @cool_zero(i64 "); Reg(r); IR(", i64 "); RI(ByteSize(n->type)); IR(")\n");
+        r = SlotAddress(n->storage); EmitDrop(r, n->type); IR("  call void @cool_zero(i64 "); Reg(r); IR(", i64 "); RI(ByteSize(n->type)); IR(")\n");
         for (item = n->a; item; item = item->next) { a = EmitExpr(item); b = OffsetAddress(r, item->offset); EmitWrite(b, a, item->type); } return r;
     }
     if (n->kind == N_LOCAL) { if (Aggregate(n->type)) return EmitRead(SlotAddress(n->slot), n->type, n->storage); r = Fresh(); IR("  "); Reg(r); IR(" = load i64, ptr %v"); RI(n->slot); IR("\n"); return LocalRead(r, n->type); }
     if (n->kind == N_LOCAL_ADDRESS) { r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr %v"); RI(n->slot); IR(" to i64\n"); return r; }
     if (n->kind == N_CALL) { args = EmitArgs(n); r = EmitCall(n, args); Free(args); return r; }
     a = EmitExpr(n->a);
+    if (n->kind == N_MOVE) { r = SlotAddress(n->storage); EmitCopy(r, a, n->type); return r; }
+    if (n->kind == N_OWN_ADDRESS) { r = Fresh(); IR("  "); Reg(r); IR(" = call i64 @cool_owner_address(i64 "); Reg(a); IR(")\n"); return r; }
     if (n->kind == N_LOAD) return EmitRead(a, n->type, n->storage);
     if (n->kind == N_FIELD_ADDRESS) return OffsetAddress(a, n->value);
     if (n->kind == N_LENGTH) return EmitLength(a, Shape(n->a->type)->count, AggregateKind(n->a->type));
@@ -189,7 +200,7 @@ U0 EmitStmt(Node *n) {
         case N_BIND: case N_ASSIGN:
             if (Aggregate(n->type)) { r = EmitExpr(n->a); EmitCopy(SlotAddress(n->slot), r, n->type); break; }
             r = LocalWrite(EmitExpr(n->a), n->type); IR("  store i64 "); Reg(r); IR(", ptr %v"); RI(n->slot); IR("\n"); break;
-        case N_EXPR: EmitExpr(n->a); break;
+        case N_EXPR: r = EmitExpr(n->a); EmitDrop(r, n->a->type); break;
         case N_RETURN:
             r = Constant(0); if (n->a) r = EmitExpr(n->a);
             if (n->a && Aggregate(n->a->type)) { value = Fresh(); IR("  "); Reg(value); IR(" = add i64 0, %result\n"); EmitCopy(value, r, n->a->type); r = value; }
@@ -213,12 +224,14 @@ U0 EmitStmt(Node *n) {
     }
 }
 #include "ForeignLLVM.cool"
+#include "OwnershipLLVM.cool"
 U0 EmitLLVM(U8 *output) {
     I64 i, j, k, parameter, offset, main = FindFun("main"); Function *f; Text *all;
     if (main < 0) Error("no main function");
     if (functions[main].generic_count || functions[main].argc || (functions[main].result != T_VOID && functions[main].result != T_I32 && functions[main].result != T_INT)) ErrorAt(functions[main].token, "invalid main signature");
     ir = TextNew(); globals = TextNew();
     IR("; Generated by the Cool-written frontend. No C transpilation.\n");
+    IR("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
     IR("declare void @cool_zero(i64, i64)\ndeclare i64 @cool_length(i64, i64, i64)\ndeclare i64 @cool_index(i64, i64, i64, i64, i64)\ndeclare void @cool_slice(i64, i64, i64, i64, i64, i64, i64)\n");
     IR("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n");
     IR("declare i64 @cool_cast(i64, i64, i64)\n");
@@ -231,6 +244,7 @@ U0 EmitLLVM(U8 *output) {
         }
 foreign_already_declared:;
     }
+    EmitDropFunctions();
     for (i = 0; i < nfun; i++) {
         f = &functions[i]; if (f->generic_count) goto llvm_function_next; reg_id = 0; terminated = FALSE; scope = NULL;
         IR("define i64 @__cool_fn"); RI(i); IR("(");
@@ -239,6 +253,7 @@ foreign_already_declared:;
         IR(") {\nentry:\n");
         IR("  %frame = alloca ["); RI(f->slots+1); IR(" x i64], align 8\n");
         for (j = 0; j < f->slots; j++) { IR("  %v"); RI(j); IR(" = getelementptr i64, ptr %frame, i64 "); RI(j); IR("\n"); }
+        if (f->drops) { IR("  %frame_address = ptrtoint ptr %frame to i64\n  call void @cool_zero(i64 %frame_address, i64 "); RI((f->slots+1)*8); IR(")\n"); }
         offset = 0;
         for (j = 0; !f->foreign && j < f->argc; j++) {
             parameter = Fresh(); IR("  "); Reg(parameter); IR(" = add i64 0, %a"); RI(j); IR("\n");

@@ -42,6 +42,16 @@ int64_t cool_alloc(int64_t size) {
     return (int64_t)(uintptr_t)p;
 }
 void cool_free(int64_t p) { free((void *)(uintptr_t)p); }
+static int64_t live_owners;
+int64_t cool_owner_alloc(int64_t size) { int64_t p = cool_alloc(size); live_owners++; return p; }
+void cool_owner_free(int64_t p) { if (p) { cool_free(p); live_owners--; } }
+int64_t cool_owner_count(void) { return live_owners; }
+int64_t cool_owner_address(int64_t cell) {
+    int64_t p = *(int64_t *)(uintptr_t)cell;
+    if (!p) fail("empty or moved owner");
+    return p;
+}
+
 void cool_copy(int64_t to, int64_t from, int64_t size) {
     if (size < 0) fail("copy size exceeds host range");
     memcpy((void *)(uintptr_t)to, (void *)(uintptr_t)from, (size_t)size);

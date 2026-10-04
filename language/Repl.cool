@@ -8,6 +8,16 @@ Alias *repl_aliases;
 I64 *repl_values;
 I64 repl_capacity;
 Bool repl_executing;
+MoveState *repl_moves;
+U0 ReplDropNew(Bool failed) {
+    DropSlot *d; Local *l; Bool keep;
+    for (d = functions[0].drops; d != repl_snapshot[0].drops; d = d->next) {
+        keep = FALSE;
+        if (!failed) for (l = locals; l; l = l->next) if (l->slot == d->slot && Owned(l->type)) keep = TRUE;
+        if (!keep) DropValue(&repl_values[d->slot], d->type);
+    }
+}
+
 Text *Submission() {
     Text *text = TextNew(); I64 ch, braces = 0, parens = 0; Bool quoted = FALSE, escaped = FALSE, line_comment = FALSE;
     while ((ch = NativeGetChar()) >= 0) {
@@ -28,7 +38,15 @@ Text *Submission() {
     Reserve(text, 0); return text;
 }
 U0 ReplRestore() {
-    I64 retained_slots = functions[0].slots;
+    I64 retained_slots = functions[0].slots; Frame *frame; DropSlot *d;
+    if (repl_executing) {
+        while (active_frame) {
+            frame = active_frame;
+            for (d = frame->function->drops; d; d = d->next) DropValue(&frame->values[d->slot], d->type);
+            active_frame = frame->parent; Free(frame->values); Free(frame);
+        }
+        ReplDropNew(TRUE);
+    } else MoveRestore(repl_moves);
     MemCpy(functions, repl_snapshot, MAX_FUNCTIONS * sizeof(Function));
     if (repl_executing && retained_slots > functions[0].slots) functions[0].slots = retained_slots;
     nfun = repl_saved_nfun; ntok = repl_saved_ntok; naggregates = repl_saved_types;
@@ -60,12 +78,13 @@ U0 ReplStep(Text *text) {
         for (i = 0; i < repl_capacity; i++) grown[i] = repl_values[i];
         Free(repl_values); repl_values = grown; repl_capacity = 65536;
     }
+    for (i = repl_snapshot[0].slots; i < f->slots; i++) repl_values[i] = 0;
     // The session's locals remain live; expression temporaries are regenerated.
     repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
-    repl_locals = locals;
+    ReplDropNew(FALSE); repl_locals = locals;
 }
 U0 Repl(Bool prompt) {
-    Text *text, *stats; I64 i, compiled;
+    Text *text, *stats; I64 i, compiled; DropSlot *d; MoveState *move;
     functions = CAlloc(MAX_FUNCTIONS * sizeof(Function)); nfun = 1;
     functions[0].name = "__session"; functions[0].package = "__main";
     repl_snapshot = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -83,12 +102,15 @@ U0 Repl(Bool prompt) {
             Append(stats, " bytecode_compilations="); Number(stats, bytecode_compilations);
             Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); goto repl_next;
         }
+        locals = repl_locals; repl_moves = MoveSnapshot(); repl_executing = FALSE;
         MemCpy(repl_snapshot, functions, MAX_FUNCTIONS * sizeof(Function));
         repl_saved_types = naggregates; repl_saved_nfun = nfun; repl_saved_ntok = ntok; repl_aliases = aliases;
         if (AIWNIOS_SetJmp(repl_context)) ReplRestore();
         else { recovery_context = repl_context; ReplStep(text); }
         recovery_context = NULL;
+        while (repl_moves) { move = repl_moves; repl_moves = move->next; Free(move); }
 repl_next:
         Free(text->data); Free(text);
     }
+    for (d = functions[0].drops; d; d = d->next) DropValue(&repl_values[d->slot], d->type);
 }

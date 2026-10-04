@@ -17,6 +17,7 @@ I64 TypeName(U8 *s) {
 }
 I64 ParseType() {
     I64 t, count, kind; Token *token = At(); U8 *name, *package = token->package;
+    if (Is("own")) { pos++; Need('[', "expected '[' after own"); t = ParseType(); Need(']', "expected ']' after owned type"); return SequenceType(A_OWNER, t, 0, token); }
     if (Take('*')) { t = ParseType(); if (t >= 100*T_PTR) Error("pointer nesting limit exceeded"); return T_PTR+t; }
     if (Take('[')) {
         kind = A_ARRAY; count = 0;
@@ -61,7 +62,7 @@ Node *AggregateLiteral(I64 type, Token *token) {
             if (Shape(type)->kind == A_SLICE) Error("slice literals must be empty; borrow an array with [low:high]");
             if (Shape(type)->kind == A_STRUCT) { field = FindField(type, Ident(), token); Need(':', "expected ':' after field name"); element = field->type; }
             else element = Shape(type)->element;
-            item = Expr(1); Coerce(item, element);
+            item = Expr(1); Coerce(item, element); Transfer(item);
             if (Shape(type)->kind == A_STRUCT) { item->offset = field->offset; item->field_key = field; } else item->offset = count*ByteSize(element);
             if (Shape(type)->kind == A_STRUCT) { for (prior = n->a; prior; prior = prior->next) if (prior->field_key == item->field_key) ErrorAt(token, "duplicate initializer field"); }
             if (tail) tail->next = item; else n->a = item; tail = item; count++;
@@ -80,13 +81,27 @@ Node *EnumLiteral(I64 type, Token *token) {
     Layout(type); ValidateBorrowedElements(type); Need('.', "enum construction requires a variant"); variant = FindField(type, Ident(), token);
     n = NewNode(N_AGG_LITERAL, token); n->type = type; n->storage = Storage(type);
     tag = NewNode(N_INT, token); tag->type = T_INT; tag->value = variant->tag; n->a = tag;
-    if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Need(')', "expected ')' after payload"); payload->offset = 8; tag->next = payload; }
+    if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Transfer(payload); Need(')', "expected ')' after payload"); payload->offset = 8; tag->next = payload; }
     else if (Take('(')) Need(')', "unit variant takes no arguments");
     return n;
 }
 Node *Atom() {
     Token *t = At(); Node *n, *tail = NULL, *arg; Local *l; I64 id, k, count = 0, ty, type_args[8], type_count = 0; U8 *name, *package; Bool qualified = FALSE;
     package = t->package;
+    if (Is("move")) {
+        pos++; n = Primary(); if (!Owned(n->type)) return n;
+        if (n->kind == N_CALL || n->kind == N_NEW || n->kind == N_AGG_LITERAL || n->kind == N_MOVE) return n;
+        l = BorrowRoot(n); if (l) { if (l->moved) ErrorAt(t, "use of moved value"); if (l->loop_level < loop_depth) ErrorAt(t, "cannot move an outer owner inside a loop"); l->moved = TRUE; }
+        if (n->kind == N_LOCAL) { arg = NewNode(N_LOCAL_ADDRESS, t); arg->slot = n->slot; arg->type = T_PTR+n->type; arg->local_ref = n->local_ref; }
+        else if (n->kind == N_LOAD) arg = n->a; else ErrorAt(t, "move requires a place or a fresh value");
+        tail = NewNode(N_MOVE, t); tail->a = arg; tail->type = n->type; tail->storage = Storage(n->type); return tail;
+    }
+    if (Is("new")) {
+        pos++; Need('[', "expected '[' after new"); ty = ParseType(); Need(']', "expected ']'"); ValidateBorrowedElements(ty);
+        if (Borrowed(ty)) ErrorAt(t, "owned storage cannot contain borrowed references");
+        n = NewNode(N_NEW, t); n->type = SequenceType(A_OWNER, ty, 0, t); n->storage = Storage(n->type);
+        Need('(', "expected '(' after new type"); if (!Take(')')) { n->a = Expr(1); Coerce(n->a, ty); Transfer(n->a); Need(')', "expected ')' after new initializer"); } return n;
+    }
     if (At()->kind == '[') { ty = ParseType(); return AggregateLiteral(ty, t); }
     if (Is("sizeof")) { pos++; Need('(', "expected '('"); ty = ParseType(); Need(')', "expected ')'"); n = NewNode(N_INT, t); n->type = T_U64; n->value = ByteSize(ty); return n; }
     if (Is("null")) { pos++; n = NewNode(N_INT, t); n->type = T_NULL; return n; }
@@ -108,9 +123,9 @@ Node *Atom() {
         n->slot = n->a->slot; n->type = T_PTR + n->a->type; return n;
     }
     if (Take('*')) {
-        if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe");
         n = NewNode(N_LOAD, t); n->a = Primary();
-        if (!Pointer(n->a->type) || n->a->type == T_PTR) ErrorAt(t, "dereference requires a typed pointer");
+        if (AggregateKind(n->a->type) == A_OWNER) { arg = NewNode(N_OWN_ADDRESS, t); arg->a = n->a; arg->type = T_PTR+Shape(n->a->type)->element; n->a = arg; }
+        else { if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe"); if (!Pointer(n->a->type) || n->a->type == T_PTR) ErrorAt(t, "dereference requires a typed pointer"); }
         n->type = n->a->type - T_PTR; n->mutable = TRUE; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }
     if (Take(K_INT)) { n = NewNode(N_INT, t); n->value = t->val; n->type = T_INT; if (t->val < 0) n->type = T_U64; return n; }
@@ -154,6 +169,7 @@ Node *Atom() {
             n->slot = -1; n->type = T_VOID; return n;
         }
         if (qualified && Eq(package, "std/mem")) {
+            if (Eq(name, "owner_count")) { if (count) Error("owner_count takes no arguments"); n->slot = -6; n->type = T_U64; return n; }
             if (Eq(name, "alloc")) {
                 if (count != 1) ErrorAt(t, "mem.alloc requires a byte count");
                 Coerce(n->a, T_U64); n->slot = -3; n->type = T_PTR + T_U8; return n;
@@ -181,11 +197,12 @@ Node *Atom() {
         id = SpecializeFunction(id, type_args, type_count);
         if (count != functions[id].argc) ErrorAt(t, "wrong argument count");
         arg = n->a;
-        for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); arg = arg->next; }
+        for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); Transfer(arg); arg = arg->next; }
         n->slot = id; n->type = functions[id].result; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }
     l = FindLocal(name);
     if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
+    if (l->moved) ErrorAt(t, "use of moved value");
     n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; n->local_ref = l; n->mutable = l->mutable; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
 }
 Node *Primary() {
@@ -208,6 +225,8 @@ Node *Primary() {
             if (kind) element = Shape(n->type)->element; else element = n->type-T_PTR;
             if (Take(':')) {
                 if (!kind) ErrorAt(t, "slicing requires an array or slice");
+                if (OwnerPlace(AggregateAddress(n))) ErrorAt(t, "borrowing a slice from owned storage requires a scoped exclusive loan");
+                if (Owned(element)) ErrorAt(t, "slices of owners require exclusive borrow tracking");
                 if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");
                 if (kind == A_ARRAY && !mutable) ErrorAt(t, "mutable slice requires a var array");
                 high = NULL; if (At()->kind != ']') { high = Expr(1); if (!Integer(high->type)) ErrorAt(t, "slice bound must be an integer"); }
@@ -264,20 +283,20 @@ Node *Block() {
     Need('{', "expected '{'"); depth++;
     while (!Take('}')) {
         if (!At()->kind) Error("unterminated block");
-        s = Statement(); if (tail) tail->next = s; else n->a = s; tail = s;
+        s = Statement(); if (tail) tail->next = s; else n->a = s; tail = s; if (s->kind == N_BIND && Owned(s->type)) { tail->next = OwnerDefer(s->slot, s->type, s->token); tail = tail->next; }
     }
     depth--; locals = saved; return n;
 }
 Node *MatchStatement() {
     Token *token = At(); Node *block, *value, *binding, *branch, *last = NULL, *previous = NULL, *address, *load, *constant, *test, *arm, *payload_bind = NULL;
-    I64 type, pattern, slot, count = 0, *seen; Field *variant; Local *saved, *local; U8 *name; Bool wildcard = FALSE;
-    pos++; Need('(', "expected '(' after match"); value = Expr(1); Need(')', "expected ')' after match value"); type = value->type;
+    I64 type, pattern, slot, count = 0, *seen; Field *variant; Local *saved, *local; U8 *name; Bool wildcard = FALSE; MoveState *moves;
+    pos++; Need('(', "expected '(' after match"); value = Expr(1); Transfer(value); Need(')', "expected ')' after match value"); type = value->type;
     if (AggregateKind(type) != A_ENUM) ErrorAt(token, "match requires an enum"); Layout(type);
     block = NewNode(N_BLOCK, token); binding = NewNode(N_BIND, token); binding->type = type; binding->a = value; slot = Storage(type); binding->slot = slot; block->a = binding;
-    seen = CAlloc(Shape(type)->count*8); Need('{', "expected match arms");
+    moves = MoveSnapshot(); seen = CAlloc(Shape(type)->count*8); Need('{', "expected match arms");
     while (!Take('}')) {
         if (wildcard) Error("wildcard must be the last match arm");
-        saved = locals; depth++; payload_bind = NULL;
+        MoveRestore(moves); saved = locals; depth++; payload_bind = NULL;
         if (Is("_")) { pos++; wildcard = TRUE; }
         else {
             pattern = ParseType(); if (pattern != type) Error("match pattern has a different enum type"); Need('.', "expected enum variant"); variant = FindField(type, Ident(), token);
@@ -291,13 +310,14 @@ Node *MatchStatement() {
                 if (!Eq(name, "_")) {
                     branch = NewNode(N_FIELD_ADDRESS, token); branch->a = address; branch->value = 8; branch->type = T_PTR+variant->type;
                     load = NewNode(N_LOAD, token); load->a = branch; load->origin_source = value; load->type = variant->type; if (Aggregate(load->type)) load->storage = Storage(load->type);
-                    local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); payload_bind->a = load; payload_bind->local_ref = local; payload_bind->type = variant->type; payload_bind->slot = local->slot;
+                    local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); if (Owned(load->type)) { constant = NewNode(N_MOVE, token); constant->a = branch; constant->type = load->type; constant->storage = Storage(load->type); load = constant; }
+                    payload_bind->a = load; payload_bind->local_ref = local; payload_bind->type = variant->type; payload_bind->slot = local->slot;
                 }
             } else if (Take('(')) Need(')', "unit variant takes no binding");
         }
         Need(K_FAT_ARROW, "expected '=>' after match pattern"); arm = Block();
-        if (payload_bind) { branch = NewNode(N_BLOCK, token); branch->a = payload_bind; payload_bind->next = arm; arm = branch; }
-        locals = saved; depth--; Take(',');
+        if (payload_bind) { branch = NewNode(N_BLOCK, token); branch->a = payload_bind; if (Owned(payload_bind->type)) { payload_bind->next = OwnerDefer(payload_bind->slot, payload_bind->type, token); payload_bind->next->next = arm; } else payload_bind->next = arm; arm = branch; }
+        MoveJoin(moves); locals = saved; depth--; Take(',');
         if (wildcard) { if (last) last->c = arm; else binding->next = arm; }
         else { branch = NewNode(N_IF, token); branch->a = test; branch->b = arm; if (last) last->c = branch; else binding->next = branch; previous = last; last = branch; }
     }
@@ -305,10 +325,11 @@ Node *MatchStatement() {
         if (count != Shape(type)->count) ErrorAt(token, "non-exhaustive match");
         if (previous) previous->c = last->b; else binding->next = last->b;
     }
-    Free(seen); return block;
+    if (Owned(type)) { branch = OwnerDefer(slot, type, token); branch->next = binding->next; binding->next = branch; }
+    MoveFinish(moves); Free(seen); return block;
 }
 Node *Statement() {
-    Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable;
+    Token *t = At(); Node *n, *initial, *post, *block; Local *l, *saved; U8 *name; I64 ty = -1; Bool mutable; MoveState *moves;
     if (t->kind == '{') return Block();
     if (Is("match")) return MatchStatement();
     if (Is("unsafe")) { pos++; unsafe_depth++; n = Block(); unsafe_depth--; return n; }
@@ -318,12 +339,12 @@ Node *Statement() {
         n = NewNode(N_BIND, t); n->a = Expr(1);
         if (ty < 0) ty = n->a->type;
         if (ty == T_VOID) ErrorAt(t, "cannot bind a void value");
-        Coerce(n->a, ty); l = AddLocal(name, ty, mutable); n->slot = l->slot; n->local_ref = l; n->type = ty;
+        Coerce(n->a, ty); Transfer(n->a); l = AddLocal(name, ty, mutable); n->slot = l->slot; n->local_ref = l; n->type = ty;
         Need(';', "expected ';'"); return n;
     }
     if (Is("return")) {
         pos++; n = NewNode(N_RETURN, t); ty = functions[current_fun].result;
-        if (At()->kind != ';') { n->a = Expr(1); Coerce(n->a, ty); }
+        if (At()->kind != ';') { n->a = Expr(1); Coerce(n->a, ty); Transfer(n->a); }
         else if (ty != T_VOID) ErrorAt(t, "return value required");
         Need(';', "expected ';'"); return n;
     }
@@ -334,7 +355,7 @@ Node *Statement() {
             initial = Statement();
             if (initial->kind != N_BIND && initial->kind != N_ASSIGN && initial->kind != N_EXPR) ErrorAt(t, "invalid for initializer");
         }
-        n = NewNode(N_FOR, t);
+        loop_depth++; n = NewNode(N_FOR, t);
         if (Take(';')) { n->a = NewNode(N_INT, t); n->a->type = T_BOOL; n->a->value = 1; }
         else { n->a = Expr(1); Need(';', "expected ';' after for condition"); }
         if (n->a->type != T_BOOL) ErrorAt(t, "for condition must be bool");
@@ -344,26 +365,27 @@ Node *Statement() {
                 if (!post->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
                 if (post->a->kind == N_LOCAL) {
                     l = FindLocal(post->a->name); if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
-                    post->kind = N_ASSIGN; post->local_ref = l; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type);
+                    post->kind = N_ASSIGN; post->local_ref = l; post->slot = l->slot; post->type = l->type; post->a = Expr(1); Coerce(post->a, post->type); Transfer(post->a); l->moved = FALSE;
                 } else if (post->a->kind == N_LOAD) {
-                    post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type);
+                    post->kind = N_STORE; post->type = post->a->type; post->a = post->a->a; post->b = Expr(1); Coerce(post->b, post->type); Transfer(post->b);
                 } else ErrorAt(t, "invalid for update assignment");
             }
             n->c = post; Need(')', "expected ')' after for update");
         }
-        loop_depth++; n->b = Block(); loop_depth--; depth--; locals = saved;
-        if (initial) { block->a = initial; initial->next = n; } else block->a = n;
+        n->b = Block(); loop_depth--; depth--; locals = saved;
+        if (initial) { block->a = initial; if (initial->kind == N_BIND && Owned(initial->type)) { initial->next = OwnerDefer(initial->slot, initial->type, initial->token); initial->next->next = n; } else initial->next = n; } else block->a = n;
         return block;
     }
     if (Is("if") || Is("while")) {
         mutable = Is("while"); pos++; n = NewNode(N_IF, t); if (mutable) n->kind = N_WHILE;
+        if (mutable) loop_depth++;
         Need('(', "expected '(' before condition"); n->a = Expr(1); Need(')', "expected ')' after condition");
         if (n->a->type != T_BOOL) ErrorAt(t, "condition must have type bool");
-        if (mutable) loop_depth++;
-        n->b = Block();
+        moves = MoveSnapshot(); n->b = Block(); MoveJoin(moves);
+        if (!mutable) MoveRestore(moves);
         if (mutable) loop_depth--;
         else if (Is("else")) { pos++; if (Is("if")) n->c = Statement(); else n->c = Block(); }
-        return n;
+        MoveJoin(moves); MoveFinish(moves); return n;
     }
     if (Is("break") || Is("continue")) {
         if (!loop_depth) Error("loop control outside a loop");
@@ -379,7 +401,7 @@ Node *Statement() {
         name = Ident(); pos++; l = FindLocal(name);
         if (!l) ErrorAt(t, "unknown assignment target");
         if (!l->mutable) ErrorAt(t, "cannot assign to let binding or parameter");
-        n = NewNode(N_ASSIGN, t); n->local_ref = l; n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type);
+        n = NewNode(N_ASSIGN, t); n->local_ref = l; n->slot = l->slot; n->type = l->type; n->a = Expr(1); Coerce(n->a, l->type); Transfer(n->a); l->moved = FALSE;
         Need(';', "expected ';'"); return n;
     }
     n = NewNode(N_EXPR, t); n->a = Expr(1);
@@ -387,7 +409,7 @@ Node *Statement() {
         if (n->a->kind != N_LOAD) ErrorAt(t, "invalid assignment target");
         if (!n->a->mutable) ErrorAt(t, "cannot assign through an immutable value");
         n->kind = N_STORE; n->type = n->a->type; n->a = n->a->a;
-        n->b = Expr(1); Coerce(n->b, n->type);
+        n->b = Expr(1); Coerce(n->b, n->type); Transfer(n->b);
     }
     Need(';', "expected ';'"); return n;
 }
@@ -405,7 +427,7 @@ U0 FunctionSignature(Function *f) {
         do { if (f->argc == 32) Error("function argument limit exceeded"); f->arg_names[f->argc] = Ident(); Need(':', "expected ':' after parameter"); f->arg_types[f->argc] = ParseType(); ValidateBorrowedElements(f->arg_types[f->argc]); if (!f->arg_types[f->argc]) Error("parameter cannot be void"); f->argc++; } while (Take(','));
         Need(')', "expected ')'");
     }
-    if (Take(K_ARROW)) f->result = ParseType();
+    if (Take(K_ARROW)) { f->result = ParseType(); ValidateBorrowedElements(f->result); }
     if (Is("borrows")) {
         pos++; f->has_contract = TRUE; Need('(', "expected '(' after borrows");
         if (!Take(')')) {
@@ -427,7 +449,7 @@ I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
     BindTypes(base->generic_names, types, count); pos = base->signature; FunctionSignature(f); f->begin = pos;
     current_fun = id; locals = NULL; depth = loop_depth = unsafe_depth = 0;
     for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }
-    f->body = Block(); AnalyzeBorrows(f); f->end = pos; if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
+    f->body = Block(); AnalyzeBorrows(f); InjectDrops(f); f->end = pos; if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
     pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
 }
 U0 ParseProgram() {
@@ -467,7 +489,7 @@ U0 ParseProgram() {
             }
             parsed[count++] = id; f = &functions[id];
             // Clear compilation products so only the changed function is recompiled.
-            f->all_locals = NULL; f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
+            f->drops = NULL; f->all_locals = NULL; f->bytecode = NULL; f->machine = NULL; f->code_count = f->code_capacity = f->registers = f->slots = f->calls = f->argc = f->result = 0;
             f->foreign = foreign; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); f->signature = pos;
@@ -503,7 +525,7 @@ declaration_next:;
     for (i = 0; i < count; i++) {
         current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign || f->generic_count) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
         for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }
-        f->body = Block(); AnalyzeBorrows(f);
+        f->body = Block(); AnalyzeBorrows(f); InjectDrops(f);
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
 parsed_next:;
     }

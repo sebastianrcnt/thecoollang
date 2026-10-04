@@ -85,6 +85,7 @@ Bool Eq(U8 *a, U8 *b) { return StrCmp(a, b) == 0; }
 #define A_ARRAY 2
 #define A_SLICE 3
 #define A_ENUM 4
+#define A_OWNER 5
 #define K_ID 256
 #define K_INT 257
 #define K_STRING 258
@@ -146,10 +147,14 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_INDEX_ADDRESS 25
 #define N_SLICE 26
 #define N_LENGTH 27
-class Local { U8 *name; I64 type, slot, mutable, depth, region; Local *next, *all_next; U8 *sources; };
+#define N_NEW 28
+#define N_MOVE 29
+#define N_OWN_ADDRESS 30
+class Local { U8 *name; I64 type, slot, mutable, depth, region, moved, loop_level; Local *next, *all_next; U8 *sources; };
 class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
+class DropSlot { I64 slot, type; DropSlot *next; };
 class Function {
-    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals;
+    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals; DropSlot *drops;
     U8 *generic_names[8]; I64 generic_args[8];
     U8 *bytecode, *machine; I64 code_count, code_capacity, registers, calls;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
@@ -176,11 +181,13 @@ U0 AddAlias(Token *t, U8 *name, U8 *path) {
 }
 Local *FindLocal(U8 *name) { Local *l = locals; while (l) { if (Eq(l->name, name)) return l; l = l->next; } return NULL; }
 extern I64 TypeSlots(I64 type);
+extern Bool Owned(I64 type);
+U0 RegisterDrop(I64 slot, I64 type) { DropSlot *d; if (!Owned(type)) return; d = CAlloc(sizeof(DropSlot)); d->slot = slot; d->type = type; d->next = functions[current_fun].drops; functions[current_fun].drops = d; }
 Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
-    res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth;
-    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
+    res = CAlloc(sizeof(Local)); res->name = name; res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
+    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; RegisterDrop(res->slot, type); res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
 Bool Pointer(I64 type) { return type >= T_PTR; }
@@ -192,7 +199,7 @@ I64 naggregates;
 Bool Aggregate(I64 type) { return T_AGG <= type < T_AGG + naggregates; }
 AggregateType *Shape(I64 type) { return &aggregate_types[type - T_AGG]; }
 extern U0 Layout(I64 type);
-I64 Storage(I64 type) { I64 slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); return slot; }
+I64 Storage(I64 type) { I64 slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); RegisterDrop(slot, type); return slot; }
 I64 AggregateKind(I64 type) { if (!Aggregate(type)) return 0; return Shape(type)->kind; }
 
 Bool Floating(I64 type) { return type == T_F64 || type == T_F32; }

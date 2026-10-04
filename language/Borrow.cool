@@ -24,7 +24,7 @@ I64 Region(Node *n) {
 Local *BorrowRoot(Node *n) {
     if (!n) return NULL;
     if (n->local_ref) return n->local_ref;
-    if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS || n->kind == N_INDEX_ADDRESS || n->kind == N_LOCAL_ADDRESS) return BorrowRoot(n->a);
+    if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS || n->kind == N_INDEX_ADDRESS || n->kind == N_LOCAL_ADDRESS || n->kind == N_OWN_ADDRESS) return BorrowRoot(n->a);
     return NULL;
 }
 U0 RecordBorrow(Local *local, Node *source) {

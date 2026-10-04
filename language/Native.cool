@@ -2,6 +2,7 @@
 #include "Lexer.cool"
 #include "Types.cool"
 #include "Borrow.cool"
+#include "Ownership.cool"
 #include "Parser.cool"
 #include "Interpreter.cool"
 #include "LLVM.cool"

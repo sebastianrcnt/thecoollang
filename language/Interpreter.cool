@@ -1,4 +1,5 @@
-class Frame { I64 *values, flow, result; };
+class Frame { I64 *values, flow, result, destination; Function *function; Frame *parent; };
+Frame *active_frame;
 class Deferred { Node *call; I64 *args; Deferred *next; };
 I64 call_depth, execution_mode;
 extern U0 CompileBytecode(Function *f);
@@ -54,13 +55,31 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
     }
     return Normalize(result, n->type);
 }
+I64 owner_live;
+U0 DropValue(I64 address, I64 type) {
+    I64 pointer, i, tag; Field *field;
+    if (!Owned(type)) return;
+    if (AggregateKind(type) == A_OWNER) {
+        pointer = address(I64 *)[0]; if (!pointer) return; address(I64 *)[0] = 0;
+        DropValue(pointer, Shape(type)->element); Free(pointer(U8 *)); owner_live--; return;
+    }
+    if (AggregateKind(type) == A_ARRAY) { for (i = 0; i < Shape(type)->count; i++) DropValue(address+i*ByteSize(Shape(type)->element), Shape(type)->element); return; }
+    if (AggregateKind(type) == A_ENUM) { tag = address(I64 *)[0]; for (field = Shape(type)->fields; field; field = field->next) if (field->tag == tag) { DropValue(address+field->offset, field->type); return; } }
+    else for (field = Shape(type)->fields; field; field = field->next) DropValue(address+field->offset, field->type);
+}
+I64 MoveValue(I64 destination, I64 source, I64 type) {
+    if (destination == source) return destination;
+    DropValue(destination, type); MemCpy(destination(U8 *), source(U8 *), ByteSize(type)); MemSet(source(U8 *), 0, ByteSize(type)); return destination;
+}
 I64 ValueRead(I64 address, I64 type, I64 destination) {
     if (!address) Error("null pointer dereference");
+    if (Owned(type)) return address;
     if (Aggregate(type)) { MemCpy(destination(U8 *), address(U8 *), ByteSize(type)); return destination; }
     return NativeMemoryRead(address, type);
 }
 U0 ValueWrite(I64 address, I64 type, I64 value) {
     if (!address) Error("null pointer dereference");
+    if (Owned(type)) { MoveValue(address, value, type); return; }
     if (Aggregate(type)) MemCpy(address(U8 *), value(U8 *), ByteSize(type)); else NativeMemoryWrite(address, type, value);
 }
 I64 SequenceLength(Node *n, I64 source) { if (n->op == A_SLICE) return source(I64 *)[1]; return n->value; }
@@ -85,6 +104,8 @@ I64 Invoke(Node *n, I64 *args, I64 destination = 0) {
         else { text = TextNew(); if (Unsigned(n->a->type)) UnsignedNumber(text, args[0]); else Number(text, args[0]); Out(text->data); Free(text->data); Free(text); }
         if (Eq(n->name, "println")) Out("\n"); return 0;
     }
+    if (n->slot == -6) return owner_live;
+    if (n->slot == -7) { DropValue(args[0], n->op); return 0; }
     if (n->slot == -3) { if (args[0] < 0) ErrorAt(n->token, "allocation size exceeds host range"); return CAlloc(args[0]); }
     if (n->slot == -4) { Free(args[0](U8 *)); return 0; }
     if (n->slot == -5) { if (args[2] < 0) ErrorAt(n->token, "copy size exceeds host range"); MemCpy(args[0](U8 *), args[1](U8 *), args[2]); return 0; }
@@ -97,12 +118,14 @@ I64 Invoke(Node *n, I64 *args, I64 destination = 0) {
     }
     if (++call_depth > 1024) ErrorAt(n->token, "call depth limit exceeded");
     f = &functions[n->slot]; frame = CAlloc(sizeof(Frame)); if (execution_mode && !f->bytecode) CompileBytecode(f);
-    frame->values = CAlloc((f->slots + f->registers + 1) * 8);
+    frame->values = CAlloc((f->slots + f->registers + 1) * 8); frame->destination = destination;
     for (i = 0; i < f->argc; i++) { ValueWrite(&frame->values[offset], f->arg_types[i], args[i]); offset += TypeSlots(f->arg_types[i]); }
+    if (execution_mode) frame->values[f->registers] = destination;
+    frame->function = f; frame->parent = active_frame; active_frame = frame;
     f->calls++;
     if (execution_mode == 2 || (execution_mode == 3 && f->calls >= 4)) result = RunNative(f, frame->values);
     else if (execution_mode) result = RunBytecode(f, frame->values);
-    else { Execute(f->body, frame); result = frame->result; } if (Aggregate(f->result)) result = ValueRead(result, f->result, destination); Free(frame->values); Free(frame); call_depth--; return result;
+    else { Execute(f->body, frame); result = frame->result; } if (Aggregate(f->result) && result != destination) { ValueWrite(destination, f->result, result); result = destination; } active_frame = frame->parent; Free(frame->values); Free(frame); call_depth--; return result;
 }
 I64 *Arguments(Node *n, Frame *frame) {
     I64 i = 0, *args = CAlloc((n->value + 1) * 8); Node *a = n->a;
@@ -115,8 +138,15 @@ I64 Eval(Node *n, Frame *frame) {
     if (n->kind == N_LOCAL) return ValueRead(&frame->values[n->slot], n->type, &frame->values[n->storage]);
     if (n->kind == N_LOCAL_ADDRESS) return &frame->values[n->slot];
     if (n->kind == N_CALL) { args = Arguments(n, frame); result = Invoke(n, args, &frame->values[n->storage]); Free(args); return result; }
+    if (n->kind == N_MOVE) { a = Eval(n->a, frame); return MoveValue(&frame->values[n->storage], a, n->type); }
+    if (n->kind == N_OWN_ADDRESS) { a = Eval(n->a, frame); result = a(I64 *)[0]; if (!result) ErrorAt(n->token, "empty or moved owner"); return result; }
+    if (n->kind == N_NEW) {
+        a = 0; if (n->a) a = Eval(n->a, frame); result = &frame->values[n->storage]; DropValue(result, n->type);
+        b = CAlloc(ByteSize(Shape(n->type)->element)); owner_live++; result(I64 *)[0] = b;
+        if (n->a) ValueWrite(b, Shape(n->type)->element, a); return result;
+    }
     if (n->kind == N_AGG_LITERAL) {
-        result = &frame->values[n->storage]; MemSet(result(U8 *), 0, ByteSize(n->type));
+        result = &frame->values[n->storage]; DropValue(result, n->type); MemSet(result(U8 *), 0, ByteSize(n->type));
         for (item = n->a; item; item = item->next) ValueWrite(result+item->offset, item->type, Eval(item, frame)); return result;
     }
     if (n->kind == N_FIELD_ADDRESS) return Eval(n->a, frame) + n->value;
@@ -152,8 +182,8 @@ U0 Execute(Node *n, Frame *frame) {
         case N_STORE:
             address = Eval(n->a, frame); value = Eval(n->b, frame); if (!address) ErrorAt(n->token, "null pointer dereference"); ValueWrite(address, n->type, value); break;
         case N_BIND: case N_ASSIGN: ValueWrite(&frame->values[n->slot], n->type, Eval(n->a, frame)); break;
-        case N_EXPR: Eval(n->a, frame); break;
-        case N_RETURN: if (n->a) frame->result = Eval(n->a, frame); frame->flow = 1; break;
+        case N_EXPR: value = Eval(n->a, frame); if (Owned(n->a->type)) DropValue(value, n->a->type); break;
+        case N_RETURN: if (n->a) { frame->result = Eval(n->a, frame); if (Aggregate(n->a->type)) { ValueWrite(frame->destination, n->a->type, frame->result); frame->result = frame->destination; } } frame->flow = 1; break;
         case N_IF: if (Eval(n->a, frame)) Execute(n->b, frame); else Execute(n->c, frame); break;
         case N_FOR: case N_WHILE:
             while (Eval(n->a, frame)) {

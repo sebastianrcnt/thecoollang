@@ -70,3 +70,8 @@ test: aggregate-test
 generic-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_generics.py
 test: generic-test
+
+.PHONY: ownership-test
+ownership-test: build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_ownership.py
+test: ownership-test
