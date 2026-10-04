@@ -30,6 +30,7 @@ I64 ParseType() {
     if (FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(token, name); name = Ident(); }
     t = FindType(package, name); if (t < 0) ErrorAt(token, "unsupported or unknown type");
     if (!Eq(package, token->package) && !Shape(t)->public) ErrorAt(token, "type is private to its package");
+    EditorTypeReference(name,t);
     if (Shape(t)->generic_count) t = InstantiateType(t);
     return t;
 }
@@ -148,7 +149,7 @@ Node *Atom() {
     }
     name = Ident();
     if (!FindLocal(name) && FindType(package, name) < 0 && Take('.')) { package = ResolveAlias(t, name); name = Ident(); qualified = TRUE; }
-    ty = FindType(package, name);
+    ty = FindType(package, name); EditorTypeReference(name,ty);
     if (ty >= 0 && Shape(ty)->generic_count) ty = InstantiateType(ty);
     if (ty >= 0 && AggregateKind(ty) == A_ENUM) { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return EnumLiteral(ty, t); }
     if (ty < 0 && (qualified || !FindLocal(name)) && At()->kind == '[') type_count = TypeArguments(type_args);

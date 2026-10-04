@@ -188,6 +188,7 @@ t59 = v_token2;
 t60 = cast[*u8]("type is private to its package");
 ErrorAt(t59, t60);
 }
+EditorTypeReference(v_name9, v_t9);
 t61 = v_t9;
 t62 = Shape(t61);
 if (((t62).generic_count != i64(0))) {

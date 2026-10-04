@@ -78,7 +78,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `26-repl-source.cool` | Live declaration source marking, disposal and token relocation | `ReplSource.cool` |
 | `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
 | `28-repl-types.cool` | Lazy-layout journal, field rollback and staged immutable text | `ReplTypes.cool` |
-| `29-editor.cool` | Native JSON diagnostics for editor transport | `Editor.cool` |
+| `29-editor.cool` | Native JSON diagnostics and semantic reference index | `Editor.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -505,3 +505,13 @@ for editor modes. The transport converts positions and orchestrates unsaved
 snapshots, never reimplements parsing or type/ownership decisions. Overlay files
 must keep their original module-resolution identity and must not update source
 files, module sums or the persistent source scan cache.
+
+Editor reference lookup keys token text by pointer identity, never spelling:
+separate declarations named `x` must remain separate. A per-analysis open-addressed
+map resolves those identities to tokens without rescanning all tokens per name.
+Local records and checked AST call slots supply binding identity; field/type
+resolution emits references at native semantic resolution sites. Specialized
+functions keep their template's declaration token. The editor mode is a fresh
+process with no REPL token compaction or interned session identifiers. Never use
+this index across source reloads without rebuilding it. Python may map paths and
+positions and deduplicate records; it must not infer Cool name resolution.

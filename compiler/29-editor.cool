@@ -30,3 +30,90 @@ fn EditorDiagnostic(token: *Token, message: *u8) {
         Free(out.data); Free(cast[*u8](out));
     }
 }
+// Name pointers retain token identity: equality here is deliberately pointer
+// equality, never spelling equality (which would confuse shadowed bindings).
+fn EditorPrepare() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        ctx.v_editor_capacity = 16;
+        while (ctx.v_editor_capacity < ctx.v_ntok * 2) { ctx.v_editor_capacity = ctx.v_editor_capacity * 2; }
+        ctx.v_editor_names = cast[**Token](CAlloc(ctx.v_editor_capacity * i64(sizeof(*Token))));
+        var i: i64 = 0;
+        while (i < ctx.v_ntok) {
+            let token = &raw ctx.v_tokens[i];
+            if (token.text != null) {
+                var slot = (cast[i64](token.text) / 8) & (ctx.v_editor_capacity - 1);
+                while (ctx.v_editor_names[slot] != null) { slot = (slot + 1) & (ctx.v_editor_capacity - 1); }
+                ctx.v_editor_names[slot] = token;
+            }
+            i = i + 1;
+        }
+    }
+}
+fn EditorNameToken(name: *u8) -> *Token {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_editor_index == i8(0) || name == null || ctx.v_editor_names == null) { return null; }
+        var slot = (cast[i64](name) / 8) & (ctx.v_editor_capacity - 1);
+        while (ctx.v_editor_names[slot] != null) {
+            if (ctx.v_editor_names[slot].text == name) { return ctx.v_editor_names[slot]; }
+            slot = (slot + 1) & (ctx.v_editor_capacity - 1);
+        }
+        return null;
+    }
+}
+fn EditorReference(source: *Token, target: *Token) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_editor_index == i8(0) || source == null || target == null) { return; }
+        let out = TextNew();
+        Append(out, cast[*u8]("{\"kind\":\"reference\",\"file\":")); EditorQuote(out, source.file);
+        Append(out, cast[*u8](",\"start\":")); Number(out, source.start);
+        Append(out, cast[*u8](",\"end\":")); Number(out, source.end);
+        Append(out, cast[*u8](",\"targetFile\":")); EditorQuote(out, target.file);
+        Append(out, cast[*u8](",\"targetStart\":")); Number(out, target.start);
+        Append(out, cast[*u8](",\"targetEnd\":")); Number(out, target.end);
+        Append(out, cast[*u8]("}\n")); Out(out.data); Free(out.data); Free(cast[*u8](out));
+    }
+}
+fn EditorTypeReference(name: *u8, type: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (ctx.v_editor_index == i8(0) || type < 1000) { return; }
+        let shape = Shape(type);
+        EditorReference(EditorNameToken(name), EditorNameToken(shape.name));
+    }
+}
+fn EditorNodes(node: *Node) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var n = node;
+        while (n != null) {
+            if (n.local_ref != null && (n.kind == 3 || n.kind == 22 || n.kind == 7 || n.kind == 8)) {
+                var source = n.token;
+                if (n.kind == 7) { source = EditorNameToken(n.local_ref.name); }
+                EditorReference(source, EditorNameToken(n.local_ref.name));
+            }
+            if (n.kind == 4 && n.slot >= 0 && n.slot < ctx.v_nfun) {
+                let target = ctx.v_functions[n.slot].token - 1;
+                var source = EditorNameToken(n.name);
+                if (n.token != null && n.token.kind == 46) { source = n.token + 1; }
+                EditorReference(source, target);
+            }
+            EditorNodes(n.a); EditorNodes(n.b); EditorNodes(n.c);
+            n = n.next;
+        }
+    }
+}
+fn EditorProgram() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var i: i64 = 0;
+        while (i < ctx.v_nfun) {
+            let f = &raw ctx.v_functions[i];
+            if (f.token != null) { EditorReference(f.token - 1, f.token - 1); }
+            EditorNodes(f.body);
+            i = i + 1;
+        }
+    }
+}

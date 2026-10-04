@@ -1,5 +1,6 @@
 """LSP transport and unsaved-file orchestration; Cool performs all analysis."""
 from dataclasses import dataclass
+from bisect import bisect_right
 import json
 from pathlib import Path
 import subprocess
@@ -80,10 +81,21 @@ def text_index(text, position):
     return sum(len(part)+1 for part in lines[:line]) + len(value)
 
 
-def byte_position(text, offset):
-    raw = text.encode('utf-8')
-    prefix = raw[:max(0, min(int(offset), len(raw)))].decode('utf-8', errors='ignore')
-    return {'line':prefix.count('\n'), 'character':len(prefix.rsplit('\n',1)[-1].encode('utf-16-le'))//2}
+class PositionMap:
+    def __init__(self,text):
+        self.raw = text.encode('utf-8')
+        self.lines = [0]
+        self.lines.extend(index+1 for index,byte in enumerate(self.raw) if byte==10)
+
+    def position(self,offset):
+        offset = max(0,min(int(offset),len(self.raw)))
+        line = bisect_right(self.lines,offset)-1
+        prefix = self.raw[self.lines[line]:offset].decode('utf-8',errors='ignore')
+        return {'line':line,'character':len(prefix.encode('utf-16-le'))//2}
+
+
+def byte_position(text,offset):
+    return PositionMap(text).position(offset)
 
 
 @dataclass
@@ -98,6 +110,7 @@ class Server:
         self.frontend, self.bundle, self.root, self.output = frontend, bundle, root, output
         self.documents = {}
         self.published = set()
+        self.references = {}
         self.initialized = False
         self.shutdown = False
 
@@ -109,6 +122,15 @@ class Server:
 
     def analyze(self):
         diagnostics = {}
+        references = {}
+        reference_keys = {}
+        position_maps = {}
+        def positions(path):
+            if path not in position_maps:
+                text = self.documents[path].text if path in self.documents else path.read_bytes().decode('utf-8')
+                position_maps[path] = PositionMap(text)
+            return position_maps[path]
+
         with tempfile.TemporaryDirectory(prefix='cool-editor-') as directory:
             work = Path(directory)
             overlays = {}
@@ -126,7 +148,7 @@ class Server:
                 output, failure = '', ''
                 try:
                     manifest, _ = self.bundle(entry,work,True,True,True,overlays=overlays,editor=True)
-                    result = subprocess.run([self.frontend,'diagnostics-bundle',manifest],capture_output=True,text=True,timeout=20)
+                    result = subprocess.run([self.frontend,'editor-index-bundle',manifest],capture_output=True,text=True,timeout=20)
                     output = result.stdout
                     if result.returncode:
                         failure = result.stderr.strip() or 'compiler analysis failed'
@@ -137,6 +159,27 @@ class Server:
                     failure = 'compiler analysis timed out'
                 except (OSError, ValueError) as error:
                     failure = str(error)
+                if not failure:
+                    for line in output.splitlines():
+                        try:
+                            record = json.loads(line)
+                        except ValueError:
+                            continue
+                        if not isinstance(record,dict) or record.get('kind') != 'reference':
+                            continue
+                        source = originals.get(Path(record['file']),Path(record['file']))
+                        target = originals.get(Path(record['targetFile']),Path(record['targetFile']))
+                        target_positions = positions(target)
+                        uri = self.documents[target].uri if target in self.documents else target.as_uri()
+                        location = {'uri':uri,'range':{'start':target_positions.position(record['targetStart']),
+                            'end':target_positions.position(record['targetEnd'])}}
+                        item = (record['start'],record['end'],location)
+                        bucket = references.setdefault(source,[])
+                        key = (record['start'],record['end'],target,record['targetStart'],record['targetEnd'])
+                        seen = reference_keys.setdefault(source,set())
+                        if key not in seen:
+                            seen.add(key)
+                            bucket.append(item)
                 found = False
                 for line in output.splitlines():
                     try:
@@ -163,6 +206,7 @@ class Server:
                 if failure and not found:
                     diagnostics.setdefault(document.uri,[]).append({'range':{'start':{'line':0,'character':0},'end':{'line':0,'character':0}},
                         'severity':1,'source':'cool','message':failure[:8192]})
+        self.references = references
         versions = {document.uri:document.version for document in self.documents.values()}
         current = set(diagnostics) | set(versions)
         for uri in sorted(self.published | current):
@@ -199,7 +243,7 @@ class Server:
                 self.error(identifier,-32600,'already initialized')
             else:
                 self.initialized = True
-                self.send(id=identifier,result={'capabilities':{'positionEncoding':'utf-16','textDocumentSync':{'openClose':True,'change':2,'save':{'includeText':False}}},
+                self.send(id=identifier,result={'capabilities':{'positionEncoding':'utf-16','definitionProvider':True,'textDocumentSync':{'openClose':True,'change':2,'save':{'includeText':False}}},
                     'serverInfo':{'name':'Cool','version':(self.root/'VERSION').read_text().strip()}})
             return None
         if not self.initialized or self.shutdown:
@@ -245,6 +289,19 @@ class Server:
             elif method == 'textDocument/didClose':
                 self.documents.pop(path,None)
             self.analyze()
+        elif method == 'textDocument/definition' and request:
+            path = uri_path(params['textDocument']['uri'])
+            content = self.documents[path].text if path in self.documents else path.read_bytes().decode('utf-8')
+            offset = len(content[:text_index(content,params['position'])].encode('utf-8'))
+            candidates = self.references.get(path,[])
+            matches = [location for start,end,location in candidates if start <= offset < end]
+            if not matches:
+                matches = [location for start,end,location in candidates if start < offset == end]
+            unique = []
+            for location in matches:
+                if location not in unique:
+                    unique.append(location)
+            self.send(id=identifier,result=unique)
         elif method == 'workspace/didChangeWatchedFiles':
             self.analyze()
         elif request:

@@ -104,6 +104,7 @@ Field *FindField(I64 type, U8 *name, Token *token) {
     Field *f; Layout(type);
     for (f = Shape(type)->fields; f; f = f->next) if (Eq(f->name, name)) {
         if (!f->public && !Eq(token->package, Shape(type)->package)) ErrorAt(token, "field is private to its package");
+        EditorReference(EditorNameToken(name),EditorNameToken(f->name));
         return f;
     }
     ErrorAt(token, "unknown field"); return NULL;

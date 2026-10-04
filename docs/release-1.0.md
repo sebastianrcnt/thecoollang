@@ -706,6 +706,30 @@ through ordinary evaluation or library use.
   Definition lookup and completion remain unimplemented; G7 stays open. See
   [editor integration](editor.md) for the exact supported scope.
 
+- Semantic definition lookup: `editor-index-bundle` emits native binding
+  references for checked AST locals/assignments/parameters and function calls,
+  plus semantic type/field resolution. Token-pointer identity distinguishes
+  shadowed variables; methods and generic instances navigate to their source
+  declarations. The LSP maps snapshot paths back to editor documents and discards
+  failed-package indexes instead of returning stale locations. Both frontends
+  and the compiler-instrumented ASan frontend pass shadowing, assignment,
+  parameter, imported function/type/field/method/generic and invalidation tests.
+  The read-only installed distribution passes cross-package definition lookup.
+  Full `make test bootstrap-check` and self-host IR/native convergence pass;
+  IR SHA256 is
+  `fa83a5e4d7f216a99f5a53c1b6658568b5ebb6795a444b8d8a3fa81cf7aebb56`.
+  A native compiler-source index produces 36,868 reference records successfully.
+  An end-to-end LSP sample copies all 31 compiler sources into a temporary normal
+  module, adds its package declarations and opens an unsaved buffer; it reports
+  no diagnostics and exits cleanly. Observed times (0.443 seconds native index,
+  1.091 seconds whole server sample) are single local runs alongside other work,
+  not benchmark medians. Token lookup uses a pointer-keyed table; transport caches
+  file position maps and deduplicates references with sets. Logs/reports are in
+  `build/release-audit/editor-definition-{regression,sanitize,final,distribution}.log`
+  and `editor-definition-{compiler,lsp-compiler}-sample.json`.
+  G7 remains open for completion, import/builtin and uninstantiated-template
+  navigation, analysis of incomplete code and broader editor integration.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

@@ -1083,6 +1083,7 @@ t12 = v_token3;
 t13 = cast[*u8]("field is private to its package");
 ErrorAt(t12, t13);
 }
+EditorReference(EditorNameToken(v_name10), EditorNameToken(v_f3.name));
 return v_f3;
 }
 v_f3 = (v_f3).next;

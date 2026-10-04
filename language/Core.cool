@@ -113,7 +113,8 @@ Token *tokens;
 I64 ntok, pos;
 U8 *lex_package = "__main";
 Token *At() { return &tokens[pos]; }
-Bool editor_diagnostics;
+Bool editor_diagnostics,editor_index;
+Token **editor_names;I64 editor_capacity;
 extern U0 EditorDiagnostic(Token *token,U8 *message);
 U0 ErrorAt(Token *t, U8 *message) {
     if(editor_diagnostics)EditorDiagnostic(t,message);

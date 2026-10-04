@@ -99,6 +99,7 @@ fn NamedAtom(token: * Token) -> * Node {
             qualified = true;
         }
         var type = FindType(package, name);
+        EditorTypeReference(name, type);
         if (type >= 0 && Shape(type).generic_count != 0) {
             type = InstantiateType(type);
         }

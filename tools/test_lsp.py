@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
     root = Path(temporary).resolve()
     project = root/'project';project.mkdir();(project/'cool.mod').write_text('module example.test/editor\n')
     main = project/'main.cool';main.write_text('package main;fn main(){}\n')
-    library = project/'lib';library.mkdir();source = library/'lib.cool';source.write_text('package lib;pub fn answer()->i64{return 7;}\n')
+    library = project/'lib';library.mkdir();source = library/'lib.cool';source.write_text('package lib;pub fn answer()->i64{return 7;}\npub struct Box{pub value:i64;}\npub fn Box.read(self:&Box)->i64{return (*self).value;}\npub fn identity[T](value:T)->T{return value;}\n')
     original = {p:p.read_bytes() for p in (main,source,project/'cool.mod')}
     bootstrap = root/'bootstrap'
     bootstrap.write_text('#!/bin/sh\nexec '+shlex.quote(str(ROOT/'build/coolc'))+' --run '+shlex.quote(str(ROOT/'build/language.BIN'))+' "$@"\n');bootstrap.chmod(0o755)
@@ -113,7 +113,7 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             client.send('textDocument/didChange',{'textDocument':{'uri':liburi,'version':2},'contentChanges':[{'text':'package lib;pub fn answer()->string{return "value";}'}]})
             diagnostics=client.barrier();assert diagnostics[uri]['diagnostics'] and diagnostics[liburi]['diagnostics']==[]
             client.send('textDocument/didClose',{'textDocument':{'uri':liburi}})
-            diagnostics=client.barrier();assert diagnostics[uri]['diagnostics']==[] and diagnostics[liburi]['diagnostics']==[]
+            diagnostics=client.barrier();assert diagnostics[uri]['diagnostics']==[] and diagnostics[liburi]['diagnostics']==[],diagnostics
             client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':5},'contentChanges':[{'text':'package main;fn main(){helper();}'}]})
             assert client.barrier()[uri]['diagnostics']
             helper=project/'unsaved.cool';helperuri=helper.as_uri()
@@ -127,6 +127,34 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             assert diagnostic['range']['start']=={'line':1,'character':10},diagnostic
             client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':7},'contentChanges':[{'text':'package main;fn main(){let x="bad\\q";}'}]})
             assert 'unsupported string escape' in client.barrier()[uri]['diagnostics'][0]['message']
+            indexed='package main;\nimport l "example.test/editor/lib";\nfn main(){var box=l.Box{value:7};let typed:l.Box=box;var x=1;x=3;x=1;{let x=2;assert(x==2);}assert(x==1);assert(l.answer()==7);assert(typed.read()==7);assert(typed.value==7);assert(l.identity[i64](x)==1);}'
+            client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':8},'contentChanges':[{'text':indexed}]})
+            checked=client.barrier();assert checked[uri]['diagnostics']==[],checked
+            def definition(document_uri,contents,offset,target_uri,target_text,target_offset,length):
+                client.number+=1;identifier='definition'+str(client.number)
+                client.send('textDocument/definition',{'textDocument':{'uri':document_uri},
+                    'position':byte_position(contents,len(contents[:offset].encode()))},identifier=identifier)
+                result,_=client.until(identifier)
+                expected={'uri':target_uri,'range':{'start':byte_position(target_text,len(target_text[:target_offset].encode())),
+                    'end':byte_position(target_text,len(target_text[:target_offset+length].encode()))}}
+                assert result.get('result')==[expected],(offset,result,expected)
+            libtext=source.read_text()
+            definition(uri,indexed,indexed.index('x=3'),uri,indexed,indexed.index('x=1'),1)
+            definition(uri,indexed,indexed.index('x==2'),uri,indexed,indexed.index('x=2'),1)
+            definition(uri,indexed,indexed.index('x==1'),uri,indexed,indexed.index('x=1'),1)
+            definition(uri,indexed,indexed.index('answer()'),liburi,libtext,libtext.index('answer()'),6)
+            definition(uri,indexed,indexed.index('read()'),liburi,libtext,libtext.index('read('),4)
+            definition(uri,indexed,indexed.index('value=='),liburi,libtext,libtext.index('value:i64'),5)
+            definition(uri,indexed,indexed.index('value:7'),liburi,libtext,libtext.index('value:i64'),5)
+            definition(uri,indexed,indexed.index('Box{'),liburi,libtext,libtext.index('Box{'),3)
+            definition(uri,indexed,indexed.index('Box=box'),liburi,libtext,libtext.index('Box{'),3)
+            definition(uri,indexed,indexed.index('identity['),liburi,libtext,libtext.index('identity['),8)
+            definition(liburi,libtext,libtext.index('self).value'),liburi,libtext,libtext.index('self:&'),4)
+            definition(liburi,libtext,libtext.index('return value')+7,liburi,libtext,libtext.index('value:T'),5)
+            client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':9},'contentChanges':[{'text':indexed.replace('x=3','x=missing')}]})
+            assert client.barrier()[uri]['diagnostics']
+            client.send('textDocument/definition',{'textDocument':{'uri':uri},'position':{'line':2,'character':1}},identifier='stale-definition')
+            response,_=client.until('stale-definition');assert response['result']==[]
             client.send('textDocument/didClose',{'textDocument':{'uri':uri}})
             assert client.barrier()[uri]['diagnostics']==[]
             client.close()
@@ -143,7 +171,7 @@ for bad in (b'Content-Length: -1\r\n\r\n',b'Content-Length: 2\r\n\r\n{',b'Conten
     try:read_message(io.BytesIO(bad))
     except ValueError:pass
     else:raise AssertionError(bad)
-print('LSP diagnostics: both frontends, native JSON, fragmented framing, UTF-16/CRLF, unsaved dependencies/new files, version ordering, close/reset and no source writes PASS')
+print('LSP: native diagnostics and definition lookup, shadowed locals/assignment/parameters, imported functions/types/fields/methods/generics, fragmented framing, UTF-16/CRLF, unsaved dependencies/new files, version ordering, index invalidation and no source writes PASS')
 
 # No-argument lifecycle requests also accept explicit JSON null parameters.
 output=io.BytesIO();server=Server(None,None,ROOT,output)
