@@ -3030,7 +3030,7 @@ t258 = (v_ty < 0);
 if (t258) {
 t259 = v_name13;
 t260 = FindLocal(t259);
-t258 = !((t260 != null));
+t258 = v_qualified != i8(0) || t260 == null;
 }
 t261 = t258;
 if (t261) {
@@ -3388,6 +3388,7 @@ return v_n18;
 t406 = v_name13;
 t407 = FindLocal(t406);
 v_l3 = t407;
+if (v_qualified != i8(0)) {v_l3 = null;}
 if (!((v_l3 != null))) {
 t408 = v_t13;
 t409 = cast[*u8]("unknown variable (functions require explicit calls)");

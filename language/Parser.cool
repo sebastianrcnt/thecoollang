@@ -151,7 +151,7 @@ Node *Atom() {
     ty = FindType(package, name);
     if (ty >= 0 && Shape(ty)->generic_count) ty = InstantiateType(ty);
     if (ty >= 0 && AggregateKind(ty) == A_ENUM) { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return EnumLiteral(ty, t); }
-    if (ty < 0 && !FindLocal(name) && At()->kind == '[') type_count = TypeArguments(type_args);
+    if (ty < 0 && (qualified || !FindLocal(name)) && At()->kind == '[') type_count = TypeArguments(type_args);
     if (ty >= 0 && At()->kind == '{') { if (qualified && !Shape(ty)->public) ErrorAt(t, "type is private to its package"); return AggregateLiteral(ty, t); }
     if (Take('(')) {
         n = NewNode(N_CALL, t); n->name = name;
@@ -206,7 +206,7 @@ Node *Atom() {
         for (k = 0; k < count; k++) { Coerce(arg, functions[id].arg_types[k]); Transfer(arg); arg = arg->next; }
         n->slot = id; n->type = functions[id].result; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }
-    l = FindLocal(name);
+    l = NULL; if (!qualified) l = FindLocal(name);
     if (!l) ErrorAt(t, "unknown variable (functions require explicit calls)");
     if (l->moved) ErrorAt(t, "use of moved value");
     n = NewNode(N_LOCAL, t); n->name = name; n->slot = l->slot; n->type = l->type; n->local_ref = l; n->mutable = l->mutable; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;

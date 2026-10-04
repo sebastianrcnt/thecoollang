@@ -190,6 +190,12 @@ through ordinary evaluation or library use.
   converge. Single-source contracts remain required; stored-reference and slice
   integration work is still open.
 
+- Package qualification audit: generic calls such as `vector.cursor[T](...)`
+  are no longer misparsed when a local has the same member name. A qualified
+  bare name also cannot resolve to an unrelated local. Both frontends reject
+  that ambiguity, generic runtime cases pass all five engines, and exact
+  self-host convergence passes. This defect was exposed by the process library.
+
 ## Next implementation checkpoints
 
 - Extend scoped loans to stored references and slice aliases; keep unsafe raw
