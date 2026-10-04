@@ -798,23 +798,6 @@ fn AnalyzeReferences(function: * Function) {
         ReferenceRelease( & raw check, null);
     }
 }
-fn RejectReplReferences(node: * Node) {
-    unsafe {
-        if (node == null) {
-            return;
-        }
-        if ((node.kind == 26 && OwnerPlace(node.a) != i8(0)) || (AggregateKind(node.type) == 3 && Owned(Shape(node.type).element) != i8(0))) { ErrorAt(node.token, cast[*u8]("owned slices in REPL submissions require persistent loan tracking")); }
-        if (ContainsReference(node.type)) {
-            ErrorAt(node.token, cast[ * u8]("scoped references in REPL submissions require persistent loan tracking"));
-        }
-        RejectReplReferences(node.a);
-        RejectReplReferences(node.b);
-        RejectReplReferences(node.c);
-        RejectReplReferences(node.next);
-    }
-}
-// Legacy slices are mutable aliases. Until both systems share a loan graph,
-// prevent a reference from coexisting with any slice of the same root.
 fn RawReferenceExpression() -> * Node {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));

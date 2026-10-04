@@ -56,3 +56,8 @@ See [compiler invariants](../docs/compiler-invariants.md) for the source map,
 type/slot/AST representation, pass ordering, ownership and loan requirements,
 backend obligations and recovery/resource limitations. Read it before changing
 shared representations; self-host convergence alone cannot validate semantics.
+
+`19-repl-loans.cool` owns persistent loan transactions and `:forget` validation.
+It clones the lexical check state per submission, filters committed holders
+on success or partial runtime failure, and frees superseded loan records. The
+session driver in `13-repl.cool` invokes it at checking/recovery boundaries.

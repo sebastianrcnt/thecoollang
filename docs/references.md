@@ -81,11 +81,10 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
   exclusively borrows its elements; element references reborrow it, and disjoint
   lexical scopes can reuse the source. References to a slice descriptor and
   slice elements containing borrowed storage remain unsupported.
-- REPL statement submissions containing references or owned slices are rejected
-  because loans are not yet retained across submissions. Legacy views of
-  persistent plain arrays remain available there with their existing aliasing
-  behavior. Compiled function bodies use the lexical rules described here;
-  persistent REPL loan integration is still required for 1.0.
+- REPL submissions retain reference and slice loans across inputs under the
+  same checking rules as functions. Top-level bindings stay live until
+  `:forget name` or session exit. See the persistent-loan and recovery rules
+  below; package loading and bounded session-resource reclamation remain work.
 - There is no automatic field dereference, reference coercion, lifetime syntax,
   or borrow-aware replacement for every collection API.
   [Methods](methods.md) use the same scoped loans.
@@ -184,8 +183,8 @@ they do not become unrelated roots of the reference being bound.
 `make reference-sets-test` validates these cases on both frontends, five engines
 and optimized native output. It includes 28 explicit rejection cases and an
 independent finite-set oracle with 216 seeded mutation queries, plus repeated
-union deduplication. Stored shared references and slices extend this model below; persistent REPL
-loans remain separate work.
+union deduplication. Stored shared references, slices and persistent REPL
+loans extend this model below.
 
 
 ## Stored shared references
@@ -507,4 +506,53 @@ self-reslicing, nested/branch/loop assignment, moved owning containers and
 scope resumption. Both frontends and all five engines plus optimized native
 output are exercised. `make slice-loans-sanitize-test` additionally instruments
 Cool LLVM accesses with ASan and the C runtime with ASan/UBSan. The REPL test
-checks explicit rejection and rollback for currently unsupported owned views.
+checks that owned views protect their sources across inputs and release them
+when explicitly forgotten.
+
+
+## Persistent REPL loans
+
+References, stored references and slices (including owned-array/owner-element
+views) can live across REPL submissions. The checking rules are the same as in
+function bodies. Top-level bindings live for the session; an explicit block
+ends its local loans when the block ends. Reads and writes through a parent
+remain restricted while a conflicting child loan lives.
+
+```text
+cool> var value = 10;
+cool> let item = &mut value;
+cool> *item = 20;
+cool> value = 30;
+error: access conflicts with a live scoped reference
+cool> :forget item
+cool> value = 30;
+cool> value
+30
+```
+
+`:forget name` removes a session binding and its held loans. Owning bindings
+are destroyed immediately and exactly once. A binding with live source or
+parent dependencies cannot be forgotten: forget dependent views first. Unknown
+names and malformed commands leave bindings intact. The removed name can then
+be declared again. This command does not reuse old value slots or reclaim all
+compiler metadata yet; the session's existing register limit still applies.
+Raw pointers remain subject to explicit unsafe lifetime obligations.
+
+Input checking uses a copy of the live loan list. Syntax/type/checking failure
+discards that copy and preserves existing bindings and loans. Successful
+execution commits loans for surviving bindings. Runtime errors can occur after
+an existing value has changed; they do **not** roll back those writes. Recovery
+therefore preserves the candidate's possible roots for old surviving bindings,
+including assignments that might not have executed yet, and discards loans
+held only by failed new bindings. This conservative union can keep a source
+borrowed until the holder is forgotten. A failing block still cannot store a
+reference to its shorter-lived local storage into an outer binding.
+
+`make repl-loans-test` exercises persistent exclusive/shared references, nested
+reborrows, owned views, compile/runtime failures, `:forget` ordering, owner
+cleanup and JIT/body replacement. Ten focused sessions and 288 independent
+read/write permission queries run on both frontends. With
+`make repl-loans-sanitize-test`, the self-hosted compiler's own LLVM loads/stores
+are ASan-instrumented and its C host/runtime use ASan/UBSan, then the same tests
+run against that compiler. These checks do not prove bounded metadata use or
+complete external-package support in long sessions; both remain release work.

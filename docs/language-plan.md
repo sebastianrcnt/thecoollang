@@ -34,8 +34,9 @@ The three follow-up areas have working, tested implementations:
 2. Move-only owners, managed allocation, nested deterministic destruction across
    all five engines, conservative branch/loop checks, modular borrowed-return
    contracts and REPL error recovery. Exclusive scoped loans and tracked slices
-   (including owned arrays/elements) work in functions. Persistent REPL loans
-   and general nested borrowed storage remain explicit release work.
+   (including owned arrays/elements) work in functions and persist across REPL
+   inputs. External REPL package loading, bounded session resources and general
+   nested borrowed storage remain explicit release work.
 3. Source packages for slices, strings, checked arithmetic, owning chunked vectors,
    binary files and process arguments. The production compiler now uses new
    syntax and compiles itself: three generations of LLVM IR and two generations

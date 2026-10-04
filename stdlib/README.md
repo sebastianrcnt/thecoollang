@@ -367,4 +367,4 @@ reborrow their arguments, and `tail`/`take` return views under declared lifetime
 contracts. Scope returned views before reusing the parent; use `&view[i]` or
 `&mut view[i]` for element access through checked references. Owned arrays and
 owning elements are supported. See [tracked slices](../docs/references.md#tracked-slices)
-for examples, reassignment semantics and the remaining REPL restrictions.
+for examples, reassignment semantics and persistent REPL lifetime rules.

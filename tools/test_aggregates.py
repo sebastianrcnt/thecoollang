@@ -56,15 +56,15 @@ struct Pair { value: i64; }
 var a = [2]Pair{Pair{value:1},Pair{value:2}};
 let s = a[:];
 fn read(p: Pair) -> i64 { return p.value; }
-read(a[0])
-read(a[0])
-read(a[0])
-read(a[0])
+read(s[0])
+read(s[0])
+read(s[0])
+read(s[0])
 fn read(p: Pair) -> i64 { return p.value+10; }
 s[0].value = 9;
-read(a[0])
+read(s[0])
 struct Pair { value: i32; }
-read(a[0])
+read(s[0])
 :quit
 '''
 p = run([*FRONT, 'repl-quiet'], input=session)
@@ -72,7 +72,7 @@ assert p.stdout == '1\n1\n1\n1\n19\n19\n', (p.stdout, p.stderr)
 assert 'recursive aggregate' in p.stderr and 'layout redefinition' in p.stderr, p.stderr
 print('aggregates: runtime bounds across engines, public/private types and fields, LLVM JIT, formatter/docs, REPL rollback and replacement PASS')
 
-session = 'var a = [1]i32{1};\nvar s = a[:];\n{ var b = [1]i32{7}; s = b[:]; assert(false); }\nvar c = [1]i32{99};\nio.println(s[0]);\n:quit\n'
+session = 'var a = [1]i32{1};\nvar b = [1]i32{7};\nvar s = a[:];\n{ s = b[:]; assert(false); }\nvar c = [1]i32{99};\nio.println(s[0]);\n:forget s\nb[0]=8;\nb[0]\n:quit\n'
 p = run([*FRONT, 'repl-quiet'], input=session)
-assert p.stdout == '7\n' and 'assertion failed' in p.stderr, (p.stdout, p.stderr)
+assert p.stdout == '7\n8\n' and 'assertion failed' in p.stderr, (p.stdout, p.stderr)
 print('aggregates: runtime-error recovery preserves storage borrowed by surviving REPL bindings PASS')

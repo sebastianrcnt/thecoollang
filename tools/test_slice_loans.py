@@ -127,9 +127,9 @@ with tempfile.TemporaryDirectory(prefix='cool-slice-loans-') as tmp:
      queries+=1
  print(f'slice loans: {queries} independent source-set queries on both frontends PASS')
  for front in FRONTS:
-  p=run([*front,'repl-quiet'],input='var p=new[[3]i64]([3]i64{1,2,3});\nlet s=(*p)[:];\n(*p)[0]\nvar a=[1]own[i64]{new[i64](7)};\nlet s=a[:];\n*a[0]\n:quit\n')
-  assert p.returncode==0 and p.stdout=='1\n7\n' and p.stderr.count('owned slices in REPL submissions require persistent loan tracking')==2,p
- print('slice loans: REPL rejects unsupported owned slices and preserves previous owners on both frontends PASS')
+  p=run([*front,'repl-quiet'],input='var p=new[[3]i64]([3]i64{1,2,3});\nlet s=(*p)[:];\ns[0]=3;\n(*p)[0]\ns[0]\n:forget s\n(*p)[0]\nvar a=[1]own[i64]{new[i64](7)};\nlet owners=a[:];\n*owners[0]=9;\n:forget owners\n*a[0]\n:quit\n')
+  assert p.returncode==0 and p.stdout=='3\n3\n9\n' and p.stderr.count('conflicts')==1,p
+ print('slice loans: persistent REPL owned slices protect and release their sources on both frontends PASS')
  source.write_text('import slice "std/slice";import "std/io";fn main(){var a=[4]i64{1,2,3,4};{let s=a[:];slice.reverse[i64](s);{let rest=slice.tail[i64](s);slice.fill[i64](rest,9);}assert(s[0]==4 && s[1]==9);{let first=slice.take[i64](s,1);first[0]=8;}}assert(a[0]==8 && a[3]==9);io.println(42);}')
  bootstrap=Path(tmp)/'bootstrap';bootstrap.write_text('#!/bin/sh\nexec '+shlex.quote(str(ROOT/'build/coolc'))+' --run '+shlex.quote(str(ROOT/'build/language.BIN'))+' "$@"\n');bootstrap.chmod(0o755)
  for front in (ROOT/'build/cool-compiler',bootstrap):

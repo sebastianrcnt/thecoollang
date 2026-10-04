@@ -1,0 +1,95 @@
+// Persistent loans are transactional for checking, conservative for partial
+// execution, and independent of the session's stable value-slot allocation.
+fn ReplLoanListFree(head: *ReferenceLoan) {
+    unsafe {
+        var loans = head;
+        while (loans != null) {
+            let next = loans.next;
+            Free(cast[*u8](loans));
+            loans = next;
+        }
+    }
+}
+fn ReplLoansBegin(statement: *Node) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let candidate = cast[*ReferenceCheck](CAlloc(i64(sizeof(ReferenceCheck))));
+        ctx.v_repl_candidate = candidate;
+        candidate.function = &raw ctx.v_functions[0];
+        var tail = &raw candidate.loans;
+        var original = ctx.v_repl_loans;
+        while (original != null) {
+            let copy = cast[*ReferenceLoan](CAlloc(i64(sizeof(ReferenceLoan))));
+            *copy = *original;
+            copy.next = null;
+            *tail = copy;
+            tail = &raw copy.next;
+            original = original.next;
+        }
+        ReferenceStatement(candidate, statement);
+    }
+}
+fn ReplLoansFinish(keep: bool, visible: *Local) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let candidate = ctx.v_repl_candidate;
+        if (candidate == null) { return; }
+        if (keep) {
+            var link = &raw candidate.loans;
+            while (*link != null) {
+                let loan = *link;
+                var local = visible;
+                while (local != null && local != loan.holder) { local = local.next; }
+                if (local != null) { link = &raw loan.next; }
+                else { *link = loan.next; Free(cast[*u8](loan)); }
+            }
+            ReplLoanListFree(ctx.v_repl_loans);
+            ctx.v_repl_loans = candidate.loans;
+        } else { ReplLoanListFree(candidate.loans); }
+        Free(cast[*u8](candidate));
+        ctx.v_repl_candidate = null;
+    }
+}
+fn ReplForget(name: *u8) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var local = ctx.v_repl_locals;
+        while (local != null && Eq(local.name, name) == i8(0)) { local = local.next; }
+        if (local == null) { Error(cast[*u8]("unknown session binding")); }
+        var loan = ctx.v_repl_loans;
+        while (loan != null) {
+            if (loan.holder != local && (loan.root == local || loan.parent == local)) {
+                Error(cast[*u8]("cannot forget a binding with live dependent loans"));
+            }
+            loan = loan.next;
+        }
+        // All validation precedes mutation. Forgotten owner slots are cleared
+        // by DropValue and remain harmless in the final session drop list.
+        if (Owned(local.type) != i8(0)) {
+            DropValue(i64(cast[i64](&raw ctx.v_repl_values[local.slot])), local.type);
+        }
+        var link = &raw ctx.v_repl_loans;
+        while (*link != null) {
+            loan = *link;
+            if (loan.holder == local) { *link = loan.next; Free(cast[*u8](loan)); }
+            else { link = &raw loan.next; }
+        }
+        var binding = &raw ctx.v_repl_locals;
+        while (*binding != local) { binding = &raw (*binding).next; }
+        *binding = local.next;
+        ctx.v_locals = ctx.v_repl_locals;
+    }
+}
+fn ReplLoanCommand() -> bool {
+    unsafe {
+        if (Take(58) == i8(0)) { return false; }
+        if (Is(cast[*u8]("forget")) == i8(0)) { Error(cast[*u8]("unknown session command")); }
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        ctx.v_pos = ctx.v_pos + 1;
+        let name = Ident();
+        Take(59);
+        if (At().kind != 0) { Error(cast[*u8]("expected one binding after :forget")); }
+        ReplForget(name);
+        return true;
+    }
+}

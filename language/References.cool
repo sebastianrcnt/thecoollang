@@ -214,10 +214,6 @@ U0 ReferenceStatement(ReferenceCheck *check,Node *node){
     if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
 }
 U0 AnalyzeReferences(Function *function){ReferenceCheck check;check.loans=NULL;check.function=function;ReferenceStatement(&check,function->body);ReferenceRelease(&check,NULL);}
-U0 RejectReplReferences(Node *node){
-    if(!node)return;if((node->kind==N_SLICE && OwnerPlace(node->a)) || (AggregateKind(node->type)==A_SLICE && Owned(Shape(node->type)->element)))ErrorAt(node->token,"owned slices in REPL submissions require persistent loan tracking");if(ContainsReference(node->type))ErrorAt(node->token,"scoped references in REPL submissions require persistent loan tracking");
-    RejectReplReferences(node->a);RejectReplReferences(node->b);RejectReplReferences(node->c);RejectReplReferences(node->next);
-}
 Node *RawReferenceExpression(){
     Token *token=At();I64 type;Node *pointer,*anchor,*result;pos++;
     if(!unsafe_depth)ErrorAt(token,"borrow_raw requires unsafe");

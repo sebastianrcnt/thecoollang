@@ -9,6 +9,7 @@ I64 *repl_values;
 I64 repl_capacity;
 Bool repl_executing;
 MoveState *repl_moves;
+#include "ReplLoans.cool"
 U0 ReplDropNew(Bool failed) {
     DropSlot *d; Local *l; Bool keep;
     for (d = functions[0].drops; d != repl_snapshot[0].drops; d = d->next) {
@@ -39,6 +40,7 @@ Text *Submission() {
 }
 U0 ReplRestore() {
     I64 retained_slots = functions[0].slots; Frame *frame; DropSlot *d;
+    ReplLoansFinish(repl_executing,repl_locals);
     if (repl_executing) {
         while (active_frame) {
             frame = active_frame;
@@ -57,6 +59,7 @@ U0 ReplStep(Text *text) {
     repl_executing = FALSE;
     LexSource(text->data, "<repl>"); pos = start;
     if (!At()->kind) return;
+    if(ReplLoanCommand())return;
     if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { ParseProgram(); return; }
     current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
     // Expression submissions may omit the trailing semicolon.
@@ -64,7 +67,7 @@ U0 ReplStep(Text *text) {
         tokens[ntok] = tokens[ntok-1]; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
     }
     if (Is("return") || Is("defer")) Error("top-level return/defer requires an explicit function or block");
-    statement = Statement(); RejectReplReferences(statement); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
+    statement = Statement(); ReplLoansBegin(statement); if (At()->kind) Error("one statement per submission; use a block for multiple statements");
     if (statement->kind == N_EXPR && statement->a->type != T_VOID && !Aggregate(statement->a->type)) {
         arg = statement->a; call = NewNode(N_CALL, arg->token); call->name = "println"; call->slot = -1; call->value = 1; call->type = T_VOID; call->a = arg;
         statement->a = call;
@@ -81,7 +84,7 @@ U0 ReplStep(Text *text) {
     for (i = repl_snapshot[0].slots; i < f->slots; i++) repl_values[i] = 0;
     // The session's locals remain live; expression temporaries are regenerated.
     repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
-    ReplDropNew(FALSE); repl_locals = locals;
+    ReplDropNew(FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals;
 }
 U0 Repl(Bool prompt) {
     Text *text, *stats; I64 i, compiled; DropSlot *d; MoveState *move;
@@ -112,5 +115,6 @@ U0 Repl(Bool prompt) {
 repl_next:
         Free(text->data); Free(text);
     }
+    ReplLoanListFree(repl_loans);repl_loans=NULL;
     for (d = functions[0].drops; d; d = d->next) DropValue(&repl_values[d->slot], d->type);
 }

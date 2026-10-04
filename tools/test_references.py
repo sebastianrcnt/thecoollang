@@ -122,6 +122,6 @@ with tempfile.TemporaryDirectory(prefix='cool-references-') as tmp:
  result=run([ROOT/'tools/cool','fmt',path]);assert result.returncode==0,result
  result=run([ROOT/'tools/cool','fmt','--check',path]);assert result.returncode==0,result
  result=run([ROOT/'tools/cool','check',path]);assert result.returncode==0,result
- result=run([ROOT/'tools/cool','repl'],input='var x=1;\nlet r=&mut x;\nx=2;\nx\n:quit\n')
- assert result.returncode==0 and result.stdout=='2\n' and 'persistent loan tracking' in result.stderr,result
+ result=run([ROOT/'tools/cool','repl'],input='var x=1;\nlet r=&mut x;\nx=2;\n*r\n:forget r\nx=2;\nx\n:quit\n')
+ assert result.returncode==0 and result.stdout=='1\n2\n' and result.stderr.count('conflicts')==1,result
 print(f'references: shared/exclusive/reborrow/return/defer on five engines + O2; {len(NEGATIVE)+len(WHOLE_NEGATIVE)} rejection cases on both frontends; formatter and REPL rollback PASS')

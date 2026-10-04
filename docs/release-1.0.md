@@ -29,7 +29,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
-| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open |
+| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent loans and explicit binding release verified) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
@@ -347,13 +347,31 @@ through ordinary evaluation or library use.
   References to slice descriptors, borrowed slice elements, general stored
   reference lifetimes and REPL integration remain release work; G2/G6 stay open.
 
+- Persistent REPL loans: reference/slice provenance now survives submissions,
+  including owned views and stored references, under the same rules as checked
+  functions. Per-input clones roll back checking failures; runtime failures
+  conservatively retain possible roots for old surviving bindings. `:forget`
+  validates dependencies before dropping owners, releasing held loans and
+  removing the name. Failed new bindings do not retain loans. Ten focused
+  sessions and 288 independent permission queries pass on both frontends,
+  including JIT/body replacement, borrow-contract rejection and partial-write
+  recovery. The self-hosted compiler itself passes these tests with verified
+  LLVM ASan load/store instrumentation and C host/runtime ASan/UBSan. Full
+  `make test bootstrap-check` passes; self-host IR/native binaries converge
+  (IR SHA256
+  `ec515445abe36c33c9ceb6ecda3080a7cc034198eaa2051065ff0c4112c31cbb`).
+  CI now includes slice and persistent-loan sanitizer targets; remote execution
+  is still unverified. `:forget` does not reclaim value slots, tokens or all
+  compiler metadata. External REPL package loading and bounded long-session
+  resource reclamation remain mandatory; G6 stays open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
   descriptors; keep unsafe raw pointers separate and add rejection regressions
   before removing restrictions.
-- Integrate persistent REPL loans and converge its array-view rules with checked
-  function bodies while preserving runtime-error recovery.
+- Complete external package loading in the REPL and bounded/reclaimable session
+  resources while preserving persistent loans and runtime-error recovery.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
   borrowed storage. Promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying

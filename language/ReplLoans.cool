@@ -1,0 +1,26 @@
+// Persistent-loan transaction, aligned with compiler/19-repl-loans.cool.
+ReferenceLoan *repl_loans;
+ReferenceCheck *repl_candidate;
+U0 ReplLoanListFree(ReferenceLoan *loans){ReferenceLoan *next;while(loans){next=loans->next;Free(loans);loans=next;}}
+U0 ReplLoansBegin(Node *statement){
+    ReferenceCheck *candidate=CAlloc(sizeof(ReferenceCheck));ReferenceLoan **tail,*original,*copy;
+    repl_candidate=candidate;candidate->function=&functions[0];tail=&candidate->loans;
+    for(original=repl_loans;original;original=original->next){copy=CAlloc(sizeof(ReferenceLoan));*copy=*original;copy->next=NULL;*tail=copy;tail=&copy->next;}
+    ReferenceStatement(candidate,statement);
+}
+U0 ReplLoansFinish(Bool keep,Local *visible){
+    ReferenceCheck *candidate=repl_candidate;ReferenceLoan **link,*loan;Local *local;
+    if(!candidate)return;
+    if(keep){link=&candidate->loans;while(*link){loan=*link;local=visible;while(local && local!=loan->holder)local=local->next;if(local)link=&loan->next;else{*link=loan->next;Free(loan);}}ReplLoanListFree(repl_loans);repl_loans=candidate->loans;}
+    else ReplLoanListFree(candidate->loans);
+    Free(candidate);repl_candidate=NULL;
+}
+U0 ReplForget(U8 *name){
+    Local *local=repl_locals,**binding;ReferenceLoan *loan,**link;
+    while(local && !Eq(local->name,name))local=local->next;if(!local)Error("unknown session binding");
+    for(loan=repl_loans;loan;loan=loan->next)if(loan->holder!=local && (loan->root==local || loan->parent==local))Error("cannot forget a binding with live dependent loans");
+    if(Owned(local->type))DropValue(&repl_values[local->slot],local->type);
+    link=&repl_loans;while(*link){loan=*link;if(loan->holder==local){*link=loan->next;Free(loan);}else link=&loan->next;}
+    binding=&repl_locals;while(*binding!=local)binding=&(*binding)->next;*binding=local->next;locals=repl_locals;
+}
+Bool ReplLoanCommand(){U8 *name;if(!Take(':'))return FALSE;if(!Is("forget"))Error("unknown session command");pos++;name=Ident();Take(';');if(At()->kind)Error("expected one binding after :forget");ReplForget(name);return TRUE;}

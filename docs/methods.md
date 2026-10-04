@@ -71,7 +71,7 @@ receivers, which reborrow their sources. Such containers support shared and
 exclusive receivers; their physical storage loans are distinct from underlying
 source loans. Shared `Iterator` values advance independently, while copies of
 `IteratorMut` suspend the parent until the child scope ends. General stored
-lifetimes, slice-loan integration and top-level persistent REPL loans remain open work;
+lifetimes, references to slice descriptors and full session resource reclamation remain open work;
 methods do not bypass these checks. Compiled functions containing methods can
 be used and replaced in the REPL under its existing signature rules.
 

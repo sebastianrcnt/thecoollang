@@ -68,6 +68,7 @@ order deterministic; they are not independently linked compiler libraries.
 | `16-references.cool` | Scoped loans and unsafe storage bridges | `References.cool` |
 | `17-calls.cool` | Named expressions, builtins and function-call resolution | `Parser.cool: Atom` |
 | `18-methods.cool` | Nominal method declaration, receiver adaptation and call lowering | `Methods.cool` |
+| `19-repl-loans.cool` | Persistent loan transactions, recovery filtering and explicit binding release | `ReplLoans.cool` |
 
 Much of the initial port still has explicit temporary variables and program
 counter loops. New modules and edited sections should use direct control flow
@@ -224,8 +225,8 @@ conservative in both layers. Ordinary borrowed returns combine selected roots.
 This avoids inventing an exclusive source-vector loan when mutating an iterator,
 while keeping physical receiver aliases and all referent invalidations checked.
 Aggregates mixing scoped references with owner/slice fields, arbitrary nested
-stored reference lifetimes, references to slice descriptors and persistent REPL
-loans remain unsupported. Do not remove
+stored reference lifetimes and references to slice descriptors remain
+unsupported. Do not remove
 their rejections merely because a happy-path example works. Unsafe `borrow_raw` anchors
 provide lifetime provenance but cannot prove arbitrary pointer validity or
 storage association. See [the reference contract](references.md).
@@ -271,6 +272,22 @@ bytecode and shares checked/runtime operations rather than inventing another
 type system. Adaptive execution compiles a function to native code after four
 calls. LLVM AOT/JIT must agree on errors and values even where it uses different
 runtime helpers.
+
+REPL checking clones the persistent loan list before analyzing a statement.
+The clone preserves order, rootless lifetime markers and Local identities;
+assignment may add roots below an old marker without mutating the saved list.
+Compile failure frees the candidate. Success commits loans whose holders are
+still visible. Runtime failure commits only loans held by previously visible
+bindings because existing values may have changed before the trap; their root
+union is conservative even for statements that did not execute. New failed
+bindings cannot retain loans or hide original dependencies. Loan lists and
+candidate check records are freed on replacement and exit.
+
+`:forget` validates source/parent dependencies and syntax before any mutation.
+It drops owning storage, removes the binding from name lookup, and frees its
+held loans. Cleared owner slots remain harmless in the final drop list. Slots,
+AST/local metadata and tokens are not reclaimed by this command; general
+bounded session storage remains an explicit release requirement.
 
 REPL function IDs remain stable so callers observe body replacement. Unsupported
 signature/generic changes require a new session. Compilation-product pointers

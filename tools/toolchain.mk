@@ -225,3 +225,12 @@ slice-loans-test: build/cool-compiler
 slice-loans-sanitize-test: build/cool-compiler
 	python3 tools/test_slice_loans.py --sanitize
 test: slice-loans-test
+
+.PHONY: repl-loans-test
+repl-loans-test: build/cool-compiler
+	python3 tools/test_repl_loans.py
+test: repl-loans-test
+
+.PHONY: repl-loans-sanitize-test
+repl-loans-sanitize-test: build/cool-compiler
+	python3 tools/test_repl_loans.py --sanitize

@@ -488,6 +488,10 @@ v_repl_executing: i8;
 
 v_repl_moves: *MoveState;
 
+v_repl_loans: *ReferenceLoan;
+
+v_repl_candidate: *ReferenceCheck;
+
 v_formatted: *Text;
 
 v_format_indent: i64;
