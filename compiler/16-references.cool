@@ -261,7 +261,7 @@ fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
         if (via == null) {
             return;
         }
-        if (writing && IsReference(via.type) && Shape(via.type).count == 0 && place.kind != 22) {
+        if (writing && IsReference(via.type) && Shape(via.type).count == 0 && place.kind != 22 && place.kind != 8) {
             ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
         }
         var loan = check.loans;
@@ -695,9 +695,15 @@ fn ReferenceAssign(check:*ReferenceCheck, target:*Local, value:*Node, stop:*Refe
                     let previous = ReferenceHolder(check, target, loan.root);
                     if (previous != null) { parent = previous.parent; } else { parent = null; }
                 }
-                let retained = ReferenceNew(loan.root, parent, loan.exclusive, loan.indirect, value, marker.next);
-                retained.holder = target;
-                marker.next = retained;
+                // A persistent binding retains a set of roots/capabilities,
+                // not one record per assignment in its input history.
+                var existing = marker.next;
+                while (existing != null && !(existing.holder == target && existing.root == loan.root && existing.parent == parent && existing.exclusive == loan.exclusive && existing.indirect == loan.indirect)) { existing = existing.next; }
+                if (existing == null) {
+                    let retained = ReferenceNew(loan.root, parent, loan.exclusive, loan.indirect, value, marker.next);
+                    retained.holder = target;
+                    marker.next = retained;
+                }
             }
             loan = loan.next;
         }
@@ -737,17 +743,11 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
             return;
         }
         if (node.kind == 8) {
-            if (ContainsReference(node.type)) {
-                ErrorAt(node.token, cast[ * u8]("scoped reference bindings cannot be reassigned"));
-            }
             ReferenceValue(check, node.a);
             ReferenceAccess(check, node, true);
             if (TrackedBorrow(node.type)) { ReferenceAssign(check, node.local_ref, node.a, saved); }
         } else {
             if (node.kind == 19) {
-                if (ContainsReference(node.type)) {
-                    ErrorAt(node.token, cast[ * u8]("stored reference fields cannot be reassigned"));
-                }
                 // Pin the destination while evaluating the value; require write
                 // access only after scalar reads in the value have completed.
                 ReferenceWriteCapability(node.a);

@@ -1485,6 +1485,33 @@ through ordinary evaluation or library use.
   This improves G2/G3/G8 evidence; all ten release gates remain open with the
   mandatory nested storage, replacement lifetime and other listed work unfinished.
 
+- Mutable local reference replacement (specification draft 25): mutable
+  reference bindings and struct/array/enum/generic values can be replaced,
+  including reference fields in locally owned heaps and mixed owning values.
+  Existing physical mutability/conflict checks and original-marker depth checks
+  reject shorter-lived sources. Return contracts include every possible source.
+  Rebinding a shared reference changes its binding, without granting write access
+  to its referent. Possible old/new roots remain conservatively protected.
+  Identical retained holder/root/parent/mode/layer edges are merged rather than
+  retaining one record per assignment. Thirty-two independently modeled root/mode
+  queries and sixteen negative programs check lifetimes, physical aliases,
+  deferred captures and unsupported reference receivers with specific diagnostics.
+  Five engines, both frontend O2 builds and compiler/runtime ASan/UBSan pass.
+  REPL tests distinguish compile-only rollback from conservative runtime-failure
+  retention; failed RHS values remain unchanged before their store executes.
+  Sixty-four and 1,024 repeated replacements have identical final tracked bytes/
+  count and identical peak tracked bytes (30,001,152 locally). The broader
+  allocation corpus now has seventeen bounded histories plus distinct-literal
+  policy retention. Full regression, native/legacy bootstrap convergence and
+  clean external editor/distribution verification pass. Prior blanket rejection
+  fixtures now test real shorter-scope installation or live-loan conflicts.
+  Evidence: `build/release-audit/reference-replacement-{final-build,final-focused,final-regression,final-sanitize,final-distribution,final-lifecycle}.log`.
+  Current IR SHA256:
+  `b8c350621af06ba0fb29373961a80c27f864e8722fea18d2e4c07d54550035ba`.
+  Cross-call borrowed replacement, nested stored borrowed pointees and borrowed
+  slice elements remain mandatory work; this implementation does not close G2
+  or declare 1.0 complete.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and lifetime-aware heap/slice

@@ -44,7 +44,7 @@ NEGATIVE=[
  ('let p=&mut a;let payload=(*p).left;x=30;','conflicts'),
  ('let p=&mut a;let payload=(*p).right;y=30;','conflicts'),
  ('let p=&mut a;*(*p).left=3;','immutable'),
- ('let p=&mut a;(*p).left=&y;','cannot be reassigned'),
+ ('let p=&mut a;(*p).left=&y;','replaced through a reference'),
  ('let p=&a;let q=&mut a;','conflicts'),
  ('let r=&x;let q=&r;let p=&mut r;','mutable place'),
  ('var r=&x;let q=&r;let p=&mut r;','conflicts'),

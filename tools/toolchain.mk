@@ -468,3 +468,10 @@ borrow-graphs-test: build/cool-compiler build/language.BIN build/compiler-host.o
 test: borrow-graphs-test
 borrow-graphs-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o
 	python3 tools/test_borrow_graphs.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: reference-replacement-test reference-replacement-sanitize-test
+reference-replacement-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_reference_replacement.py
+test: reference-replacement-test
+reference-replacement-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_reference_replacement.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

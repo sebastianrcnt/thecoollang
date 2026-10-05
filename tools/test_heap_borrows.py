@@ -60,7 +60,7 @@ invalid=[
  'fn main(){var x=1;let p=make(&x);let q=new[&View](&*p);}',
  'fn main(){let p=new[View]();}',
  'fn main(){let p=new[&i64]();}',
- 'fn main(){var x=1;var y=2;var p=make(&x);(*p).r=&y;}',
+ 'fn main(){var x=1;var y=2;var p=make(&x);{var z=3;(*p).r=&z;}}',
  'fn main(){var x=1;var p=new[own[View]](make(&x));{var y=2;*p=make(&y);}}',
  'fn replace(p:&mut own[View],r:&i64){*p=make(r);}fn main(){}',
  'fn main(){var x=1;var p=make(&x);let r=&p;let q=take(&mut p);}',

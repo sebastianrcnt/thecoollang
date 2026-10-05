@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 24
+# Cool language specification — 1.0 draft 25
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -900,3 +900,26 @@ Cross-call replacement through reference receivers remains rejected until
 mutation contracts carry destination lifetimes. Stored references whose pointees
 also contain borrows, and slices whose elements contain borrows, remain separate
 unfinished lifetime work; this revision does not declare the 1.0 gate complete.
+
+
+## Draft 25: mutable local reference replacement
+
+Mutable local reference bindings and borrowed struct/array/enum/generic values
+may be replaced, including reference fields in locally owned heaps. The new
+borrow roots must outlive the original binding. Physical mutability and live
+loan checks apply before storing; rebinding `var r:&T` never grants mutable
+access through its shared referent. Explicit full initialization remains required.
+
+The binding retains the union of old/new possible roots at its original lifetime
+marker. Nested blocks, branches and loops cannot release installed roots early.
+Identical holder/root/parent/mode/layer edges are retained once rather than once
+per assignment. This conservative rule may keep a replaced root borrowed longer
+than runtime use requires. All possible roots also contribute to return contract
+checking. A failed RHS preserves the old reference value before its store executes.
+REPL checking failures restore prior loans; runtime failures conservatively
+retain candidate roots because preceding stores may already have executed.
+
+Borrowed storage replacement through reference receivers remains unfinished:
+callee parameters do not yet express the destination's retained lifetime.
+Nested stored borrowed pointees and borrowed slice elements remain mandatory
+work. This revision does not change the 1.0 release status.

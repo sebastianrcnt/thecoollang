@@ -57,7 +57,7 @@ NEGATIVE=[
  ('let r=&v;*(*r).write=3;','immutable|shared reference|exclusive borrow'),
  ('let r=&v;let copy=(*r).write;','shared reference'),
  ('let r=&v;*v.write=3;','conflicts'),
- ('let r=&mut v;let child=(*r).write;(*r).write=&mut b;','cannot be reassigned'),
+ ('let r=&mut v;let child=(*r).write;(*r).write=&mut b;','conflicts'),
  ('let copy=identity[Mixed](v);*v.write=3;','conflicts'),
  ('let result=field(v);b=3;','conflicts'),
  ('let result=field(v);let n=b;','conflicts'),

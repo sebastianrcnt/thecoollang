@@ -159,3 +159,24 @@ rollback and drop-descriptor cleanup. This is contiguous slot reuse, not moving
 compaction: a request larger than every free contiguous gap can still fail even
 when the sum of free slots would suffice. Lifetime-free raw pointers must not be
 used after their source binding is forgotten.
+
+
+## Repeated reference replacement
+
+Local reference replacement retains possible old/new roots at the original
+binding marker. Identical holder/root/parent/mode/layer records are merged.
+The allocation corpus now includes `reference_replacement_roots`: after creating
+`x`, `y` and `r=&x`, repeat `r=&y` 64 or 1,024 times, check both roots remain
+protected, forget `r`, and verify both roots become writable. Both histories
+have identical final compiler allocation bytes/count and identical measured
+peak compiler allocation bytes (30,001,152 in this local capture). The test
+asserts peak equality for this fixed history, so final cleanup alone cannot
+hide accumulation of duplicated persistent loan records. Shim bookkeeping and
+host-internal allocations are excluded, as in the existing methodology.
+
+Checking failures discard staged new roots. Runtime failures preserve candidate
+roots conservatively because an earlier store in the same input may already
+have executed. A failed RHS before its store leaves the previous reference value,
+while the candidate new root may remain protected until the binding is forgotten.
+This is tested separately from compile-only rollback and documented explicitly;
+no whole-input value rollback is claimed.

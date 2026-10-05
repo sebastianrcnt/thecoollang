@@ -64,7 +64,7 @@ NEGATIVE=[
  ('var x=1;let r=&mut x;let s=&mut *r;let y=*r;', 'conflicts'),
  ('var x=1;let r=&mut x;let s=&*r;*r=2;', 'conflicts'),
  ('var x=1;let r=&x;var y=2;r=&y;', 'let binding'),
- ('var x=1;var r=&mut x;var y=2;r=&mut y;', 'cannot be reassigned'),
+ ('var x=1;var r=&mut x;{var y=2;r=&mut y;}', 'outlive'),
  ('var x=1;defer set(&mut x);x=2;', 'conflicts'),
  ('var x=1;both(&mut x,&mut x);', 'conflicts'),
  ('let p=new[i64](1);*(&mut *p)=consume(move p);', 'conflicts'),

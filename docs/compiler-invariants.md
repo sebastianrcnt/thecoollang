@@ -872,3 +872,22 @@ depth 40, lazy generic layouts and REPL rollback are checked. The per-query call
 bound counts graph edges/types rather than relying on a wall-clock timeout as
 proof of linear work. Overall compilation can still issue many separate queries;
 this audit establishes the traversal bound, not linear total compiler complexity.
+
+
+## Local borrowed replacement
+
+`ReferenceStatement` routes local `N_ASSIGN` and locally rooted `N_STORE`
+through `ReferenceAssign`, including reference-bearing values. `N_ASSIGN`
+changes physical binding storage; it must not be treated as mutation through
+that binding's shared referent. A live physical loan still blocks replacement.
+Through-reference borrowed replacement remains explicitly rejected.
+
+The original null-root holder marker anchors retained loans. Every incoming
+root must outlive the target depth, and borrow-region analysis accumulates new
+sources for return-contract validation. Keep old roots conservatively. Before
+inserting, merge an existing identical holder/root/parent/mode/layer edge below
+the marker; expression identity is irrelevant once a loan has a holder. This
+bounds repeated identical REPL replacement without discarding distinct
+capabilities or parent ancestry. Cross-engine replacement, independently modeled
+root permissions, runtime rollback and 64/1,024-input allocation histories cover
+this invariant.

@@ -30,8 +30,8 @@ its enclosing block. Owner destruction still follows normal scope cleanup.
 
 Passing or binding an existing reference reborrows it. A child exclusive loan
 suspends parent access; a shared child prevents parent writes. After the child
-block ends, the parent can be used again. Reference bindings currently cannot
-be reassigned. `move` of a reference is also a reborrow, not ownership transfer.
+block ends, the parent can be used again. Mutable local reference bindings can
+be reassigned under the lifetime rules below. `move` of a reference is also a reborrow, not ownership transfer.
 Moving an owning pointee requires an exclusive reference and leaves its owner
 slot empty, just as a direct owner move does.
 
@@ -224,10 +224,11 @@ its loans remain live while any arm executes. Payload bindings reborrow that
 holder. By-value methods on borrowed containers obey the same rules.
 
 A reference-containing struct/array requires an explicit full initializer;
-`PairView {}` cannot manufacture null references. Containers and reference
-fields cannot be reassigned, even when declared `var`; ordinary scalar fields
-can be changed when no conflicting loan exists. These restrictions prevent a
-shorter-lived reference from being written into an older container. Shared or
+`PairView {}` cannot manufacture null references. Mutable local containers, reference fields and array elements can be replaced
+when the new roots outlive the original binding and no live loan protects its
+storage. This also applies to locally owned heap fields. Replacement through a
+reference receiver remains unsupported until destination lifetime contracts
+exist. Shared or
 exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
 source roots as shared loans while separately borrowing the container's storage.
 An exclusive container receiver can update ordinary fields, but
@@ -387,7 +388,8 @@ fn main() {
 }
 ```
 
-Reference fields and whole borrowed containers still cannot be reassigned.
+Mutable local reference fields and whole borrowed containers follow the
+replacement rules below; reference receiver replacement remains unsupported.
 Shared outer receivers may read through contained exclusive references or
 reborrow them as shared, but cannot copy an exclusive handle or mutate through
 it. This also applies to computed receivers such as `(*share(&view)).output`;
@@ -820,3 +822,39 @@ and generic owners, consumed exclusive getters, nested moves and enum cleanup, a
 zero after scope exit, twenty rejected programs, twelve independent capability
 queries and persistent REPL roots. `make heap-borrows-sanitize-test` adds an ASan
 compiler and LLVM load/store plus C runtime ASan/UBSan instrumentation.
+
+
+## Mutable local reference replacement
+
+A `var` reference binding, reference field or fixed-array element can receive a
+new initialized reference. This includes generic/enum containers and fields in
+locally owned heaps. Physical storage must be mutable and unborrowed, and every
+new root must live at least as long as the original binding. Return contracts
+include all possible roots acquired by replacement.
+
+```cool
+var x=7;
+var y=8;
+{
+    var view=&x;
+    view=&y;
+    assert(*view==8);
+}
+x=9;
+y=10;
+```
+
+Possible old/new roots remain protected until the binding's scope ends (or the
+REPL binding is forgotten). Replacement does not yet shorten the old root's
+loan. Branches, loops and nested blocks retain the union at the original binding
+marker. Installing a reference to a shorter-lived nested local is rejected.
+Replacing a binding is distinct from mutating its referent: a mutable binding
+of type `&T` can be replaced, while writes through its shared referent remain
+forbidden. Live references to the binding/container itself prevent replacement.
+
+Identical retained root/parent/mode/layer records are merged, so repeating the
+same replacement does not retain one loan record per input. A failed RHS leaves the old reference value when the store was not executed.
+REPL checking failures discard staged loans; runtime failures retain candidate
+roots conservatively because earlier stores in the input may have executed.
+Replacing borrowed storage through `&mut` receivers, multi-layer stored borrowed
+pointees and borrowed slice elements still require further lifetime work.
