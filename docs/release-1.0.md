@@ -2203,6 +2203,46 @@ through ordinary evaluation or library use.
   elements, descriptor lifetime and arbitrary nested storage remain required.
   All release gates remain Open.
 
+- REPL persistent ancestry now prunes dead leaves after candidate filtering and
+  compact graph transfer on both successful commits and partially executed
+  runtime failures. The caller's explicit visible list is authoritative. A Local
+  remains protected whenever it is a visible binding, loan root/holder or graph
+  root/summary root. Pruning neither changes its type nor invents a root ancestor;
+  later existing reclamation frees unused Locals after cleanup/rollback.
+  This fixes a concrete audit finding: failed generic assignments left an
+  ancestry-only Local carrying a newly instantiated, subsequently rolled-back
+  type ID. The old ancestor traversal did not read that type, so this was residual
+  metadata rather than an observed invalid dereference.
+  Persistent loans merge only with identical root/holder/parent/mode/layer/value
+  type keys, excluding root-null markers and holder-null temporary records.
+  Value and physical graphs join together, preserving all alternatives and
+  unknown conservatism; a joint copy compacts the resulting graph.
+  A new private-copy audit instruments Field frees and new type clears in both
+  actual frontends, inspecting all live compact arena nodes/edges, node roots/
+  summary roots and loan result/root/holder/parent types. Negative controls prove
+  detection and role probes preserve all live metadata. Six histories
+  per frontend pass normally and under ASan/UBSan, including generic return/copy,
+  physical field recovery, failed recursive layout and reuse of rolled-back type
+  IDs with a different generic layout. Direct encoded IDs are checked; recursive
+  descriptor dependency coverage is still incomplete.
+  Both lifecycle suites add successful/failed generic-parent histories at 64
+  and 1,024 submissions. Production final allocations stay at 32,154,387/45
+  (success) and 32,154,291/43 (runtime failure); tracked peaks stay 32,165,100 and
+  32,167,100 respectively. Both roots remain protected before forget, then their
+  mutation succeeds. Legacy tracked graph allocations end at zero and peaks
+  stay 1,280 bytes for both histories. Legacy excludes loans/Local metadata,
+  whereas production instruments compiler allocation call sites; neither
+  includes host-internal allocations, JIT mappings or production RSS.
+  Full `make -j4 test bootstrap-check`, independent production lifecycle,
+  provenance graph/copy/loan/selection and physical address sanitizer targets,
+  descriptor rollback ASan/UBSan and external editor distribution validation
+  pass. Generated compiler IR SHA-256 is
+  `6a35a6f6c73e82911846faddf4a5306490b6671399557c76d42803a62470e509`.
+  Evidence: `build/release-audit/descriptor-prune-{build,focused,lifecycle,regression,sanitize,distribution,reuse}.log`.
+  Remaining recursive descriptor dependencies, parameter/aliased owner geometry,
+  stored referents and borrowed slice elements are required work. All release
+  gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

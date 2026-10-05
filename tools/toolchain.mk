@@ -552,3 +552,10 @@ physical-address-test: build/cool-compiler build/language-runtime.o build/langua
 test: physical-address-test
 physical-address-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_physical_address.py --frontend build/repl-loans-asan/cool-compiler --output build/physical-address-asan-audit.json
+
+.PHONY: descriptor-rollback-test descriptor-rollback-sanitize-test
+descriptor-rollback-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_descriptor_rollback.py --output build/descriptor-rollback-audit.json
+test: descriptor-rollback-test
+descriptor-rollback-sanitize-test: build/cool-compiler build/coolc
+	python3 tools/test_descriptor_rollback.py --sanitize --output build/descriptor-rollback-asan-audit.json

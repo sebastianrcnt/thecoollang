@@ -53,6 +53,7 @@ fn ReplLoansFinish(keep: bool, visible: *Local) {
             ctx.v_repl_graph = candidate.graph;
             candidate.graph = null;
             ctx.v_repl_loans = candidate.loans;
+            ReplPruneAncestry(visible);
         } else { ReplLoanListFree(candidate.loans); }
         ReferenceGraphFree(candidate.graph);
         Free(cast[*u8](candidate));
@@ -104,5 +105,65 @@ fn ReplLoanCommand() -> bool {
         if (At().kind != 0) { Error(cast[*u8]("expected one binding after :forget")); }
         ReplForget(name);
         return true;
+    }
+}
+// A parent absent from visible bindings, holders and graph roots is an
+// unreachable ancestry leaf. Remove the leaf, never invent a new ancestor.
+fn ReplAncestryOnly(local: *Local, visible: *Local) -> bool {
+    unsafe {
+        if (local == null) { return false; }
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var binding = visible;
+        while (binding != null) {
+            if (binding == local) { return false; }
+            binding = binding.next;
+        }
+        var loan = ctx.v_repl_loans;
+        while (loan != null) {
+            if (loan.root == local || loan.holder == local) { return false; }
+            loan = loan.next;
+        }
+        if (ctx.v_repl_graph != null) {
+            var node = ctx.v_repl_graph.nodes;
+            while (node != null) {
+                if (node.root == local || node.summary_root == local) { return false; }
+                node = node.next;
+            }
+        }
+        return true;
+    }
+}
+fn ReplPruneAncestry(visible: *Local) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var loan = ctx.v_repl_loans;
+        while (loan != null) {
+            if (ReplAncestryOnly(loan.parent, visible)) { loan.parent = null; }
+            loan = loan.next;
+        }
+        // Persistent holder records with identical lifetime/mode keys may be
+        // joined; preserve both value and physical alternatives, including unknown.
+        var check = ReferenceCheck{};
+        check.graph = ctx.v_repl_graph;
+        loan = ctx.v_repl_loans;
+        while (loan != null) {
+            if (loan.root != null && loan.holder != null) {
+                var link = &raw loan.next;
+                while (*link != null) {
+                    let other = *link;
+                    if (other.root == loan.root && other.holder == loan.holder &&
+                        other.parent == loan.parent && other.exclusive == loan.exclusive &&
+                        other.indirect == loan.indirect && other.provenance_type == loan.provenance_type) {
+                        ReferenceProvenanceJoin(&raw check, loan, other);
+                        *link = other.next;
+                        Free(cast[*u8](other));
+                    } else { link = &raw other.next; }
+                }
+            }
+            loan = loan.next;
+        }
+        let compact = ReferenceLoansCopyGraph(ctx.v_repl_loans);
+        ReferenceGraphFree(ctx.v_repl_graph);
+        ctx.v_repl_graph = compact;
     }
 }

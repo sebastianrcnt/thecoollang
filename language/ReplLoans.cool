@@ -10,11 +10,12 @@ U0 ReplLoansBegin(Node *statement){
     candidate->graph=ReferenceLoansCopyGraph(candidate->loans);
     ReferenceStatement(candidate,statement);
 }
+extern U0 ReplPruneAncestry(Local *visible);
 U0 ReplLoansFinish(Bool keep,Local *visible){
     ReferenceCheck *candidate=repl_candidate;ReferenceLoan **link,*loan;Local *local;ProvenanceGraph *compact;
     ReferenceChecksAbort();
     if(!candidate)return;
-    if(keep){link=&candidate->loans;while(*link){loan=*link;local=visible;while(local && local!=loan->holder)local=local->next;if(local)link=&loan->next;else{*link=loan->next;Free(loan);}}compact=ReferenceLoansCopyGraph(candidate->loans);ReferenceGraphFree(candidate->graph);candidate->graph=compact;ReplLoanListFree(repl_loans);ReferenceGraphFree(repl_graph);repl_graph=candidate->graph;candidate->graph=NULL;repl_loans=candidate->loans;}
+    if(keep){link=&candidate->loans;while(*link){loan=*link;local=visible;while(local && local!=loan->holder)local=local->next;if(local)link=&loan->next;else{*link=loan->next;Free(loan);}}compact=ReferenceLoansCopyGraph(candidate->loans);ReferenceGraphFree(candidate->graph);candidate->graph=compact;ReplLoanListFree(repl_loans);ReferenceGraphFree(repl_graph);repl_graph=candidate->graph;candidate->graph=NULL;repl_loans=candidate->loans;ReplPruneAncestry(visible);}
     else ReplLoanListFree(candidate->loans);
     ReferenceGraphFree(candidate->graph);Free(candidate);repl_candidate=NULL;
 }
@@ -27,3 +28,7 @@ U0 ReplForget(U8 *name){
     compact=ReferenceLoansCopyGraph(repl_loans);ReferenceGraphFree(repl_graph);repl_graph=compact;binding=&repl_locals;while(*binding!=local)binding=&(*binding)->next;*binding=local->next;locals=repl_locals;ReplTrimStorage();
 }
 Bool ReplLoanCommand(){U8 *name;if(!Take(':'))return FALSE;if(!Is("forget"))Error("unknown session command");pos++;name=Ident();Take(';');if(At()->kind)Error("expected one binding after :forget");ReplForget(name);return TRUE;}
+
+// Dead ancestry leaves are pruned without inventing a root ancestor.
+Bool ReplAncestryOnly(Local *local,Local *visible){ReferenceLoan *loan;ProvenanceNode *node;if(!local)return FALSE;for(;visible;visible=visible->next)if(visible==local)return FALSE;for(loan=repl_loans;loan;loan=loan->next)if(loan->root==local || loan->holder==local)return FALSE;if(repl_graph)for(node=repl_graph->nodes;node;node=node->next)if(node->root==local || node->summary_root==local)return FALSE;return TRUE;}
+U0 ReplPruneAncestry(Local *visible){ReferenceLoan *loan,*other,**link;ReferenceCheck check;ProvenanceGraph *compact;for(loan=repl_loans;loan;loan=loan->next)if(ReplAncestryOnly(loan->parent,visible))loan->parent=NULL;MemSet(&check,0,sizeof(ReferenceCheck));check.graph=repl_graph;for(loan=repl_loans;loan;loan=loan->next)if(loan->root && loan->holder){link=&loan->next;while(*link){other=*link;if(other->root==loan->root && other->holder==loan->holder && other->parent==loan->parent && other->exclusive==loan->exclusive && other->indirect==loan->indirect && other->provenance_type==loan->provenance_type){ReferenceProvenanceJoin(&check,loan,other);*link=other->next;Free(other);}else link=&other->next;}}compact=ReferenceLoansCopyGraph(repl_loans);ReferenceGraphFree(repl_graph);repl_graph=compact;}

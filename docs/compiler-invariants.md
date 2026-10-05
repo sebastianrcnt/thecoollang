@@ -1327,3 +1327,40 @@ including candidate graph cloning; all 13 workloads end with zero tracked graph
 allocations and equal peaks. The same instrumentation exclusions apply. Full
 physical alias/projection protection, opaque authority and arbitrary nested
 borrowed storage remain unfinished.
+
+
+## Persistent REPL ancestry and rolled-back descriptors
+
+`ReplLoansFinish(keep, visible)` transfers the filtered candidate and its compact
+joint value/physical graph before pruning dead ancestry leaves. `visible` is the
+explicit successful binding list or the saved binding list after a runtime
+failure; consulting the old session list during a successful new declaration
+would be incorrect. A parent is removable only when it is absent from that list,
+all persistent loan roots/holders and every compact graph root/summary root.
+Such a Local cannot be a next holder in ancestry traversal. Removing its leaf
+edge preserves protection of observable holders; reparenting to a root would
+invent authority and is forbidden. Local metadata is neither mutated nor freed
+by pruning. Existing later `ReplReclaimLocals` performs actual reclamation after
+runtime cleanup and declaration/type rollback.
+
+After pruning, only loans with nonnull root and holder and identical
+root/holder/parent/exclusive/indirect/provenance_type keys may merge.
+`ReferenceProvenanceJoin` preserves value and physical alternatives, including
+unknown alternatives. Root-null markers and holder-null temporaries are excluded.
+A second joint arena copy retains reachable unions and releases old graph nodes.
+Rejected checking still discards its entire candidate without changing session
+loans. Successful commits and partially executed runtime failures both normalize
+persistent histories.
+
+`tools/test_descriptor_rollback.py` builds private copies of both actual
+frontends. Immediately before a rollback frees a Field or clears a newly
+allocated type, hooks inspect every live compact arena node and Field edge,
+including physical/auxiliary nodes, root/summary-root Local types and loan
+root/holder/parent/result types. Negative controls prove Field-pointer and encoded
+type-ID detection. Private role probes preserve visible/root/holder/graph-root/
+summary-root metadata while removing only a dead parent leaf. This checks direct
+encoded type IDs; it does not prove all recursive descriptor dependencies.
+Both lifecycle suites additionally exercise repeated generic parent assignments,
+on success and runtime failure, preserving old/new roots until forget. Production
+allocation tracking includes compiler allocations; legacy tracking covers graph
+internals only. Neither measures host-internal/JIT allocations or production RSS.
