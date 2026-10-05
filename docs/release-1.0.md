@@ -2271,6 +2271,33 @@ through ordinary evaluation or library use.
   slice-element provenance separately from backing storage, and update stored
   receiver aliases at arbitrary depth. All release gates remain Open.
 
+- Private nested-reference design probes now provide concrete counterexamples
+  before guards are removed. Twelve source fixtures are compiled using copied
+  actual compiler sources and object artifacts. With only ReferenceStorage
+  bypassed, and with typed layer-routing added, returning an external scalar
+  reference through function-local Inner/Outer storage is overrejected in both
+  copy and address forms. The coarse Region return gate combines the local
+  descriptor's FRAME provenance with the external reference. Direct-holder
+  routing alone also misses the computed stored-LOAD acquisition branch.
+  A further private root-based return-validator hypothesis remains unsound:
+  `fn bad(p:&i64)->& &i64 borrows(p){return &p;}` is accepted even though it returns
+  the callee's parameter descriptor slot. The real frontend and Region-retaining
+  private control correctly reject it. The unsafe accepted fixture is never run.
+  Seven other negative probes remain rejected; two original positive probes
+  execute successfully. These tree-mode experiments are not cross-engine safety
+  evidence and intentionally do not pass readiness. The script's explicit
+  `--assert-expectations` checks classification and diagnostics and rejects the
+  three remaining gaps after saving the report.
+  No production guards or compiler semantics were changed by these experiments;
+  stage-2 IR remains
+  `6a35a6f6c73e82911846faddf4a5306490b6671399557c76d42803a62470e509`.
+  Evidence: `build/release-audit/nested-reference-{expanded-baseline,routing-expanded,graph-return-probe,root-lifetime-control,readiness-failed}.json`
+  and `nested-reference-{root-lifetime-control,readiness-failed}.log`.
+  The next root representation must distinguish parameter slot lifetime from
+  caller referent lifetime, propagate that distinction through summaries and
+  stored aliases, and select external payloads through computed origins before
+  replacing Region checks. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

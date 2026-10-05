@@ -1396,3 +1396,43 @@ edges; it is not a proof of arbitrary nested borrowed storage or complete
 runtime/JIT lifetimes. ASan/UBSan instruments the generated production LLVM
 frontend plus host/runtime. The seed BIN/host remains an unsanitized parity
 control, including during `--sanitize` runs.
+
+
+## Nested reference root identity: experimental counterexamples
+
+`tools/test_nested_reference_probe.py` builds private source copies and leaves
+production guards intact. Its normal bypass replaces only `ReferenceStorage`;
+`--routing` additionally tests typed-copy/address layer routing and retaining
+both layers when a nonreference aggregate supplies a nested reference. These
+changes alone do not allow returning an external scalar reference through a
+function-local Inner/Outer pair: coarse `CheckBorrowReturns` still sees FRAME.
+The direct named-holder path is not the whole acquisition path; stored LOAD
+origins also enter the computed-origin branch before that routing executes.
+
+The private `--graph-returns` experiment replaces the reference-result Region
+check with temporary loan-root checks. It is deliberately retained as a failed
+hypothesis, not a valid compiler implementation. Checking depth zero, parameter
+place-region bits and a reference root type accepts this invalid program:
+
+```cool
+fn bad(p: &i64) -> & &i64 borrows(p) { return &p; }
+```
+
+Here `p` is a by-value reference descriptor in the callee's frame. Its referent
+is external; the descriptor slot is not. Existing `ReferenceParameters` uses
+that same Local identity for a simple reference parameter's external root,
+while acquiring `&p` can use it for the descriptor slot. Root type and parameter
+bits cannot distinguish the two roles. The real frontend and the control
+retaining Region correctly reject the program. Accepted negative experiments
+are checked only and never executed.
+
+A sound replacement must distinguish parameter descriptor storage from external
+referent roots, preserve that distinction through copying, summaries and alias
+stores, and keep local physical roots separate from external payload roots
+through computed projections. Do not remove the Region guard based on the failed
+root predicate. Twelve private source probes include by-value aggregate and owner
+slot returns, computed temporary-owner addressing, stores from an undeclared
+borrows source, short Inner escape and a shared/mutable barrier. The failed
+hypothesis additionally overrejects two valid local-Inner external-return forms.
+`--assert-expectations` fails on these three gaps after saving the full report;
+an observational exit zero never means release acceptance.
