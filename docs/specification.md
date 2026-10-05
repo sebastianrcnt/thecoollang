@@ -339,7 +339,11 @@ short circuiting, argument order, named fields, array elements, indexed stores,
 slice bounds and a temporary method receiver. Each frontend executes all five
 engines and an optimized standalone binary. Existing reference/ownership suites
 cover the separate validity obligations around moves and live destinations.
-This does not yet specify overflow/conversion policy or cleanup timing.
+Overflow and conversion policy is stated under
+[fixed-width integer values](#fixed-width-integer-values-and-operations) and
+[inference and permitted implicit conversions](#inference-and-permitted-implicit-conversions);
+cleanup and defer ordering under
+[statements, control flow and deferred calls](#statements-control-flow-and-deferred-calls).
 
 ## Primary expressions, calls and construction
 

@@ -3130,6 +3130,12 @@ through ordinary evaluation or library use.
   This completes G1's runtime-failure definition; the inference/coercion audit
   and the other specification-freeze tasks stay Open.
 
+- Specification cross-references: the expressions section no longer claims that
+  overflow/conversion policy and cleanup timing are unspecified; it now points to
+  the fixed-width-integer, inference/conversion and statement/cleanup sections
+  that state them. This is a G1 accuracy fix; the inference/coercion audit and the
+  other specification-freeze tasks stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
