@@ -93,32 +93,29 @@ fn ReferenceLoad(value: * Node, token: * Token) -> * Node {
         return load;
     }
 }
-fn ContainsReference(type: i64) -> bool {
-    unsafe {
-        if (IsReference(type)) {
-            return true;
-        }
-        if (Aggregate(type) == i8(0)) {
-            return false;
-        }
-        Layout(type);
-        let shape = Shape(type);
-        if (shape.kind == 2 || shape.kind == 3) {
-            return ContainsReference(shape.element);
-        }
-        if (shape.kind == 5) {
-            return false;
-        }
-        var field = shape.fields;
-        while (field != null) {
-            if (ContainsReference(field.type)) {
-                return true;
-            }
-            field = field.next;
-        }
-        return false;
+// Type graphs may cycle through slice elements. A visited node is not proof
+// of a reference; continue the finite reachability search through other fields.
+fn ContainsReferenceWalk(type:i64,visited:*u8)->bool { unsafe {
+    if (IsReference(type)) { return true; }
+    if (Aggregate(type)==i8(0)) { return false; }
+    let index=type-1000;
+    if (index>=4096) { Error(cast[*u8]("internal type graph index outside type limit")); }
+    if (visited[index]!=u8(0)) { return false; }
+    Layout(type); visited[index]=u8(1);
+    let shape=Shape(type);
+    if (shape.kind==2 || shape.kind==3) { return ContainsReferenceWalk(shape.element,visited); }
+    if (shape.kind==5) { return false; }
+    var field=shape.fields;
+    while (field!=null) {
+        if (ContainsReferenceWalk(field.type,visited)) { return true; }
+        field=field.next;
     }
-}
+    return false;
+}}
+fn ContainsReference(type:i64)->bool { unsafe {
+    var visited=[4096]u8{};
+    return ContainsReferenceWalk(type,cast[*u8](&raw visited));
+}}
 // Stored references are copied as reborrows. Owning payloads and stored
 // references to borrowed storage still need further lifetime tracking.
 fn TrackedBorrow(type: i64) -> bool {

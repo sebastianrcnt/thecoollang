@@ -229,6 +229,25 @@ SLICE_CASES.extend([
 ])
 STORE_DIAGNOSTICS['slice_live_mutable_payload_alias']='conflicts'
 
+SLICE_CASES.extend([
+    ('nested_slice_read', 'accept', 'fn main(){var a=[2]i64{7,9};var rows=[1][]i64{a[:]};var s=rows[:];assert(s[0][0]==7 && s[0][1]==9);}'),
+    ('nested_slice_external_address_return', 'accept', 'fn get(x:[]i64)->&i64 borrows(x){var rows=[1][]i64{x};var s=rows[:];return &s[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(*r==7);}'),
+    ('nested_slice_local_address_return', 'reject', 'fn bad(x:[]i64)->&i64 borrows(x){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];return &s[0][0];}fn main(){}'),
+    ('nested_slice_local_slot_return', 'reject', 'fn bad(x:[]i64)->&[]i64 borrows(x){var rows=[1][]i64{x};var s=rows[:];return &s[0];}fn main(){}'),
+    ('nested_slice_short_replacement', 'reject', 'fn main(){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];{var b=[1]i64{9};s[0]=b[:];}}'),
+    ('nested_slice_retained_inner_mutation', 'reject', 'fn main(){var a=[1]i64{7};var b=[1]i64{9};var rows=[1][]i64{a[:]};var s=rows[:];s[0]=b[:];b[0]=11;}'),
+    ('recursive_slice_read', 'accept', 'struct Node{kids:[]Node;value:i64;}fn main(){var none=[0]Node{};var leaf=Node{kids:none[:],value:7};var kids=[1]Node{leaf};var root=Node{kids:kids[:],value:9};assert(root.kids[0].value==7);}'),
+    ('recursive_slice_short_replacement', 'reject', 'struct Node{kids:[]Node;value:i64;}fn main(){var none=[0]Node{};var root=Node{kids:none[:],value:7};{var shortnone=[0]Node{};var short=[1]Node{Node{kids:shortnone[:],value:9}};root.kids=short[:];}}'),
+])
+STORE_DIAGNOSTICS.update({
+    'nested_slice_short_replacement':'assigned borrow may outlive local storage',
+    'nested_slice_retained_inner_mutation':'conflicts',
+    'recursive_slice_short_replacement':'assigned borrow may outlive local storage',
+})
+
+SLICE_CASES.append(('recursive_slice_reference_initializer','reject','struct Node{next:[]Node;r:&i64;}fn main(){let node=new[Node]();}'))
+STORE_DIAGNOSTICS['recursive_slice_reference_initializer']='reference storage requires an explicit initializer'
+
 STORE_DIAGNOSTICS.update({
     'slice_short_payload_store':'assigned borrow may outlive local storage',
     'slice_retained_payload_mutation':'conflicts',

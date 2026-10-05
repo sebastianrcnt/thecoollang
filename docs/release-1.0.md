@@ -2455,6 +2455,30 @@ through ordinary evaluation or library use.
   Permanent private slice readiness and sanitizer targets include REPL and
   allocation checks. Production guards remain; all release gates remain Open.
 
+- Cyclic borrowed type reachability: a private recursive `Node{kids:[]Node}`
+  program exposed a stack-overflow/SIGSEGV in `ContainsReference`. Both frontend
+  implementations now perform finite type reachability with a query-local
+  visited bitmap, preserving the owner boundary and checking remaining fields
+  after a cycle. Nine new private fixtures cover nested slices, external versus
+  local element/slot returns, retained backing mutation, recursive reads and
+  short replacements, and a cycle-first explicit-reference initializer. Two
+  actual production diagnostic probes verify unsupported recursive declarations
+  reject without a compiler crash.
+  Full `make -j4 test bootstrap-check editor-distribution-test` PASS. Expanded
+  combined depth/store/slice audit: 182 classifications, 70 accepted programs
+  and 420 execution runs across both frontends/five engines plus O2, no gaps.
+  Permanent private slice readiness and instrumented slice sanitizer audits
+  each pass 94 classifications/38 positives plus 12 persistent scenarios and
+  eight allocation observations; readiness runs 228 executions and sanitizer
+  runs 38 tree executions. Primary-forms sanitizer also PASS.
+  Evidence: `build/release-audit/recursive-slice-{regression,combined,sanitize}.log`,
+  `build/release-audit/recursive-slice-combined.json`,
+  `build/nested-reference-slice-{readiness,asan}-audit.json`. Baseline crash:
+  `build/release-audit/nested-slice-baseline.log`. Stage-2 IR SHA256:
+  `ba0be15aabe8ad8529cf157a7ea2d9bc9d820d0f5363369c9e787bbc5b14cc0d`.
+  Production guards remain; mutual recursion, aliases and broader lifetime
+  coverage remain required. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

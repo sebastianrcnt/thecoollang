@@ -1628,3 +1628,22 @@ The sanitizer slice target also runs persistent scenarios and the allocation
 workloads on private frontend IR with verified ASan load/store instrumentation.
 The production borrowed-slice guards remain until the broader nested/recursive,
 module and alias audit is complete.
+
+## Cyclic borrowed type reachability
+
+`ContainsReference` asks whether any reachable field/array/slice element is a
+reference, stopping at owning payloads as before. Slice element types can cycle
+back to their containing struct. Each query therefore owns one zeroed 4096-byte
+visited bitmap, indexed by aggregate type ID; recursive calls reuse that bitmap.
+Revisiting a type returns false for that edge, while the caller continues its
+remaining fields. A cycle before a later reference field must not hide the
+reference or permit implicit initialization of reference storage. The bitmap is
+query-local; caching negative results between partially resolved type graphs
+would need separate invalidation rules.
+
+Private fixtures cover recursive reads and short backing replacement alongside
+nested slice value/address/slot paths. A cycle-first struct with a subsequent
+reference field must require explicit initialization. Actual production
+frontends also reject unsupported recursive borrowed types with an ordinary
+diagnostic instead of overflowing the compiler stack. These regressions do not
+remove production nested-storage restrictions or certify arbitrary type graphs.

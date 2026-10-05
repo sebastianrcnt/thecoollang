@@ -47,6 +47,10 @@ invalid=[
  'var a=[1]i64{};let n=a[true];','var a=[1]i64{};let s=a[0:1:1];',
  'let n=borrow_raw[i64](null,null);','var n=0;unsafe{let r=borrow_raw[&i64](&raw n,n);}',
 ]
+recursive_types=[
+ 'struct Node{kids:[]Node;value:i64;}fn main(){var empty=[0]Node{};}',
+ 'struct Node{kids:[]Node;r:&i64;}fn main(){let node=new[Node]();}',
+]
 def run(command,env):return subprocess.run([str(x) for x in command],cwd=ROOT,env=env,capture_output=True,text=True,timeout=180)
 with tempfile.TemporaryDirectory(prefix='cool primary forms ') as temporary:
  directory=Path(temporary);source=directory/'main.cool';binary=directory/'program';wrapper=directory/'bootstrap'
@@ -55,6 +59,9 @@ with tempfile.TemporaryDirectory(prefix='cool primary forms ') as temporary:
  if args.frontend:fronts.append(args.frontend.resolve())
  for frontend in fronts:
   env={**os.environ,'COOL_FRONTEND':str(frontend),'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
+  for code in recursive_types:
+   source.write_text(code);r=run([frontend,'check',source],env)
+   assert r.returncode==2 and any(message in r.stderr for message in ('slice elements cannot contain borrowed slices','stored references require single-layer aggregate storage','reference storage requires an explicit initializer')),(code,r)
   source.write_text(program)
   for engine in ('tree','interp','jit','llvm','llvm-jit','O2'):
    if engine=='O2':

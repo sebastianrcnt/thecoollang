@@ -46,15 +46,8 @@ Node *ReferenceLoad(Node *value,Token *token){
     load->a=address;load->origin_source=value;load->type=Shape(value->type)->element;load->mutable=Shape(value->type)->count;
     if(Aggregate(load->type))load->storage=Storage(load->type);return load;
 }
-Bool ContainsReference(I64 type){
-    AggregateType *shape;Field *field;
-    if(IsReference(type))return TRUE;if(!Aggregate(type))return FALSE;
-    Layout(type);shape=Shape(type);
-    if(shape->kind==A_ARRAY || shape->kind==A_SLICE)return ContainsReference(shape->element);
-    if(shape->kind==A_OWNER)return FALSE;
-    for(field=shape->fields;field;field=field->next)if(ContainsReference(field->type))return TRUE;
-    return FALSE;
-}
+Bool ContainsReferenceWalk(I64 type,U8 *visited){I64 index;AggregateType *shape;Field *field;if(IsReference(type))return TRUE;if(!Aggregate(type))return FALSE;index=type-T_AGG;if(index>=4096)Error("internal type graph index outside type limit");if(visited[index])return FALSE;Layout(type);visited[index]=1;shape=Shape(type);if(shape->kind==A_ARRAY || shape->kind==A_SLICE)return ContainsReferenceWalk(shape->element,visited);if(shape->kind==A_OWNER)return FALSE;for(field=shape->fields;field;field=field->next)if(ContainsReferenceWalk(field->type,visited))return TRUE;return FALSE;}
+Bool ContainsReference(I64 type){U8 visited[4096];MemSet(visited,0,sizeof(visited));return ContainsReferenceWalk(type,visited);}
 Bool TrackedBorrow(I64 type){return Borrowed(type)!=0;}
 Bool ReferenceStorage(I64 type){
     AggregateType *shape;Field *field;
