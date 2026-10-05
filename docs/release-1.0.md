@@ -1465,6 +1465,26 @@ through ordinary evaluation or library use.
   and borrowed slice elements remain mandatory unfinished work. G2 and 1.0 remain
   open; this implementation does not replace those requirements with unsafe code.
 
+- Borrowed type graph complexity audit: replaced active-path recursion guards
+  with independent per-query/per-validation visited bitmaps. Shared owning DAGs
+  no longer repeat the same reachable subgraph exponentially. Reference storage
+  checks resolve lazy nominal layouts before reading fields. Thirty cyclic,
+  shared-diamond and seeded graphs produce 524 borrowed/mutability queries checked
+  against a separate worklist oracle. Private LLVM instrumentation bounds both
+  property and storage-validation visits by types/edges, including depth-40
+  `new` expressions. A late invalid storage branch, generic concrete layouts and
+  REPL type-ID rollback are covered on native/legacy and ASan compiler frontends.
+  Full regression, native/legacy bootstrap convergence, heap ASan/UBSan and clean
+  external editor/distribution checks pass. Local direct-check timing observations
+  and their limits are documented in `docs/performance.md`; total compilation
+  still performs multiple independent queries and is not certified linear.
+  Evidence: `build/release-audit/borrow-graphs-{regression,sanitize,distribution,final-focused,final-sanitize}.log`;
+  raw local measurements: `build/release-audit/borrow-graphs-timing.json`.
+  Current IR SHA256:
+  `497007cf5690d20ef1bdf5862efe2ba70f9c4359000440e5df1526482ef1aeb6`.
+  This improves G2/G3/G8 evidence; all ten release gates remain open with the
+  mandatory nested storage, replacement lifetime and other listed work unfinished.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and lifetime-aware heap/slice

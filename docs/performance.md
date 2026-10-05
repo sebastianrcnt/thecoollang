@@ -320,3 +320,28 @@ actual runtime prerequisite and verifies that make rebuilds the object and that
 native output/cache invalidation reflect the change. This optimization reduces
 orchestration overhead without certifying incremental typechecking or closing
 the wider 1.0 release gates.
+
+
+### Borrowed type graph traversal
+
+An active recursion path terminated owning cycles but repeatedly explored shared
+DAG subgraphs. A borrow-free diamond consisting of two owning fields pointing
+at the previous level reproduced exponential work: direct native `check` took
+0.527 seconds at depth 16 and exceeded a three-second timeout at depth 20.
+These baseline figures are single reproduction observations.
+
+Query-local visited bitmaps now bound each borrowed/mutability traversal by
+reachable types and fields. Validation uses an independent bitmap, and storage
+checks resolve lazy layouts before inspecting fields. Five fresh-process samples
+on the local Apple Silicon host gave median direct `check` times of 3.921 ms at
+depth 16, 3.177 ms at depth 24 and 2.999 ms at depth 40. Measurements include
+process launch and parsing; the first depth-8 sample was 328.661 ms, so this is
+not a general latency guarantee or a controlled statistical speedup estimate.
+The raw local capture is `build/release-audit/borrow-graphs-timing.json`.
+
+`make borrow-graphs-test` checks results against independent worklist reachability
+and counts property/validation calls in a private instrumented compiler. Each query must satisfy a
+structural bound based on graph edges/types; cycles, field permutations and DAGs
+are covered. Compiler checks may still make multiple traversals of the same
+types across separate queries. This removes exponential work within a query,
+without claiming linear overall compilation or closing G8.

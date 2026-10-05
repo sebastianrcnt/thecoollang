@@ -461,3 +461,10 @@ heap-borrows-test: build/cool-compiler build/language.BIN build/language-runtime
 test: heap-borrows-test
 heap-borrows-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_heap_borrows.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: borrow-graphs-test borrow-graphs-sanitize-test
+borrow-graphs-test: build/cool-compiler build/language.BIN build/compiler-host.o build/language-runtime.o
+	python3 tools/test_borrow_graphs.py
+test: borrow-graphs-test
+borrow-graphs-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o
+	python3 tools/test_borrow_graphs.py --frontend build/repl-loans-asan/cool-compiler

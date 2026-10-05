@@ -871,30 +871,44 @@ return i64(0);
 
 // Borrowed values retain external roots; owning handles do not expose the
 // ownership allocation's contents as part of their value-level provenance.
-struct BorrowTypePath{type:i64;next:*BorrowTypePath;}
-fn BorrowTypeProperty(type:i64,mode:bool,path:*BorrowTypePath)->i8{unsafe{
+// Query-local graph visitation bounds work by reachable types/fields, including
+// recursive owners and shared DAGs. Do not retain results across lazy layouts.
+fn BorrowTypeWalk(type:i64,mode:bool,visited:*u8)->i8{unsafe{
  if(Aggregate(type)==i8(0)){return i8(0);}
- var previous=path;while(previous!=null){if(previous.type==type){return i8(0);}previous=previous.next;}
- Layout(type);let shape=Shape(type);
+ let index=type-1000;
+ if(index>=4096){Error(cast[*u8]("internal type graph index outside type limit"));}
+ if(visited[index]!=u8(0)){return i8(0);}
+ Layout(type);visited[index]=u8(1);let shape=Shape(type);
  if(shape.kind==6){if(mode){return i8(shape.count);}return i8(1);}
  if(shape.kind==3){return i8(1);}
- var entry=BorrowTypePath{type:type,next:path};
- if(shape.kind==2 || shape.kind==5){return BorrowTypeProperty(shape.element,mode,&raw entry);}
- var field=shape.fields;while(field!=null){if(BorrowTypeProperty(field.type,mode,&raw entry)!=i8(0)){return i8(1);}field=field.next;}
+ if(shape.kind==2 || shape.kind==5){return BorrowTypeWalk(shape.element,mode,visited);}
+ var field=shape.fields;
+ while(field!=null){if(BorrowTypeWalk(field.type,mode,visited)!=i8(0)){return i8(1);}field=field.next;}
  return i8(0);
 }}
-fn Borrowed(type:i64)->i8{return BorrowTypeProperty(type,false,null);}
-fn ValidateBorrowedPath(type:i64,path:*BorrowTypePath){unsafe{
+fn BorrowTypeProperty(type:i64,mode:bool)->i8{unsafe{
+ if(Aggregate(type)==i8(0)){return i8(0);}
+ var visited=[4096]u8{};
+ return BorrowTypeWalk(type,mode,cast[*u8](&raw visited));
+}}
+fn Borrowed(type:i64)->i8{return BorrowTypeProperty(type,false);}
+fn ValidateBorrowedGraph(type:i64,visited:*u8){unsafe{
  if(Aggregate(type)==i8(0)){return;}
- var previous=path;while(previous!=null){if(previous.type==type){return;}previous=previous.next;}
- ValidateReferenceStorage(type,At());Layout(type);let shape=Shape(type);
- var entry=BorrowTypePath{type:type,next:path};
+ let index=type-1000;
+ if(index>=4096){Error(cast[*u8]("internal type graph index outside type limit"));}
+ if(visited[index]!=u8(0)){return;}
+ Layout(type);visited[index]=u8(1);ValidateReferenceStorage(type,At());let shape=Shape(type);
  if(shape.kind==3){if(Borrowed(shape.element)!=i8(0)){ErrorAt(shape.token,cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));}return;}
  if(shape.kind==5 && !ReferenceStorage(shape.element)){ErrorAt(shape.token,cast[*u8]("owned storage cannot contain nested borrowed references"));}
- if(shape.kind==2 || shape.kind==5){ValidateBorrowedPath(shape.element,&raw entry);return;}
- var field=shape.fields;while(field!=null){ValidateBorrowedPath(field.type,&raw entry);field=field.next;}
+ if(shape.kind==2 || shape.kind==5){ValidateBorrowedGraph(shape.element,visited);return;}
+ var field=shape.fields;
+ while(field!=null){ValidateBorrowedGraph(field.type,visited);field=field.next;}
 }}
-fn ValidateBorrowedElements(type:i64){ValidateBorrowedPath(type,null);}
+fn ValidateBorrowedElements(type:i64){unsafe{
+ if(Aggregate(type)==i8(0)){return;}
+ var visited=[4096]u8{};
+ ValidateBorrowedGraph(type,cast[*u8](&raw visited));
+}}
 
 fn FindField(arg_v_type24: i64, arg_v_name10: *u8, arg_v_token3: *Token) -> *Field {
 unsafe {

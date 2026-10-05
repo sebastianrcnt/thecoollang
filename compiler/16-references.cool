@@ -121,6 +121,7 @@ fn ReferenceStorage(type: i64) -> bool {
         if (Aggregate(type) == i8(0)) {
             return true;
         }
+        Layout(type);
         let shape = Shape(type);
         if (shape.kind == 3) { return Borrowed(shape.element) == i8(0); }
         if (shape.kind == 5) {
@@ -141,7 +142,7 @@ fn ReferenceStorage(type: i64) -> bool {
 }
 // Per-root modes are retained in loans. This maximum is only the permission
 // required to copy a typed value; it must never upgrade a shared source root.
-fn ReferenceMode(type:i64)->i64{return i64(BorrowTypeProperty(type,true,null));}
+fn ReferenceMode(type:i64)->i64{return i64(BorrowTypeProperty(type,true));}
 fn ValidateReferenceStorage(type: i64, token: * Token) {
     unsafe {
         if (IsReference(type)) {

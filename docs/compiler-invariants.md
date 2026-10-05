@@ -781,9 +781,14 @@ reading field lists, including lazy nominal and generic layouts.
 `ValidateBorrowedElements` first enforces reference-storage restrictions, then
 checks owner payloads for unsupported nested stored references and slice
 elements for borrowed payloads, recursively validating owner/array/nominal fields. The predicate and storage validator have distinct
-roles. `BorrowTypeProperty` walks borrowed/mutability properties with a local
-type path, stopping recursive owned cycles. `ValidateBorrowedPath` uses its own
-cycle guard. Both paths keep lazy `Layout` resolution before reading fields. Heap
+roles. `BorrowTypeProperty` creates an independent 4096-byte visited bitmap for
+each query; `BorrowTypeWalk` visits each reachable aggregate once, bounding
+work by reachable types and fields even in shared DAGs. Returning false for a
+repeated type is valid for this single-root existential reachability query; do
+not cache intermediate false results across queries. `ValidateBorrowedGraph`
+uses a separate bitmap per validation. Neither bitmap survives lazy layouts,
+generic specialization or REPL rollback. Both walks and `ReferenceStorage`
+resolve `Layout` before reading fields. Heap
 initializers propagate external loans, while addresses into an owned allocation
 use physical owner roots; relaxing the validator alone would not establish this. The production implementations use direct control flow
 and remain semantically aligned with the compact bootstrap `Types.cool` helpers.
@@ -857,3 +862,13 @@ handles before classifying borrowed payloads. The handle is always zeroed, never
 recursively cleared in its allocation. Typed destructor traversal still frees
 only owned subobjects. Compiler and runtime checks preserve the distinction
 between externally borrowed heap fields and references to the heap itself.
+
+
+The graph audit uses a separate Python worklist oracle over generated nominal
+owner/array graphs. A private compiler LLVM copy records property results and
+property/validation walk calls; normal compiler artifacts contain no instrumentation. Cycles with
+late shared/exclusive terminals, reversed field order, shared diamonds through
+depth 40, lazy generic layouts and REPL rollback are checked. The per-query call
+bound counts graph edges/types rather than relying on a wall-clock timeout as
+proof of linear work. Overall compilation can still issue many separate queries;
+this audit establishes the traversal bound, not linear total compiler complexity.

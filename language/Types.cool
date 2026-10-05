@@ -81,31 +81,36 @@ Bool Owned(I64 type) {
     if (Shape(type)->kind == A_ARRAY) return Owned(Shape(type)->element);
     for (f = Shape(type)->fields; f; f = f->next) if (Owned(f->type)) return TRUE; return FALSE;
 }
-class BorrowTypePath{I64 type;BorrowTypePath *next;};
-Bool BorrowTypeProperty(I64 type,Bool mode,BorrowTypePath *path){
- AggregateType *shape;Field *field;BorrowTypePath entry,*previous;
+Bool BorrowTypeWalk(I64 type,Bool mode,U8 *visited){
+ AggregateType *shape;Field *field;I64 index;
  if(!Aggregate(type))return FALSE;
- for(previous=path;previous;previous=previous->next)if(previous->type==type)return FALSE;
- Layout(type);shape=Shape(type);
+ index=type-T_AGG;if(index>=MAX_TYPES)Error("internal type graph index outside type limit");if(visited[index])return FALSE;
+ Layout(type);visited[index]=1;shape=Shape(type);
  if(shape->kind==6){if(mode)return shape->count;return TRUE;}
  if(shape->kind==A_SLICE)return TRUE;
- entry.type=type;entry.next=path;
- if(shape->kind==A_ARRAY || shape->kind==A_OWNER)return BorrowTypeProperty(shape->element,mode,&entry);
- for(field=shape->fields;field;field=field->next)if(BorrowTypeProperty(field->type,mode,&entry))return TRUE;
+ if(shape->kind==A_ARRAY || shape->kind==A_OWNER)return BorrowTypeWalk(shape->element,mode,visited);
+ for(field=shape->fields;field;field=field->next)if(BorrowTypeWalk(field->type,mode,visited))return TRUE;
  return FALSE;
 }
-Bool Borrowed(I64 type){return BorrowTypeProperty(type,FALSE,NULL);}
-U0 ValidateBorrowedPath(I64 type,BorrowTypePath *path){
- AggregateType *shape;Field *field;BorrowTypePath entry,*previous;
+Bool BorrowTypeProperty(I64 type,Bool mode){
+ U8 visited[MAX_TYPES];if(!Aggregate(type))return FALSE;
+ MemSet(visited,0,MAX_TYPES);return BorrowTypeWalk(type,mode,visited);
+}
+Bool Borrowed(I64 type){return BorrowTypeProperty(type,FALSE);}
+U0 ValidateBorrowedGraph(I64 type,U8 *visited){
+ AggregateType *shape;Field *field;I64 index;
  if(!Aggregate(type))return;
- for(previous=path;previous;previous=previous->next)if(previous->type==type)return;
- ValidateReferenceStorage(type,At());Layout(type);shape=Shape(type);entry.type=type;entry.next=path;
+ index=type-T_AGG;if(index>=MAX_TYPES)Error("internal type graph index outside type limit");if(visited[index])return;
+ Layout(type);visited[index]=1;ValidateReferenceStorage(type,At());shape=Shape(type);
  if(shape->kind==A_SLICE){if(Borrowed(shape->element))ErrorAt(shape->token,"slice elements cannot contain borrowed slices until lifetime analysis exists");return;}
  if(shape->kind==A_OWNER && !ReferenceStorage(shape->element))ErrorAt(shape->token,"owned storage cannot contain nested borrowed references");
- if(shape->kind==A_ARRAY || shape->kind==A_OWNER){ValidateBorrowedPath(shape->element,&entry);return;}
- for(field=shape->fields;field;field=field->next)ValidateBorrowedPath(field->type,&entry);
+ if(shape->kind==A_ARRAY || shape->kind==A_OWNER){ValidateBorrowedGraph(shape->element,visited);return;}
+ for(field=shape->fields;field;field=field->next)ValidateBorrowedGraph(field->type,visited);
 }
-U0 ValidateBorrowedElements(I64 type){ValidateBorrowedPath(type,NULL);}
+U0 ValidateBorrowedElements(I64 type){
+ U8 visited[MAX_TYPES];if(!Aggregate(type))return;
+ MemSet(visited,0,MAX_TYPES);ValidateBorrowedGraph(type,visited);
+}
 
 Field *FindField(I64 type, U8 *name, Token *token) {
     Field *f; Layout(type);

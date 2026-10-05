@@ -40,13 +40,13 @@ Bool TrackedBorrow(I64 type){return Borrowed(type)!=0;}
 Bool ReferenceStorage(I64 type){
     AggregateType *shape;Field *field;
     if(IsReference(type))return !Borrowed(Shape(type)->element);
-    if(!Aggregate(type))return TRUE;shape=Shape(type);
+    if(!Aggregate(type))return TRUE;Layout(type);shape=Shape(type);
     if(shape->kind==A_SLICE)return !Borrowed(shape->element);if(shape->kind==A_OWNER)return TRUE;
     if(shape->kind==A_ARRAY)return ReferenceStorage(shape->element);
     for(field=shape->fields;field;field=field->next)if(!ReferenceStorage(field->type))return FALSE;
     return TRUE;
 }
-I64 ReferenceMode(I64 type){return BorrowTypeProperty(type,TRUE,NULL);}
+I64 ReferenceMode(I64 type){return BorrowTypeProperty(type,TRUE);}
 U0 ValidateReferenceStorage(I64 type,Token *token){
     if(IsReference(type)){if(Borrowed(Shape(type)->element) && !ReferenceStorage(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
     else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references require single-layer aggregate storage");
