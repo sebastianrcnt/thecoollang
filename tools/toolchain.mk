@@ -526,3 +526,10 @@ loan-provenance-test: build/cool-compiler build/compiler-host.o build/language-r
 test: loan-provenance-test
 loan-provenance-sanitize-test: repl-loans-sanitize-test build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_loan_provenance.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/loan-provenance-asan-audit.json
+
+.PHONY: provenance-selection-test provenance-selection-sanitize-test
+provenance-selection-test: build/cool-compiler build/compiler-host.o build/language-runtime.o
+	python3 tools/test_provenance_selection.py --output build/provenance-selection-audit.json
+test: provenance-selection-test
+provenance-selection-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_provenance_selection.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/provenance-selection-asan-audit.json

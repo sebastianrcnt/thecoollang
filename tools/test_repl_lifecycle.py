@@ -109,6 +109,9 @@ def workload(name,count):
     if name=='kept_field_graphs':
         prefix='struct Pair{left:&i64;right:&i64;}\nvar x=7;\nvar y=8;\nvar assigned=Pair{left:&x,right:&y};\n'
         return (prefix+'assigned=Pair{left:&x,right:&y};\n'*count+'*assigned.left\n*assigned.right\n','7\n8\n',0)
+    if name=='kept_selected_graphs':
+        prefix='struct Pair{left:&i64;right:&i64;}\nstruct Outer{inner:Pair;}\nvar x=7;\nvar y=8;\nlet other=Outer{inner:Pair{left:&x,right:&y}};\nvar assigned=other;\n'
+        return (prefix+'assigned=Outer{inner:other.inner};\n'*count+'*assigned.inner.left\n*assigned.inner.right\n','7\n8\n',0)
     if name=='rejected_loan_analysis':
         return ('fn fail(){var x=1;let r=&x;x=2;}\n'*count+'var x=1;\nx\n','1\n',count)
     if name=='distinct_literals_policy':
@@ -132,7 +135,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
     (project/'cool.mod').write_text('module example.test/lifecycle\n')
     (project/'bad/bad.cool').write_text('package bad;pub fn broken()->i64{return missing;}')
     observations=[]
-    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','rejected_loan_analysis','distinct_literals_policy'):
+    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','rejected_loan_analysis','distinct_literals_policy'):
         rows=[]
         for count in args.counts:
             source,output,errors=workload(name,count)
@@ -145,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
         bounded=name!='distinct_literals_policy'
         if bounded and not args.observe:
             assert all(row['live_bytes']==rows[0]['live_bytes'] and row['live_count']==rows[0]['live_count'] for row in rows),rows
-        if name in ('reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','rejected_loan_analysis') and not args.observe:
+        if name in ('reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','rejected_loan_analysis') and not args.observe:
             assert all(row['peak_bytes']==rows[0]['peak_bytes'] for row in rows),rows
         print(name+': '+', '.join(f'{row["submissions"]} => {row["live_bytes"]} bytes/{row["live_count"]} allocations' for row in rows))
     report=dict(artifact_sha256=digests,counts=args.counts,observations=observations,method='Copied emitted compiler IR call-site instrumentation for CAlloc, StrNew, FileRead (with size output) and Free; fresh REPL process per observation. Shim bookkeeping uses separate host malloc. Final live allocations measured at process exit after REPL cleanup, including fixed compiler tables/live declarations and policy-retained literal text. Other host-internal allocations and JIT mappings are not covered; peak bytes are diagnostic instrumentation data, not production RSS. No compiler source regeneration or shared artifact mutation.')

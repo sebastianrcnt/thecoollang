@@ -1,0 +1,220 @@
+// Select value provenance without changing physical scoped-loan protection.
+struct ReferenceSelection { node: *ProvenanceNode; type: i64; known: i64; }
+struct ReferenceCursor { path: *ProvenanceCursor; complete: i64; }
+fn ReferenceCursorFree(path: *ProvenanceCursor) {
+    unsafe {
+        var current = path;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+    }
+}
+// Walk address syntax as well as origin_source: a source alone drops fields.
+// Unknown/raw/computed boundaries remain coarse. The cursor is query scratch.
+fn ReferencePlaceCursor(place: *Node, via: *Local, origin: *Node) -> ReferenceCursor {
+    unsafe {
+        var result = ReferenceCursor{path:null,complete:0};
+        var current = place;
+        while (current != null) {
+            if (origin != null && (current == origin || (origin.kind == 18 && current == origin.a))) {
+                // AggregateAddress removes a LOAD wrapper from a computed
+                // value; its address is the same origin boundary, not a new
+                // payload projection on the already-selected value graph.
+                result.complete = 1; break;
+            }
+            if ((current.kind == 3 || current.kind == 22) && current.local_ref == via && via != null) { result.complete = 1; break; }
+            let kind = PlaceProjectionKind(current);
+            if (kind > 0 && kind < 5) {
+                let step = cast[*ProvenanceCursor](CAlloc(i64(sizeof(ProvenanceCursor))));
+                step.type = PlaceProjectionType(current);
+                step.kind = kind;
+                if (kind == 1) { step.key = current.field_key; }
+                step.next = result.path;
+                result.path = step;
+                if (kind == 1 && step.key == 0) { break; }
+            } else if (current.kind != 18) { break; }
+            current = PlaceProjectionParent(current);
+        }
+        return result;
+    }
+}
+fn ReferenceSelectionJoin(check: *ReferenceCheck, result: *ReferenceSelection, node: *ProvenanceNode, mode: i64) {
+    unsafe {
+        // All nodes in one loan graph protect the same external root. Keep
+        // alternative selected edges distinct and intersect entry barriers.
+        var selected = node;
+        if (mode == 0) {
+            let fresh = ProvenanceNodeNew(check.graph, result.type, node.root, 0);
+            fresh.opaque = node.opaque;
+            var edge = node.edges;
+            while (edge != null) {
+                if (!ProvenanceEdgeNew(fresh, edge.kind, edge.key, edge.target, 0)) {
+                    Error(cast[*u8]("invalid internal selected graph"));
+                }
+                edge = edge.next;
+            }
+            selected = ReferenceGraphIntern(check.graph, fresh);
+        }
+        if (node.opaque != 0) { result.known = 0; }
+        if (result.node == null) { result.node = selected; }
+        else {
+            var target = ReferenceLoan{}; target.provenance = result.node;
+            var source = ReferenceLoan{}; source.provenance = selected;
+            ReferenceProvenanceJoin(check, &raw target, &raw source);
+            result.node = target.provenance;
+        }
+    }
+}
+fn ReferenceSelectFallback(check: *ReferenceCheck, result: *ReferenceSelection, root: *Local, mode: i64) {
+    unsafe {
+        let node = ReferenceGraphValueNode(check.graph, result.type, root, mode, 1);
+        ReferenceSelectionJoin(check, result, node, 1);
+        result.known = 0;
+    }
+}
+// Finite product states include actual mode. Missing precise edges mean that
+// this root does not occur there; opaque roots retain a conservative fallback.
+fn ReferenceSelectGraph(check: *ReferenceCheck, source: *ReferenceLoan, path: *ProvenanceCursor, complete: i64, type: i64) -> ReferenceSelection {
+    unsafe {
+        var result = ReferenceSelection{node:null,type:type,known:1};
+        if (source.provenance == null) {
+            if (source.provenance_known == 0) { ReferenceSelectFallback(check, &raw result, source.root, source.exclusive); }
+            return result;
+        }
+        let root_mode = ReferenceRootMode(source);
+        if (complete == 0) { ReferenceSelectFallback(check, &raw result, source.root, root_mode); return result; }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = source.provenance; first.cursor = path; first.exclusive = source.exclusive;
+        var current = first;
+        var tail = first;
+        while (current != null) {
+            let node = current.node;
+            let cursor = current.cursor;
+            if (cursor == null) {
+                if (node.type == type) { ReferenceSelectionJoin(check, &raw result, node, current.exclusive); }
+                else { ReferenceSelectFallback(check, &raw result, source.root, current.exclusive & root_mode); }
+            } else {
+                if (node.opaque != 0 || node.type != cursor.type || node.root != null) {
+                    ReferenceSelectFallback(check, &raw result, source.root, current.exclusive & node.exclusive & root_mode);
+                }
+                if (node.type == cursor.type) {
+                    var edge = node.edges;
+                    while (edge != null) {
+                        if (edge.kind == cursor.kind && (cursor.kind != 1 || edge.key == cursor.key)) {
+                            tail = ProvenanceQueryAppend(first, tail, edge.target, cursor.next, current.exclusive & edge.exclusive);
+                        }
+                        edge = edge.next;
+                    }
+                }
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+        return result;
+    }
+}
+fn ReferenceSelectLoan(check: *ReferenceCheck, target: *ReferenceLoan, source: *ReferenceLoan, place: *Node, via: *Local, origin: *Node, payload: bool) {
+    unsafe {
+        var cursor = ReferencePlaceCursor(place, via, origin);
+        var type = target.provenance_type;
+        if (payload && IsReference(type)) { type = Shape(type).element; }
+        var selected = ReferenceSelectGraph(check, source, cursor.path, cursor.complete, type);
+        ReferenceCursorFree(cursor.path);
+        if (payload && selected.node != null && IsReference(target.provenance_type)) {
+            selected.node = ReferenceGraphParent(check.graph, target.provenance_type, 3, 0, selected.node);
+        }
+        target.provenance = selected.node;
+        target.provenance_known = selected.known;
+    }
+}
+// Intern only a freshly prepended node. Edges already point to existing graph
+// nodes; no recursive equality or merging of different root/mode paths occurs.
+fn ReferenceGraphSame(left: *ProvenanceNode, right: *ProvenanceNode) -> bool {
+    unsafe {
+        if (left.type != right.type || left.root != right.root || left.exclusive != right.exclusive || left.opaque != right.opaque) { return false; }
+        var a = left.edges;
+        var count: i64 = 0;
+        while (a != null) {
+            var b = right.edges;
+            while (b != null && !(a.kind == b.kind && a.key == b.key && a.exclusive == b.exclusive && a.target == b.target)) { b = b.next; }
+            if (b == null) { return false; }
+            count = count + 1;
+            a = a.next;
+        }
+        var b = right.edges;
+        while (b != null) { count = count - 1; b = b.next; }
+        return count == 0;
+    }
+}
+fn ReferenceGraphIntern(graph: *ProvenanceGraph, fresh: *ProvenanceNode) -> *ProvenanceNode {
+    unsafe {
+        if (graph.nodes != fresh) { Error(cast[*u8]("invalid internal graph intern head")); }
+        var old = fresh.next;
+        while (old != null) {
+            if (ReferenceGraphSame(fresh, old)) {
+                graph.nodes = fresh.next;
+                var edge = fresh.edges;
+                while (edge != null) { let next = edge.next; Free(cast[*u8](edge)); edge = next; }
+                Free(cast[*u8](fresh));
+                return old;
+            }
+            old = old.next;
+        }
+        return fresh;
+    }
+}
+fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Local, exclusive: i64, indirect: i64, expression: *Node, next: *ReferenceLoan, place: *Node, via: *Local, origin: *Node, payload: bool) -> *ReferenceLoan {
+    unsafe {
+        var selected = ReferenceLoan{};
+        selected.root = source.root;
+        selected.exclusive = exclusive;
+        selected.provenance_type = expression.type;
+        var scoped = *source;
+        scoped.exclusive = scoped.exclusive & exclusive;
+        if (expression.kind == 23 && expression.op == 1) {
+            // borrow_raw supplies a lifetime anchor, not a field mapping.
+            scoped.provenance = null;
+            scoped.provenance_known = 0;
+        }
+        ReferenceSelectLoan(check, &raw selected, &raw scoped, place, via, origin, payload);
+        var old = next;
+        while (old != null && old.expression == expression && old.holder == null) {
+            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
+                ReferenceProvenanceJoin(check, old, &raw selected);
+                return next;
+            }
+            old = old.next;
+        }
+        let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
+        loan.provenance = selected.provenance;
+        loan.provenance_known = selected.provenance_known;
+        return loan;
+    }
+}
+// Coarsening a path may union origins but never invent stronger capability.
+// This is an existential per-root bound, not authorization for an opaque path.
+fn ReferenceRootMode(source: *ReferenceLoan) -> i64 {
+    unsafe {
+        if (source.provenance == null) {
+            if (source.provenance_known != 0) { return 0; }
+            return source.exclusive;
+        }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = source.provenance; first.exclusive = source.exclusive;
+        var tail = first;
+        var current = first;
+        var mode: i64 = 0;
+        while (current != null) {
+            let node = current.node;
+            if (node.root == source.root) { mode = mode | (current.exclusive & node.exclusive); }
+            var edge = node.edges;
+            while (edge != null) {
+                tail = ProvenanceQueryAppend(first, tail, edge.target, null, current.exclusive & edge.exclusive);
+                edge = edge.next;
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+        return mode;
+    }
+}

@@ -7,7 +7,14 @@ p=argparse.ArgumentParser();p.add_argument('--frontend',type=Path);p.add_argumen
 def run(cmd,**kw):return subprocess.run(list(map(str,cmd)),cwd=ROOT,capture_output=True,text=True,timeout=180,**kw)
 AUDIT='''extern "C" fn LoanRecord(stage:i64,holder:*u8,root:*u8,field:*u8,reading:i64,writing:i64,valid:i64);
 fn LoanAudit(check:*ReferenceCheck,node:*Node){unsafe{
- let local=node.local_ref;if(local==null || AggregateKind(local.type)!=1){return;}
+ let local=node.local_ref;if(local==null || local.name==null){return;}
+ if(Eq(local.name,cast[*u8]("picked"))!=0 || Eq(local.name,cast[*u8]("picked_copy"))!=0 || Eq(local.name,cast[*u8]("uncertain"))!=0 || Eq(local.name,cast[*u8]("indexed"))!=0){
+  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
+   let valid=loan.provenance_type==local.type && (loan.provenance==null || (loan.provenance.graph==check.graph && loan.provenance.type==local.type));
+   LoanRecord(node.kind,local.name,loan.root.name,cast[*u8]("value"),BoolInt(ReferenceLoanQuery(loan,null,loan.root,false)),loan.provenance_known,BoolInt(valid));
+  }loan=loan.next;}return;
+ }
+ if(AggregateKind(local.type)!=1){return;}
  if(Eq(local.name,cast[*u8]("tracked"))==0 && Eq(local.name,cast[*u8]("copied"))==0 && Eq(local.name,cast[*u8]("assigned"))==0 && Eq(local.name,cast[*u8]("mixed"))==0){return;}
  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
   var field=Shape(local.type).fields;while(field!=null){
@@ -39,7 +46,19 @@ PROGRAM='''import "std/io";struct Pair{left:&i64;right:&i64;}
 fn AuditPair(){var x=7;var y=8;let tracked=Pair{left:&x,right:&y};let copied=tracked;var assigned=Pair{left:&x,right:&y};assigned=copied;assert(*assigned.left==7);assert(*assigned.right==8);}
 fn AuditSame(){var x=7;let tracked=Pair{left:&x,right:&x};let copied=tracked;assert(*copied.left==7);assert(*copied.right==7);}
 struct Mixed{left:&i64;right:&mut i64;}fn AuditMixed(){var x=7;var y=8;let mixed=Mixed{left:&x,right:&mut y};assert(*mixed.left==7);assert(*mixed.right==8);}
-fn main(){AuditPair();AuditSame();AuditMixed();io.println(42);}
+struct Outer{inner:Pair;}
+fn swap(a:&i64,b:&i64)->Pair borrows(a,b){return Pair{left:b,right:a};}
+fn AuditSelection(){
+ var x=7;var y=8;
+ let tracked=Pair{left:&x,right:&y};
+ let receiver=&tracked;let picked=(*receiver).left;let picked_copy=picked;assert(*picked_copy==7);
+ let outer=Outer{inner:tracked};{let picked=outer.inner.left;assert(*picked==7);}
+ let array=[2]&i64{&x,&y};{let indexed=array[0];assert(*indexed==7);}
+ let owner=new[Pair](tracked);{let picked=(*owner).left;assert(*picked==7);}
+ {let picked=(*new[Pair](tracked)).left;assert(*picked==7);}
+ let opaque=swap(&x,&y);let uncertain=opaque.left;assert(*uncertain==8);
+}
+fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();io.println(42);}
 '''
 with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  tmp=Path(directory);source=(ROOT/'compiler/16-references.cool').read_text();
@@ -64,6 +83,16 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  records=[]
  for line in r.stderr.splitlines():
   tag,stage,holder,root,field,reading,writing,valid=line.split();assert tag=='LOAN';record=(int(stage),holder,root,field,int(reading),int(writing));assert valid=='1';records.append(record)
+ selection=[r for r in records if r[1] in ('picked','picked_copy','uncertain','indexed')]
+ assert selection,records
+ for stage,holder,root,field,reading,known in selection:
+  assert field=='value' and root in ('x','y','tracked'),(stage,holder,root,field,reading,known)
+  if holder in ('picked','picked_copy'):assert (reading,known)==(int(root=='x'),1),(stage,holder,root,reading,known)
+  elif holder=='indexed':assert (reading,known)==(1,1),(stage,holder,root,reading,known)
+  else:assert (reading,known)==(1,0),(stage,holder,root,reading,known)
+ assert sum(r[1]=='picked' and r[2]=='x' for r in selection)==4,selection
+ assert any(r[1]=='picked_copy' and r[2]=='x' for r in selection),selection
+ records=[r for r in records if r not in selection]
  # Original roots are independent of queried field. In Pair, only x reaches
  # left and y reaches right; AuditSame additionally puts x in both fields.
  by_holder={}
@@ -85,6 +114,6 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r
  assert 'AddressSanitizer' not in r.stderr and 'runtime error:' not in r.stderr,r
  assert sum(line.startswith('LOAN ') for line in r.stderr.splitlines())>=8,r
- report={'records':records,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode oracle mixed shared/exclusive fields, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
+ report={'records':records,'selection_records':selection,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode oracle mixed shared/exclusive fields, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print(f'live loan provenance: {len(records)} field/root/mode records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print(f'live loan provenance: {len(records)} field/root/mode and {len(selection)} selection records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))

@@ -34,6 +34,8 @@ fn ReferenceAggregateProvenance(check: *ReferenceCheck, loan: *ReferenceLoan, ag
         // Untyped initializer children retain their conservative root record.
         if (edge == 0 || (edge == 1 && key == 0)) { return; }
         loan.provenance = ReferenceGraphParent(check.graph, aggregate.type, edge, key, loan.provenance);
+        loan.provenance_type = aggregate.type;
+        loan.provenance_known = 1;
     }
 }
 // Copy all live loan graphs through one map and drop unreachable graph history.
@@ -65,16 +67,40 @@ fn ReferenceLoansCopyGraph(loans: *ReferenceLoan) -> *ProvenanceGraph {
 // Opaque calls must not assume that equal argument/result types preserve fields.
 fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source: *ReferenceLoan) {
     unsafe {
-        let left = loan.provenance;
-        let right = source.provenance;
+        var left = loan.provenance;
+        var right = source.provenance;
+        var type = loan.provenance_type;
+        if (type == 0 && left != null) { type = left.type; }
+        // Unknown alternatives are not the identity element of a union.
+        // Preserve the declared value type and an explicitly opaque anchor.
+        if (right == null && source.provenance_known == 0) {
+            right = ReferenceGraphValueNode(check.graph, type, source.root, ReferenceRootMode(source), 1);
+        } else if (right != null && right.type != type) {
+            right = ReferenceGraphValueNode(check.graph, type, source.root, ReferenceRootMode(source), 1);
+        }
+        if (left == null && loan.provenance_known == 0) {
+            left = ReferenceGraphValueNode(check.graph, type, loan.root, ReferenceRootMode(loan), 1);
+        }
+        if (left != null && left.type != type) {
+            left = ReferenceGraphValueNode(check.graph, type, loan.root, ReferenceRootMode(loan), 1);
+        }
+        loan.provenance = left;
+        if (left != null) { loan.provenance_known = BoolInt(left.opaque == 0); }
+        if (right == null) { return; }
+        if (left == null && loan.provenance_known != 0) {
+            loan.provenance = right;
+            loan.provenance_known = BoolInt(right.opaque == 0);
+            return;
+        }
         if (right == null || left == null || left == right || left.type != right.type) { return; }
-        let joined = ProvenanceNodeNew(check.graph, left.type, left.root, left.exclusive);
+        var joined = ProvenanceNodeNew(check.graph, left.type, left.root, left.exclusive);
         if (joined.root == null) {
             joined.root = right.root;
             joined.exclusive = right.exclusive;
         } else if (right.root != null) {
             joined.exclusive = joined.exclusive | right.exclusive;
         }
+        joined.opaque = left.opaque | right.opaque;
         var edge = left.edges;
         while (edge != null) {
             ProvenanceEdgeNew(joined, edge.kind, edge.key, edge.target, edge.exclusive);
@@ -85,7 +111,9 @@ fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source:
             ProvenanceEdgeNew(joined, edge.kind, edge.key, edge.target, edge.exclusive);
             edge = edge.next;
         }
+        joined = ReferenceGraphIntern(check.graph, joined);
         loan.provenance = joined;
+        loan.provenance_known = BoolInt(joined.opaque == 0);
     }
 }
 fn ReferenceNewFrom(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Local, exclusive: i64, indirect: i64, expression: *Node, next: *ReferenceLoan) -> *ReferenceLoan {
@@ -99,18 +127,31 @@ fn ReferenceNewFrom(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Loc
             old = old.next;
         }
         let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
-        if (source.provenance != null && loan.provenance.type == source.provenance.type) { loan.provenance = source.provenance; }
+        if (loan.provenance_type == source.provenance_type) {
+            loan.provenance = source.provenance;
+            loan.provenance_known = source.provenance_known;
+        }
         return loan;
     }
 }
 fn ReferenceGraphLeaf(graph: *ProvenanceGraph, type: i64, root: *Local, mode: i64) -> *ProvenanceNode {
     unsafe {
+        let kind = AggregateKind(type);
+        var opaque: i64 = 0;
+        if (kind == 1 || kind == 2 || kind == 4 || kind == 5 || (kind == 6 && Borrowed(Shape(type).element) != i8(0))) { opaque = 1; }
+        return ReferenceGraphValueNode(graph, type, root, mode, opaque);
+    }
+}
+fn ReferenceGraphValueNode(graph: *ProvenanceGraph, type: i64, root: *Local, mode: i64, opaque: i64) -> *ProvenanceNode {
+    unsafe {
         var node = graph.nodes;
         while (node != null) {
-            if (node.type == type && node.root == root && node.exclusive == mode && node.edges == null) { return node; }
+            if (node.opaque == opaque && node.type == type && node.root == root && node.exclusive == mode && node.edges == null) { return node; }
             node = node.next;
         }
-        return ProvenanceNodeNew(graph, type, root, mode);
+        let fresh = ProvenanceNodeNew(graph, type, root, mode);
+        fresh.opaque = opaque;
+        return fresh;
     }
 }
 fn ReferenceGraphParent(graph: *ProvenanceGraph, type: i64, kind: i64, key: i64, child: *ProvenanceNode) -> *ProvenanceNode {
@@ -118,7 +159,7 @@ fn ReferenceGraphParent(graph: *ProvenanceGraph, type: i64, kind: i64, key: i64,
         var node = graph.nodes;
         while (node != null) {
             let edge = node.edges;
-            if (node.type == type && node.root == null && edge != null && edge.next == null && edge.kind == kind && edge.key == key && edge.target == child && edge.exclusive == 1) { return node; }
+            if (node.opaque == 0 && node.type == type && node.root == null && edge != null && edge.next == null && edge.kind == kind && edge.key == key && edge.target == child && edge.exclusive == 1) { return node; }
             node = node.next;
         }
         let parent = ProvenanceNodeNew(graph, type, null, 1);

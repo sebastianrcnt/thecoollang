@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Compare production subtree selection against an independent finite-state oracle."""
+import argparse, hashlib, json, os, random, subprocess, tempfile
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+p=argparse.ArgumentParser();p.add_argument('--frontend',type=Path);p.add_argument('--sanitize',action='store_true');p.add_argument('--output',type=Path);args=p.parse_args()
+def run(cmd,**kw):return subprocess.run(list(map(str,cmd)),cwd=ROOT,capture_output=True,text=True,timeout=240,**kw)
+def query(nodes,edges,path,start,mode,write):
+ todo=[(start,0 if path else -1,mode)];seen=set()
+ while todo:
+  n,c,m=todo.pop()
+  if n<0 or (n,c,m) in seen:continue
+  seen.add((n,c,m));typ,root,cap,opaque=nodes[n]
+  if c<0:
+   if root==0 and (not write or m&cap):return 1
+  elif typ==path[c][0]:
+   _,kind,key,nxt=path[c]
+   todo += [(t,nxt,m&cap) for s,k,v,t,cap in edges if s==n and k==kind and (kind!=1 or v==key)]
+ return 0
+def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
+ # Independent selection returns a union of original endpoint states and
+ # opaque root alternatives, then queries that union with another cursor.
+ bound=0;todo=[(start,mode)];seen=set()
+ while todo:
+  n,m=todo.pop()
+  if n<0 or (n,m) in seen:continue
+  seen.add((n,m));_,root,cap,_=nodes[n]
+  if root==0:bound |= m&cap
+  todo += [(t,m&cap) for s,k,v,t,cap in edges if s==n]
+ if start<0:bound=mode if not known else 0
+ states=[];fallback=[];precise=1
+ if start<0:
+  if not known:fallback.append(mode);precise=0
+ elif not complete:fallback.append(bound);precise=0
+ else:
+  todo=[(start,0 if path else -1,mode)];seen=set()
+  while todo:
+   n,c,m=todo.pop()
+   if n<0 or (n,c,m) in seen:continue
+   seen.add((n,c,m));nt,root,cap,opaque=nodes[n]
+   if c<0:
+    if nt==typ:states.append((n,m));precise &= not opaque
+    else:fallback.append(m&bound);precise=0
+   else:
+    ct,kind,key,nxt=path[c]
+    if opaque or nt!=ct or root>=0:fallback.append(m&cap&bound);precise=0
+    if nt==ct:todo += [(t,nxt,m&cap) for s,k,v,t,cap in edges if s==n and k==kind and (kind!=1 or v==key)]
+ reading=int(any(query(nodes,edges,extra,n,m,write) for n,m in states) or (not extra and any(not write or m for m in fallback)))
+ return reading,int(precise)
+AUDIT='''
+export "C" fn SelectJoinProbe(){unsafe{
+ var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
+ var shared=ReferenceLoan{};shared.root=&raw root;shared.provenance_type=20;
+ var absent=ReferenceLoan{};absent.root=&raw root;absent.provenance_type=20;absent.provenance_known=1;
+ ReferenceProvenanceJoin(&raw check,&raw absent,&raw shared);
+ if(absent.provenance==null || absent.provenance_known!=0 || !ReferenceLoanQuery(&raw absent,null,&raw root,false)){NativeExit(51);}
+ let child=ProvenanceNodeNew(&raw graph,30,&raw root,1);
+ let parent=ReferenceGraphParent(&raw graph,20,1,100,child);
+ var precise=ReferenceLoan{};precise.root=&raw root;precise.provenance_type=20;precise.provenance_known=1;precise.exclusive=1;precise.provenance=parent;
+ ReferenceProvenanceJoin(&raw check,&raw precise,&raw shared);
+ if(precise.provenance_known!=0 || ReferenceLoanQuery(&raw precise,null,&raw root,true)){NativeExit(52);}
+ let head=graph.nodes;
+ for(var i:i64=0;i<128;i=i+1){ReferenceProvenanceJoin(&raw check,&raw precise,&raw shared);if(graph.nodes!=head){NativeExit(53);}}
+ ReferenceProvenanceJoin(&raw check,&raw shared,&raw precise);
+ if(shared.provenance_known!=0 || !ReferenceLoanQuery(&raw shared,null,&raw root,false)){NativeExit(54);}
+ var mismatch=ReferenceLoan{};mismatch.root=&raw root;mismatch.provenance_type=30;mismatch.provenance=ProvenanceNodeNew(&raw graph,30,&raw root,0);mismatch.provenance_known=1;
+ var destination=ReferenceLoan{};destination.root=&raw root;destination.provenance_type=20;destination.provenance_known=1;destination.exclusive=1;
+ ReferenceProvenanceJoin(&raw check,&raw destination,&raw mismatch);
+ if(destination.provenance==null || destination.provenance.type!=20 || destination.provenance_known!=0 || ReferenceLoanQuery(&raw destination,null,&raw root,true)){NativeExit(55);}
+ ProvenanceGraphFree(&raw graph);
+}}
+export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mode:i64,complete:i64,type:i64,known:i64,q:i64,qs:*i64,writing:i64)->i64{unsafe{
+ var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
+ let nodes=cast[**ProvenanceNode](CAlloc((n+1)*8));
+ for(var i:i64=0;i<n;i=i+1){var r:*Local=null;if(ns[4*i+1]==0){r=&raw root;}nodes[i]=ProvenanceNodeNew(&raw graph,ns[4*i],r,ns[4*i+2]);nodes[i].opaque=ns[4*i+3];}
+ for(var i:i64=0;i<e;i=i+1){var t:*ProvenanceNode=null;if(es[5*i+3]>=0){t=nodes[es[5*i+3]];}ProvenanceEdgeNew(nodes[es[5*i]],es[5*i+1],es[5*i+2],t,es[5*i+4]);}
+ let paths=cast[*ProvenanceCursor](CAlloc((c+q+1)*i64(sizeof(ProvenanceCursor))));
+ for(var i:i64=0;i<c;i=i+1){paths[i].type=ps[4*i];paths[i].kind=ps[4*i+1];paths[i].key=ps[4*i+2];if(ps[4*i+3]>=0){paths[i].next=&raw paths[ps[4*i+3]];}}
+ for(var i:i64=0;i<q;i=i+1){paths[c+i].type=qs[4*i];paths[c+i].kind=qs[4*i+1];paths[c+i].key=qs[4*i+2];if(qs[4*i+3]>=0){paths[c+i].next=&raw paths[c+qs[4*i+3]];}}
+ var source=ReferenceLoan{};source.root=&raw root;source.exclusive=mode;source.provenance_known=known;if(start>=0){source.provenance=nodes[start];}
+ var path:*ProvenanceCursor=null;if(c>0){path=paths;}var extra:*ProvenanceCursor=null;if(q>0){extra=&raw paths[c];}
+ var selected=ReferenceSelectGraph(&raw check,&raw source,path,complete,type);
+ let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known;
+ Free(cast[*u8](paths));Free(cast[*u8](nodes));ProvenanceGraphFree(&raw graph);return result;
+}}
+'''
+DRIVER=r'''
+#include <stdint.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+extern void SelectJoinProbe(void);
+extern int64_t SelectProbe(int64_t,int64_t,int64_t*,int64_t*,int64_t,int64_t*,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t*,int64_t);
+static int64_t get(void){int64_t v;if(scanf("%"SCNd64,&v)!=1)abort();return v;}
+int main(void){SelectJoinProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
+ int64_t *ns=calloc(n*4+1,8),*es=calloc(e*5+1,8),*ps=calloc(c*4+1,8),*qs=calloc(q*4+1,8);
+ for(int64_t i=0;i<n*4;i++)ns[i]=get();for(int64_t i=0;i<e*5;i++)es[i]=get();for(int64_t i=0;i<c*4;i++)ps[i]=get();for(int64_t i=0;i<q*4;i++)qs[i]=get();
+ printf("%"PRId64"\n",SelectProbe(n,e,ns,es,c,ps,start,mode,complete,type,known,q,qs,writing));free(ns);free(es);free(ps);free(qs);
+}return 0;}
+'''
+rng=random.Random(20261005);cases=[]
+for trial in range(160):
+ nodes=[(rng.randrange(3),rng.randrange(-1,1),rng.randrange(2),rng.randrange(2)) for _ in range(7)]
+ edges=list(set((rng.randrange(7),rng.randrange(1,5),rng.randrange(3),rng.randrange(-1,7),rng.randrange(2)) for _ in range(24)))
+ paths=[[]]
+ paths += [[(nodes[s][0],k,v,-1)] for s,k,v,t,m in edges[:3]]
+ paths += [[(rng.randrange(3),rng.randrange(1,5),rng.randrange(3),1),(rng.randrange(3),rng.randrange(1,5),rng.randrange(3),rng.choice((-1,0)))]]
+ for path in paths:
+  for writing in (0,1):
+   extra=rng.choice(paths);start=rng.randrange(-1,7);mode=rng.randrange(2);complete=int(rng.random()>.15);typ=rng.randrange(3);known=rng.randrange(2)
+   cases.append((nodes,edges,path,start,mode,complete,typ,known,extra,writing))
+# Explicit precise missing branches, shared barriers, and graph/cursor cycles.
+nodes=[(10,-1,1,0),(20,0,1,0),(20,0,0,0),(10,-1,1,0)]
+edges=[(0,1,100,1,1),(0,1,101,2,1),(0,3,0,3,0),(3,3,0,0,1)]
+for path in ([],[(10,1,100,-1)],[(10,1,101,-1)],[(10,1,999,-1)],[(10,3,0,1),(10,3,0,0)]):
+ for mode in (0,1):
+  for writing in (0,1):cases.append((nodes,edges,path,0,mode,1,20,1,[],writing))
+with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directory:
+ tmp=Path(directory);audit=tmp/'audit.cool';audit.write_text(AUDIT);files=sorted((ROOT/'compiler').glob('*.cool'));manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(f)+'\n' for f in files)+'__main\t'+str(audit)+'\n');ir=tmp/'compiler.ll'
+ frontend=args.frontend.resolve() if args.frontend else ROOT/'build/cool-compiler';env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
+ r=run([frontend,'llvm-bundle',manifest,ir],env=env);assert r.returncode==0,r
+ text=ir.read_text();text=text.replace('define i32 @main(', 'define i32 @unused_compiler_main(')
+ if args.sanitize:text='\n'.join(line.replace(' {',' sanitize_address {') if line.startswith('define ') else line for line in text.splitlines())+'\n'
+ ir.write_text(text);driver=tmp/'driver.c';driver.write_text(DRIVER);binary=tmp/'probe'
+ flags=['-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer'] if args.sanitize else ['-O2']
+ inputs=[];artifacts={}
+ for name in ('compiler-host.o','language-runtime.o'):
+  original=ROOT/'build'/name;copy=tmp/name;copy.write_bytes(original.read_bytes());artifacts[name]=hashlib.sha256(copy.read_bytes()).hexdigest();inputs.append(copy)
+ if args.sanitize:
+  checked=tmp/'checked.ll';r=run(['clang','-Wno-override-module','-O1','-fsanitize=address','-S','-emit-llvm',ir,'-o',checked]);assert r.returncode==0,r
+  assert '__asan_report_load' in checked.read_text() and '__asan_report_store' in checked.read_text()
+  inputs=[ROOT/'compiler/host.c',ROOT/'language/runtime.c']
+ r=run(['clang','-Wno-override-module',*flags,'-I'+str(ROOT/'compiler'),'-I'+str(ROOT/'language'),ir,driver,*inputs,'-lffi','-o',binary]);assert r.returncode==0,r
+ lines=[];expected=[]
+ for nodes,edges,path,start,mode,complete,typ,known,extra,write in cases:
+  lines.append(' '.join(map(str,[len(nodes),len(edges),len(path),len(extra),start,mode,complete,typ,known,write,*[v for row in nodes+edges+path+extra for v in row]])))
+  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise)
+ r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
+ actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
+ for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query oracle; same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Metadata only, not permission authorization.'}
+ if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
+ print(f'provenance selection: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))

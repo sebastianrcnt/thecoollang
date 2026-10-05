@@ -6,6 +6,7 @@
 // ownership before the current two-layer checker can use this representation.
 struct ProvenanceGraph { nodes: *ProvenanceNode; }
 struct ProvenanceNode {
+    opaque: i64;
     graph: *ProvenanceGraph;
     type: i64;
     root: *Local;
@@ -168,6 +169,7 @@ fn ProvenanceCopyNew(graph: *ProvenanceGraph, source: *ProvenanceNode) -> *Prove
         let state = cast[*ProvenanceCopyState](CAlloc(i64(sizeof(ProvenanceCopyState))));
         state.source = source;
         state.target = ProvenanceNodeNew(graph, source.type, source.root, source.exclusive);
+        state.target.opaque = source.opaque;
         return state;
     }
 }

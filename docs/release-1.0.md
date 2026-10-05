@@ -1740,6 +1740,44 @@ through ordinary evaluation or library use.
   parameter summaries and descriptor-lifetime audit must be completed before
   arbitrary nested borrowed storage is accepted. All release gates remain Open.
 
+- Typed loan value selection: production loans now distinguish a precise absent
+  root from unknown provenance and record the graph's declared value type.
+  Address cursors select nominal fields, conservative element unions, referents
+  and owned payloads. A named `&Pair` keeps physical storage protection separate
+  from its referent's field graph. Computed aggregate LOADs use their stripped
+  address as the origin boundary, avoiding duplicate payload traversal. Unknown
+  raw/computed boundaries and opaque call results retain explicit opaque roots;
+  coarsening intersects actual source capabilities. Unknown/null and mismatched
+  typed alternatives cannot disappear during graph union. Shared selection
+  barriers apply to outgoing edges and terminal roots. Shallow node interning
+  bounds repeated identical selected-value assignment history. Arena copying
+  preserves the opaque flag.
+
+  Private actual binding/copy checks verify 34 field/root/mode records and 14
+  value-selection records: named references, nested structs, array element
+  unions, named and computed owners, precise absent roots and opaque swapped
+  call results. Five engines/O2 and REPL failure recovery pass. An independent
+  Python finite-state oracle verifies 1,620 typed selection/query combinations,
+  including cyclic graphs/cursors, shared barriers, absent/unknown roots and
+  mismatched types. Helper probes cover unknown/precise union in both orders,
+  precise absence, mismatch and repeated identical union. Compiler-generated
+  private LLVM ASan and host/runtime ASan/UBSan pass. Selected nested-value REPL
+  replacement at 64/1,024 submissions has equal final bytes/counts (32,154,836/60)
+  and equal peak bytes (32,167,949). Full regression, production and legacy seed
+  convergence, and external editor/distribution installation pass. Reports:
+  `build/provenance-selection{,-asan}-audit.json`,
+  `build/loan-provenance{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/provenance-selection-{build,focused,regression,sanitize,lifecycle,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `bf45d3723467d583c1d815b0beb8282c3d9942981a52d86fe58e27de9806fc06`.
+
+  This certifies metadata selection, not authorization of additional language
+  programs. Existing coarse roots, ancestry and two-layer permission decisions
+  remain authoritative on both frontends. Computed reborrow retagging, partial
+  stores, call substitution, descriptor lifetimes and physical overlap must be
+  integrated and checked before arbitrary nested borrowed storage is accepted.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

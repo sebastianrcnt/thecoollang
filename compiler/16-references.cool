@@ -2,6 +2,8 @@
 // Numeric AST tags are shared with the bootstrap frontend's Core.cool.
 struct ReferenceLoan {
     provenance: *ProvenanceNode;
+    provenance_type: i64;
+    provenance_known: i64;
     root: * Local;
     holder: * Local;
     parent: * Local;
@@ -314,6 +316,8 @@ fn ReferenceNew(check: *ReferenceCheck, root: * Local, parent: * Local, exclusiv
             var type = root.type;
             if (expression != null) { type = expression.type; }
             loan.provenance = ReferenceGraphLeaf(check.graph, type, root, exclusive);
+            loan.provenance_type = type;
+            loan.provenance_known = BoolInt(loan.provenance.opaque == 0);
         }
         loan.root = root;
         loan.parent = parent;
@@ -406,7 +410,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
                 if (physical) {
                     if (nested) {
                         ReferenceSourceAccess(check, before, via, source.root, exclusive & source.exclusive, token, origin);
-                        check.loans = ReferenceNewFrom(check, source, via, exclusive & source.exclusive, 1, expression, check.loans);
+                        check.loans = ReferenceNewSelected(check, source, via, exclusive & source.exclusive, 1, expression, check.loans, place, via, null, true);
                     }
                 } else {
                     var mode = exclusive & source.exclusive;
@@ -415,9 +419,9 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
                         indirect = source.indirect;
                     }
                     ReferenceSourceAccess(check, before, via, source.root, mode, token, origin);
-                    check.loans = ReferenceNewFrom(check, source, via, mode, indirect, expression, check.loans);
+                    check.loans = ReferenceNewSelected(check, source, via, mode, indirect, expression, check.loans, place, via, null, false);
                     if (nested && !preserve) {
-                        check.loans = ReferenceNewFrom(check, source, via, mode & ReferenceMode(Shape(expression.type).element), 1, expression, check.loans);
+                        check.loans = ReferenceNewSelected(check, source, via, mode & ReferenceMode(Shape(expression.type).element), 1, expression, check.loans, place, via, null, true);
                     }
                     found = true;
                 }
@@ -551,7 +555,7 @@ fn ReferenceProjection(check: * ReferenceCheck, node: * Node, mode: i64) {
         var source = check.loans;
         while (source != before) {
             if (source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {
-                check.loans = ReferenceNew(check, source.root, source.parent, mode & source.exclusive, 0, node, check.loans);
+                check.loans = ReferenceNewSelected(check, source, source.parent, mode & source.exclusive, 0, node, check.loans, node.a, null, origin, false);
             }
             source = source.next;
         }

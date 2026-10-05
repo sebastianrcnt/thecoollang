@@ -28,7 +28,7 @@ struct GraphAudit { graph:ProvenanceGraph; copies:ProvenanceGraph; nodes:**Prove
 export "C" fn GraphNew(count:i64,edge_count:i64,nodes:*i64,edges:*i64)->*GraphAudit { unsafe {
  let a=cast[*GraphAudit](CAlloc(i64(sizeof(GraphAudit))));a.count=count;
  a.nodes=cast[**ProvenanceNode](CAlloc((count+2)*8));a.roots=cast[*Local](CAlloc(4*i64(sizeof(Local))));
- for(var i:i64=0;i<count;i=i+1){var root:*Local=null;if(nodes[3*i+1]>=0){root=&raw a.roots[nodes[3*i+1]];}a.nodes[i]=ProvenanceNodeNew(&raw a.graph,nodes[3*i],root,nodes[3*i+2]);}
+ for(var i:i64=0;i<count;i=i+1){var root:*Local=null;if(nodes[3*i+1]>=0){root=&raw a.roots[nodes[3*i+1]];}a.nodes[i]=ProvenanceNodeNew(&raw a.graph,nodes[3*i],root,nodes[3*i+2]);a.nodes[i].opaque=i%2;}
  for(var i:i64=0;i<edge_count;i=i+1){var target:*ProvenanceNode=null;if(edges[5*i+3]>=0){target=a.nodes[edges[5*i+3]];}if(!ProvenanceEdgeNew(a.nodes[edges[5*i]],edges[5*i+1],edges[5*i+2],target,edges[5*i+4])){NativeExit(3);}}
  let other=cast[*ProvenanceGraph](CAlloc(i64(sizeof(ProvenanceGraph))));
  let foreign=ProvenanceNodeNew(other,0,null,1);
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix='cool typed provenance ') as directory:
   let saved=sources[1];if(ProvenanceGraphCopyRoots(&raw a.copies,sources,&raw sources[1],2) || sources[1]!=saved){NativeExit(11);}
   if(!ProvenanceGraphCopyRoots(&raw a.copies,sources,a.nodes,count+2)){NativeExit(6);}
   if(a.nodes[count]!=a.nodes[0] || a.nodes[count+1]!=null){NativeExit(7);}
-  for(var i:i64=0;i<count;i=i+1){if(a.nodes[i]==sources[i] || a.nodes[i].graph!=&raw a.copies || a.nodes[i].type!=sources[i].type || a.nodes[i].root!=sources[i].root || a.nodes[i].exclusive!=sources[i].exclusive){NativeExit(8);}}
+  for(var i:i64=0;i<count;i=i+1){if(a.nodes[i]==sources[i] || a.nodes[i].graph!=&raw a.copies || a.nodes[i].type!=sources[i].type || a.nodes[i].root!=sources[i].root || a.nodes[i].exclusive!=sources[i].exclusive || a.nodes[i].opaque!=sources[i].opaque){NativeExit(8);}}
  }
  Free(cast[*u8](sources));
  // A malformed source fails after allocating partial copies. The existing
