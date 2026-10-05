@@ -345,6 +345,36 @@ SLICE_CASES.extend([
     ('depth3_slice_generic_projection_return','accept','fn identity[T](s:[]T)->[]T borrows(s){return s;}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity[[][]i64](layers[:])[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
 ])
 
+
+# Straight-line aliases retain the original parameter origin, including unused
+# aliases of other parameters. Unsupported statements retain opaque summaries.
+SLICE_CASES.extend([
+ ('slice_alias_chain_return','accept','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;var tail=copy[0:];let result=tail[:];return result;}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'),
+ ('slice_alias_unused_other_origin','accept','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let unused=b;let copy=a;return copy;}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'),
+ ('slice_alias_second_origin','accept','fn second(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let first=a;let next=b;var result=next;return result;}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return second(local[:],x);}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'),
+ ('depth3_slice_alias_projection','accept','fn identity(s:[][][]i64)->[][][]i64 borrows(s){let copy=s;var result=copy[:];return result;}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity(layers[:])[0][0];}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'),
+ ('slice_alias_local_origin_escape','reject','fn second(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let unused=a;let copy=b;return copy;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return second(x,local[:]);}fn main(){}'),
+ ('slice_alias_reassignment_opaque','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){var copy=a;copy=b;return copy;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+ ('slice_alias_effect_opaque','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;assert(true);return copy;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+ ('slice_alias_dynamic_reslice_opaque','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;let n=0;return copy[n:];}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+])
+for aliases, expected in ((30,'accept'),(31,'reject')):
+    body=''.join('let c%d=%s;'%(i, 'a' if i==0 else 'c%d'%(i-1)) for i in range(aliases))
+    program='fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){'+body+'return c%d;}'%(aliases-1)
+    program+='fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'
+    SLICE_CASES.append(('slice_alias_capacity_%d'%aliases,expected,program))
+STORE_DIAGNOSTICS.update({name:'outlive' for name, expected, _ in SLICE_CASES if name.startswith('slice_alias_') and expected=='reject'})
+
+SLICE_CASES.extend([
+ ('slice_alias_shared_subtree_mutation','reject','fn identity(s:[][]i64)->[][]i64 borrows(s){let copy=s;var result=copy[:];return result;}fn bad(s:&[][]i64){let copy=identity(*s);let inner=copy[0];inner[0]=9;}fn main(){}'),
+ ('slice_alias_shadow_parameter','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let a=b;return a;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+ ('slice_alias_duplicate_name','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;let copy=b;return copy;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+ ('slice_alias_truncated_reslice','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a[:;return copy;}fn main(){}'),
+ ('slice_alias_long_body_opaque','reject','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){'+'assert(true);'*100+'let copy=a;return copy;}fn bad(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){}'),
+])
+STORE_DIAGNOSTICS['slice_alias_long_body_opaque']='outlive'
+STORE_DIAGNOSTICS.update({'slice_alias_shared_subtree_mutation':'cannot mutate or move through a shared reference','slice_alias_duplicate_name':'duplicate local declaration','slice_alias_truncated_reslice':'expected identifier'})
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -433,7 +463,7 @@ SLICE_REPL_CASES.extend([
  ('projection_opaque_replacement',
   'fn identity(s:[]i64)->[]i64 borrows(s){return s;}\n'
   'var a=[2]i64{7,9};\nidentity(a[:])[0]\n'
-  'fn identity(s:[]i64)->[]i64 borrows(s){let copy=s;return copy;}\n'
+  'fn identity(s:[]i64)->[]i64 borrows(s){assert(true);let copy=s;return copy;}\n'
   'identity(a[:])[0]\n:quit\n',
   '7\n7\n', {'borrow projection change requires a new session':1}),
  ('projection_reslice_replacement',
@@ -456,9 +486,25 @@ SLICE_REPL_CASES.extend([
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
   'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
   'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
-  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;return copy;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){assert(true);let copy=a;return copy;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
   'use(a[:],b[:])[0]\n:quit\n',
   '7\n7\n', {'borrow projection change requires a new session':1}),
+])
+
+
+SLICE_REPL_CASES.extend([
+ ('projection_alias_same_source_replacement',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
+  'var a=[2]i64{7,8};\nvar b=[2]i64{9,10};\nuse(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let unused=b;var copy=a[1:];let result=copy[:];return result;}\n'
+  'use(a[:],b[:])[0]\n:quit\n', '7\n8\n', {}),
+ ('projection_alias_other_source_replacement',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;return copy;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let unused=a;let copy=b;return copy;}\n'
+  'use(a[:],b[:])[0]\n:quit\n', '7\n7\n', {'borrow projection change requires a new session':1}),
 ])
 
 def main():

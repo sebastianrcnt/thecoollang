@@ -1697,10 +1697,16 @@ root creation. Computed selections leave old temporaries protecting evaluation
 but do not retag proven-absent roots as the result.
 
 `ReferenceSliceProjection` recognizes an entire tokenized body returning an
-equal-typed slice argument, optionally with literal/omitted bounds. It excludes
+equal-typed slice argument through inferred straight-line `let`/`var` aliases,
+optionally with literal/omitted bounds. Each name stores its original argument
+index; unused aliases of other arguments do not enter the final result. It excludes
 foreign declarations, uninstantiated templates and checked stores effects.
 The bounded recognizer checks identifier kinds and the final semicolon/brace;
-extra statements/expressions remain opaque. Forward headers have complete
+assignments, type annotations, shadowing, calls and other statements/expressions
+remain opaque. The recognizer uses stack tables for at most 32 names (including
+arguments) and accepts at most 512 body tokens; exceeding either limit falls
+back to the conservative summary. Every token access is bounded by the closing
+brace. No token/name pointers escape the query. Forward headers have complete
 body token ranges before checking callers. Recognized calls preserve source
 value graphs/capability limits, but discard physical geometry as before.
 Unused overdeclared sources do not enter the result; their argument loans still
@@ -1715,7 +1721,7 @@ passing. Stored receiver summaries keep the original conservative path.
 REPL replacement checks the prior established projection against the new body
 range before publishing it. A different argument or opaque body cannot replace
 an established precise projection; otherwise older callers could retain only
-the old subset of origins. Same-source literal reslicing/renaming is compatible.
+the old subset of origins. Same-source literal reslicing/renaming and alias chains are compatible.
 Function token compaction already updates begin/end ranges; failed declarations
 restore the prior snapshot. Arbitrary body summaries and dependent caller
 revalidation remain required implementation work.

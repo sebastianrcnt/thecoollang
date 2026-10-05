@@ -2584,6 +2584,45 @@ through ordinary evaluation or library use.
   `slice-value-selection-trial.{json,log}` and `slice-projection-sanitize.log`.
   Production nested-storage guards and all release gates remain Open.
 
+- Straight-line slice alias projections (specification draft 28): result-origin
+  inference now follows inferred `let`/`var` copies and literal reslicing while
+  retaining the original parameter index. Unused aliases of other parameters
+  do not contaminate the result. Assignments, calls, dynamic bounds, shadowing,
+  duplicate names and unsupported statements keep the conservative summary;
+  shared payload capabilities cannot become mutable through an alias. The
+  recognizer uses bounded stack tables (32 names including arguments, 512 body
+  tokens), checks token reads and falls back on exhaustion. Both frontends are
+  aligned. Same-origin alias replacement preserves existing REPL callers;
+  changed origins are rejected and roll back. General body summaries and
+  dependent caller revalidation remain unfinished.
+
+  Corrected permanent readiness: 194 classifications/80 positive programs,
+  480 five-engine/O2 executions, 26 REPL scenarios and eight allocation
+  observations PASS. Private sanitizer: the same 194 classifications and
+  80 tree executions PASS. Shared mutation, duplicate declarations and malformed
+  reslicing were rejected correctly on the first run, but their expected
+  diagnostics initially assumed a later lifetime error; the test now asserts
+  the actual earlier capability/declaration/grammar errors. No fixture was
+  removed. Ordinary alias fixtures also pass 26 checks and eight executions on
+  unmodified public production/seed frontends. Production nested-storage guards
+  remain enabled.
+
+  Full regression, three-generation bootstrap convergence and external editor/
+  distribution validation passed on the unchanged compiler in the combined
+  `slice-alias-final-validation.log` run; that command exited 2 solely for the
+  three new diagnostic expectations above. After correcting only expectations,
+  readiness/slice sanitizer plus graph/copy/loan/selection/access/physical/
+  descriptor/stores/public slice sanitizer targets exit 0 in
+  `build/release-audit/slice-alias-corrected-validation.log`.
+  Production stage-2 IR SHA256:
+  `7f368956c2b3fbcd679beeeefe9100cfd4cea9e53b63560dfcb3548fd6f59979`.
+  Additional evidence: `build/release-audit/slice-alias-bootstrap.log`,
+  `build/release-audit/slice-alias-public.json` and
+  `build/nested-reference-slice-{readiness,asan}-audit.json`; both permanent
+  reports' compiler/legacy source hashes match the committed sources.
+  The four allocation workloads retain equal final/peak tracked allocations
+  at histories 64 and 1024. All mandatory release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

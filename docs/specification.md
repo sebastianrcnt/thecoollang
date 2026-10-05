@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 27
+# Cool language specification — 1.0 draft 28
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -991,3 +991,20 @@ remain unfinished incremental-compilation work.
 Arbitrary nested borrowed storage and borrowed slice elements remain guarded in
 production. Private readiness tests audit deeper cases without enabling those
 features. This draft does not complete any 1.0 release gate.
+
+
+## Draft 28: straight-line slice aliases
+
+The proven slice projection from draft 27 also follows straight-line inferred
+`let` and `var` bindings. Each initializer must be a previously available slice
+parameter or alias, optionally resliced with literal/omitted bounds; the final
+statement returns such a value. The result retains the original parameter's
+origins, even when an unused alias refers to a different contracted parameter.
+All call arguments remain protected during evaluation. A mutable descriptor
+binding does not strengthen the borrowed element capabilities.
+
+Assignments, calls, branches, explicit binding type annotations, shadowed names
+and other unrecognized body forms retain conservative summaries. Live REPL
+replacement accepts an alias chain with the same proven source and rejects a
+changed or unproven source under the draft 27 compatibility rule. General body
+summaries and dependent caller revalidation remain required work.

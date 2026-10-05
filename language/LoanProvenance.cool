@@ -1,4 +1,32 @@
-I64 ReferenceSliceProjection(Function *f){I64 begin=f->begin,end=f->end,argument=0,position;Token *t=tokens;if(f->foreign || f->generic_count || f->store_destinations || AggregateKind(f->result)!=A_SLICE)return -1;if(begin<0 || end>ntok || end-begin<5 || end-begin>11)return -1;if(t[begin].kind!='{' || t[begin+1].kind!=K_ID || t[begin+2].kind!=K_ID || !Eq(t[begin+1].text,"return") || t[end-2].kind!=';' || t[end-1].kind!='}')return -1;while(argument<f->argc && !Eq(f->arg_names[argument],t[begin+2].text))argument++;if(argument==f->argc || f->arg_types[argument]!=f->result || !(f->borrow_contract&(1<<argument)))return -1;position=begin+3;if(t[position].kind=='['){position++;if(t[position].kind==K_INT)position++;if(t[position].kind!=':')return -1;position++;if(t[position].kind==K_INT)position++;if(t[position].kind!=']')return -1;position++;}if(position!=end-2)return -1;return argument;}
+// Straight-line aliases preserve the original slice parameter projection.
+I64 ReferenceSliceProjection(Function *f){
+ I64 begin=f->begin,end=f->end,count=0,position,selected,origin,duplicate;
+ U8 *names[32],*name;I64 origins[32];Bool returning;Token *t=tokens;
+ if(f->foreign || f->generic_count || f->store_destinations || AggregateKind(f->result)!=A_SLICE || f->argc>32)return -1;
+ if(begin<0 || end>ntok || end-begin<5 || end-begin>512)return -1;
+ if(t[begin].kind!='{' || t[end-1].kind!='}')return -1;
+ while(count<f->argc){names[count]=f->arg_names[count];origins[count]=-1;if(f->arg_types[count]==f->result && (f->borrow_contract&(1<<count)))origins[count]=count;count++;}
+ position=begin+1;
+ while(position<end-1){
+  if(t[position].kind!=K_ID)return -1;
+  returning=Eq(t[position].text,"return");name=NULL;
+  if(returning)position++;
+  else{
+   if(!Eq(t[position].text,"let") && !Eq(t[position].text,"var"))return -1;
+   if(position+3>=end-1 || t[position+1].kind!=K_ID || t[position+2].kind!='=' || count==32)return -1;
+   name=t[position+1].text;duplicate=0;while(duplicate<count){if(Eq(names[duplicate],name))return -1;duplicate++;}position+=3;
+  }
+  if(position>=end-1 || t[position].kind!=K_ID)return -1;
+  selected=0;while(selected<count && !Eq(names[selected],t[position].text))selected++;
+  if(selected==count || origins[selected]<0)return -1;
+  origin=origins[selected];position++;
+  if(position<end-1 && t[position].kind=='['){position++;if(position<end-1 && t[position].kind==K_INT)position++;if(position>=end-1 || t[position].kind!=':')return -1;position++;if(position<end-1 && t[position].kind==K_INT)position++;if(position>=end-1 || t[position].kind!=']')return -1;position++;}
+  if(position>=end-1 || t[position].kind!=';')return -1;
+  position++;if(returning){if(position!=end-1)return -1;return origin;}
+  names[count]=name;origins[count]=origin;count++;
+ }
+ return -1;
+}
 extern U0 ReferenceSliceElementGraph(ReferenceCheck *check,ReferenceLoan *target,ReferenceLoan *source,Node *expression,Node *place,Local *via);
 // Manual bootstrap counterpart of production typed loan metadata.
 U0 ReferenceGraphFree(ProvenanceGraph *graph){if(graph){ProvenanceGraphFree(graph);Free(graph);}}

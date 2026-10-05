@@ -895,7 +895,9 @@ an instrumented compiler and generated LLVM/runtime checks.
 
 For `fn identity(s: []i64) -> []i64 borrows(s) { return s; }`, the compiler keeps
 the caller's actual backing origins. The same applies to a body consisting only
-of `return s[1:];` or another slice with literal/omitted bounds. This precision
+of `return s[1:];` or straight-line aliases such as
+`let copy=s; var tail=copy[1:]; return tail;`. Alias initializers and the return
+may reslice with literal/omitted bounds. This precision
 helps select an inner slice value without retaining an intermediate descriptor
 array as part of the result. Descriptor addresses and whole intermediate slices
 still require that array's lifetime. Other function bodies use conservative
@@ -905,5 +907,6 @@ A live session cannot replace such a function with a body returning a different
 parameter or a body whose projection cannot yet be proven. It reports `borrow
 projection change requires a new session`, preserving the prior function and
 callers. Reslicing the same parameter with literal bounds and renaming that
-parameter remain compatible. General body summaries and caller revalidation
-are still required work; see specification draft 27.
+parameter, or following the same source through aliases, remain compatible.
+General body summaries and caller revalidation
+are still required work; see specification drafts 27–28.
