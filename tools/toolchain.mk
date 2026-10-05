@@ -545,3 +545,10 @@ provenance-access-sanitize-test: repl-loans-sanitize-test
 legacy-graph-lifecycle-test: build/coolc
 	python3 tools/test_legacy_graph_lifecycle.py --output build/legacy-graph-lifecycle-audit.json
 test: legacy-graph-lifecycle-test
+
+.PHONY: physical-address-test physical-address-sanitize-test
+physical-address-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_physical_address.py --legacy --output build/physical-address-audit.json
+test: physical-address-test
+physical-address-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_physical_address.py --frontend build/repl-loans-asan/cool-compiler --output build/physical-address-asan-audit.json

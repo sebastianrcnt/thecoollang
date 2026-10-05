@@ -1,0 +1,42 @@
+
+// Physical address sets use the same arena, separately from value provenance.
+fn ReferencePhysicalJoin(check:*ReferenceCheck,loan:*ReferenceLoan,source:*ReferenceLoan){unsafe{
+ if(loan.physical_provenance==null || source.physical_provenance==null || loan.root==null){loan.physical_provenance=null;return;}
+ if(loan.physical_provenance==source.physical_provenance){return;}
+ var left=ReferenceLoan{};left.root=loan.root;left.exclusive=1;left.provenance_type=loan.root.type;left.provenance=loan.physical_provenance;left.provenance_known=1;
+ var right=left;right.provenance=source.physical_provenance;
+ ReferenceProvenanceJoin(check,&raw left,&raw right);loan.physical_provenance=left.provenance;
+}}
+fn ReferencePhysicalCapture(check:*ReferenceCheck,place:*Node,via:*Local,expression:*Node){unsafe{
+ var cursor=ReferencePlaceCursor(place,via,null);var step=cursor.path;var valid=cursor.complete!=0;
+ while(step!=null){if(step.kind==3 || (step.kind==2 && AggregateKind(step.type)==3)){valid=false;}step=step.next;}
+ var node:*ProvenanceNode=null;
+ if(valid){
+  var type=place.type;if(Pointer(type)!=i8(0)){type=type-100000;}
+  node=ReferenceGraphValueNode(check.graph,type,via,1,0);
+  var reversed:*ProvenanceCursor=null;step=cursor.path;
+  while(step!=null){let next=step.next;step.next=reversed;reversed=step;step=next;}
+  cursor.path=reversed;step=reversed;
+  while(step!=null){node=ReferenceGraphParent(check.graph,step.type,step.kind,step.key,node);step=step.next;}
+ }
+ ReferenceCursorFree(cursor.path);
+ var loan=check.loans;while(loan!=null){if(loan.holder==null && loan.expression==expression && loan.root==via && loan.indirect==0){loan.physical_provenance=node;}loan=loan.next;}
+}}
+fn ReferencePhysicalMayOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,place:*Node,via:*Local)->bool{unsafe{
+ if(loan.physical_provenance==null || via==null || ReferenceThroughStored(place)){return true;}
+ var cursor=ReferencePlaceCursor(place,via,null);
+ if(cursor.complete==0){ReferenceCursorFree(cursor.path);return true;}
+ var found=false;
+ if(via==loan.root){
+  var source=*loan;source.provenance=loan.physical_provenance;source.provenance_known=1;
+  found=ReferencePathMayAccess(&raw source,cursor.path,1);
+ }else if(IsReference(via.type)){
+  var source=check.loans;var known=false;
+  while(source!=null){if(source.holder==via && source.root==loan.root && source.indirect==0){
+   known=true;
+   if(source.physical_provenance==null || ProvenanceAddressOverlap(loan.physical_provenance,source.physical_provenance,loan.root)){found=true;}
+  }source=source.next;}
+  if(!known){found=true;}
+ }else{found=true;}
+ ReferenceCursorFree(cursor.path);return found;
+}}

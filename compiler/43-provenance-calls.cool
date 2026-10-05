@@ -38,6 +38,7 @@ fn ReferenceBoundedSummary(check: *ReferenceCheck, type: i64, root: *Local, mode
 fn ReferenceCallGraph(check: *ReferenceCheck, source: *ReferenceLoan, type: i64, indirect: i64) -> ReferenceLoan {
     unsafe {
         var result = *source;
+        result.physical_provenance = null;
         result.provenance_type = type;
         if (source.provenance == null && source.provenance_known != 0) { return result; }
         let bound = source.exclusive & ReferenceRootMode(source);
@@ -66,6 +67,7 @@ fn ReferenceNewCall(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Loc
             old = old.next;
         }
         let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
+        loan.physical_provenance = value.physical_provenance;
         loan.provenance = value.provenance;
         loan.provenance_type = value.provenance_type;
         loan.provenance_known = value.provenance_known;

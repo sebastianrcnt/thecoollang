@@ -44,19 +44,19 @@ fn ReferenceLoansCopyGraph(loans: *ReferenceLoan) -> *ProvenanceGraph {
     unsafe {
         var count: i64 = 0;
         var loan = loans;
-        while (loan != null) { count = count + 1; loan = loan.next; }
+        while (loan != null) { count = count + 2; loan = loan.next; }
         if (count == 0) { return null; }
         let sources = cast[**ProvenanceNode](CAlloc(count * 8));
         let targets = cast[**ProvenanceNode](CAlloc(count * 8));
         var index: i64 = 0;
         loan = loans;
-        while (loan != null) { sources[index] = loan.provenance; index = index + 1; loan = loan.next; }
+        while (loan != null) { sources[index] = loan.provenance; sources[index + 1] = loan.physical_provenance; index = index + 2; loan = loan.next; }
         let graph = cast[*ProvenanceGraph](CAlloc(i64(sizeof(ProvenanceGraph))));
         let valid = ProvenanceGraphCopyRoots(graph, sources, targets, count);
         if (valid) {
             index = 0;
             loan = loans;
-            while (loan != null) { loan.provenance = targets[index]; index = index + 1; loan = loan.next; }
+            while (loan != null) { loan.provenance = targets[index]; loan.physical_provenance = targets[index + 1]; index = index + 2; loan = loan.next; }
         }
         Free(cast[*u8](sources)); Free(cast[*u8](targets));
         if (!valid) { ReferenceGraphFree(graph); Error(cast[*u8]("invalid internal persistent loan graph")); }
@@ -67,6 +67,7 @@ fn ReferenceLoansCopyGraph(loans: *ReferenceLoan) -> *ProvenanceGraph {
 // Opaque calls must not assume that equal argument/result types preserve fields.
 fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source: *ReferenceLoan) {
     unsafe {
+        ReferencePhysicalJoin(check, loan, source);
         var left = loan.provenance;
         var right = source.provenance;
         var type = loan.provenance_type;
@@ -133,6 +134,7 @@ fn ReferenceNewFrom(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Loc
             old = old.next;
         }
         let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
+        loan.physical_provenance = source.physical_provenance;
         if (loan.provenance_type == source.provenance_type) {
             loan.provenance = source.provenance;
             loan.provenance_known = source.provenance_known;

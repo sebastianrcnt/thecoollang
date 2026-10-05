@@ -174,3 +174,21 @@ compatible function replacements need allocation/JIT lifecycle measurements.
 
 This work closes no release gate until the implementation and this full scope of
 acceptance evidence exist.
+
+### Root-relative physical address sets
+
+Each loan now carries a separate `physical_provenance` arena root. Stable direct
+addresses capture resolved field paths, array element unions and whole-place
+prefixes. A missing root means unknown geometry, not absence. Copies preserve
+geometry, merges union known sets and unknown dominates. Loan arena cloning
+copies value and physical roots together with one identity map; compaction and
+REPL candidate commits retain both sets. Pair overlap uses visited node pairs;
+opaque/type mismatch stays conservative, enum variant fields overlap physical
+payload storage and array indexes remain a union. Scratch worklists are freed.
+
+Only an existing physical-root conflict can be refined. Direct local struct
+fields can be disjoint, including named references and call arguments. Indirect
+access checks the whole source address set; paths through stored handles remain
+conservative. Raw bridges and opaque call returns lose precise geometry. Owned
+payload sibling access remains conservative. No arbitrary nested-storage guard
+is removed, and borrowed descriptor/type/field-key lifetimes still need audit.

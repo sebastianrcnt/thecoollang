@@ -2108,6 +2108,32 @@ through ordinary evaluation or library use.
   lifetime and arbitrary nested borrowed storage still require completion. No
   release gate is closed by this additional rejection check; all remain Open.
 
+- Physical address geometry is now separate from typed value provenance.
+  Stable direct struct field addresses carry root-relative paths. Loan copies,
+  unions and persistent candidate cloning preserve both arena roots. Unknown
+  geometry dominates union; raw bridges and opaque call returns drop precision.
+  Physical overlap uses visited node pairs, prefix protection, enum payload
+  overlap and conservative array element unions. It only refines pre-existing
+  root conflicts. Named references can access disjoint field regions; indirect
+  projections use whole source regions and stored handles remain conservative.
+
+  Actual fixtures pass 9 accepted and 16 rejected programs, five engines/O2 and
+  persistent REPL recovery/forget on production and seed frontends. Cases cover
+  field copies and call arguments, nested structs, whole-place conflicts, merged
+  address sets, raw bridges, enum replacement, array unions and owner movement.
+  Owned payload sibling access remains rejected; arbitrary nested borrowed
+  storage and descriptor lifetime remain pending. The 1,642-case independent
+  selection/authority suite also checks physical pair overlap. All 13 legacy
+  graph lifecycle workloads end at zero tracked graph allocations with identical
+  64/1,024 repetition peaks, under documented instrumentation exclusions.
+
+  Full regression/bootstrap convergence, four existing provenance sanitizer
+  targets plus physical-address sanitizer and external editor/distribution
+  installation pass. Compiler IR SHA-256:
+  `87fdb6ce125db886a2940ec634b9233620201e4e38f32dfdb8240e63f1529b8c`.
+  Evidence: `build/release-audit/physical-address-{build,focused,regression,sanitize,distribution,extra-fixtures}.log`.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

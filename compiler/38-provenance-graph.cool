@@ -277,3 +277,30 @@ fn ProvenanceGraphCopy(graph: *ProvenanceGraph, source: *ProvenanceNode) -> *Pro
         return output;
     }
 }
+
+struct ProvenancePairState{left:*ProvenanceNode;right:*ProvenanceNode;next:*ProvenancePairState;}
+fn ProvenancePairAppend(head:*ProvenancePairState,tail:*ProvenancePairState,left:*ProvenanceNode,right:*ProvenanceNode)->*ProvenancePairState{unsafe{
+ if(left==null || right==null){return tail;}var state=head;
+ while(state!=null){if(state.left==left && state.right==right){return tail;}state=state.next;}
+ let fresh=cast[*ProvenancePairState](CAlloc(i64(sizeof(ProvenancePairState))));fresh.left=left;fresh.right=right;tail.next=fresh;return fresh;
+}}
+fn ProvenanceAddressRootPossible(node:*ProvenanceNode,root:*Local)->bool{unsafe{
+ if(node==null){return false;}
+ let first=cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));first.node=node;
+ var current=first;var tail=first;var found=false;
+ while(current!=null && !found){if(current.node.opaque!=0 || current.node.root==root){found=true;}else{var edge=current.node.edges;while(edge!=null){tail=ProvenanceQueryAppend(first,tail,edge.target,null,0);edge=edge.next;}}current=current.next;}
+ current=first;while(current!=null){let next=current.next;Free(cast[*u8](current));current=next;}return found;
+}}
+fn ProvenanceAddressOverlap(left:*ProvenanceNode,right:*ProvenanceNode,root:*Local)->bool{unsafe{
+ if(left==null || right==null){return true;}
+ let first=cast[*ProvenancePairState](CAlloc(i64(sizeof(ProvenancePairState))));first.left=left;first.right=right;
+ var current=first;var tail=first;var found=false;
+ while(current!=null && !found){let a=current.left;let b=current.right;
+  if(a.opaque!=0 || b.opaque!=0 || a.type!=b.type){found=true;}
+  else if(a.root==root){found=ProvenanceAddressRootPossible(b,root);}
+  else if(b.root==root){found=ProvenanceAddressRootPossible(a,root);}
+  else{var x=a.edges;while(x!=null){var y=b.edges;while(y!=null){if(x.kind==y.kind && (x.kind!=1 || x.key==y.key || AggregateKind(a.type)==4)){tail=ProvenancePairAppend(first,tail,x.target,y.target);}y=y.next;}x=x.next;}}
+  current=current.next;
+ }
+ current=first;while(current!=null){let next=current.next;Free(cast[*u8](current));current=next;}return found;
+}}

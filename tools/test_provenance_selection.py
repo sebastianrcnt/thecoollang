@@ -66,6 +66,30 @@ def copy_modes(nodes,edges,path,start,mode,complete,known):
    _,kind,key,nxt=path[c]
    pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
  return result
+def address_root_possible(nodes,edges,start):
+ pending=[start];seen=set()
+ while pending:
+  n=pending.pop()
+  if n<0 or n in seen:continue
+  seen.add(n)
+  if nodes[n][1]==0 or nodes[n][3]:return True
+  pending.extend(t for s,k,v,t,m in edges if s==n and t>=0)
+ return False
+def address_overlap(nodes,edges,left,right):
+ if left<0 or right<0:return 1
+ pending=[(left,right)];seen=set()
+ while pending:
+  a,b=pending.pop()
+  if (a,b) in seen:continue
+  seen.add((a,b));at,ar,ac,ao=nodes[a];bt,br,bc,bo=nodes[b]
+  if ao or bo or at!=bt:return 1
+  if ar==0:
+   if address_root_possible(nodes,edges,b):return 1
+  elif br==0:
+   if address_root_possible(nodes,edges,a):return 1
+  else:
+   pending.extend((xt,yt) for xs,xk,xv,xt,xm in edges for ys,yk,yv,yt,ym in edges if xs==a and ys==b and xt>=0 and yt>=0 and xk==yk and (xk!=1 or xv==yv or at==2))
+ return 0
 def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  # Independent selection returns a union of original endpoint states and
  # opaque root alternatives, then queries that union with another cursor.
@@ -166,6 +190,11 @@ export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mo
  var result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete))+8*ReferencePathWriteModes(&raw source,path,complete);
  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
  ctx.v_naggregates=0;ctx.v_aggregate_types=cast[*AggregateType](CAlloc(8*i64(sizeof(AggregateType))));
+ var token=Token{};let enum_type=NewType(4,&raw token);
+ for(var i:i64=0;i<n;i=i+1){if(nodes[i].type==2){nodes[i].type=enum_type;}}
+ var partner:*ProvenanceNode=null;if(start>=0){partner=nodes[(start+1)%n];}
+ result=result+512*BoolInt(ProvenanceAddressOverlap(source.provenance,partner,&raw root));
+ for(var i:i64=0;i<n;i=i+1){nodes[i].type=ns[4*i];}
  for(var i:i64=0;i<n;i=i+1){nodes[i].type=CopyProbeType(nodes[i].type);}
  for(var i:i64=0;i<c;i=i+1){paths[i].type=CopyProbeType(paths[i].type);}
  result=result+64*ReferencePathCopyModes(&raw source,path,complete);
@@ -273,10 +302,10 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  lines=[];expected=[]
  for nodes,edges,path,start,mode,complete,typ,known,extra,write in cases:
   lines.append(' '.join(map(str,[len(nodes),len(edges),len(path),len(extra),start,mode,complete,typ,known,write,*[v for row in nodes+edges+path+extra for v in row]])))
-  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known)+8*write_modes(nodes,edges,path,start,mode,complete,known)+64*copy_modes(nodes,edges,path,start,mode,complete,known))
+  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known)+8*write_modes(nodes,edges,path,start,mode,complete,known)+64*copy_modes(nodes,edges,path,start,mode,complete,known)+512*address_overlap(nodes,edges,start,(start+1)%len(nodes) if start>=0 else -1))
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent physical address pair-product overlap and access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
  print(f'provenance selection/overlap/authority: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
