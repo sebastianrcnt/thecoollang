@@ -2079,6 +2079,35 @@ through ordinary evaluation or library use.
   terminal prefixes), opaque permissions, descriptor lifetime and arbitrary
   nested stored borrowing remain required. All release gates remain Open.
 
+- Universal write/copy mode queries no longer stop after recording a physical
+  terminal prefix. They continue matching edges so an exclusive prefix cannot
+  hide a deeper shared contribution from the same root. Node capability remains
+  terminal-specific; child paths use edge barriers. Slot-write and handle-copy
+  end boundaries remain unchanged, and existential overlap still stops when a
+  physical prefix has proved overlap. Exclusive-plus-unknown remains fallback,
+  not a universal authorization result. Both frontends mirror this behavior.
+
+  Independent authority/selection/overlap oracles pass 1,642 cases, including
+  prefix/descendant permission combinations, opaque children and a traversed
+  graph/cursor cycle. Actual private production/seed metadata hooks place an
+  exclusive physical prefix ahead of mixed payload alternatives and require
+  named/computed writes and field/whole copies to reject. These injected states
+  validate query/checker behavior, not ordinary-source construction of that
+  mapping. Four added persistent rejection/recovery histories exercise candidate
+  graph cloning: 64/1,024 repetitions end at zero tracked graph allocations with
+  stable peaks of 2,792 bytes for named write/copy, 3,232 for computed write and
+  2,320 for computed copy. All 13 legacy workloads pass under the previously
+  documented instrumentation exclusions.
+
+  Full regression, production/seed bootstrap convergence, generated LLVM ASan,
+  host/runtime ASan/UBSan and external editor/distribution installation pass.
+  Compiler IR SHA-256:
+  `f4025b550cd8861959fbc1a0085b2fb7f76e84f39d825501f2949ed98a293e6b`.
+  Evidence: `build/release-audit/provenance-prefix-authority-{build,focused,injection,selection,regression,sanitize,distribution}.log`.
+  Physical address/projection alias protection, opaque permissions, descriptor
+  lifetime and arbitrary nested borrowed storage still require completion. No
+  release gate is closed by this additional rejection check; all remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

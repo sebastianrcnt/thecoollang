@@ -83,10 +83,13 @@ fn ReferencePathAuthorityModes(source: *ReferenceLoan, path: *ProvenanceCursor, 
                 }
             }
             else if (node.opaque != 0 || node.type != cursor.type) { modes = modes | 4; }
-            else if (node.root == source.root && node.root != null) {
-                if ((current.exclusive & node.exclusive) != 0) { modes = modes | 1; }
-                else { modes = modes | 2; }
-            } else {
+            else {
+                if (node.root == source.root && node.root != null) {
+                    if ((current.exclusive & node.exclusive) != 0) { modes = modes | 1; }
+                    else { modes = modes | 2; }
+                }
+                // Physical protection is one contribution, not a stopping rule:
+                // a deeper referent of this same root may cross a shared barrier.
                 var edge = node.edges;
                 while (edge != null) {
                     if (edge.kind == cursor.kind && (cursor.kind != 1 || edge.key == cursor.key)) {

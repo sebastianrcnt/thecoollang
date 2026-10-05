@@ -100,8 +100,9 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
 fn WriteBarrierProbe(check:*ReferenceCheck,node:*Node){unsafe{
  let local=node.local_ref;
  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
- let computed=node.kind==4 && node.slot>=0 && node.slot<ctx.v_nfun && ctx.v_functions[node.slot].name!=null && Eq(ctx.v_functions[node.slot].name,cast[*u8]("probe_return"))!=0;
- if(!computed && (local==null || local.name==null || Eq(local.name,cast[*u8]("write_probe"))==0)){return;}
+ let computed=node.kind==4 && node.slot>=0 && node.slot<ctx.v_nfun && ctx.v_functions[node.slot].name!=null && (Eq(ctx.v_functions[node.slot].name,cast[*u8]("probe_return"))!=0 || Eq(ctx.v_functions[node.slot].name,cast[*u8]("prefix_return"))!=0);
+ if(!computed && (local==null || local.name==null || Eq(local.name,cast[*u8]("write_probe"))==0 && Eq(local.name,cast[*u8]("prefix_probe"))==0)){return;}
+ let prefix=(computed && Eq(ctx.v_functions[node.slot].name,cast[*u8]("prefix_return"))!=0) || (!computed && Eq(local.name,cast[*u8]("prefix_probe"))!=0);
  let inner=Shape(node.type).element;let field=ParameterField(inner,cast[*u8]("right"));
  var loan=check.loans;var changed=false;
  while(loan!=null){if(((computed && loan.holder==null && loan.expression==node) || (!computed && loan.holder==local)) && loan.indirect==1 && loan.root!=null && Eq(loan.root.name,cast[*u8]("b"))!=0){
@@ -109,12 +110,13 @@ fn WriteBarrierProbe(check:*ReferenceCheck,node:*Node){unsafe{
    let group=edge.target;var item=group.edges;
    while(item!=null){if(item.kind==1 && item.key==cast[i64](field)){
     if(!ProvenanceEdgeNew(group,1,item.key,item.target,0)){NativeExit(91);}
+    if(prefix){loan.provenance.root=loan.root;loan.provenance.exclusive=1;}
     var tail=ProvenanceCursor{type:inner,kind:1,key:item.key,next:null};
     var path=ProvenanceCursor{type:node.type,kind:3,key:0,next:&raw tail};
     var referent=ProvenanceCursor{type:item.target.type,kind:3,key:0,next:null};
     let existential=ReferenceLoanQuery(loan,&raw path,loan.root,true);
-    if(ReferencePathWriteModes(loan,&raw path,1)!=0 || ReferencePathCopyModes(loan,&raw path,1)!=3){NativeExit(94);}
-    if(ReferencePathCopyModes(loan,null,1)!=0){NativeExit(95);}
+    if(ReferencePathWriteModes(loan,&raw path,1)!=BoolInt(prefix) || ReferencePathCopyModes(loan,&raw path,1)!=3){NativeExit(94);}
+    if(ReferencePathCopyModes(loan,null,1)!=BoolInt(prefix)){NativeExit(95);}
     tail.next=&raw referent;
     if(!existential || ReferencePathWriteModes(loan,&raw path,1)!=3){NativeExit(92);}
     changed=true;break;
@@ -325,9 +327,14 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot copy or move an exclusive reference through a shared path' in r.stderr,r
  probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let write_probe=&mut pair;let q=*write_probe;}')
  r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot copy or move an exclusive reference through a shared path' in r.stderr,r
+ for statement,diagnostic in [('*(*prefix_probe).right=9;','cannot mutate or move through a shared reference'),('let q=(*prefix_probe).right;', 'cannot copy or move an exclusive reference through a shared path'),('let q=*prefix_probe;', 'cannot copy or move an exclusive reference through a shared path')]:
+  probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let prefix_probe=&mut pair;'+statement+'}')
+  r=run([binary,'check',probe],env=env);assert r.returncode==2 and diagnostic in r.stderr,(statement,r)
  computed_prefix='struct Pair{left:&mut i64;right:&mut i64;}fn probe_return(p:&mut Pair)->&mut Pair borrows(p){return p;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};'
  for statement,diagnostic in [('(*probe_return(&mut pair)).right;', 'cannot copy or move an exclusive reference through a shared path'),('let q=(*probe_return(&mut pair)).right;', 'cannot copy or move an exclusive reference through a shared path'),('let q=*probe_return(&mut pair);', 'cannot copy or move an exclusive reference through a shared path'),('*(*probe_return(&mut pair)).right=9;', 'cannot mutate or move through a shared reference'),('let q=&mut *(*probe_return(&mut pair)).right;', 'cannot copy or move an exclusive reference through a shared path')]:
   probe.write_text(computed_prefix+statement+'}')
+  r=run([binary,'check',probe],env=env);assert r.returncode==2 and diagnostic in r.stderr,(statement,r)
+  probe.write_text(computed_prefix.replace('probe_return','prefix_return')+statement.replace('probe_return','prefix_return')+'}')
   r=run([binary,'check',probe],env=env);assert r.returncode==2 and diagnostic in r.stderr,(statement,r)
  repl='struct Pair{left:&i64;right:&i64;}\nvar x=7;\nvar y=8;\nvar assigned=Pair{left:&x,right:&y};\n{assigned=Pair{left:&x,right:&y};assert(false);}\nfn broken(){var a=1;let r=&a;a=2;}\nassigned=assigned;\n*assigned.left\n*assigned.right\n:forget assigned\nx=3;\nx\n:quit\n'
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r

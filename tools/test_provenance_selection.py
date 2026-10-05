@@ -43,8 +43,8 @@ def write_modes(nodes,edges,path,start,mode,complete,known):
   visited.add((n,c,m));typ,root,cap,opaque=nodes[n]
   if c<0:continue
   if opaque or typ!=path[c][0]:result|=4
-  elif root==0:result|=1 if m&cap else 2
   else:
+   if root==0:result|=1 if m&cap else 2
    _,kind,key,nxt=path[c]
    pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
  return result
@@ -61,8 +61,8 @@ def copy_modes(nodes,edges,path,start,mode,complete,known):
    if typ in (0,1,20,30,40):
     if typ not in (0,30) and root==0:result|=1 if m&cap else 2
    else:pending.extend((t,-1,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0)
-  elif root==0:result|=1 if m&cap else 2
   else:
+   if root==0:result|=1 if m&cap else 2
    _,kind,key,nxt=path[c]
    pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
  return result
@@ -219,6 +219,41 @@ for typ in (20,30,40):
   es=[(0,3 if typ!=40 else 2,0,1,0),(1,3,0,0,1)]
   cases.append((ns,es,[],0,mode,1,typ,1,[],1))
   assert copy_modes(ns,es,[],0,mode,1,1)==(0 if typ==30 else 1 if mode else 2)
+# The same root is physical storage at an exclusive prefix and a shared
+# external referent deeper in its payload. The exclusive prefix must not stop
+# either authority query. Cycle and reversed edge variants preserve that fact.
+for cyclic in (False,True):
+ for reverse in (False,True):
+  ns=[(20,0,1,0),(10,-1,1,0),(30,0,0,0)]
+  es=[(0,3,0,1,1),(1,1,100,2,0)]
+  if cyclic:es.append((1,3,0,0,1))
+  if reverse:es.reverse()
+  path=[(20,3,0,1),(10,1,100,2),(30,3,0,-1)]
+  assert write_modes(ns,es,path,0,1,1,1)==3
+  assert copy_modes(ns,es,path,0,1,1,1)==3
+  cases.append((ns,es,path,0,1,1,30,1,[],1))
+for prefix_cap in (0,1):
+ for child_cap in (0,1):
+  ns=[(20,0,prefix_cap,0),(10,-1,1,0),(20,0,child_cap,0)]
+  es=[(0,3,0,1,1),(1,1,100,2,1)]
+  path=[(20,3,0,1),(10,1,100,2),(20,3,0,-1)]
+  expected=(1 if prefix_cap else 2)|(1 if child_cap else 2)
+  assert write_modes(ns,es,path,0,1,1,1)==expected
+  assert copy_modes(ns,es,path,0,1,1,1)==expected
+  cases.append((ns,es,path,0,1,1,20,1,[],1))
+for prefix_cap in (0,1):
+ ns=[(20,0,prefix_cap,0),(10,-1,1,1)]
+ es=[(0,3,0,1,1)];path=[(20,3,0,1),(10,1,100,-1)]
+ expected=(1 if prefix_cap else 2)|4
+ assert write_modes(ns,es,path,0,1,1,1)==expected
+ assert copy_modes(ns,es,path,0,1,1,1)==expected
+ cases.append((ns,es,path,0,1,1,10,1,[],1))
+for mode in (0,1):
+ ns=[(20,0,1,0),(20,0,0,0)];es=[(0,3,0,1,1),(1,3,0,0,1)]
+ path=[(20,3,0,0)]
+ assert write_modes(ns,es,path,0,mode,1,1)==(3 if mode else 2)
+ assert copy_modes(ns,es,path,0,mode,1,1)==(3 if mode else 2)
+ cases.append((ns,es,path,0,mode,1,20,1,[],1))
 with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directory:
  tmp=Path(directory);audit=tmp/'audit.cool';audit.write_text(AUDIT);files=sorted((ROOT/'compiler').glob('*.cool'));manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(f)+'\n' for f in files)+'__main\t'+str(audit)+'\n');ir=tmp/'compiler.ll'
  frontend=args.frontend.resolve() if args.frontend else ROOT/'build/cool-compiler';env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}

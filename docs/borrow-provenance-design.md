@@ -100,7 +100,10 @@ reject shared alternatives for named and computed stored-referent writes and
 exclusive-handle value copies/moves. Computed projection read pins query their
 original live source with the full place cursor, preserving shared barriers. Handle copies stop at reference/slice nodes; their internal
 payload graphs retain lifetime protection without requiring exclusive copy
-authority. Full physical protection and opaque authority remain required. Typed graph paths now exclude proven absent layer-one payload roots
+authority. Universal mode queries record physical prefix contributions and
+continue matching edges; existential overlap may stop at the prefix. This retains
+deeper shared capabilities of the same root. Full physical protection and opaque
+authority remain required. Typed graph paths now exclude proven absent layer-one payload roots
 from production conflict matching and reborrow acquisition. Overlap ignores
 shared/exclusive mode; terminal physical roots overlap remaining projections.
 Unknown/opaque/incomplete paths remain conservative. This first access step

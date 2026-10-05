@@ -1297,3 +1297,33 @@ aggregate copies, consecutive calls and store-then-return source propagation on
 five engines/O2 and both frontends. Two ordinary shared receiver cases reject
 mutable field extraction/reborrowing. Arbitrary nested borrowed storage, full
 physical place protection and opaque permission authority are still unfinished.
+
+
+## Authority contributions after physical terminal prefixes
+
+For an unfinished cursor, `ReferencePathAuthorityModes` records a matching
+physical terminal's shared/exclusive contribution and continues along matching
+edges. Stopping at an exclusive physical prefix can hide a shared referent of
+that same root deeper in the payload. Node capability describes that terminal;
+child capability still follows edge barriers, not an extra global node-mode AND.
+Both copy and write queries retain all contributions. Existential overlap queries
+may still stop at a physical prefix because overlap has already been proved.
+
+The value-slot end boundary remains unchanged: a write cursor ending at a slot
+contributes zero, while a copy cursor ending at a reference/slice checks only the
+handle, never its internal payload. Prefix and descendant contributions may be
+mixed (1|2); opaque descendants additionally retain unknown (4). In particular,
+exclusive-plus-unknown (1|4) is not proof of universal exclusive permission, and
+unknown paths still use the existing scoped fallback.
+
+The independent oracle now covers 1,642 cases, including same-root physical
+prefixes with deeper shared/exclusive contributions, opaque children and an
+actually traversed graph/cursor cycle. Private actual production/seed hooks
+inject a physical prefix ahead of mixed payload paths and require named/computed
+writes and field/whole copies to reject. This deliberately injected metadata
+regression does not claim ordinary source constructs that mapping. Four added
+64/1,024-submission legacy histories exercise persistent prefix rejection/recovery,
+including candidate graph cloning; all 13 workloads end with zero tracked graph
+allocations and equal peaks. The same instrumentation exclusions apply. Full
+physical alias/projection protection, opaque authority and arbitrary nested
+borrowed storage remain unfinished.
