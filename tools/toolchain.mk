@@ -435,3 +435,8 @@ template-names-test: build/cool-compiler build/language.BIN build/language-runti
 test: template-names-test
 template-names-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_template_names.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: repl-jit-lifecycle-test
+repl-jit-lifecycle-test: build/cool-compiler build/compiler-host.o build/language-runtime.o
+	python3 tools/test_repl_jit_lifecycle.py --output build/repl-jit-lifecycle-audit.json
+test: repl-jit-lifecycle-test

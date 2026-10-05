@@ -92,3 +92,56 @@ observations did not reproduce a missing release or an incorrect free. The raw
 local report records the exact instrumented artifact identities; broader host/JIT
 accounting, successful specialization-cache retention and the full G6 acceptance
 assessment remain separate work.
+
+## Host and JIT mapping audit
+
+The Apple Silicon host's `NativeCompilerState` allocates its context once and
+retains that singleton for the process. The resolver adapter in `repl_io.h`
+reuses a static 65,536-byte response buffer. The FFI adapter in `ffi.h` uses
+stack argument arrays and a stack `ffi_cif`, resolves foreign symbols through
+`dlsym(RTLD_DEFAULT)` and has no adapter-owned `dlopen` handles or closure cache.
+These observations do not account for allocations inside libffi, dyld, foreign
+functions or the Python module resolver.
+
+Each executable JIT mapping belongs to a `Function.machine/machine_size` pair.
+After user frames return/unwind, `FreeFunctionChanges` frees mappings replaced
+by a committed definition or created in a rejected transaction. Recoverable
+branch-range errors in `CompileNative` occur before allocating executable memory.
+Existing JIT mappings survive failed calls so their previously committed code
+remains usable. The CLI returns from Main after Repl; surviving current code and
+compiler metadata have process lifetime. There is no reusable embedded-session
+teardown contract yet.
+
+```sh
+make repl-jit-lifecycle-test
+# Larger/alternative counts and a separate report:
+python3 tools/test_repl_jit_lifecycle.py --counts 64 1024 \
+  --output build/repl-jit-lifecycle-audit.json
+```
+
+This independent diagnostic frontend copies the same emitted IR/host/runtime
+snapshot and wraps `NativeJitAlloc/Free`. It records mapping addresses, requested
+sizes and host-page-rounded live bytes. Unknown/double frees, duplicate live
+addresses, nonpositive requests and mismatched release sizes fail immediately.
+Expected user output, assertion diagnostics and zero user owners are checked
+separately. The four workloads have exact allocation/release expectations:
+
+| History | Allocations after n repetitions | Releases | Current mappings |
+| --- | ---: | ---: | ---: |
+| Warm callee replacement with a live JIT caller | n + 2 | n | 2 |
+| Cold/new JIT rolled back on runtime failure | n | n | 0 |
+| New JIT rollback retaining earlier bytecode | n | n | 0 |
+| Runtime failure retaining existing JIT | 1 | 0 | 1 |
+
+At 64 and 1,024 repetitions, final mapping counts, requested sizes and rounded
+live bytes must agree for each history. Addresses naturally vary across fresh
+processes; the JSON report records them as diagnostic data, with artifact SHA256
+identities. Current mappings are intentionally counted at exit; asserting zero
+would confuse retained live code with obsolete replacement history.
+
+This measures executable mapping ownership on these paths. It does not measure
+RSS, all compiler/host heap allocations, every legal session or dangling accesses.
+The heap lifecycle audit and sanitizer suites remain separate complementary
+checks. No production change was needed: these workloads reproduced neither
+obsolete mapping growth nor an invalid release. Whole G6 acceptance still needs
+an assessment of all resource policies and unsupported session operations.

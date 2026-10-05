@@ -1373,6 +1373,23 @@ through ordinary evaluation or library use.
   Type-dependent members and full unused-body typing/arity/ownership remain
   separate semantic work; the language conformance gate remains open.
 
+- REPL host/JIT lifecycle audit: host context is a process singleton, resolver
+  response storage is static, and the FFI adapter owns stack argument/cif values
+  rather than a dynamic closure or dlopen cache. Private emitted-IR wrappers now
+  account for NativeJitAlloc/Free mapping address, exact size and page-rounded
+  bytes, rejecting duplicate mappings, unknown/double frees and mismatched sizes.
+  At 64/1,024 histories, warm replacements retain exactly two current mappings
+  and release every replaced mapping; cold/new JIT runtime rollback releases all
+  new mappings; existing JIT rollback retains exactly its one committed mapping.
+  Output, assertion diagnostic and owner-count checks are independent of mapping
+  totals. `repl-jit-lifecycle-test` is part of normal regression/CI, and both heap
+  and JIT lifecycle targets pass against the current pinned IR. Evidence:
+  `build/release-audit/repl-jit-lifecycle-focused.log` and
+  `build/repl-jit-lifecycle-audit.json`. `repl-memory.md` records current-code
+  process lifetime, external library/Python allocations and non-RSS boundaries.
+  No production mapping leak was reproduced; full resource-policy acceptance
+  and broader unsupported session operations remain G6 work.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and lifetime-aware slice
