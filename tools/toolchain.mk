@@ -362,3 +362,10 @@ primary-forms-test: build/cool-compiler build/language.BIN build/language-runtim
 test: primary-forms-test
 primary-forms-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_primary_forms.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: package-rules-test package-rules-sanitize-test
+package-rules-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_package_rules.py
+test: package-rules-test
+package-rules-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_package_rules.py --frontend build/repl-loans-asan/cool-compiler

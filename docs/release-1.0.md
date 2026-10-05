@@ -1013,6 +1013,26 @@ through ordinary evaluation or library use.
   conformance audit and unfinished source-file/package grammar. No release gate
   is closed by these grammar examples; remote CI has not been observed.
 
+- Source/package assembly contract: specification draft 10 records file versus
+  directory selection, package declaration consistency, import-path identity,
+  file-local aliases, visibility and root-only test files. A real multi-file
+  fixture reproduced `cool test` reading a dependency's `_test.cool` sources and
+  failing on that dependency's test-only import. The driver now selects test
+  files only for the requested package before scanning metadata or resolving
+  edges. The same dependency's tests are included when it is explicitly selected
+  as the test root. Production imports, standalone files and normal directory
+  compilation preserve their selection rules. Fixtures verify two aliases with
+  the same spelling in different files, private cross-file helpers, rejection of
+  leaked/private/duplicate aliases and inconsistent/duplicate/missing headers,
+  and root test failure visibility. Both frontends and the ASan frontend pass
+  five run engines and both test backends. Full regression, self-host/bootstrap
+  convergence and installed Neovim/distribution checks pass. Remote CI remains
+  unobserved. Evidence is in
+  `build/release-audit/package-rules-{before,focused,final,regression,sanitize,distribution}.log`.
+  Compiler/runtime sources are unchanged; this change is in source selection and
+  its language contract. Module-format/version/checksum policy, complete encoding
+  and semantic conformance remain open release requirements.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

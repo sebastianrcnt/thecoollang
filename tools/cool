@@ -119,7 +119,8 @@ def bundle(entry, work, offline=False, frozen=False, include_tests=False, *, imp
             raise ValueError('import cycle: ' + ' -> '.join([*active, package]))
         if package in done:
             return
-        sources = [location] if location.is_file() or location in overlays else sorted({p for p in [*location.glob('*.cool'), *(p for p in overlays if p.parent==location)] if include_tests or not p.name.endswith('_test.cool')})
+        test_sources = include_tests and package == (import_path or '__main')
+        sources = [location] if location.is_file() or location in overlays else sorted({p for p in [*location.glob('*.cool'), *(p for p in overlays if p.parent==location)] if test_sources or not p.name.endswith('_test.cool')})
         if not sources:
             raise ValueError(f'no Cool files in package {package}: {location}')
         active.append(package)

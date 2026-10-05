@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 9
+# Cool language specification — 1.0 draft 10
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -79,8 +79,8 @@ for valid cases. The broader language suite covers LLVM and numerical behavior.
 
 The following EBNF specifies individual top-level forms. `identifier` follows
 the lexical identifier rule; contextual parser words still have their grammatical
-meaning. `string_token` denotes a quoted string token. This section does not yet
-specify the driver's complete multi-file package-header/resolution rules.
+meaning. `string_token` denotes a quoted string token. Source assembly constraints
+are defined in the following section.
 `block` is the braced statement sequence defined below.
 
 ```ebnf
@@ -164,6 +164,59 @@ when instantiated; complete validation of unused templates remains release work.
 parameters, duplicate nominal members, malformed lists, invalid C signatures,
 method owners, borrow contracts and implementation limits, on both frontends.
 The wider package/method/reference suites cover visibility and lifetime behavior.
+
+## Source files and package assembly
+
+```ebnf
+source_file = { package_decl | import_decl | struct_decl | enum_decl
+              | function_decl | extern_decl | export_decl } ;
+```
+
+The public `cool` CLI assembles source files with these additional rules:
+
+- A directory entry selects its immediate `.cool` files in sorted order; it does
+  not recursively merge child directories. A file entry selects that root file
+  alone, even inside a module. Imported package directories are still resolved
+  normally. Use a directory entry to compile all sibling files of a package.
+- Each selected file in a directory package requires exactly one `package name;`
+  declaration. All selected files in that directory must declare the same name.
+  A standalone file may omit the declaration. Duplicate package declarations are
+  rejected. The current grammar permits a package declaration among top-level
+  forms; placing it first is the conventional spelling, not an extra parser rule.
+- Package identity is the resolved import path, not just the declared short
+  name. Files in one package share top-level functions/types and package-private
+  members. Different import paths remain distinct even when they declare the
+  same short name. A directory basename need not equal its declared package name.
+- Import aliases are scoped to the source file. An explicit alias follows
+  `import`; otherwise the final path component is the alias. Aliases may be
+  reused for different packages in different files, but cannot be duplicated in
+  one file. A sibling file's import does not introduce its alias locally.
+- Imported functions/types/methods must be public, and imported struct field
+  access must respect field visibility. A public function does not expose its
+  private helper as a callable imported name. Imports are collected before
+  signatures/bodies, so their written position does not prescribe initialization
+  execution. There is no top-level executable initialization statement syntax.
+- Ordinary directory builds/checks/runs omit filenames ending `_test.cool`.
+  `cool test` includes such files only in the requested root package; dependencies
+  use their production files. Dependency test-only imports and invalid test code
+  cannot contaminate the root test build. Explicit file entries select the named
+  file regardless of its suffix. Root tests remain type-checked, and eligible
+  root `test_` functions must take no parameters and return void.
+
+Import edges must be acyclic. `std/io` and `std/mem` are compiler-supported
+packages; other `std/` paths resolve from the shipped standard library. Nonstandard
+imports require a `cool.mod` module context and a supplying module in its resolved
+graph. `__main` and `__scan` are reserved internal identities and cannot be imported
+as user packages. Module versions, replacements, checksum persistence, cache and
+offline/frozen resolution are separate module-management contracts still under
+release audit; they must not be inferred from this source assembly grammar.
+
+`make package-rules-test` uses real multi-file packages to verify per-file alias
+isolation, cross-file private helpers, public access, declared-name/path separation,
+file-versus-directory selection, package-header consistency and root-only test
+inclusion. Both frontends run five engines; the instrumented frontend is included
+by the sanitizer target. Existing project tests cover cycles, version resolution,
+checksums and build-cache behavior.
 
 ## Expressions: precedence and sequencing
 
@@ -476,6 +529,8 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 10: specify source-file/package assembly, file-local import aliases and
+  test selection; exclude dependency test files when testing a root package.
 - Draft 9: complete the primary-expression productions and record call,
   construction, projection, owner/reference and explicit conversion syntax.
 - Draft 8: specify statement/control-flow/defer grammar and normal-exit ordering;
@@ -518,8 +573,8 @@ a link is not proof that a release gate is closed.
 
 ## Work required before freezing this specification
 
-1. Complete the source-encoding/control-byte and source-file/package grammar
-   audit. Verify completeness and conformance mapping of the published
+1. Complete the source-encoding/control-byte audit. Verify completeness and
+   conformance mapping of the published source-file/package,
    declaration, statement, type and expression productions, including generic
    arguments, methods and borrow contracts.
 2. Define inference/coercion, integer/float operations and every runtime failure

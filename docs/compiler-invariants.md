@@ -618,3 +618,15 @@ coercion, transfer and live-place validation remain active. The initializer stay
 before the loop node in its enclosing block, so it executes once and participates
 in the same ownership/reference analysis as an ordinary store. Do not special-case
 projected writes to bypass loans or introduce a separate unchecked evaluator.
+
+## Package test-source selection
+
+The driver's include_tests flag applies only to the requested root package, not
+to every package visited through imports. Determine eligibility using the resolved
+package identity, not the declared short name or directory basename. Dependencies
+supply production files even during a root test build; their test-only imports
+must never add edges to that graph. Explicit file entries remain explicit and
+are not filtered by filename suffix. Source selection happens before metadata
+scanning, so excluded dependency tests must not produce parse/resolution errors
+or affect the artifact input set. Selecting that dependency itself as a test root
+must include its own tests normally.
