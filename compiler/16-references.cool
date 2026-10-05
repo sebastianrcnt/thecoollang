@@ -690,11 +690,11 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                             if (NestedReference(node.type) && NestedReference(arg.type)) {
                                 indirect = source.indirect;
                             }
-                            results = ReferenceNew(check, source.root, source.parent, mode, indirect, node, results);
+                            results = ReferenceNewCall(check, source, source.parent, mode, indirect, node, results);
                             // An opaque non-nested anchor may protect both the
                             // returned storage and its borrowed payloads.
                             if (NestedReference(node.type) && !NestedReference(arg.type)) {
-                                results = ReferenceNew(check, source.root, source.parent, mode & ReferenceMode(Shape(node.type).element), 1, node, results);
+                                results = ReferenceNewCall(check, source, source.parent, mode & ReferenceMode(Shape(node.type).element), 1, node, results);
                             }
                         }
                         source = source.next;

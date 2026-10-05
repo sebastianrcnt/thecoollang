@@ -47,9 +47,15 @@ fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **
 }
 fn ReferenceTypeSummary(check: *ReferenceCheck, type: i64, root: *Local) -> *ProvenanceNode {
     unsafe {
+        var cached = check.graph.nodes;
+        while (cached != null) {
+            if (cached.summary_kind == 1 && cached.type == type && cached.summary_root == root) { return cached; }
+            cached = cached.next;
+        }
         var states: *ReferenceTypeState = null;
         let node = ReferenceTypeNode(check, type, root, &raw states);
         while (states != null) { let next = states.next; Free(cast[*u8](states)); states = next; }
+        if (node != null) { node.summary_root = root; node.summary_kind = 1; node.summary_mode = 1; }
         return node;
     }
 }

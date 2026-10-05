@@ -15,6 +15,27 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
  if(Eq(local.name,cast[*u8]("params"))==0 && Eq(local.name,cast[*u8]("readonly"))==0 && Eq(local.name,cast[*u8]("editable"))==0 && Eq(local.name,cast[*u8]("heap"))==0 && Eq(local.name,cast[*u8]("array"))==0 && Eq(local.name,cast[*u8]("generic"))==0 && Eq(local.name,cast[*u8]("cycle"))==0 && Eq(local.name,cast[*u8]("slice"))==0){return;}
  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
   let valid=loan.provenance_type==local.type && loan.provenance!=null && loan.provenance.type==local.type && loan.provenance.graph==check.graph;
+  if(Eq(local.name,cast[*u8]("params"))!=0){
+   var source=*loan;source.exclusive=1;source.provenance_known=0;
+   source.provenance=ReferenceGraphValueNode(check.graph,local.type,loan.root,0,1);
+   var bounded=ReferenceCallGraph(check,&raw source,local.type,0);
+   let mutableField=ParameterField(local.type,cast[*u8]("mutable"));
+   var cursor=ProvenanceCursor{type:local.type,kind:1,key:cast[i64](mutableField),next:null};
+   if(bounded.provenance==null || ReferenceRootMode(&raw bounded)!=0 || ReferenceLoanQuery(&raw bounded,&raw cursor,loan.root,true)){NativeExit(74);}
+   var arena=ProvenanceGraph{};var copied=bounded;copied.provenance=ProvenanceGraphCopy(&raw arena,bounded.provenance);
+   if(copied.provenance==null || ReferenceRootMode(&raw copied)!=0 || ReferenceLoanQuery(&raw copied,&raw cursor,loan.root,true)){NativeExit(75);}
+   var copyCheck=ReferenceCheck{};copyCheck.graph=&raw arena;let before=arena.nodes;
+   let cached=ReferenceCallGraph(&raw copyCheck,&raw source,local.type,0);
+   if(cached.provenance!=copied.provenance || arena.nodes!=before){NativeExit(76);}
+   source.provenance=null;source.provenance_known=1;
+   let absent=ReferenceCallGraph(check,&raw source,local.type,0);
+   if(absent.provenance!=null || absent.provenance_known!=1){NativeExit(77);}
+   source.provenance_known=0;var unknown=ReferenceCallGraph(check,&raw source,local.type,0);
+   if(unknown.provenance==null || !ReferenceLoanQuery(&raw unknown,&raw cursor,loan.root,true)){NativeExit(78);}
+   var sharedAgain=ReferenceCallGraph(&raw copyCheck,&raw bounded,local.type,0);
+   if(sharedAgain.provenance!=copied.provenance || ReferenceLoanQuery(&raw sharedAgain,&raw cursor,loan.root,true)){NativeExit(79);}
+   ProvenanceGraphFree(&raw arena);
+  }
   var copy=ProvenanceGraph{};let cloned=ProvenanceGraphCopy(&raw copy,loan.provenance);
   if(IsReference(local.type) && loan.indirect==0){
    LoanRecord(200,local.name,cast[*u8]("parameter"),cast[*u8]("anchor"),BoolInt(ReferenceLoanQuery(loan,null,loan.root,false)),BoolInt(ReferenceLoanQuery(loan,null,loan.root,true)),BoolInt(valid));
@@ -84,6 +105,14 @@ fn LoanAudit(check:*ReferenceCheck,node:*Node){unsafe{
    LoanRecord(node.kind,local.name,loan.root.name,cast[*u8]("store"),BoolInt(ReferenceLoanQuery(loan,null,loan.root,false)),loan.provenance_known,BoolInt(valid));
   }loan=loan.next;}return;
  }
+ if(Eq(local.name,cast[*u8]("callmix"))!=0){
+  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
+   var field=Shape(local.type).fields;while(field!=null){
+    var cursor=ProvenanceCursor{type:local.type,kind:1,key:cast[i64](field),next:null};
+    LoanRecord(node.kind,local.name,loan.root.name,field.name,BoolInt(ReferenceLoanQuery(loan,&raw cursor,loan.root,false)),BoolInt(ReferenceLoanQuery(loan,&raw cursor,loan.root,true)),BoolInt(loan.provenance_type==local.type && loan.provenance!=null && loan.provenance.graph==check.graph));field=field.next;
+   }
+  }loan=loan.next;}return;
+ }
  if(AggregateKind(local.type)!=1){return;}
  if(Eq(local.name,cast[*u8]("tracked"))==0 && Eq(local.name,cast[*u8]("copied"))==0 && Eq(local.name,cast[*u8]("assigned"))==0 && Eq(local.name,cast[*u8]("mixed"))==0){return;}
  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
@@ -137,6 +166,8 @@ fn AuditStores(){var x=7;var y=8;var z=9;
  var elements=[2]&i64{&x,&y};elements[0]=&z;let after_element=elements[1];assert(*after_element==8);
  var owned=new[Pair](Pair{left:&x,right:&y});(*owned).left=&z;let after_owned=(*owned).left;assert(*after_owned==9);
 }
+fn makeMixed(a:&i64,b:&mut i64)->Mixed borrows(a,b){return Mixed{left:a,right:b};}
+fn AuditCalls(){var x=7;var y=8;let callmix=makeMixed(&x,&mut y);assert(*callmix.left==7);*callmix.right=9;assert(*callmix.right==9);}
 struct Container{pair:Pair;count:i64;}
 fn AuditComputed(){var x=7;var y=8;var container=Container{pair:Pair{left:&x,right:&y},count:3};
  let computed=&(*(&container)).pair.left;let from_computed=*computed;let computed_scalar=&(*(&container)).count;
@@ -152,7 +183,7 @@ fn AuditParameters(){var x=7;var y=8;var z=9;
  ParamHeap(new[Probe](Probe{shared:&x,mutable:&mut y,count:0}));
  ParamGeneric[Probe](new[Probe](Probe{shared:&x,mutable:&mut y,count:0}));ParamCycle(new[Chain](Chain.End));var buffer=[2]i64{1,2};ParamSlice(buffer[:]);
 }
-fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();AuditStores();AuditParameters();AuditComputed();io.println(42);}
+fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();AuditStores();AuditParameters();AuditComputed();AuditCalls();io.println(42);}
 '''
 with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  tmp=Path(directory);source=(ROOT/'compiler/16-references.cool').read_text();
@@ -180,6 +211,10 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  records=[]
  for line in r.stderr.splitlines():
   tag,stage,holder,root,field,reading,writing,valid=line.split();assert tag=='LOAN';record=(int(stage),holder,root,field,int(reading),int(writing));assert valid=='1';records.append(record)
+ calls=[r for r in records if r[1]=='callmix'];assert len(calls)==4,calls
+ for stage,holder,root,field,reading,writing in calls:
+  assert reading==1 and writing==int(root=='y' and field=='right'),(root,field,reading,writing)
+ records=[r for r in records if r not in calls]
  computed=[r for r in records if r[3]=='reborrow'];assert len(computed)==8,computed
  for stage,holder,root,field,reading,known in computed:
   assert root in ('x','y','container'),(holder,root)
@@ -199,7 +234,7 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
   assert field=='value' and root in ('x','y','tracked'),(stage,holder,root,field,reading,known)
   if holder in ('picked','picked_copy'):assert (reading,known)==(int(root=='x'),1),(stage,holder,root,reading,known)
   elif holder=='indexed':assert (reading,known)==(1,1),(stage,holder,root,reading,known)
-  else:assert (reading,known)==(1,0),(stage,holder,root,reading,known)
+  else:assert (reading,known)==(1,1),(stage,holder,root,reading,known)
  assert sum(r[1]=='picked' and r[2]=='x' for r in selection)==4,selection
  assert any(r[1]=='picked_copy' and r[2]=='x' for r in selection),selection
  stores=[r for r in records if r[3]=='store'];assert len(stores)==18,stores
@@ -231,6 +266,6 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r
  assert 'AddressSanitizer' not in r.stderr and 'runtime error:' not in r.stderr,r
  assert sum(line.startswith('LOAN ') for line in r.stderr.splitlines())>=8,r
- report={'records':records,'selection_records':selection,'store_records':stores,'parameter_records':parameters,'computed_reborrow_records':computed,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode and value-selection oracles, partial/nested/element/owned stores, live receiver propagation and opaque call unions, unknown/absent receiver probes, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
+ report={'records':records,'selection_records':selection,'store_records':stores,'parameter_records':parameters,'computed_reborrow_records':computed,'call_records':calls,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode and value-selection oracles, partial/nested/element/owned stores, live receiver propagation and opaque call unions, unknown/absent receiver probes, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print(f'live loan provenance: {len(records)} field/root/mode and {len(selection)} selection and {len(stores)} store and {len(parameters)} parameter and {len(computed)} computed reborrow records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print(f'live loan provenance: {len(records)} field/root/mode and {len(selection)} selection and {len(stores)} store and {len(parameters)} parameter and {len(computed)} computed reborrow and {len(calls)} call records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))

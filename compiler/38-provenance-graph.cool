@@ -6,6 +6,13 @@
 // ownership before the current two-layer checker can use this representation.
 struct ProvenanceGraph { nodes: *ProvenanceNode; }
 struct ProvenanceNode {
+    // Arena-local semantic summary keys survive compaction with live nodes.
+    // Kind 1=unbounded type skeleton, 2=value bound, 3=referent payload bound.
+    // Owned reachability for canonical summaries; never an authorization edge.
+    summary_base: *ProvenanceNode;
+    summary_root: *Local;
+    summary_kind: i64;
+    summary_mode: i64;
     opaque: i64;
     graph: *ProvenanceGraph;
     type: i64;
@@ -170,6 +177,9 @@ fn ProvenanceCopyNew(graph: *ProvenanceGraph, source: *ProvenanceNode) -> *Prove
         state.source = source;
         state.target = ProvenanceNodeNew(graph, source.type, source.root, source.exclusive);
         state.target.opaque = source.opaque;
+        state.target.summary_root = source.summary_root;
+        state.target.summary_kind = source.summary_kind;
+        state.target.summary_mode = source.summary_mode;
         return state;
     }
 }
@@ -203,6 +213,18 @@ fn ProvenanceGraphCopyRoots(graph: *ProvenanceGraph, sources: **ProvenanceNode, 
         var current = first;
         var valid = true;
         while (current != null && valid) {
+            let base = current.source.summary_base;
+            if (base != null) {
+                if (base.graph != current.source.graph) { valid = false; }
+                else {
+                    var mapped = ProvenanceCopyFind(first, base);
+                    if (mapped == null) {
+                        mapped = ProvenanceCopyNew(graph, base);
+                        tail.next = mapped; tail = mapped;
+                    }
+                    current.target.summary_base = mapped.target;
+                }
+            }
             var edge = current.source.edges;
             while (edge != null && valid) {
                 var target: *ProvenanceNode = null;

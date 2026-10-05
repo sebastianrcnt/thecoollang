@@ -1096,5 +1096,41 @@ records against field/root/mode expectations, including same-root fields and
 mixed shared/exclusive fields, five engines/O2 and REPL recovery. Separate
 64/1,024-submission allocation histories cover retained field assignments and
 failed function reference analysis. Typed metadata does not replace the two-layer
-permission checker yet: computed field selection, opaque call/partial-store
-substitution, parameter summaries and descriptor-lifetime audit remain required.
+permission checker yet. Computed selection, partial-store metadata, parameter
+upper bounds and opaque call upper bounds are now represented. Authoritative
+caller/callee substitution, physical protection and descriptor-lifetime audit
+remain required.
+
+
+## Opaque call summaries and reusable skeleton ownership
+
+`ReferenceNewCall` builds each contracted source root's output separately.
+`ReferenceCallGraph` intersects the source loan mode with its reachable root
+mode before applying a declared output-type upper bound. A shared source cannot
+supply mutable output capability. Known absent payload roots remain absent;
+unknown sources remain conservative. Equal argument/result types never establish
+field correspondence: each possible root may occur in every borrowed output slot.
+Borrow-free slots contain no graph node. Nested reference physical anchors remain
+separate from Referent payload summaries; existing scoped checks still authorize
+actual source programs.
+
+`ReferenceTypeSummary` caches a recursive type skeleton by arena/type/root.
+Bounded value/payload overlays also key on mode and summary kind. Their barriers
+intersect the skeleton capabilities. `summary_base` preserves the canonical
+skeleton across observed/possible-origin unions and compaction. It is owned
+reachability, never a path for root query, value selection or mode propagation.
+Following it for authorization would bypass shared barriers and is forbidden.
+Clone uses the same identity map for auxiliary and projection targets, including
+cycles; foreign auxiliary targets trigger the same complete rollback as malformed
+edges. Arena destruction still follows allocation lists. Reclamation marks
+`summary_root` as well as terminal roots, while Local/type/field ownership stays
+with existing descriptors.
+
+Private actual-call records test mixed root capabilities without assuming body
+field mappings. Helper probes test stronger skeletons behind shared overlays,
+clone/cache reuse, alternating shared/unknown bounds and known absence. Clone
+oracles include auxiliary cycles/sharing and foreign-target rollback. REPL
+histories retain observed aggregates across opaque calls, nested mutable receivers
+and recursive owning return values; final and peak tracked bytes remain equal at
+64 and 1,024 submissions. These tests cover metadata/lifecycle, not arbitrary
+nested stored references or graph-based authorization.

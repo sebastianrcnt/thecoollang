@@ -32,7 +32,11 @@ fn ReplReclaimLocals() {
         }
         if (ctx.v_repl_graph != null) {
             var node = ctx.v_repl_graph.nodes;
-            while (node != null) { if (node.root != null) { node.root.repl_mark = node.root.repl_mark | 2; } node = node.next; }
+            while (node != null) {
+                if (node.root != null) { node.root.repl_mark = node.root.repl_mark | 2; }
+                if (node.summary_root != null) { node.summary_root.repl_mark = node.summary_root.repl_mark | 2; }
+                node = node.next;
+            }
         }
         ctx.v_functions[0].all_locals = null;
         var tail = &raw ctx.v_functions[0].all_locals;

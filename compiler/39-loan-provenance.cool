@@ -101,6 +101,12 @@ fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source:
             joined.exclusive = joined.exclusive | right.exclusive;
         }
         joined.opaque = left.opaque | right.opaque;
+        // Keep one canonical skeleton reachable through repeated observed /
+        // possible-origin unions. All modes of this type share that skeleton.
+        joined.summary_base = left.summary_base;
+        if (joined.summary_base == null && left.summary_kind != 0) { joined.summary_base = left; }
+        if (joined.summary_base == null) { joined.summary_base = right.summary_base; }
+        if (joined.summary_base == null && right.summary_kind != 0) { joined.summary_base = right; }
         var edge = left.edges;
         while (edge != null) {
             ProvenanceEdgeNew(joined, edge.kind, edge.key, edge.target, edge.exclusive);

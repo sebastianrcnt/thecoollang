@@ -1865,6 +1865,42 @@ through ordinary evaluation or library use.
   before arbitrary nested borrowed storage is accepted. All release gates
   remain Open.
 
+- Opaque call provenance now constructs declared output-type upper bounds for
+  each contracted source root, bounded by that source's actual capability.
+  Borrow-free siblings and known absent roots stay absent; nested physical
+  anchors remain separate from Referent payloads. Equal input/output types do
+  not imply field correspondence. Temporary store destinations use the same
+  constructor when composing returns; persistent opaque stores still preserve
+  conservative unknown mappings.
+
+  Recursive skeleton and bounded overlay reuse survive graph clone/compaction.
+  An auxiliary owned connection preserves canonical skeleton identity after
+  observed/possible-origin unions; queries and mode propagation never follow
+  that connection. Clone preserves auxiliary sharing/cycles, rejects foreign
+  targets and rolls back; Local reclamation marks its summary keys. Private
+  shared-bound probes confirm stronger cached skeletons cannot grant writes,
+  including after clone and alternate bounds. Four actual mixed-capability
+  call records pass alongside existing 34 field, 14 selection, 18 store,
+  22 parameter and eight computed reborrow records, five engines/O2 and REPL
+  recovery. Graph copy's 201,624 queries and 1,620 selection cases pass with
+  generated LLVM ASan and host/runtime ASan/UBSan.
+
+  REPL observed/opaque return, nested reference return and recursive owning
+  return histories have equal final tracked bytes/counts at 64/1,024 submissions:
+  respectively 32,159,904/107, 32,159,719/89 and 32,165,670/137. Their peak bytes
+  are also equal: 32,173,255, 32,174,298 and 32,178,389. Final reports are measured
+  after REPL cleanup; peak measurements cover session use. Recursive owning
+  values preserve allocation counts and release to zero on forget. Full
+  regression, production/seed bootstrap convergence, stores contracts under
+  sanitizers and external editor/distribution installation pass.
+  Reports: `build/loan-provenance{,-asan}-audit.json`,
+  `build/provenance-copy{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/provenance-calls-{build,focused,regression,sanitize,contract-sanitize,lifecycle,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `fef0fa0d77a3f2a7734f003ce1458282f00773bbf036592e5346c1498f7b7836`.
+  Authoritative graph substitution/physical protection and arbitrary nested
+  borrowed storage remain unfinished; all release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

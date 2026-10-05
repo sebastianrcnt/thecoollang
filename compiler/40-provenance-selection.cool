@@ -44,6 +44,8 @@ fn ReferenceSelectionJoin(check: *ReferenceCheck, result: *ReferenceSelection, n
         if (mode == 0) {
             let fresh = ProvenanceNodeNew(check.graph, result.type, node.root, 0);
             fresh.opaque = node.opaque;
+            fresh.summary_base = node.summary_base;
+            if (fresh.summary_base == null && node.summary_kind != 0) { fresh.summary_base = node; }
             var edge = node.edges;
             while (edge != null) {
                 if (!ProvenanceEdgeNew(fresh, edge.kind, edge.key, edge.target, 0)) {
@@ -130,7 +132,7 @@ fn ReferenceSelectLoan(check: *ReferenceCheck, target: *ReferenceLoan, source: *
 // nodes; no recursive equality or merging of different root/mode paths occurs.
 fn ReferenceGraphSame(left: *ProvenanceNode, right: *ProvenanceNode) -> bool {
     unsafe {
-        if (left.type != right.type || left.root != right.root || left.exclusive != right.exclusive || left.opaque != right.opaque) { return false; }
+        if (left.type != right.type || left.root != right.root || left.exclusive != right.exclusive || left.opaque != right.opaque || left.summary_base != right.summary_base) { return false; }
         var a = left.edges;
         var count: i64 = 0;
         while (a != null) {

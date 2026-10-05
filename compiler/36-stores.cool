@@ -237,7 +237,7 @@ fn ReferenceCallStores(check: * ReferenceCheck, node: * Node, stop: * ReferenceL
                             var source = check.loans;
                             while (source != stop) {
                                 if (source.expression == value && source.holder == null && source.root != null) {
-                                    check.loans = ReferenceNew(check, source.root, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
+                                    check.loans = ReferenceNewCall(check, source, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
                                 }
                                 source = source.next;
                             }

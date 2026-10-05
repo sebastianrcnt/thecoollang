@@ -95,8 +95,13 @@ Graph roots participate in Local reclamation. Loan queries intersect the loan's
 entry capability before following graph barriers.
 
 The existing two-layer checker remains authoritative; typed graph paths are not
-yet used to authorize access. Field loads, opaque calls, partial stores and
-parameter summaries still need graph selection/substitution. Legacy bootstrap
+yet used to authorize access. Field loads and partial stores now select/update
+metadata; parameter and opaque return summaries describe declared possible
+structure. Opaque return bounds are per source root/capability, with recursive
+skeleton reuse preserved through owned auxiliary clone edges. These are upper
+bounds, not callee-body field correspondences. Auxiliary ownership is never
+followed for access authorization. Precise typed caller/callee substitution
+and physical protection remain required. Legacy bootstrap
 checking retains its old internal records and unchanged permission behavior;
 private metadata validation concerns production-source LLVM (also compiled by
 legacy during self-hosting). Physical prefix overlap, descriptor-lifetime audit
