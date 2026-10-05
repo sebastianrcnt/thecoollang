@@ -2,7 +2,7 @@ package vector;
 import option "std/option";
 // Stable chunks avoid relocating live elements when the vector grows.
 struct Chunk[T] {
-    values: [32]T;
+    values: [32]option.Option[T];
     previous: * Chunk[T];
     next: own[Chunk[T]];
 }
@@ -11,7 +11,7 @@ pub struct Vector[T] {
     tail: * Chunk[T];
     count: usize;
 }
-pub fn create[T]() -> Vector[T] {
+pub fn create[T]() -> Vector[T]borrows() {
     return Vector[T] {
     };
 }
@@ -20,11 +20,18 @@ pub fn len[T](vector: & Vector[T]) -> usize {
         return ( * vector).count;
     }
 }
-pub fn append[T](vector: & mut Vector[T], value: T) {
+pub fn append[T](vector: & mut Vector[T], value: T) stores(vector, value) {
     unsafe {
         let index = ( * vector).count % 32;
         if (index == 0) {
-            let chunk = new[Chunk[T]]();
+            var empty = Vector[T] {
+            };
+            let chunk = new[Chunk[T]](Chunk[T] {
+                previous: null, next: move empty.head, values: [32]option.Option[T] {
+                    option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None
+                }
+            }
+            );
             let pointer = & raw * chunk;
             ( * pointer).previous = ( * vector).tail;
             if (( * vector).count == 0) {
@@ -34,7 +41,7 @@ pub fn append[T](vector: & mut Vector[T], value: T) {
             }
             ( * vector).tail = pointer;
         }
-        ( * ( * vector).tail).values[index] = move value;
+        ( * ( * vector).tail).values[index] = option.Option[T].Some(move value);
         ( * vector).count = ( * vector).count + 1;
     }
 }
@@ -47,28 +54,33 @@ fn pointer_at[T](vector: * Vector[T], index: usize) -> * T {
             chunk = & raw * ( * chunk).next;
             block = block - 1;
         }
-        return & raw( * chunk).values[index % 32];
+        let slot = & raw( * chunk).values[index % 32];
+        assert( * cast[ * i64](slot) == 1);
+        return cast[ * T](cast[ * u8](slot) + 8);
     }
 }
-pub fn pop[T](vector: & mut Vector[T]) -> option.Option[T] {
+pub fn pop[T](vector: & mut Vector[T]) -> option.Option[T]borrows(vector) {
     unsafe {
-        if (( * vector).count == 0) {
+        let raw = cast[ * Vector[T]](vector);
+        if (( * raw).count == 0) {
             return option.Option[T].None;
         }
-        let index = (( * vector).count - 1) % 32;
-        let chunk = ( * vector).tail;
-        let value = move( * chunk).values[index];
-        ( * vector).count = ( * vector).count - 1;
+        let index = (( * raw).count - 1) % 32;
+        let chunk = ( * raw).tail;
+        let slot = & raw( * chunk).values[index];
+        let value = move * borrow_raw[ & mut option.Option[T]](slot, vector);
+        * slot = option.Option[T].None;
+        ( * raw).count = ( * raw).count - 1;
         if (index == 0) {
             let previous = ( * chunk).previous;
-            ( * vector).tail = previous;
+            ( * raw).tail = previous;
             if (previous == null) {
-                let released = move( * vector).head;
+                let released = move( * raw).head;
             } else {
                 let released = move( * previous).next;
             }
         }
-        return option.Option[T].Some(move value);
+        return move value;
     }
 }
 pub fn clear[T](vector: & mut Vector[T]) {
@@ -101,7 +113,9 @@ pub fn next[T](cursor: * Cursor[T]) -> * T {
         if (( * cursor).remaining == 0) {
             return null;
         }
-        let value = & raw( * ( * cursor).chunk).values[( * cursor).index];
+        let slot = & raw( * ( * cursor).chunk).values[( * cursor).index];
+        assert( * cast[ * i64](slot) == 1);
+        let value = cast[ * T](cast[ * u8](slot) + 8);
         ( * cursor).index = ( * cursor).index + 1;
         ( * cursor).remaining = ( * cursor).remaining - 1;
         if (( * cursor).index == 32 && ( * cursor).remaining > 0) {
@@ -128,10 +142,10 @@ pub fn at_mut[T](vector: & mut Vector[T], index: usize) -> & mut T borrows(vecto
 pub fn Vector.len[T](self: & Vector[T]) -> usize {
     return ( * self).count;
 }
-pub fn Vector.append[T](self: & mut Vector[T], value: T) {
+pub fn Vector.append[T](self: & mut Vector[T], value: T) stores(self, value) {
     append[T](self, move value);
 }
-pub fn Vector.pop[T](self: & mut Vector[T]) -> option.Option[T] {
+pub fn Vector.pop[T](self: & mut Vector[T]) -> option.Option[T]borrows(self) {
     return pop[T](self);
 }
 pub fn Vector.clear[T](self: & mut Vector[T]) {

@@ -496,6 +496,20 @@ SLICE_CASES.append(('reference_identity_unused_local', 'accept', 'fn first(x:&i6
 SLICE_CASES.append(('reference_branch_local_union', 'reject', 'fn choose(c:bool,x:&i64,y:&i64)->&i64 borrows(x,y){if(c){return x;}else{return y;}}fn get(x:&i64)->&i64 borrows(x){var local=9;return choose(true,x,&local);}fn main(){}'))
 STORE_DIAGNOSTICS['reference_branch_local_union']='outlive'
 
+SLICE_CASES.append(('empty_borrowed_direct', 'accept', 'enum Maybe{None;Some(&i64);}struct Container{p:own[Maybe];}fn put(dst:&mut Container){(*dst).p=new[Maybe](Maybe.None);}fn main(){}'))
+SLICE_CASES.append(('empty_borrowed_named', 'accept', 'enum Maybe{None;Some(&i64);}struct Container{p:own[Maybe];}fn put(dst:&mut Container){let p=new[Maybe](Maybe.None);(*dst).p=move p;}fn main(){}'))
+SLICE_CASES.append(('empty_borrowed_unit', 'accept', 'enum Maybe{None;Some(&i64);}struct Container{p:own[Maybe];}fn put(dst:&mut Maybe){let value=Maybe.None;*dst=value;}fn main(){}'))
+SLICE_CASES.append(('empty_unit_return', 'accept', 'enum Maybe{None;Some(&i64);}fn empty()->Maybe borrows(){let v=Maybe.None;return v;}fn main(){match(empty()){Maybe.None=>{}Maybe.Some(r)=>{assert(false);}}}'))
+SLICE_CASES.append(('empty_owner_return', 'accept', 'enum Maybe{None;Some(&i64);}fn empty()->own[Maybe] borrows(){let p=new[Maybe](Maybe.None);return move p;}fn main(){let p=empty();match(*p){Maybe.None=>{}Maybe.Some(r)=>{assert(false);}}}'))
+SLICE_CASES.append(('nonempty_unit_local_escape', 'reject', 'enum Maybe{None;Some(&i64);}fn bad(dst:&mut Maybe){var local=7;let v=Maybe.Some(&local);*dst=v;}fn main(){}'))
+SLICE_CASES.append(('empty_owner_physical_escape', 'reject', 'enum Maybe{None;Some(&i64);}fn bad()->&Maybe borrows(){let p=new[Maybe](Maybe.None);return &*p;}fn main(){}'))
+STORE_DIAGNOSTICS.update({'nonempty_unit_local_escape':'outlive','empty_owner_physical_escape':'outlive'})
+
+SLICE_CASES.append(('empty_borrowed_pending_index_move','reject','enum Maybe{None;Some(&i64);}fn consume(p:own[[2]Maybe])->usize{let gone=move p;return 0;}fn main(){var p=new[[2]Maybe]([2]Maybe{Maybe.None,Maybe.None});(*p)[consume(move p)]=Maybe.None;}'))
+STORE_DIAGNOSTICS['empty_borrowed_pending_index_move']='owner moved while an access to its storage is pending'
+SLICE_CASES.append(('empty_borrowed_live_address_move','reject','enum Maybe{None;Some(&i64);}fn main(){var p=new[Maybe](Maybe.None);let r=&*p;let gone=move p;}'))
+STORE_DIAGNOSTICS['empty_borrowed_live_address_move']='conflicts'
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -696,6 +710,8 @@ SLICE_REPL_CASES.append(('nested_owned_recursive_runtime_recovery','import "std/
 
 SLICE_REPL_CASES.append(('reference_identity_revalidation_rollback', 'fn choose(x:&i64,y:&i64)->&i64 borrows(x,y){return x;}\nfn caller(x:&i64)->&i64 borrows(x){var b=9;return choose(x,&b);}\nvar a=7;\n*caller(&a)\nfn choose(x:&i64,y:&i64)->&i64 borrows(x,y){return y;}\n*caller(&a)\n:quit\n', '7\n7\n', {'returned borrow may outlive local storage or violate its borrows contract': 1}))
 
+SLICE_REPL_CASES.append(('borrowed_vector_binding_recovery', 'import vector "std/vector";\nimport "std/mem";\nvar a=7;\nvar b=9;\nvar values=vector.create[&i64]();\nvalues.append(&a);\nvalues.append(&b);\n{let popped=values.pop();assert(false);}\n**values.at(0)\na=8;\nb=10;\n:forget values\na=8;\nb=10;\na\nb\nmem.owner_count()\n:quit\n', '7\n8\n10\n0\n', {'assertion failed': 1, 'access conflicts with a live scoped reference': 2}))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frontend', type=Path, default=ROOT / 'build/cool-compiler')
@@ -717,7 +733,8 @@ def main():
     assert len({name for name, _, _ in CASES}) == len(CASES)
     sources = sorted((ROOT/'compiler').glob('*.cool'))
     legacy_sources = sorted((ROOT/'language').glob('*.cool')) if args.legacy else []
-    hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources+legacy_sources}
+    hash_sources = sources+legacy_sources+sorted((ROOT/'stdlib').rglob('*.cool'))
+    hashes = {str(p.relative_to(ROOT)): digest(p) for p in hash_sources}
     artifacts = [args.frontend.resolve(), ROOT/'build/compiler-host.o', ROOT/'build/language-runtime.o']
     artifact_hashes = {str(p): digest(p) for p in artifacts}
     env = {**os.environ, 'COOLC_COMPILER_BIN':str(ROOT/'coolc/seed/Compiler.BIN')}
@@ -797,9 +814,15 @@ def main():
         if args.repl:
             for front_name,front in fronts:
                 for name,source,expected,errors in SLICE_REPL_CASES:
-                    result=run([*front,'repl-quiet'],input=source)
+                    execution='repl-quiet'
+                    if name=='borrowed_vector_binding_recovery':
+                        execution='project_driver'
+                        runner=tmp/(front_name+'-repl-runner')
+                        runner.write_text('#!/bin/sh\nexec '+shlex.join(list(map(str,front)))+' "$@"\n');runner.chmod(0o755)
+                        result=subprocess.run([str(ROOT/'tools/cool'),'repl'],cwd=ROOT,env={**env,'COOL_FRONTEND':str(runner)},input=source,capture_output=True,text=True,timeout=240)
+                    else:result=run([*front,'repl-quiet'],input=source)
                     matches=(result.returncode==0 and result.stdout==expected and result.stderr.count('error:')==sum(errors.values()) and all(result.stderr.count(message)==count for message,count in errors.items()))
-                    repl_observations.append(dict(frontend=front_name,name=name,source=source,expected_stdout=expected,expected_errors=errors,exit=result.returncode,stdout=result.stdout,stderr=result.stderr,matches_expectation=matches))
+                    repl_observations.append(dict(frontend=front_name,execution=execution,name=name,source=source,expected_stdout=expected,expected_errors=errors,exit=result.returncode,stdout=result.stdout,stderr=result.stderr,matches_expectation=matches))
                     print(front_name,'repl',name,'PASS' if matches else 'FAIL')
         repl_lifecycle=None
         if args.repl:
@@ -808,7 +831,7 @@ def main():
             assert result.returncode==0,result
             repl_lifecycle=json.loads(lifecycle.read_text())
             print(result.stdout,end='')
-        assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
+        assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in hash_sources},'source changed during audit'
         report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,repl=args.repl,repl_observations=repl_observations,repl_lifecycle=repl_lifecycle,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Byte-identical copies of production/seed frontend sources, without feature bypasses. Optional explicit countermodel changes external-root authorization. Positive programs execute on tree and optional five engines/O2; accepted negatives never execute. Source hash stability, parameter-slot lifetime rejection, persistent REPL and allocation histories are verified. Sanitizer instruments the production frontend; generated program runtime sanitizer coverage is supplied by complementary suites.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:

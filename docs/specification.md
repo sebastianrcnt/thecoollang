@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 34
+# Cool language specification — 1.0 draft 35
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1137,3 +1137,31 @@ is checked separately from active effects, so duplicate detection does not depen
 on whether a relation becomes inactive. Forwarding through another specialization
 uses its concrete active effects. This revision does not complete the collection
 API or the 1.0 release gates.
+
+
+## Draft 35: empty borrowed values and vector slots
+
+A tracked local binding whose checked holder has no scoped roots represents a
+root-free value, even when its declared type can contain references. Copying or
+moving its non-reference value does not manufacture a borrow of the local's
+physical storage. This permits named unit enum variants and owners of such
+variants to be stored or returned. Actual retained roots remain conservative;
+previously retained roots are not forgotten merely because a later assignment
+installs an empty value. Addresses and pending owner-storage accesses retain
+physical protection. Shared paths and unknown parameter roots remain checked.
+
+`std/vector.Vector[T]` supports borrowed element types through initialized
+`Option[T]` slots, including shared/mutable references, borrowed aggregates and
+borrowed owners. Free and method append APIs declare conditional `stores`
+effects; pop APIs return their option with a borrow contract on the source.
+Shared access/iteration cannot upgrade mutable element capabilities. Popping
+moves the active option, resets its slot to None, and releases an empty chunk.
+Safe callers cannot append/pop/clear while incompatible element loans are live.
+For borrowed T, pop results conservatively retain the source vector lifetime.
+Clear does not erase the holder's historical scoped roots before its scope ends.
+
+Slots use the published enum layout and private chunk invariants; raw adapters
+must only expose payloads of initialized Some slots. Chunk allocation count is
+unchanged, but tag/alignment storage increases chunk size. Measuring and tuning
+that runtime cost remains part of the performance gate. This draft does not
+close the full safety, library, performance or release gates.

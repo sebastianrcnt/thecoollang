@@ -2894,7 +2894,67 @@ through ordinary evaluation or library use.
   before promoting the prototype; it is not release acceptance evidence.
   All mandatory gates remain Open.
 
+- Root-free transport and borrowed vectors (specification draft 35): named
+  unit variants and owners initialized without scoped roots no longer acquire
+  fictitious local-storage loans when copied/moved. The exception requires a
+  tracked holder marker and no root-bearing loan for that holder; it excludes
+  references, physical addresses, owner_slot and pending_owner acquisitions.
+  Actual and historically retained roots remain conservative. Explicit unit/
+  owner stores and returns pass, while real local payload escape, owner-address
+  escape, live-address moves and pending-index owner moves remain rejected.
+
+  Vector now stores 32 initialized Option[T] slots per chunk. Free/method append
+  APIs retain conditional stores effects; free/method pop returns carry source
+  borrow contracts. Payload addressing asserts Some and uses the published enum
+  offset. Pop moves through a typed scoped raw anchor, resets None, then updates
+  and releases chunks through the trusted raw adapter without reusing freed slots.
+  No per-element heap wrapper is introduced. Borrowed pop results conservatively
+  retain the source lifetime; clear retains historical scoped roots until scope
+  exit. Shared access/iteration preserve mutable-payload barriers.
+
+  Permanent borrowed-vector tests cover 65 independent modeled values, chunk
+  growth/deletion, shared/mutable iteration, aggregate/owned borrowed elements,
+  exact live owner counts, fully empty reuse and live-chunk pop/reappend from a
+  different source. Ten lifetime/capability negatives pass. Normal reports have
+  32 engine/negative observations on production/legacy; instrumented frontend
+  and runtime ASan/UBSan reports have 49. Compiler/legacy/stdlib hashes match.
+  Existing owning-vector model seeds 7/42/2026 and runtime sanitizers also pass.
+  REPL pop followed by assertion failure preserves the surviving vector and its
+  protected roots; forgetting it releases storage and permits source reuse.
+
+  Combined audit: 392 classifications, 168 positives, 1,008 engine executions,
+  48 REPL scenarios, zero gaps and 12 allocation observations PASS. Combined
+  production ASan/UBSan frontend audit has the same classifications, 168 tree
+  positives and all REPL scenarios PASS. Permanent slice reports cover 304
+  classifications, 136 positives, 816 executions (136 ASan tree runs), 48 REPL
+  scenarios and zero gaps. All compiler/legacy/stdlib hashes match. Existing
+  tracked resource histories at 64/1024 retain equal final/peak allocations.
+
+  Full `make -k -j4 test bootstrap-check editor-distribution-test
+  borrowed-vector-sanitize-test nested-reference-slice-sanitize-test
+  stores-sanitize-test` exits 0 in
+  `build/release-audit/borrowed-vector-final-regression.log`. Expanded/repaired
+  permanent targets exit 0 in `borrowed-vector-verified-validation.log`.
+  Final combined evidence: `empty-borrowed-verified-combined{,-asan}.{json,log}`.
+  Earlier expanded reports failed only because the new package-import REPL
+  fixture was run directly without the project driver. The fixture now runs
+  the same private frontend through the driver, records that execution route,
+  and includes stdlib hashes; no compiler guard or test was removed.
+  Production stage-2 IR SHA256:
+  `e0937220990e13a54c5abccf45f1811bb169215d52747d5e3ade77075aa4e755`.
+
+  Measuring the new representation found a real performance regression:
+  Chunk[u8] grows 48→528 bytes, and a controlled 500,000-byte standalone O2
+  append/traverse/clear workload rises 58.350→91.655 ms median (seven alternating
+  samples after warm-up). `tools/bench_vector_storage.py` and
+  `docs/benchmarks/vector-storage-arm64.json` reproduce/retain the evidence.
+  Reducing plain-value slot overhead while preserving safe borrowed storage is
+  now required before G8 closure. All mandatory gates remain Open.
+
 ## Next implementation checkpoints
+
+- Reduce the measured plain-value Vector slot overhead while retaining explicit
+  borrowed initialization, active-slot checks and correct destructor lifetimes.
 
 - Expand adversarial/model coverage for production nested references and
   borrowed slice elements, including repeated relocation through fields, arrays,

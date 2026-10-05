@@ -132,3 +132,12 @@ ownership, returned loans, collection chains, formatting, docs and REPL method
 replacement. Negative cases cover receiver/type/arity/visibility/ownership and
 loan conflicts. The full regression and self-hosting suites remain required for
 shared parser changes.
+
+
+Vector methods support borrowed T as described in specification draft 35.
+`append` retains `stores(self,value)` effects; `pop` returns `Option[T]` with
+`borrows(self)`. Ordinary T specializations have inactive store effects. Shared
+at/iteration preserve inner-reference barriers, and mutable operations suspend
+conflicting receiver/element loans. Borrowed pop results conservatively retain
+the vector lifetime; clear releases runtime storage but does not erase historical
+scoped roots before the binding's scope ends.

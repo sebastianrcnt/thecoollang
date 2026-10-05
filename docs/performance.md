@@ -345,3 +345,33 @@ structural bound based on graph edges/types; cycles, field permutations and DAGs
 are covered. Compiler checks may still make multiple traversals of the same
 types across separate queries. This removes exponential work within a query,
 without claiming linear overall compilation or closing G8.
+
+
+## Borrowed-vector storage cost (development regression)
+
+The draft-35 Vector implementation uses initialized Option[T] slots for both
+plain and borrowed T. This removes unsafe zero initialization of reference
+slots without per-element heap wrappers, but it increases tag/padding bytes and
+adds slot handling. This regression must be addressed before closing G8.
+
+`python3 tools/bench_vector_storage.py --before-ref 23dbe7d --output
+build/vector-storage-benchmark/report.json` builds old/current package copies
+with the same compiler at LLVM release O2. Each standalone executable appends
+500,000 bytes, traverses them with the raw cursor, checks the independent sum
+62,499,028 and explicitly clears the vector. One warm-up precedes seven
+alternating samples; durations include process launch. No unrelated validation
+was running during the retained sample run.
+
+| Measurement | Before | Option slots |
+| --- | ---: | ---: |
+| `sizeof(Chunk[u8])` | 48 bytes | 528 bytes |
+| Whole-process median | 58.350 ms | 91.655 ms |
+
+Chunk size excludes owner/runtime overhead and is not an RSS measurement.
+The approximately 1.57x elapsed-time ratio describes this byte workload only;
+it is not a general compiler or collection performance claim. Raw samples,
+programs and source/compiler/binary hashes are retained in
+[vector-storage-arm64.json](benchmarks/vector-storage-arm64.json). The larger
+slot representation especially affects narrow element types. Preserve borrowed
+slot initialization and destructor safety while reducing plain-value overhead;
+do not revert to uninitialized scoped references to recover performance.

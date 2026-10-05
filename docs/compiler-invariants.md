@@ -1834,3 +1834,25 @@ destination and no TrackedBorrow on either its pointee or source. This condition
 must not erase other active pairs. Nontemplate declarations and unresolved known
 incompatible types keep strict validation. Both frontend implementations keep
 these rules aligned; forwarding and caller analysis use the active concrete masks.
+
+
+## Root-free holder copies and vector slot lifecycle
+
+Named value acquisition may suppress local-root fallback only for tracked
+non-reference copies/moves through a non-reference holder, with a lifetime
+marker present and no root-bearing loan anywhere for that holder. It must not
+apply to owner_slot or pending_owner acquisition. Actual roots still use typed
+selection, source access and role reconstruction. Physical/address operations
+retain their ordinary local root even if the stored enum variant is unit-only.
+
+Vector chunks hold 32 fully initialized Option[T] slots. Count and cursor bounds
+ensure every exposed payload is Some; pointer_at and raw cursor next use the
+published offset-eight enum payload layout and assert the tag. Append declares
+storage effects in both free and method APIs. Pop obtains a typed scoped Option
+through borrow_raw before moving it, then uses the trusted raw adapter to reset
+None and update/free source chunks without using a dangling slot afterward.
+This is an unsafe implementation obligation, not a language-wide permission to
+mutate storage protected by scoped loans. Typed return contracts preserve the
+caller's source lifetimes and permissions. Slot tags and padding increase bytes
+per chunk; exact runtime owner counts remain one allocation per live chunk plus
+owning element allocations. No per-element wrapper heap is introduced.

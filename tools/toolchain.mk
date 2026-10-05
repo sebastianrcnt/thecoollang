@@ -594,3 +594,10 @@ repl-dependencies-test: build/cool-compiler build/language.BIN build/coolc build
 test: repl-dependencies-test
 repl-dependencies-sanitize-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
 	python3 tools/test_repl_dependencies.py --legacy --sanitize --output build/repl-dependencies-asan-audit.json
+
+.PHONY: borrowed-vector-test borrowed-vector-sanitize-test
+borrowed-vector-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_borrowed_vector.py --output build/borrowed-vector-audit.json
+test: borrowed-vector-test
+borrowed-vector-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_borrowed_vector.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/borrowed-vector-asan-audit.json

@@ -1,0 +1,45 @@
+{
+  "before_ref": "23dbe7d",
+  "count": 500000,
+  "expected_sum": 62499028,
+  "compiler_sha256": "08263730088008628aebb5f855451cea78292aa45bbb788f5b84c753b71f78b0",
+  "rows": [
+    {
+      "name": "before",
+      "binary": "/Volumes/t5/coollang/build/vector-storage-benchmark/before-program",
+      "binary_sha256": "ae6d02d3b9bd544e9034e6d6c471f2fb2173bd7d1b77ff3825a54ef02b13fafa",
+      "vector_sha256": "938f19648164655480121678014d6fc424be89d1a5137346efb4f4f815f4b463",
+      "source": "package main;import v \"example.test/vectorcost/before\";import \"std/io\";fn main(){var bytes=v.create[u8]();for(var i=0;i<500000;i=i+1){bytes.append(u8(i%251));}var sum:i64=0;unsafe{var it=v.cursor[u8](&bytes);for(var i=0;i<500000;i=i+1){sum=sum+i64(*v.next[u8](&raw it));}}assert(sum==62499028);bytes.clear();io.println(v.chunk_size[u8]());}",
+      "samples_ms": [
+        58.712667,
+        58.3495,
+        58.1115,
+        56.608959,
+        59.364125,
+        60.936417,
+        57.907333
+      ],
+      "chunk_bytes": 48,
+      "median_ms": 58.3495
+    },
+    {
+      "name": "after",
+      "binary": "/Volumes/t5/coollang/build/vector-storage-benchmark/after-program",
+      "binary_sha256": "a62e16196c9054d839cf57f70555ee65e5bff9237475fdaea816c75ee8135f47",
+      "vector_sha256": "ef21a38d7ae5aaf12d90785eb5773332687bac013796a70e3ed8ba6697a5fd1f",
+      "source": "package main;import v \"example.test/vectorcost/after\";import \"std/io\";fn main(){var bytes=v.create[u8]();for(var i=0;i<500000;i=i+1){bytes.append(u8(i%251));}var sum:i64=0;unsafe{var it=v.cursor[u8](&bytes);for(var i=0;i<500000;i=i+1){sum=sum+i64(*v.next[u8](&raw it));}}assert(sum==62499028);bytes.clear();io.println(v.chunk_size[u8]());}",
+      "samples_ms": [
+        91.655417,
+        89.256584,
+        92.261916,
+        93.676125,
+        92.10225,
+        90.050416,
+        88.666458
+      ],
+      "chunk_bytes": 528,
+      "median_ms": 91.655417
+    }
+  ],
+  "method": "LLVM release O2 standalone native processes. One warm-up each, then alternating order. Duration includes process launch, append, raw cursor traversal and explicit clear. Chunk bytes are sizeof private Chunk[u8], excluding owner/runtime overhead; no RSS claim."
+}

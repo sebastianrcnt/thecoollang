@@ -404,6 +404,19 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
             ReferencePhysicalCapture(check, place, via, expression);
             found = true;
         }
+        // A checked binding marker with no payload loans denotes an empty
+        // borrowed value, not a borrow of the local's physical storage. Pending
+        // owner-address acquisitions still require their ordinary root pin.
+        if ((expression.kind == 3 || expression.kind == 18 || expression.kind == 29) && TrackedBorrow(expression.type) && !IsReference(expression.type) && !IsReference(via.type) && !owner_slot && check.pending_owner == null) {
+            var marker = before;
+            var tracked = false;
+            var roots = false;
+            while (marker != null) {
+                if (marker.holder == via) { if (marker.root == null) { tracked = true; } else { roots = true; } }
+                marker = marker.next;
+            }
+            if (tracked && !roots) { found = true; }
+        }
         var source = before;
         while (source != null) {
             if (source.root != null && source.holder == via && (preserve || bridge || (physical && (nested || slicing)) || source.indirect == layer) && (bridge || ReferencePayloadMayAccess(source, place, via))) {

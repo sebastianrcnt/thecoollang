@@ -979,3 +979,38 @@ This permits one API for scalar, array, owning and borrowed values. A shared
 destination is never made writable by this rule. Other active relations in the
 same function remain enforced. Known invalid unused templates and nongeneric
 invalid declarations still fail (specification draft 34).
+
+
+### Borrowed vector elements
+
+Vector now accepts `&T`, `&mut T`, borrowed aggregates and borrowed owners.
+Appending retains the element's roots at the vector binding's lifetime marker;
+shorter-lived sources cannot be installed. Shared `at` and `iter` preserve shared
+barriers even when T itself is a mutable reference. Exclusive access/iteration
+reborrow those capabilities and suspend conflicting parent operations.
+
+```cool
+import vector "std/vector";
+fn main() {
+    var a = 7;
+    {
+        var values = vector.create[&i64]();
+        values.append(&a);
+        assert(**values.at(0) == 7);
+        values.clear();
+    }
+    a = 9;
+}
+```
+
+Pop returns `Option[T]` borrowing the source vector for borrowed T. Popped values
+may not escape that source's lifetime through this conservative API. Clear frees
+runtime storage but retains prior scoped roots until the vector binding's scope
+ends. Internal Option slots distinguish empty storage from initialized elements;
+they add no per-element heap allocation. The private representation includes an
+enum tag and padding per slot. `make borrowed-vector-test` and
+`make borrowed-vector-sanitize-test` cover chunk boundaries, iteration, popped
+values, aggregates/owners, exact owner cleanup and required capability/lifetime
+rejections. Specification draft 35 also permits copying a known root-free named
+enum/owner without creating a fictitious borrow of its local storage; physical
+addresses and pending owner accesses keep ordinary protection.
