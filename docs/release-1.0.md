@@ -28,9 +28,9 @@ implement parsing, type analysis, interpretation or code generation.
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
-| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
+| G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | **Closed** (owned UTF-8 `Text` and `Vector[u8]` bytes; owning `Vector`/`Map`; `fs`/`path`/`process`; JSON serialization; ownership/error/lifetime contract in `stdlib/README.md`; the two-package `examples/tally` project — see the audit log) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
-| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open (native tooling and real Neovim client verified; broader recovery/unsupported contexts pending) |
+| G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | **Closed** (`cool fmt`/`test`/`doc` token-preserving integration; `cool lsp` diagnostics, definitions and scoped/package/type/member/generic completion; a real Neovim client and the external-distribution editor test — see the audit log) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | **Closed** (34 O0/O2 interpreter differential cases plus per-suite rejection cases; ownership/borrow/aggregate/slice/collection seeded fuzzers; runtime ASan/UBSan and instrumented-frontend sanitizer targets; the two-package `examples/tally` project on five engines and standalone O2; `make bootstrap-check` old/new convergence — see the audit log) |
 | G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
@@ -3276,6 +3276,27 @@ through ordinary evaluation or library use.
   self-host IR fixed point. All of this is green in `build/drop-depth/reg20.log`;
   G9 is closed. This does not close the remaining language, ergonomics,
   performance, tooling or distribution gates.
+
+- Gate closure — G5 core libraries: owned UTF-8 `Text` (127 strict-decoder
+  oracle cases) and `Vector[u8]` binary bytes; owning `Vector` with chunked
+  storage, element loans and tracked iteration; ordered text-key `Map`; `fs`,
+  `path` and `process` utilities; JSON serialization (105 oracle/error cases).
+  `stdlib/README.md` documents the ownership, error and resource-lifetime
+  contract, including explicit non-goals. The two-package `examples/tally`
+  project exercises text, map, vector and JSON together and matches an
+  independent Python model on both frontends, five engines and standalone O2.
+  Library, path, process, JSON, text, map and vector suites are green in
+  `build/drop-depth/reg20.log`; G5 is closed.
+
+- Gate closure — G7 developer tools: `make developer-tools-test` verifies
+  token-preserving and idempotent formatting, API doc generation and test
+  discovery with failure status. `make lsp-test` verifies native diagnostics,
+  definition lookup and scoped/package/type/member/generic completion, including
+  unsaved dependencies, UTF-16/CRLF positions, version ordering and index
+  invalidation, on both frontends and the ASan-instrumented frontend. The real
+  Neovim client and the external read-only distribution editor test pass
+  (`build/drop-depth/reg20.log`); G7 is closed. Remaining broader recovery is
+  tracked as improvement work, not a release blocker.
 
 ## Next implementation checkpoints
 
