@@ -2511,6 +2511,25 @@ through ordinary evaluation or library use.
   and foreign/raw coverage; production nested guards and all release gates
   remain Open.
 
+- Root-free slice replacement audit: promoted six local-return countercases
+  into the permanent public slice-descriptor suite. Literal/helper-created empty
+  bindings acquire local backing through assignment, a branch, a scoped mutable
+  alias or a checked `stores` call. Zero-sized arrays and zero-length views also
+  retain their installed backing roots. Every countercase requires the precise
+  return-lifetime diagnostic, not merely any rejection. Five positive paths
+  validate literal/helper empties, external stored/aliased backing, and both
+  taken/untaken branches with expected values and zero surviving owners.
+  Public production and seed frontends PASS on five engines plus O2. The
+  slice-descriptor sanitizer target also PASS on its third, instrumented
+  frontend and generated ASan/UBSan runtime; total suite now has 37 rejections
+  and 30 independently modeled descriptor permission queries per frontend.
+  Its REPL-loan sanitizer dependency passes persistence/recovery and the
+  288-query read/write model. Compiler sources/IR are unchanged.
+  Evidence: `build/release-audit/slice-empty-descriptor-{regression,sanitize}.log`.
+  These tests cover root accumulation after an initially empty value; they do
+  not complete foreign/raw, recursive alias or whole-language safety audits.
+  Production nested-storage guards and all release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

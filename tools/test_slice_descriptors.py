@@ -7,6 +7,11 @@ p=argparse.ArgumentParser();p.add_argument('--frontend',type=Path);p.add_argumen
 prelude='''import "std/io";import "std/mem";
 struct View{data:[]i64;tag:i64;}
 struct Mixed{data:[]i64;label:&i64;}
+fn empty()->[]i64 borrows(){return []i64{};}
+fn install(dst:&mut []i64,src:[]i64) stores(dst,src){*dst=src;}
+fn from_empty(x:[]i64)->[]i64 borrows(x){var s=empty();install(&mut s,x);return s;}
+fn from_empty_alias(x:[]i64)->[]i64 borrows(x){var s=[]i64{};{let p=&mut s;*p=x;}return s;}
+fn from_empty_branch(x:[]i64,yes:bool)->[]i64 borrows(x){var s=[]i64{};if(yes){s=x;}return s;}
 fn count(s:&[]i64)->usize{return len(*s);}
 fn first(s:&[]i64)->&i64 borrows(s){return &(*s)[0];}
 fn mut_first(s:&mut []i64)->&mut i64 borrows(s){return &mut (*s)[0];}
@@ -25,6 +30,11 @@ program=prelude+'''fn main(){
  {var mixed=Mixed{data:b[:],label:&label};{let r=&mixed;assert(len((*r).data)==3);assert((*r).data[2]==30);assert(*(*r).label==7);}mixed.data[0]=11;}
  {var sa=a[:];var sb=b[:];let r=choose(&sa,&sb,false);assert((*r)[0]==11);assert(sum(r)==61);}
  {var owners=[2]own[i64]{new[i64](1),new[i64](2)};{var s=owners[:];{let r=&s;assert(len(*r)==2);assert(*(*r)[0]==1);}{let r=&mut s;*(*r)[0]=3;let old=move (*r)[1];(*r)[1]=new[i64](*old+2);}}assert(*owners[0]==3 && *owners[1]==4);}
+ {let z=empty();assert(len(z)==0);}
+ {let s=from_empty(a[:]);assert(s[0]==44);}
+ {let s=from_empty_alias(a[:]);assert(s[1]==45);}
+ {let s=from_empty_branch(a[:],true);assert(s[2]==46);}
+ {let s=from_empty_branch(a[:],false);assert(len(s)==0);}
  assert(mem.owner_count()==0);io.println(42);
 }
 '''
@@ -56,6 +66,15 @@ whole=[
  'fn main(){var a=[1]own[i64]{new[i64](1)};var s=a[:];let r=&s;*(*r)[0]=9;}',
  'fn main(){var p=new[[2]i64]([2]i64{1,2});var s=(*p)[:];let r=&s;let gone=move p;}',
 ]
+# A zero-region initial value cannot erase backing roots installed later.
+zero_region_invalid=[
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=[]i64{};var a=[1]i64{7};s=a[:];return s;}fn main(){}',
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=[]i64{};var a=[1]i64{7};if(true){s=a[:];}return s;}fn main(){}',
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=[]i64{};var a=[1]i64{7};{let p=&mut s;*p=a[:];}return s;}fn main(){}',
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=empty();var a=[1]i64{7};install(&mut s,a[:]);return s;}fn main(){}',
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=empty();var a=[0]i64{};install(&mut s,a[:]);return s;}fn main(){}',
+ 'fn bad(x:[]i64)->[]i64 borrows(x){var s=empty();var a=[1]i64{7};{let p=&mut s;*p=a[0:0];}return s;}fn main(){}',
+]
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)
 with tempfile.TemporaryDirectory(prefix='cool slice descriptors ') as temporary:
  root=Path(temporary);source=root/'main.cool';binary=root/'program';wrapper=root/'bootstrap'
@@ -82,6 +101,9 @@ with tempfile.TemporaryDirectory(prefix='cool slice descriptors ') as temporary:
    assert (r.returncode,r.stdout,r.stderr)==(0,'42\n',''),(front,engine,r)
   for code in [prelude+'fn main(){var a=[3]i64{1,2,3};var b=[3]i64{4,5,6};var s=a[:];var t=b[:];'+body+'}' for body in invalid]+[prelude+body for body in whole]:
    source.write_text(code);r=run([front,'check',source],env);assert r.returncode==2,(front,code,r)
+  for code in zero_region_invalid:
+   source.write_text(prelude+code);r=run([front,'check',source],env)
+   assert r.returncode==2 and 'returned borrow may outlive local storage or violate its borrows contract' in r.stderr,(front,code,r)
   # Independent physical/payload permission model, both reference capabilities.
   queries=0
   for exclusive in (False,True):
@@ -100,4 +122,4 @@ with tempfile.TemporaryDirectory(prefix='cool slice descriptors ') as temporary:
      queries+=1
   r=run([front,'repl-quiet'],env,'var a=[2]i64{1,2};\nvar s=a[:];\nlet r=&mut s;\n(*r)[0]=42;\nlen(*r)\nlen(s)\n:forget s\n:forget r\ns[0]\n:forget s\na[0]\n:quit\n')
   assert r.returncode==0 and r.stdout=='2\n42\n42\n' and r.stderr.count('error:')==2,r
-print(f'slice descriptors: mixed/owned storage, shared/exclusive projections and contracts, five engines + O2; {len(invalid)+len(whole)} rejections, {queries} modeled queries and persistent REPL on {len(fronts)} frontends PASS')
+print(f'slice descriptors: mixed/owned storage, shared/exclusive projections and contracts, five engines + O2; {len(invalid)+len(whole)+len(zero_region_invalid)} rejections (including empty-value branch/alias/store returns), {queries} modeled queries and persistent REPL on {len(fronts)} frontends PASS')

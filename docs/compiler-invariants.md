@@ -1672,3 +1672,13 @@ Return authorization now runs after scoped statement checking, so an earlier
 conflicting reborrow in a branch may be diagnosed before a later return escape.
 The language regression checks that first conflict separately from a one-branch
 local-backing return rejection. Production nested-storage guards remain active.
+
+The public slice-descriptor regression now exercises zero-region initial
+values receiving backing through direct assignment, branches, mutable aliases
+and checked stores calls. Local sources must produce the return-lifetime
+diagnostic, including zero-sized arrays and zero-length views. Matching external
+sources must execute with the expected payload values, while an untaken branch
+still returns a root-free empty slice. Both ordinary frontends and the
+instrumented compiler run these cases; generated code also runs under
+ASan/UBSan. Foreign/raw and arbitrary recursive alias paths remain separate
+audit work.
