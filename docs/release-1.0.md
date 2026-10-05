@@ -1817,6 +1817,54 @@ through ordinary evaluation or library use.
   descriptor lifetimes remain required before arbitrary nested borrowed
   storage is accepted. All release gates remain Open.
 
+- Declared parameter type summaries and computed reborrow adaptation: parameter
+  loans no longer infer a value type from anonymous payload Locals whose type
+  is zero. By-value borrowed parameters use their declared aggregate shape;
+  nested-reference parameters retain separate physical anchor loans and
+  Referent payload summaries. Field/element/owned-payload edges enumerate all
+  possible external origins represented by an abstract parameter root. Type
+  memoization preserves recursive owned-layout cycles; borrow-free fields have
+  no origin. Reference terminal/edge permissions use reference mutability;
+  slice permissions use `ReferenceMode`, because slice count is not a permission
+  field. Shared receivers intersect all internal mutable capabilities. These
+  summaries describe possible structure, not observed argument/return field
+  mappings. Unsupported future borrowed kinds stay opaque, and their borrow
+  classification must be added with the kind. Summary scratch is freed after
+  construction; insertion errors are internal invariant failures after types
+  have passed parameter layout/borrow classification.
+
+  Computed reborrow loans now adapt their graph before expression retagging.
+  Scalar physical anchors remain conservative while known absent payload roots
+  stay absent; borrowing a stored reference wraps the selected Referent payload
+  without merging the physical and payload layers.
+
+  Private production-source checks verify 22 parameter path/mode records across
+  mixed shared/exclusive fields, a borrow-free sibling, shared and exclusive
+  receivers, array/owner/slice wrappers, concrete generics and a recursive enum
+  with the borrowed terminal following three owned links. Joint graph clones
+  preserve these query results and cycles. Eight actual computed-reborrow
+  records verify physical anchors, selected/absent payload roots, nested
+  reference extraction and scalar projections. Existing 34 field/root/mode,
+  14 selection and 18 store records, five engines/O2 and REPL recovery pass.
+  Generated private LLVM ASan and host/runtime ASan/UBSan pass, including the
+  full stores contract suite. Repeated typed/recursive parameter function
+  replacement at 64/1,024 submissions retains equal final bytes/counts
+  (32,156,971/161) and peak bytes (32,165,734); repeated computed reborrow
+  assignment retains equal final bytes/counts (32,154,689/46) and peak bytes
+  (32,166,586). Full regression, production and seed convergence, and external
+  editor/distribution installation pass. Reports:
+  `build/loan-provenance{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/provenance-parameters-{build,focused,regression,sanitize,contract-sanitize,lifecycle,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `0f936bfece0c5e008f7b7eae18f466c31c839941622b2b3930d24c3d77c925c9`.
+
+  Region/PlaceRegion, return/store contracts, caller-owned versus callee-owned
+  storage and existing coarse scoped permissions remain authoritative on both
+  frontends. Typed caller/callee graph substitution, physical protection,
+  graph-aware authorization and descriptor-lifetime audit are still required
+  before arbitrary nested borrowed storage is accepted. All release gates
+  remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

@@ -218,3 +218,18 @@ fn ReferenceRootMode(source: *ReferenceLoan) -> i64 {
         return mode;
     }
 }
+
+// A computed reborrow retags existing temporary loans. Adapt their value graph
+// at the same time, preserving physical and payload layer identities.
+fn ReferenceComputedGraph(check: *ReferenceCheck, loan: *ReferenceLoan, place: *Node, origin: *Node, expression: *Node, exclusive: i64) {
+    unsafe {
+        var source = *loan;
+        source.exclusive = source.exclusive & exclusive;
+        var target = source;
+        target.provenance_type = expression.type;
+        ReferenceSelectLoan(check, &raw target, &raw source, place, null, origin, loan.indirect != 0 && NestedReference(expression.type));
+        loan.provenance = target.provenance;
+        loan.provenance_type = target.provenance_type;
+        loan.provenance_known = target.provenance_known;
+    }
+}

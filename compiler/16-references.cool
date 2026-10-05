@@ -372,6 +372,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
                     if (exclusive > ReferenceMode(origin.type)) {
                         ErrorAt(token, cast[ * u8]("cannot make an exclusive borrow from a shared reference"));
                     }
+                    ReferenceComputedGraph(check, loan, place, origin, expression, exclusive);
                     loan.exclusive = exclusive & loan.exclusive;
                     // A scalar projection may retain extra shared roots. Keep
                     // them conservatively rather than losing the anchor.

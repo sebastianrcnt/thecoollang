@@ -1,0 +1,73 @@
+// A parameter root denotes every possible external origin of that parameter.
+// Type summaries are conservative possibilities, never observed field mappings.
+// One build fixes its abstract root; memoized type nodes retain recursive edges.
+// Types are already validated by parameter layout/borrow classification. Errors
+// below indicate impossible internal graph insertion, not recoverable syntax.
+// A future borrowed kind must also be included in TrackedBorrow classification.
+struct ReferenceTypeState { type: i64; node: *ProvenanceNode; next: *ReferenceTypeState; }
+fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **ReferenceTypeState) -> *ProvenanceNode {
+    unsafe {
+        if (!TrackedBorrow(type)) { return null; }
+        var state = *states;
+        while (state != null) { if (state.type == type) { return state.node; } state = state.next; }
+        let node = ProvenanceNodeNew(check.graph, type, null, 1);
+        state = cast[*ReferenceTypeState](CAlloc(i64(sizeof(ReferenceTypeState))));
+        state.type = type; state.node = node; state.next = *states; *states = state;
+        let shape = Shape(type);
+        if (shape.kind == 6 || shape.kind == 3) {
+            node.root = root;
+            var mode = shape.count;
+            if (shape.kind == 3) { mode = ReferenceMode(type); }
+            node.exclusive = mode;
+            let child = ReferenceTypeNode(check, shape.element, root, states);
+            if (child != null) {
+                var kind: i64 = 3;
+                if (shape.kind == 3) { kind = 2; }
+                if (!ProvenanceEdgeNew(node, kind, 0, child, mode)) { Error(cast[*u8]("invalid internal reference type summary")); }
+            }
+        } else if (shape.kind == 2 || shape.kind == 5) {
+            let child = ReferenceTypeNode(check, shape.element, root, states);
+            var kind: i64 = 2;
+            if (shape.kind == 5) { kind = 4; }
+            if (child != null && !ProvenanceEdgeNew(node, kind, 0, child, 1)) { Error(cast[*u8]("invalid internal payload type summary")); }
+        } else if (shape.kind == 1 || shape.kind == 4) {
+            Layout(type);
+            var field = shape.fields;
+            while (field != null) {
+                let child = ReferenceTypeNode(check, field.type, root, states);
+                if (child != null && !ProvenanceEdgeNew(node, 1, cast[i64](field), child, 1)) { Error(cast[*u8]("invalid internal field type summary")); }
+                field = field.next;
+            }
+        } else {
+            // A future borrowed kind must remain opaque, not become absence.
+            node.root = root; node.exclusive = ReferenceMode(type); node.opaque = 1;
+        }
+        return node;
+    }
+}
+fn ReferenceTypeSummary(check: *ReferenceCheck, type: i64, root: *Local) -> *ProvenanceNode {
+    unsafe {
+        var states: *ReferenceTypeState = null;
+        let node = ReferenceTypeNode(check, type, root, &raw states);
+        while (states != null) { let next = states.next; Free(cast[*u8](states)); states = next; }
+        return node;
+    }
+}
+fn ReferenceParameterGraph(check: *ReferenceCheck, loan: *ReferenceLoan, type: i64, payload: bool) {
+    unsafe {
+        loan.provenance_type = type;
+        if (payload && IsReference(type)) {
+            let child = ReferenceTypeSummary(check, Shape(type).element, loan.root);
+            loan.provenance = null;
+            if (child != null) { loan.provenance = ReferenceGraphParent(check.graph, type, 3, 0, child); }
+        } else if (!IsReference(type)) {
+            loan.provenance = ReferenceTypeSummary(check, type, loan.root);
+        } else {
+            // The parameter's physical anchor is not a callee-owned referent
+            // graph. Its payload, where borrowed, is in a separate loan.
+            loan.provenance = ReferenceGraphLeaf(check.graph, type, loan.root, loan.exclusive);
+        }
+        loan.provenance_known = 1;
+        if (loan.provenance != null) { loan.provenance_known = BoolInt(loan.provenance.opaque == 0); }
+    }
+}
