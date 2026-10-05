@@ -3146,6 +3146,16 @@ through ordinary evaluation or library use.
   generated dispatch sections (02-lexer, 06-parser, 08-llvm, 13-repl, 15-native);
   G3's complete audit stays Open.
 
+- Compiler maintenance: `compiler/13-repl.cool` no longer contains a generated
+  dispatch state machine. `Repl` is now a direct loop: initialize the session
+  tables, prompt, read a submission, handle `:quit`/`:stats`, otherwise snapshot
+  the session, execute through the native recovery frame, commit or restore,
+  then free the submission. Behavior is unchanged: the REPL function/storage/
+  package/project/loan/dependency suites and the full regression suite pass, and
+  both bootstrap paths converge (self-host IR SHA256 begins
+  `e688788c51a34afd`). Four modules still contain generated dispatch sections
+  (02-lexer, 06-parser, 08-llvm, 15-native); G3's complete audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
