@@ -3298,6 +3298,19 @@ through ordinary evaluation or library use.
   (`build/drop-depth/reg20.log`); G7 is closed. Remaining broader recovery is
   tracked as improvement work, not a release blocker.
 
+- Receiver and reassignment coverage: the nested-reference probe adds eight
+  shared/exclusive-receiver and stored-reference cases. Reads through a shared
+  receiver and returns of a stored reference through a shared receiver are
+  accepted; mutation through a shared receiver is rejected with a shared-
+  reference diagnostic. Retargeting a stored reference through an exclusive
+  receiver is accepted; retargeting through a shared receiver is rejected as an
+  immutable assignment. Reassigning a stored reference to a longer-lived local
+  is accepted; reassigning it to a local that dies with the block is rejected as
+  an outliving borrow. All eight match on the production and seed frontends and
+  run in the slice probe target. This extends G2/G4's adversarial coverage for
+  shared-receiver relocation and lifetime-aware reassignment; the broader
+  ownership and ergonomics audits stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

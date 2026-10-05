@@ -230,6 +230,22 @@ SLICE_CASES.extend([
 STORE_DIAGNOSTICS['slice_live_mutable_payload_alias']='conflicts'
 
 SLICE_CASES.extend([
+    ('receiver_slice_read', 'accept', 'struct View{items:[]i64;}fn first(v:&View)->i64 borrows(v){return (*v).items[0];}fn main(){var a=[2]i64{7,9};var view=View{items:a[:]};assert(first(&view)==7);}'),
+    ('receiver_slice_mutable_write', 'accept', 'struct View{items:[]i64;}fn set(v:&mut View,x:i64){(*v).items[0]=x;}fn main(){var a=[1]i64{7};var view=View{items:a[:]};set(&mut view,9);assert(view.items[0]==9);}'),
+    ('receiver_slice_shared_mutate', 'reject', 'struct View{items:[]i64;}fn set(v:&View,x:i64){(*v).items[0]=x;}fn main(){}'),
+    ('receiver_stored_reference_return', 'accept', 'struct Holder{r:&i64;}fn get(h:&Holder)->&i64 borrows(h){return (*h).r;}fn main(){var a=7;var h=Holder{r:&a};assert(*get(&h)==7);}'),
+    ('receiver_stored_reference_retarget', 'accept', 'struct Holder{r:&i64;}fn retarget(h:&mut Holder,src:&i64) stores(h,src){(*h).r=src;}fn main(){var a=7;var b=9;var h=Holder{r:&a};retarget(&mut h,&b);assert(*h.r==9);}'),
+    ('receiver_stored_reference_shared_retarget', 'reject', 'struct Holder{r:&i64;}fn retarget(h:&Holder,src:&i64){(*h).r=src;}fn main(){}'),
+    ('stored_reference_reassign', 'accept', 'struct Holder{r:&i64;}fn main(){var a=7;var b=9;var h=Holder{r:&a};h.r=&b;assert(*h.r==9);}'),
+    ('stored_reference_reassign_dead', 'reject', 'struct Holder{r:&i64;}fn main(){var a=7;var h=Holder{r:&a};{var b=9;h.r=&b;}assert(*h.r==7);}'),
+])
+STORE_DIAGNOSTICS.update({
+    'receiver_slice_shared_mutate':'shared reference',
+    'receiver_stored_reference_shared_retarget':'immutable',
+    'stored_reference_reassign_dead':'outlive',
+})
+
+SLICE_CASES.extend([
     ('nested_slice_read', 'accept', 'fn main(){var a=[2]i64{7,9};var rows=[1][]i64{a[:]};var s=rows[:];assert(s[0][0]==7 && s[0][1]==9);}'),
     ('nested_slice_external_address_return', 'accept', 'fn get(x:[]i64)->&i64 borrows(x){var rows=[1][]i64{x};var s=rows[:];return &s[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(*r==7);}'),
     ('nested_slice_local_address_return', 'reject', 'fn bad(x:[]i64)->&i64 borrows(x){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];return &s[0][0];}fn main(){}'),
