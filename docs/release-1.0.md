@@ -3003,10 +3003,47 @@ through ordinary evaluation or library use.
   Broader element-size performance, scope-exit depth, safety fuzzing and every
   remaining mandatory release gate remain Open.
 
+- Bounded-depth destruction (specification draft 36 continuation): scope-exit
+  destruction of deep owned structures no longer grows the native stack with
+  value depth. The interpreter walks explicit DFS frames (32 inline, then a
+  heap buffer); generated LLVM destructors submit typed callbacks to a LIFO
+  worklist in the C runtime, releasing owner storage after its children.
+  Array/struct children are enqueued in reverse so the LIFO dispatcher keeps
+  forward DFS order, and enums release only the active payload.
+
+  Regression: a 32,768-node owning chain under a 1 MiB RLIMIT_STACK crashes
+  every engine before the change (tree/interp/jit/llvm exit 139, llvm-jit exit
+  132) and completes with stdout `123`, exit 0 and zero remaining owners after
+  it, on both frontends and at release O2. `tools/test_drop_depth.py` covers
+  the deep chain, worklist growth boundaries, mixed struct/enum/array
+  ownership, moved/null owner slots and persistent-REPL release across five
+  engines + O2; `make drop-depth-sanitize-test` adds runtime ASan/UBSan and an
+  ASan-instrumented frontend (129 executions). The full `make -k -j4 test
+  bootstrap-check editor-distribution-test borrowed-vector-sanitize-test
+  nested-reference-slice-sanitize-test stores-sanitize-test` exits 0 in
+  `build/drop-depth/full-regression.log`; both bootstrap paths converge
+  (self-host IR SHA256 begins `6f186acc8c51245b`).
+
+  Ordinary destruction keeps direct-call cost. Types whose structural drop
+  depth is bounded are emitted as direct recursive drops with no dispatcher,
+  and owner wrappers skip the worklist entirely for moved/null slots. Release
+  O2 destruction microbenchmarks (independent checksum, warm-up, seven
+  alternating samples, three runs) measure shallow per-iteration owner drops
+  and 300-wide arrays at parity with the previous recursive code, and recursive
+  chains / 500k-byte vector teardown at ~1.16x / ~1.33x. The residual is the
+  cost of the bounded worklist on recursive types and remains the G8 follow-up
+  named below. Evidence and methodology: `tools/bench_drop_depth.py` and
+  `docs/benchmarks/drop-depth-arm64.json`. The interpreter backends still pay
+  the iterative-DFS frame cost on shallow drops; an interpreter fast path is
+  not implemented. Broader depth/store/slice audits, safety fuzzing and every
+  remaining mandatory gate stay Open.
+
 ## Next implementation checkpoints
 
-- Measure larger plain/borrowed Vector elements and long-chain scope-exit
-  destruction; reduce remaining costs while preserving lifetime/destructor checks.
+- Reduce the remaining bounded-worklist cost for recursive-type scope-exit
+  destruction (~1.2-1.35x in the current microbenchmarks) and add an
+  interpreter fast path for shallow drops, preserving lifetime/destructor
+  checks.
 
 - Expand adversarial/model coverage for production nested references and
   borrowed slice elements, including repeated relocation through fields, arrays,

@@ -77,29 +77,58 @@ fn DropFieldsReverseIR(field:*Field){unsafe{
  while(index>0){index=index-1;DropFieldIR(fields[index]);}
  Free(cast[*u8](fields));
 }}
+// Bounded structural drop depth. Recursive types exhaust the budget and stay
+// on the runtime worklist; shallow types are emitted as direct recursive drops
+// so ordinary destruction pays no dispatch cost.
+fn DropInlineDepth(type:i64,budget:i64)->i64{unsafe{
+ if(budget<=0){return 1000000;}
+ if(Owned(type)==i8(0)){return 0;}
+ let shape=Shape(type);
+ if(shape.kind==5||shape.kind==2){
+  let child=DropInlineDepth(shape.element,budget-1);
+  if(child>=1000000){return 1000000;}
+  return child+1;
+ }
+ var best:i64=0;var field=shape.fields;
+ while(field!=null){if(Owned(field.type)!=i8(0)){let child=DropInlineDepth(field.type,budget-1);if(child>=1000000){return 1000000;}if(child>best){best=child;}}field=field.next;}
+ return best+1;
+}}
 fn EmitDropFunctions(){unsafe{
  EmitClearFunctions();
  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
  for(var i:i64=0;i<ctx.v_naggregates;i=i+1){
   let type=1000+i;let a=Shape(type);
   if(a.generic_count==0 && Owned(type)!=i8(0)){
-   IR(cast[*u8]("define void @__cool_drop"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  call void @cool_drop_enqueue(i64 %address, ptr @__cool_drop_body"));RI(type);IR(cast[*u8](")\n  ret void\n}\n"));
-   IR(cast[*u8]("define void @__cool_drop_body"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));
+   let inlined=DropInlineDepth(type,8)<1000000;
+   if(inlined){IR(cast[*u8]("define void @__cool_drop"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));}
+   else if(a.kind==5){IR(cast[*u8]("define void @__cool_drop"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n  %live = load i64, ptr %cell\n  %alive = icmp ne i64 %live, 0\n  br i1 %alive, label %drop, label %done\ndrop:\n  call void @cool_drop_enqueue(i64 %address, ptr @__cool_drop_body"));RI(type);IR(cast[*u8](")\n  br label %done\ndone:\n  ret void\n}\n"));IR(cast[*u8]("define void @__cool_drop_body"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));}
+   else{IR(cast[*u8]("define void @__cool_drop"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  call void @cool_drop_enqueue(i64 %address, ptr @__cool_drop_body"));RI(type);IR(cast[*u8](")\n  ret void\n}\n"));IR(cast[*u8]("define void @__cool_drop_body"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));}
    if(a.kind==5){
     IR(cast[*u8]("  %owned = load i64, ptr %cell\n  %alive = icmp ne i64 %owned, 0\n  br i1 %alive, label %drop, label %done\ndrop:\n  store i64 0, ptr %cell\n"));
-    if(Owned(a.element)!=i8(0)){IR(cast[*u8]("  call void @cool_drop_defer_free(i64 %owned)\n  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %owned)\n"));}
-    else{IR(cast[*u8]("  call void @cool_owner_free(i64 %owned)\n"));}
+    if(Owned(a.element)!=i8(0)){
+     if(inlined){IR(cast[*u8]("  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %owned)\n  call void @cool_owner_free(i64 %owned)\n"));}
+     else{IR(cast[*u8]("  call void @cool_drop_defer_free(i64 %owned)\n  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %owned)\n"));}
+    }else{IR(cast[*u8]("  call void @cool_owner_free(i64 %owned)\n"));}
     IR(cast[*u8]("  br label %done\ndone:\n  ret void\n"));
    }else if(a.kind==2){
-    IR(cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 ["));RI(a.count);IR(cast[*u8](", %entry], [%item, %body]\n  %more = icmp ne i64 %index, 0\n  br i1 %more, label %body, label %done\nbody:\n  %item = sub i64 %index, 1\n  %offset = mul i64 %item, "));RI(ByteSize(a.element));
-    IR(cast[*u8]("\n  %element = add i64 %address, %offset\n  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %element)\n  br label %loop\ndone:\n  ret void\n"));
+    if(inlined){
+     IR(cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 [0, %entry], [%next, %body]\n  %more = icmp ult i64 %index, "));RI(a.count);IR(cast[*u8]("\n  br i1 %more, label %body, label %done\nbody:\n  %offset = mul i64 %index, "));RI(ByteSize(a.element));
+     IR(cast[*u8]("\n  %element = add i64 %address, %offset\n  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %element)\n  %next = add i64 %index, 1\n  br label %loop\ndone:\n  ret void\n"));
+    }else{
+     IR(cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 ["));RI(a.count);IR(cast[*u8](", %entry], [%item, %body]\n  %more = icmp ne i64 %index, 0\n  br i1 %more, label %body, label %done\nbody:\n  %item = sub i64 %index, 1\n  %offset = mul i64 %item, "));RI(ByteSize(a.element));
+     IR(cast[*u8]("\n  %element = add i64 %address, %offset\n  call void @__cool_drop"));RI(a.element);IR(cast[*u8]("(i64 %element)\n  br label %loop\ndone:\n  ret void\n"));
+    }
    }else if(a.kind==4){
     IR(cast[*u8]("  %tag = load i64, ptr %cell\n  switch i64 %tag, label %done [\n"));
     var field=a.fields;while(field!=null){if(Owned(field.type)!=i8(0)){IR(cast[*u8]("    i64 "));RI(field.tag);IR(cast[*u8](", label %variant"));RI(field.tag);IR(cast[*u8]("\n"));}field=field.next;}
     IR(cast[*u8]("  ]\n"));field=a.fields;
     while(field!=null){if(Owned(field.type)!=i8(0)){IR(cast[*u8]("variant"));RI(field.tag);IR(cast[*u8](":\n"));DropFieldIR(field);IR(cast[*u8]("  br label %done\n"));}field=field.next;}
     IR(cast[*u8]("done:\n  ret void\n"));
-   }else{DropFieldsReverseIR(a.fields);IR(cast[*u8]("  ret void\n"));}
+   }else{
+    if(inlined){var field=a.fields;while(field!=null){if(Owned(field.type)!=i8(0)){DropFieldIR(field);}field=field.next;}}
+    else{DropFieldsReverseIR(a.fields);}
+    IR(cast[*u8]("  ret void\n"));
+   }
    IR(cast[*u8]("}\n"));
   }
  }

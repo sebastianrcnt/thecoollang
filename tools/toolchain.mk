@@ -601,3 +601,11 @@ borrowed-vector-test: build/cool-compiler build/language.BIN build/language-runt
 test: borrowed-vector-test
 borrowed-vector-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_borrowed_vector.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/borrowed-vector-asan-audit.json
+
+# Deep/wide owning destruction must not grow the native stack with value depth.
+.PHONY: drop-depth-test drop-depth-sanitize-test
+drop-depth-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_drop_depth.py --output build/drop-depth-audit.json
+test: drop-depth-test
+drop-depth-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_drop_depth.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/drop-depth-asan-audit.json

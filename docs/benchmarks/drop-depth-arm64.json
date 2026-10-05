@@ -1,0 +1,211 @@
+{
+  "before": "/tmp/coollang-baseline",
+  "after": "/Volumes/t5/coollang",
+  "samples": 7,
+  "compiler_sha256": "e70af34ffcb4f20e1527b8532cab84300a4c6f42ed001b9183f2c30f77c2a002",
+  "rows": [
+    {
+      "program": "shallow",
+      "name": "before",
+      "root": "/tmp/coollang-baseline",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/shallow/coollang-baseline-program",
+      "binary_sha256": "54083516973c960aebc24539affff1af019d318426c680ca75937b8580cbb46b",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Pair { a: own[i64]; b: own[i64]; }\nfn main() {\n  var total: i64 = 0;\n  for (var i = 0; i < 1000000; i = i + 1) {\n    var p = Pair { a: new[i64](i), b: new[i64](i) };\n    total = total + *p.a;\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        35.506083,
+        32.639959,
+        34.273041,
+        32.492,
+        32.51725,
+        33.871958,
+        34.162292
+      ],
+      "stdout": "499999500000",
+      "median_ms": 33.871958
+    },
+    {
+      "program": "shallow",
+      "name": "after",
+      "root": "/Volumes/t5/coollang",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/shallow/coollang-program",
+      "binary_sha256": "b530f942e6e0c900f273b0e8640e7065cc3763f7b4ca3f1342309b3c7a8b2604",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Pair { a: own[i64]; b: own[i64]; }\nfn main() {\n  var total: i64 = 0;\n  for (var i = 0; i < 1000000; i = i + 1) {\n    var p = Pair { a: new[i64](i), b: new[i64](i) };\n    total = total + *p.a;\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        35.469583,
+        34.227,
+        34.3855,
+        33.497125,
+        34.183042,
+        34.257875,
+        35.244667
+      ],
+      "stdout": "499999500000",
+      "median_ms": 34.257875
+    },
+    {
+      "program": "wide",
+      "name": "before",
+      "root": "/tmp/coollang-baseline",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/wide/coollang-baseline-program",
+      "binary_sha256": "cc83c83f6d7b4ac5448106f2299445cfa64dbbc2996f66da373ef31d73495a5e",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Wide { items: [300]own[i64]; }\nfn main() {\n  var total: i64 = 0;\n  for (var round = 0; round < 2000; round = round + 1) {\n    var w = Wide {};\n    for (var i = 0; i < 300; i = i + 1) { w.items[i] = new[i64](i); }\n    total = total + *w.items[0];\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        10.084875,
+        9.575166,
+        9.770167,
+        9.753459,
+        9.578708,
+        10.231625,
+        10.197417
+      ],
+      "stdout": "0",
+      "median_ms": 9.770167
+    },
+    {
+      "program": "wide",
+      "name": "after",
+      "root": "/Volumes/t5/coollang",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/wide/coollang-program",
+      "binary_sha256": "8ddb83c9c3faa601c306ca9ad10933e1c29b29894eca91d489a60ce5dda1fae6",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Wide { items: [300]own[i64]; }\nfn main() {\n  var total: i64 = 0;\n  for (var round = 0; round < 2000; round = round + 1) {\n    var w = Wide {};\n    for (var i = 0; i < 300; i = i + 1) { w.items[i] = new[i64](i); }\n    total = total + *w.items[0];\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        9.801667,
+        10.787542,
+        10.006417,
+        9.628875,
+        9.859167,
+        10.07475,
+        9.713833
+      ],
+      "stdout": "0",
+      "median_ms": 9.859167
+    },
+    {
+      "program": "deep",
+      "name": "before",
+      "root": "/tmp/coollang-baseline",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/deep/coollang-baseline-program",
+      "binary_sha256": "1036045738975a068b96e9083240719dd424665b985360ca2cdb4d7742f07f1e",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Node { next: own[Node]; value: i64; }\nfn prepend(root: &mut own[Node], value: i64) {\n  let node = new[Node](Node { next: move *root, value: value });\n  *root = move node;\n}\nfn main() {\n  var total: i64 = 0;\n  for (var round = 0; round < 200; round = round + 1) {\n    { var empty = Node {}; var root = move empty.next;\n      for (var i = 0; i < 8192; i = i + 1) { prepend(&mut root, i); }\n      total = total + (*root).value; }\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        75.111292,
+        76.25325,
+        72.579625,
+        74.844542,
+        73.8185,
+        75.388959,
+        75.012833
+      ],
+      "stdout": "1638200",
+      "median_ms": 75.012833
+    },
+    {
+      "program": "deep",
+      "name": "after",
+      "root": "/Volumes/t5/coollang",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/deep/coollang-program",
+      "binary_sha256": "0da0858e06ae55bbbdb4d733775f18a24feb7639786e52dae262bf02ea0aa126",
+      "source": "package main;\nimport \"std/mem\";import \"std/io\";\nstruct Node { next: own[Node]; value: i64; }\nfn prepend(root: &mut own[Node], value: i64) {\n  let node = new[Node](Node { next: move *root, value: value });\n  *root = move node;\n}\nfn main() {\n  var total: i64 = 0;\n  for (var round = 0; round < 200; round = round + 1) {\n    { var empty = Node {}; var root = move empty.next;\n      for (var i = 0; i < 8192; i = i + 1) { prepend(&mut root, i); }\n      total = total + (*root).value; }\n  }\n  assert(mem.owner_count() == 0);\n  io.println(total);\n}\n",
+      "samples_ms": [
+        87.966208,
+        87.9635,
+        85.019417,
+        85.07225,
+        85.17525,
+        87.022917,
+        85.805583
+      ],
+      "stdout": "1638200",
+      "median_ms": 85.805583
+    },
+    {
+      "program": "vector",
+      "name": "before",
+      "root": "/tmp/coollang-baseline",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/vector/coollang-baseline-program",
+      "binary_sha256": "67d127a6d0e54746363340fa55a5fe655e420bc543929521a61c0e41195c36b1",
+      "source": "package main;\nimport v \"std/vector\";import \"std/io\";\nfn main() {\n  var bytes = v.create[u8]();\n  for (var i = 0; i < 500000; i = i + 1) { bytes.append(u8(i % 251)); }\n  var sum: i64 = 0;\n  unsafe { var it = v.cursor[u8](&bytes); for (var i = 0; i < 500000; i = i + 1) { sum = sum + i64(*v.next[u8](&raw it)); } }\n  assert(sum == 62499028);\n  bytes.clear();\n  io.println(sum);\n}\n",
+      "samples_ms": [
+        56.205292,
+        56.938459,
+        55.821042,
+        54.46675,
+        55.849541,
+        56.057833,
+        57.179584
+      ],
+      "stdout": "62499028",
+      "median_ms": 56.057833
+    },
+    {
+      "program": "vector",
+      "name": "after",
+      "root": "/Volumes/t5/coollang",
+      "binary": "/Volumes/t5/coollang/build/drop-depth-benchmark/vector/coollang-program",
+      "binary_sha256": "531d6810388e7244eb0ea0b88fa5b80d0cb87bf1cfb1516c1a4c7ead167f190e",
+      "source": "package main;\nimport v \"std/vector\";import \"std/io\";\nfn main() {\n  var bytes = v.create[u8]();\n  for (var i = 0; i < 500000; i = i + 1) { bytes.append(u8(i % 251)); }\n  var sum: i64 = 0;\n  unsafe { var it = v.cursor[u8](&bytes); for (var i = 0; i < 500000; i = i + 1) { sum = sum + i64(*v.next[u8](&raw it)); } }\n  assert(sum == 62499028);\n  bytes.clear();\n  io.println(sum);\n}\n",
+      "samples_ms": [
+        77.486542,
+        78.349833,
+        73.961792,
+        72.913541,
+        74.769375,
+        74.154458,
+        75.374167
+      ],
+      "stdout": "62499028",
+      "median_ms": 74.769375
+    }
+  ],
+  "method": "LLVM release O2 standalone native processes; one warm-up each, then alternating order. Duration includes process launch and scope-exit destruction. Three independent runs are retained in repeat_medians_ms; per-run samples are in rows.",
+  "repeat_medians_ms": {
+    "shallow": {
+      "before": [
+        33.959,
+        33.393,
+        33.872
+      ],
+      "after": [
+        34.034,
+        34.59,
+        34.258
+      ]
+    },
+    "wide": {
+      "before": [
+        10.406,
+        9.97,
+        9.77
+      ],
+      "after": [
+        10.42,
+        10.01,
+        9.859
+      ]
+    },
+    "deep": {
+      "before": [
+        74.052,
+        72.388,
+        75.013
+      ],
+      "after": [
+        86.705,
+        85.19,
+        85.806
+      ]
+    },
+    "vector": {
+      "before": [
+        56.581,
+        56.343,
+        56.058
+      ],
+      "after": [
+        76.299,
+        74.526,
+        74.769
+      ]
+    }
+  }
+}
