@@ -467,14 +467,14 @@ I64 TemplateTypeSyntax(Function *f, I64 nesting) {
     return is_void;
 }
 U0 TemplateSignatureSyntax(Function *f) {
-    U8 *names[32], *name; I64 count = 0, i;
+    U8 *names[32], *name; I64 count = 0, i, starts[32], ends[32], saved, token, generic;Bool dependent;
     Need('(', "expected '(' after function name");
     if (!Take(')')) {
         do {
             if (count == 32) Error("function argument limit exceeded");
             name = Ident();
             for (i = 0; i < count; i++) if (Eq(names[i], name)) Error("duplicate parameter name");
-            names[count++] = name; Need(':', "expected ':' after parameter"); if(TemplateTypeSyntax(f,0))Error("parameter cannot be void");
+            names[count++] = name; Need(':', "expected ':' after parameter"); starts[count-1]=pos;if(TemplateTypeSyntax(f,0))Error("parameter cannot be void");ends[count-1]=pos;
         } while (Take(','));
         Need(')', "expected ')'");
     }
@@ -486,6 +486,7 @@ U0 TemplateSignatureSyntax(Function *f) {
             Need(')', "expected ')' after borrows contract");
         }
     }
+    if(Is("stores")){Function contract;MemSet(&contract,0,sizeof(Function));contract.argc=count;saved=pos;for(i=0;i<count;i++){contract.arg_names[i]=names[i];contract.arg_types[i]=-1;dependent=FALSE;for(token=starts[i];token<ends[i];token++)for(generic=0;generic<f->generic_count;generic++)if(tokens[token].kind==K_ID && Eq(tokens[token].text,f->generic_names[generic]))dependent=TRUE;if(!dependent){pos=starts[i];contract.arg_types[i]=ParseType();}}pos=saved;StoreSignature(&contract,FALSE);}
     if (At()->kind != '{') Error("expected function body after signature");
 }
 U0 FunctionSignature(Function *f) {
@@ -504,7 +505,7 @@ U0 FunctionSignature(Function *f) {
         }
     }
     if (Borrowed(f->result) && !f->has_contract) ErrorAt(f->token, "returning borrowed values requires a borrows(parameter) contract");
-    ValidateMethodSignature(f);
+    StoreSignature(f,TRUE);ValidateMethodSignature(f);
 }
 I64 specialization_depth;
 I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
@@ -569,6 +570,7 @@ U0 ParseProgram() {
             else FunctionSignature(f);
             if (old) {
                 if(old->foreign!=f->foreign || old->exported!=f->exported)ErrorAt(f->token,"C ABI change requires a new session");
+                if(!StoreSignatureSame(old,f))ErrorAt(f->token,"signature change requires a new session");
                 if (old->argc != f->argc || old->result != f->result || old->borrow_contract != f->borrow_contract) ErrorAt(f->token, "signature change requires a new session");
                 for (j = 0; j < f->argc; j++) if (old->arg_types[j] != f->arg_types[j]) ErrorAt(f->token, "signature change requires a new session");
             }

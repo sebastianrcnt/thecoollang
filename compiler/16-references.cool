@@ -605,19 +605,20 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 }
             }
             var results: * ReferenceLoan = null;
-            var index: i64 = 0;
             var arg = node.a;
+            while(arg!=null){ReferenceValue(check,arg);arg=arg.next;}
+            ReferenceCallStores(check,node,saved);
+            var index: i64 = 0;
+            arg = node.a;
             while (arg != null) {
-                let before = check.loans;
-                ReferenceValue(check, arg);
                 if ((contract & (1 << index)) != 0) {
                     if (!TrackedBorrow(arg.type)) {
                         ErrorAt(node.token, cast[ * u8]("reference return requires a tracked reference argument"));
                     }
                     var source = check.loans;
                     var found = false;
-                    while (source != before) {
-                        if (source.expression == arg) {
+                    while (source != saved) {
+                        if (source.holder==null && source.expression == arg) {
                             found = true;
                             var mode = ReferenceMode(node.type) & source.exclusive;
                             var indirect: i64 = 0;
@@ -755,9 +756,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
                 ReferenceValue(check, node.b);
                 ReferenceAccess(check, node.a, true);
                 if (TrackedBorrow(node.type)) {
-                    let target = BorrowRoot(node.a);
-                    if (target != null && IsReference(target.type)) { ErrorAt(node.token, cast[*u8]("borrowed storage cannot be replaced through a reference")); }
-                    ReferenceAssign(check, target, node.b, saved);
+                    ReferenceStore(check,node.a,node.b,saved);
                 }
             } else {
                 if (node.kind == 10 || node.kind == 11 || node.kind == 21) {
@@ -780,6 +779,7 @@ fn AnalyzeReferences(function: * Function) {
         var check = ReferenceCheck {
         };
         check.function = function;
+        ReferenceParameters(&raw check);
         ReferenceStatement( & raw check, function.body);
         ReferenceRelease( & raw check, null);
     }

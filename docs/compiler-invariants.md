@@ -876,11 +876,12 @@ this audit establishes the traversal bound, not linear total compiler complexity
 
 ## Local borrowed replacement
 
-`ReferenceStatement` routes local `N_ASSIGN` and locally rooted `N_STORE`
-through `ReferenceAssign`, including reference-bearing values. `N_ASSIGN`
+`ReferenceStatement` routes `N_ASSIGN` through `ReferenceAssign` and borrowed
+`N_STORE` through `ReferenceStore`, including reference-bearing values. `N_ASSIGN`
 changes physical binding storage; it must not be treated as mutation through
 that binding's shared referent. A live physical loan still blocks replacement.
-Through-reference borrowed replacement remains explicitly rejected.
+Through-reference borrowed replacement resolves physical destination loans
+and applies checked storage relations.
 
 The original null-root holder marker anchors retained loans. Every incoming
 root must outlive the target depth, and borrow-region analysis accumulates new
@@ -925,13 +926,44 @@ an independent worklist oracle. It runs propagation twice and counts destination
 visits, including a depth-32 alias diamond, cyclic aliases, multiple store
 queries, late branches, stored aliases, computed reborrows and contracted results.
 It copies host/runtime objects and records source/IR/object identities in
-`build/borrow-origins-audit.json`. Normal native/legacy and ASan frontends still
-reject unsupported receiver writes (or earlier live-alias conflicts). This audit
-proves the component's modeled provenance results, not cross-call mutation safety.
+`build/borrow-origins-audit.json`. Normal native/legacy and ASan frontends reject
+missing mutation contracts
+(or earlier live-alias conflicts). This audit proves the component's modeled
+provenance results; the separate stores suite covers call mutation.
 
-The remaining cross-call implementation must validate destination/source
-relations in function signatures, preserve per-root capabilities, retain source
-loans at every actual destination's original marker, update live receiver
-payload loans and caller return-region edges, compare effects on REPL replacement,
-and preserve candidate roots after partially executed runtime failures. The
-origin split is prerequisite evidence; it does not itself relax those checks.
+## Checked call mutation
+
+`Function.store_contract[32]` is a source bitmask per parameter destination;
+`store_destinations` skips ordinary calls quickly. Signature parsing checks
+parameter names, duplicate relations and concrete type constraints. Unused
+signature syntax also checks non-dependent types. REPL replacement compares the
+whole effect matrix, independent of clause order. Ordinary function snapshots
+copy these fields. Legacy seed and production frontends implement the same rules.
+
+`BorrowCallStores` records caller destination/source edges in the value-region
+channel. Body stores and forwarded effects check binding-origin parameter bits
+against the caller's effect matrix. Frame bits may never flow into external
+storage. Installed sources participate in return checking as well.
+
+`ReferenceParameters` gives nested parameters separate physical and payload
+roots. Synthetic payload Locals have type 0 and depth 0, no runtime slot or
+lexical name, and are linked into the function's allocation ownership list.
+Conflating the two roots makes valid self-stores conflict with their own RHS.
+Ordinary borrowed by-value parameters use synthetic payload roots but addresses
+of their local physical storage still carry the frame region.
+
+`ReferenceCallStores` runs after all arguments are checked and before selecting
+returned loans. `ReferenceInstall` retains source edges at original destination
+markers and updates stable live nested receivers with layer-one payload edges.
+Forced parent links follow physical receiver ancestry and must not introduce a
+cycle. Actual computed destinations must all resolve and pass depth checks.
+Modes are intersected with outer reference capability rather than upgraded.
+Retained roots remain below temporary release boundaries. Identical capability
+edges are merged by holder/root/parent/mode/layer; old roots stay conservative.
+
+Call argument payloads also gain installed roots before return selection. REPL
+checking rejection discards candidate roots; runtime failure retains them because
+part of a submission may have executed. Repeated calls and compatible function
+replacements are covered by 64/1,024-submission private allocation measurements.
+This is still a two-layer root model. Arbitrary stored references to borrowed
+pointees and slices of borrowed elements need further provenance work.

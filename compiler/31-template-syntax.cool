@@ -43,6 +43,7 @@ fn TemplateSignatureSyntax(function: *Function) {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         var names: [32]*u8 = [32]*u8{};
+        var starts:[32]i64=[32]i64{};var ends:[32]i64=[32]i64{};
         var count: i64 = 0;
         Need(40, cast[*u8]("expected '(' after function name"));
         if (Take(41) == i8(0)) {
@@ -54,7 +55,9 @@ fn TemplateSignatureSyntax(function: *Function) {
                 }
                 names[count] = name; count = count + 1;
                 Need(58, cast[*u8]("expected ':' after parameter"));
+                starts[count-1]=ctx.v_pos;
                 if (TemplateTypeSyntax(function, 0) != 0) { Error(cast[*u8]("parameter cannot be void")); }
+                ends[count-1]=ctx.v_pos;
                 if (Take(44) == i8(0)) { break; }
             }
             Need(41, cast[*u8]("expected ')'"));
@@ -75,6 +78,19 @@ fn TemplateSignatureSyntax(function: *Function) {
                 }
                 Need(41, cast[*u8]("expected ')' after borrows contract"));
             }
+        }
+        if(Is(cast[*u8]("stores"))!=i8(0)){
+            var contract=Function{};contract.argc=count;let saved=ctx.v_pos;
+            for(var i:i64=0;i<count;i=i+1){
+                contract.arg_names[i]=names[i];contract.arg_types[i]=-1;var dependent=false;
+                for(var token:i64=starts[i];token<ends[i];token=token+1){
+                    for(var generic:i64=0;generic<function.generic_count;generic=generic+1){
+                        if(ctx.v_tokens[token].kind==256 && Eq(ctx.v_tokens[token].text,function.generic_names[generic])!=i8(0)){dependent=true;}
+                    }
+                }
+                if(!dependent){ctx.v_pos=starts[i];contract.arg_types[i]=ParseType();}
+            }
+            ctx.v_pos=saved;StoreSignature(&raw contract,false);
         }
         if (At().kind != 123) { Error(cast[*u8]("expected function body after signature")); }
     }

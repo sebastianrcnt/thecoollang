@@ -35,14 +35,14 @@ invalid=[
  'let r=&s;let copy=*r;', 'let r=&s;let copy=(*r)[:];',
  'let r=&s;s[0]=9;', 'let r=&mut s;s[0]=9;', 'let r=&mut s;let x=s[0];',
  'let r=&mut s;let n=len(s);', 'let r=&s;s=b[:];', 'let r=&mut s;s=b[:];',
- 'let r=&mut s;*r=b[:];',
+ 'let r=&mut s;{var z=[1]i64{3};*r=z[:];}',
  'let r=&mut s;let e=&(*r)[0];(*r)[1]=9;',
  'let r=&mut s;let e=&mut (*r)[0];let x=(*r)[1];',
  'let r=&mut s;let e=&mut (*r)[0];let copy=*r;',
  'let r=&mut s;let e=mut_first(r);let n=len(*r);',
  'let r=choose(&s,&t,true);t[0]=9;', 'let r=choose(&s,&t,true);s[0]=9;',
  'let r=choose(&s,&t,true);let e=&mut (*r)[0];',
- 'var h=View{data:b[:],tag:0};let r=&mut h;(*r).data=a[:];',
+ 'var h=View{data:b[:],tag:0};let r=&mut h;{var z=[1]i64{3};(*r).data=z[:];}',
  'let r=&s;let rr=&r;',
 ]
 whole=[

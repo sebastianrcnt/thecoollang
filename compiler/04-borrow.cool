@@ -93,6 +93,7 @@ fn BorrowEdges(node:*Node){unsafe{
 }}
 fn BorrowStoredEdges(node:*Node){unsafe{
  if(node==null){return;}
+ if(node.kind==4){BorrowCallStores(node);}
  if(node.kind==19 && Borrowed(node.type)!=i8(0)){
   let root=BorrowRoot(node.a);
   if(root!=null && IsReference(root.type)){

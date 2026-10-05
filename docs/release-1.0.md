@@ -1536,11 +1536,52 @@ through ordinary evaluation or library use.
   caller/receiver loan updates and nested stored provenance remain mandatory;
   all release gates stay open.
 
+- Checked borrowed mutation: specification draft 26 adds repeatable
+  `stores(destination,source)` relations to function signatures. Destinations
+  require exclusive references to borrowed storage; source names/types and body
+  effects are checked. Unused templates check non-dependent parameter types;
+  dependent constraints remain specialization checks. Local frame roots cannot
+  escape into caller storage. Forwarded/recursive setters, multiple destinations,
+  computed receiver unions, slices, references, enums, generic aggregates and
+  borrowed owning handles retain installed source roots at every original caller
+  marker. Live receiver payload loans gain the new roots without granting shared
+  sources exclusive permission. Return-contract checking includes call effects.
+  REPL body replacement compares the effect matrix independent of clause order;
+  compilation failures discard staged roots and runtime failures retain candidate
+  roots, including partial setters with a live receiver.
+
+  Parameter checking separates physical binding storage from borrowed payload
+  roots using compiler-only synthetic Locals, retained under existing function
+  cleanup ownership. This avoids self-store conflicts while preserving frame
+  address escape rejection. Retained capability edges merge identically rather
+  than growing with repeated calls. Private copied-IR allocation histories for
+  64/1,024 identical setter calls and compatible setter redefinitions have equal
+  final allocation bytes/counts and equal peak bytes. The report records emitted
+  artifact identities in `build/repl-stores-lifecycle-audit.json`; it measures
+  compiler-owned allocation calls, not process RSS or host-internal memory.
+
+  A first sanitizer run found a function-table underflow on builtin `assert`
+  calls: these use negative IDs. Both borrow-region and loan effect dispatch now
+  reject negative IDs before table access. Final full regression and exact
+  three-generation bootstrap convergence pass. The stores suite passes on native,
+  legacy and ASan compilers across five engines/O2, with generated LLVM load/store
+  ASan and runtime ASan/UBSan instrumentation, 26 rejection cases and 28 independent
+  root/mode queries per frontend. Related nested/reference/slice/loan-layer suites
+  now test short-lived installations in place of obsolete blanket-rejection cases.
+  Clean external editor/distribution installation also passes.
+  Evidence: `build/release-audit/stores-final-{build,focused,regression,sanitize,distribution,lifecycle}.log`.
+  Emitted compiler IR SHA-256:
+  `b3a703f2dc02229e0e94b083cbe2705a9308bd2cb379511537949f533b0efba5`.
+  Cross-call replacement is now supported within the current two-layer model.
+  Arbitrary nested stored borrowed pointees, borrowed slice elements, whole-language
+  conformance and other mandatory checkpoints remain unfinished. All release
+  gates remain Open; this is not a 1.0 declaration.
+
 ## Next implementation checkpoints
 
-- Complete nested stored references and lifetime-aware heap/slice
-  descriptor replacement; keep unsafe raw pointers separate and add rejection regressions
-  before removing restrictions.
+- Complete nested stored references and borrowed slice elements; preserve
+  checked heap/slice replacement contracts, keep unsafe raw pointers separate and
+  add rejection regressions before removing restrictions.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
   packages, persistent loans and runtime-error recovery.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and

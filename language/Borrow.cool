@@ -40,7 +40,7 @@ U0 RecordBorrowDestination(Node *n,Node *source){
  RecordBorrowEdge(BorrowRoot(n),source,TRUE);
 }
 U0 BorrowEdges(Node *n){if(!n)return;if(n->kind==N_BIND || n->kind==N_ASSIGN)RecordBorrow(n->local_ref,n->a);BorrowEdges(n->a);BorrowEdges(n->b);BorrowEdges(n->c);BorrowEdges(n->next);}
-U0 BorrowStoredEdges(Node *n){Local *root;Node proxy;if(!n)return;if(n->kind==N_STORE && Borrowed(n->type)){root=BorrowRoot(n->a);if(root && IsReference(root->type)){MemSet(&proxy,0,sizeof(Node));proxy.kind=N_LOCAL;proxy.type=root->type;proxy.local_ref=root;RecordBorrowDestination(&proxy,n->b);}else RecordBorrowEdge(root,n->b,TRUE);}BorrowStoredEdges(n->a);BorrowStoredEdges(n->b);BorrowStoredEdges(n->c);BorrowStoredEdges(n->next);}
+U0 BorrowStoredEdges(Node *n){Local *root;Node proxy;if(!n)return;if(n->kind==N_CALL)BorrowCallStores(n);if(n->kind==N_STORE && Borrowed(n->type)){root=BorrowRoot(n->a);if(root && IsReference(root->type)){MemSet(&proxy,0,sizeof(Node));proxy.kind=N_LOCAL;proxy.type=root->type;proxy.local_ref=root;RecordBorrowDestination(&proxy,n->b);}else RecordBorrowEdge(root,n->b,TRUE);}BorrowStoredEdges(n->a);BorrowStoredEdges(n->b);BorrowStoredEdges(n->c);BorrowStoredEdges(n->next);}
 U0 CheckBorrowReturns(Node *n,Function *f){if(!n)return;if(n->kind==N_RETURN && Borrowed(f->result) && (Region(n->a)&~f->borrow_contract))ErrorAt(n->token,"returned borrow may outlive local storage or violate its borrows contract");CheckBorrowReturns(n->a,f);CheckBorrowReturns(n->b,f);CheckBorrowReturns(n->c,f);CheckBorrowReturns(n->next,f);}
 U0 PropagateBorrowRegions(Function *f){
  Local *local;BorrowSource *edge;Bool changed;I64 before,origin_before;

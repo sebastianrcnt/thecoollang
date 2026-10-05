@@ -48,7 +48,7 @@ invalid=[
  'fn main(){var x=1;var y=2;let r=&x;r=&y;}',
  'fn main(){var x=1;var y=2;var r=&y;defer later(r);r=&x;y=3;}',
  'fn replace(p:&mut View,r:&i64){(*p).r=r;}fn main(){}',
- 'fn main(){var x=1;var y=2;var v=make(&x);let p=&mut v;(*p).r=&y;}',
+ 'fn main(){var x=1;var y=2;var v=make(&x);let p=&mut v;{var z=3;(*p).r=&z;}}',
 ]
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)
 with tempfile.TemporaryDirectory(prefix='cool borrowed heaps ') as temporary:
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='cool borrowed heaps ') as temporary:
     r=run([binary],env)
    else:r=run([ROOT/'tools/cool','run','--backend',engine,source],env)
    assert (r.returncode,r.stdout,r.stderr)==(0,'25\n',''),(front,engine,r)
-  diagnostics=['outlive']*6+['conflicts']*6+['cannot assign','conflicts','replaced through a reference','replaced through a reference']
+  diagnostics=['outlive']*6+['conflicts']*6+['cannot assign','conflicts','replaced through a reference','outlive']
   for body,diagnostic in zip(invalid,diagnostics):
    code=prelude+body;source.write_text(code);r=run([front,'check',source],env)
    assert r.returncode==2 and diagnostic in r.stderr,(front,diagnostic,code,r)

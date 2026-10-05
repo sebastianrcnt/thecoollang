@@ -151,6 +151,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
     for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNew(source->root,source->parent,mode & source->exclusive,0,node,check->loans);
     ReferenceAddressIndices(check,node->a);
 }
+extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);
 U0 ReferenceValue(ReferenceCheck *check,Node *node){
     ReferenceLoan *saved,*loan,*before,*results,*source;Node *arg,*item;I64 contract,index,mode,indirect;Bool found;
     if(!node)return;
@@ -175,13 +176,13 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     if(node->kind==N_CALL){
         saved=check->loans;contract=0;results=NULL;
         if(TrackedBorrow(node->type)){contract=functions[node->slot].borrow_contract;if(!contract && IsReference(node->type))ErrorAt(node->token,"reference return requires at least one borrows source");}
-        index=0;
+        for(arg=node->a;arg;arg=arg->next)ReferenceValue(check,arg);
+        ReferenceCallStores(check,node,saved);index=0;
         for(arg=node->a;arg;arg=arg->next){
-            before=check->loans;ReferenceValue(check,arg);
             if(contract & (1<<index)){
                 if(!TrackedBorrow(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
                 found=FALSE;
-                for(source=check->loans;source!=before;source=source->next)if(source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(NestedReference(node->type) && NestedReference(arg->type)){indirect=source->indirect;}results=ReferenceNew(source->root,source->parent,mode,indirect,node,results);if(NestedReference(node->type) && !NestedReference(arg->type))results=ReferenceNew(source->root,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
+                for(source=check->loans;source!=saved;source=source->next)if(!source->holder && source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(NestedReference(node->type) && NestedReference(arg->type)){indirect=source->indirect;}results=ReferenceNew(source->root,source->parent,mode,indirect,node,results);if(NestedReference(node->type) && !NestedReference(arg->type))results=ReferenceNew(source->root,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
                 if(!found && IsReference(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
             }
             index++;
@@ -199,17 +200,20 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     ReferenceValue(check,node->a);ReferenceValue(check,node->b);ReferenceValue(check,node->c);
 }
 U0 ReferenceAssign(ReferenceCheck *check,Local *target,Node *value,ReferenceLoan *stop){ReferenceLoan *marker=stop,*loan,*retained,*previous,*existing;Local *parent;while(marker && !(marker->root==NULL && marker->holder==target))marker=marker->next;if(!marker)ErrorAt(value->token,"borrowed assignment requires local tracked storage");for(loan=check->loans;loan!=stop;loan=loan->next)if(loan->expression==value && loan->root){if(loan->root->depth>target->depth)ErrorAt(value->token,"assigned borrow may outlive local storage");parent=loan->parent;if(ReferenceAncestor(check,target,parent,loan->root)){previous=ReferenceHolder(check,target,loan->root);if(previous)parent=previous->parent;else parent=NULL;}for(existing=marker->next;existing;existing=existing->next)if(existing->holder==target && existing->root==loan->root && existing->parent==parent && existing->exclusive==loan->exclusive && existing->indirect==loan->indirect)break;if(!existing){retained=ReferenceNew(loan->root,parent,loan->exclusive,loan->indirect,value,marker->next);retained->holder=target;marker->next=retained;}}}
+extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);
+extern U0 ReferenceStore(ReferenceCheck *check,Node *place,Node *value,ReferenceLoan *stop);
+extern U0 ReferenceParameters(ReferenceCheck *check);
 U0 ReferenceStatement(ReferenceCheck *check,Node *node){
     ReferenceLoan *saved,*loan,**link;Node *statement;if(!node)return;saved=check->loans;
     if(node->kind==N_BLOCK){for(statement=node->a;statement;statement=statement->next)ReferenceStatement(check,statement);ReferenceRelease(check,saved);return;}
     if(node->kind==N_BIND && TrackedBorrow(node->type)){ReferenceValue(check,node->a);link=&check->loans;while(*link!=saved){loan=*link;if(loan->expression==node->a){loan->holder=node->local_ref;link=&loan->next;}else{*link=loan->next;Free(loan);}}loan=ReferenceNew(NULL,NULL,0,0,node,check->loans);loan->holder=node->local_ref;check->loans=loan;return;}
     if(node->kind==N_ASSIGN){ReferenceValue(check,node->a);ReferenceAccess(check,node,TRUE);if(TrackedBorrow(node->type))ReferenceAssign(check,node->local_ref,node->a,saved);}
-    else if(node->kind==N_STORE){ReferenceWriteCapability(node->a);ReferenceAddressMode(check,node->a,FALSE);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type)){if(BorrowRoot(node->a) && IsReference(BorrowRoot(node->a)->type))ErrorAt(node->token,"borrowed storage cannot be replaced through a reference");ReferenceAssign(check,BorrowRoot(node->a),node->b,saved);}}
+    else if(node->kind==N_STORE){ReferenceWriteCapability(node->a);ReferenceAddressMode(check,node->a,FALSE);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type)){ReferenceStore(check,node->a,node->b,saved);}}
     else if(node->kind==N_IF || node->kind==N_WHILE || node->kind==N_FOR){ReferenceValue(check,node->a);ReferenceRelease(check,saved);ReferenceStatement(check,node->b);ReferenceStatement(check,node->c);}
     else ReferenceValue(check,node->a);
     if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
 }
-U0 AnalyzeReferences(Function *function){ReferenceCheck check;check.loans=NULL;check.function=function;ReferenceStatement(&check,function->body);ReferenceRelease(&check,NULL);}
+U0 AnalyzeReferences(Function *function){ReferenceCheck check;check.loans=NULL;check.function=function;ReferenceParameters(&check);ReferenceStatement(&check,function->body);ReferenceRelease(&check,NULL);}
 Node *RawReferenceExpression(){
     Token *token=At();I64 type;Node *pointer,*anchor,*result;pos++;
     if(!unsafe_depth)ErrorAt(token,"borrow_raw requires unsafe");

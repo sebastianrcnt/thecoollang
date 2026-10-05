@@ -227,15 +227,13 @@ A reference-containing struct/array requires an explicit full initializer;
 `PairView {}` cannot manufacture null references. Mutable local containers, reference fields and array elements can be replaced
 when the new roots outlive the original binding and no live loan protects its
 storage. This also applies to locally owned heap fields. Replacement through a
-reference receiver remains unsupported until destination lifetime contracts
-exist. Shared or
-exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
+reference receiver retains destination roots and requires `stores` contracts for
+external parameter storage. Shared or exclusive borrows such as `&PairView` and `&mut PairView` retain its possible
 source roots as shared loans while separately borrowing the container's storage.
-An exclusive container receiver can update ordinary fields, but
-cannot replace reference fields or mutate through a contained shared reference.
-Stored `&mut T` uses the reborrow rules below. Mixed ownership/slice storage,
-general nested stored lifetimes and lifetime-aware replacement remain required
-work for the full stored-reference gate.
+An exclusive container receiver can update ordinary fields and replace reference
+fields under lifetime checks, but cannot mutate through a contained shared reference.
+Stored `&mut T` uses the reborrow rules below. General nested stored lifetimes
+and borrowed slice elements remain required work for the full stored-reference gate.
 
 `make stored-references-test` checks nested structs/arrays/enums, generic
 copies, methods, computed projections, match evaluation, empty results, owner
@@ -297,7 +295,7 @@ to advance. The source vector remains immutable until all its loans end.
 Fields within one container still share a conservative physical root. References
 returned from a locally bound iterator cannot escape its scope, even if the
 source outlives it: `next` explicitly borrows `self`. General stored lifetimes
-and lifetime-aware reference replacement remain necessary for
+remain necessary for
 the complete borrowing design; this API does not close that release gate.
 
 `make nested-references-test` covers container receiver mutation, reborrows,
@@ -389,7 +387,7 @@ fn main() {
 ```
 
 Mutable local reference fields and whole borrowed containers follow the
-replacement rules below; reference receiver replacement remains unsupported.
+replacement and checked `stores` rules below.
 Shared outer receivers may read through contained exclusive references or
 reborrow them as shared, but cannot copy an exclusive handle or mutate through
 it. This also applies to computed receivers such as `(*share(&view)).output`;
@@ -602,7 +600,7 @@ Function body replacement keeps stable function IDs, including callers already
 compiled by the JIT. Successful replacement releases the old AST, local metadata,
 bytecode and JIT mapping after user frames finish. Failed parsing/compilation or
 execution releases newly staged artifacts and preserves previous function code.
-Signature, borrow-contract, generic and foreign/exported C ABI mode changes
+Signature, borrow/store-contract, generic and foreign/exported C ABI mode changes
 require a new session. Escaped string literals remain valid after replacement.
 `make repl-functions-test` exercises repeated warm/cold replacement, failed generic
 specialization and ID reuse, batch rollback, owner cleanup and C ABI rejection
@@ -720,11 +718,10 @@ borrowed heap payloads retain their external roots. Direct
 references to these aggregates preserve physical and payload loans separately.
 Slices of owning elements support reading, explicit moves and replacement through
 an exclusive descriptor reference; moving their backing owner remains rejected.
-Replacing a slice or slice-containing field through a reference is currently
-rejected, because cross-call replacement lifetimes are not tracked. Ordinary
-local descriptor reassignment retains the existing lifetime checks. Stored
-`&[]T` fields, references to references, borrowed slice elements and
-general replacement contracts still require further implementation.
+Replacing a slice or slice-containing field through an exclusive reference uses
+the original destination lifetime. Cross-call replacement requires a matching
+`stores` contract described below. Stored `&[]T` fields, references to borrowed
+references and borrowed slice elements still require further implementation.
 
 `make slice-descriptors-test` verifies both frontends, five engines and O2,
 31 negative programs, 30 independent permission-model queries and persistent
@@ -772,14 +769,14 @@ owned handles become empty and dereferencing them produces a checked fault.
 The moved destination keeps its external loans. A retained exclusive reference
 field cannot be used incompatibly with the destination's loan. Once the
 latter's scope ends, the receiver's preserved borrowed fields can be used again.
-Direct moved bindings still follow whole-root move checking, and reference fields
-cannot be replaced. REPL dependents must be forgotten before their parent loan
+Direct moved bindings still follow whole-root move checking. Reference fields
+follow the checked replacement rules below. REPL dependents must be forgotten before their parent loan
 holders; moving a value does not remove its lexical or persistent root record.
 
 This supports nested ordinary aggregates and generic layouts, shared/exclusive
 fields, arrays, named/anonymous enum matches and aggregates combining slices and
 owners. Borrowed owning heaps are supported as described below; stored references
-to borrowed pointees and general cross-call replacement lifetimes remain incomplete. `make mixed-owned-references-test` checks both
+to borrowed pointees and borrowed slice elements remain incomplete. `make mixed-owned-references-test` checks both
 frontends, five engines and O2, zero leaked owners, checked empty-owner faults,
 17 rejected programs, 14 independent permission queries and persistent REPL
 roots. `make mixed-owned-references-sanitize-test` adds an ASan compiler and
@@ -812,8 +809,8 @@ initialized where the ordinary type rules permit them.
 Local owner replacement may retain new external roots at the original binding's
 lifetime marker. Earlier possible roots remain pinned conservatively until that
 binding ends. A borrow from a shorter block cannot be installed into a longer
-lived heap. Reference-field assignment and cross-call borrowed storage
-replacement through a receiver remain rejected. Heap storage containing a
+lived heap. Reference-field assignment is supported; cross-call borrowed storage
+replacement through a receiver requires a matching `stores` contract. Heap storage containing a
 reference to an already-borrowed pointee is also still rejected; arbitrary nested
 stored lifetimes require further work.
 
@@ -856,5 +853,39 @@ Identical retained root/parent/mode/layer records are merged, so repeating the
 same replacement does not retain one loan record per input. A failed RHS leaves the old reference value when the store was not executed.
 REPL checking failures discard staged loans; runtime failures retain candidate
 roots conservatively because earlier stores in the input may have executed.
-Replacing borrowed storage through `&mut` receivers, multi-layer stored borrowed
-pointees and borrowed slice elements still require further lifetime work.
+Multi-layer stored borrowed pointees and borrowed slice elements still require
+further lifetime work.
+
+
+## Borrowed replacement through functions
+
+```cool
+struct View { value: &i64; }
+fn set(dst: &mut View, src: &i64) stores(dst,src) {
+    (*dst).value=src;
+}
+fn forward(dst: &mut View, src: &i64) stores(dst,src) {
+    set(dst,src);
+}
+```
+
+`stores(dst,src)` says that `src` may become part of the borrowed contents of
+`dst`. Both are parameter names. Multiple distinct pairs are allowed, including
+self-source relations. The destination must be an exclusive reference to a type
+containing borrows; the source must contain borrows. The body is checked against
+all declared relations. A caller-local value cannot be installed in a destination
+that outlives it, and a callee-local value cannot escape into caller storage.
+
+The destination and live receivers retain old/new source roots until the
+original holder is released. Shared sources allow reads but prevent direct
+writes; exclusive sources also prevent direct reads. Parent and child receiver
+capabilities remain distinct. A computed receiver conservatively retains roots
+at all possible actual destinations. Return `borrows` clauses are separate and
+must cover installed sources when those sources can appear in the return value.
+
+Contracts are part of compatible REPL function replacement. A rejected input
+discards staged roots; a runtime error after a setter preserves candidate roots
+and may leave the stored value changed. Foreign C declarations cannot declare
+checked `stores` effects. `make stores-test` checks both frontends, five engines,
+O2, modeled root permissions and REPL behavior; `make stores-sanitize-test` adds
+an instrumented compiler and generated LLVM/runtime checks.

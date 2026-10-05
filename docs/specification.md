@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 25
+# Cool language specification — 1.0 draft 26
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -109,8 +109,9 @@ parameter      = identifier, ":", type ;
 parameters     = "(", [ parameter, { ",", parameter } ], ")" ;
 result         = "->", type ;
 borrow_contract = "borrows", "(", [ identifier, { ",", identifier } ], ")" ;
+store_contract = "stores", "(", identifier, ",", identifier, ")" ;
 function_decl  = [ "pub" ], "fn", function_name, [ generic_names ],
-                 parameters, [ result ], [ borrow_contract ], block ;
+                 parameters, [ result ], [ borrow_contract ], { store_contract }, block ;
 extern_decl    = [ "pub" ], "extern", '"C"', "fn", identifier,
                  parameters, [ result ], [ borrow_contract ], ";" ;
 export_decl    = [ "pub" ], "export", '"C"', "fn", identifier,
@@ -727,6 +728,9 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 26: add checked `stores(destination,source)` contracts, caller lifetime
+  retention and compatible REPL replacement effects; keep nested stored work open.
+
 - Draft 19: specify primitive floating operation normalization and unordered
   comparisons; correct bootstrap NaN comparison behavior with carrier-bit tests.
 - Draft 18: validate unused generic nominal member grammar, uniqueness, type
@@ -923,3 +927,32 @@ Borrowed storage replacement through reference receivers remains unfinished:
 callee parameters do not yet express the destination's retained lifetime.
 Nested stored borrowed pointees and borrowed slice elements remain mandatory
 work. This revision does not change the 1.0 release status.
+
+
+## Draft 26: checked borrowed storage mutation
+
+An exclusive reference to borrowed storage can install borrowed values through
+`stores(destination, source)` signature relations. Relations follow the optional
+return `borrows` contract, can repeat for distinct pairs, and are part of the
+function's REPL replacement signature. Destinations require `&mut T` with a
+borrowed `T`; sources must contain borrows. Unknown names, duplicate pairs and
+known incompatible types are errors even in unused templates. Dependent template
+type constraints are checked on specialization. Foreign declarations cannot
+promise checked storage effects; C/raw-pointer access retains its unsafe duties.
+
+The body must declare every possible parameter source installed into every
+possible parameter destination. Function-local roots cannot escape into caller
+storage. Caller checking retains the union of old and incoming roots at each
+actual destination's original lifetime marker. All actual roots of computed
+receivers are checked. Shared/exclusive payload permissions are preserved and
+live reborrow ancestry gains installed roots. Call arguments remain protected
+while later arguments are evaluated; installation effects and return-contract
+root selection are applied after argument checking. A setter that also returns
+a borrow must include all possible return sources in `borrows`.
+
+This supports local and cross-call replacement of reference fields, borrowed
+aggregates, slices and borrowed owning handles. Repeated identical retained
+edges are merged. Compilation rejection rolls back staged loans; REPL runtime
+failure retains candidate roots because a store may already have executed.
+Multi-layer stored borrowed pointees and borrowed slice elements remain required
+work. All 1.0 release gates remain open.

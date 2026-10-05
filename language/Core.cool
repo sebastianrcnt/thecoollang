@@ -173,7 +173,7 @@ Local *repl_allocated_locals;
 class DropSlot { I64 slot, type; DropSlot *next; };
 class ByteAllocation { ByteAllocation *next; };
 class Function {
-    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, exported, generic_count, origin, signature, borrow_contract, has_contract; Local *all_locals,*allocated_locals; ReplNode *nodes; DropSlot *drops;
+    U8 *name, *package; I64 result, argc, slots, begin, end, public, foreign, exported, generic_count, origin, signature, borrow_contract, has_contract, store_destinations; I64 store_contract[32]; Local *all_locals,*allocated_locals; ReplNode *nodes; DropSlot *drops;
     U8 *generic_names[8]; I64 generic_args[8];
     U8 *bytecode, *machine; ByteAllocation *byte_allocations; I64 code_count, code_capacity, registers, calls, machine_size;
     U8 *arg_names[32]; I64 arg_types[32]; Node *body; Token *token;
@@ -302,6 +302,9 @@ extern Bool ReferenceStorage(I64 type);
 extern U0 ReferenceMatchBinding(Node *binding);
 extern U0 ValidateReferenceStorage(I64 type, Token *token);
 extern U0 AnalyzeReferences(Function *function);
+extern U0 StoreSignature(Function *f,Bool concrete);
+extern Bool StoreSignatureSame(Function *a,Function *b);
+extern U0 BorrowCallStores(Node *node);
 
 extern Node *RawReferenceExpression();
 extern Node *ReferencePointerCast(Node *value,I64 type,Token *token);

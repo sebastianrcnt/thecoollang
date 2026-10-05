@@ -9,6 +9,7 @@
 #include "TemplateBody.cool"
 #include "TemplateAggregate.cool"
 #include "References.cool"
+#include "Stores.cool"
 #include "Methods.cool"
 #include "Interpreter.cool"
 #include "LLVM.cool"

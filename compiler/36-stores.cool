@@ -1,0 +1,279 @@
+// A stores(destination,source) signature relation retains source provenance in
+// caller-owned storage. Contracts are checked in bodies and instantiated calls.
+fn StoreSignature(function: * Function, concrete: bool) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        function.store_destinations = 0;
+        for (var i: i64 = 0; i < 32; i = i + 1) {
+            function.store_contract[i] = 0;
+        }
+        while (Is(cast[ * u8]("stores")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[ * u8]("expected '(' after stores"));
+            let destination = Ident();
+            Need(44, cast[ * u8]("expected source after stores destination"));
+            let source = Ident();
+            Need(41, cast[ * u8]("expected ')' after stores contract"));
+            var dst: i64 = 0;
+            while (dst < function.argc && Eq(function.arg_names[dst], destination) == i8(0)) {
+                dst = dst + 1;
+            }
+            var src: i64 = 0;
+            while (src < function.argc && Eq(function.arg_names[src], source) == i8(0)) {
+                src = src + 1;
+            }
+            if (dst == function.argc || src == function.argc) {
+                Error(cast[ * u8]("unknown parameter in stores contract"));
+            }
+            if ((function.store_contract[dst] & (1 << src)) != 0) {
+                Error(cast[ * u8]("duplicate stores relation"));
+            }
+            {
+                let type = function.arg_types[dst];
+                if ((concrete || type >= 0) && (!IsReference(type) || Shape(type).count == 0 || !TrackedBorrow(Shape(type).element))) {
+                    Error(cast[ * u8]("stores destination requires an exclusive reference to borrowed storage"));
+                }
+                if ((concrete || function.arg_types[src] >= 0) && !TrackedBorrow(function.arg_types[src])) {
+                    Error(cast[ * u8]("stores source must contain borrowed references"));
+                }
+                if (function.foreign != 0) {
+                    Error(cast[ * u8]("extern C stores contracts require a checked Cool body"));
+                }
+            }
+            function.store_destinations = function.store_destinations | (1 << dst);
+            function.store_contract[dst] = function.store_contract[dst] | (1 << src);
+        }
+    }
+}
+fn StoreSignatureSame(left: * Function, right: * Function) -> bool {
+    unsafe {
+        if (left.store_destinations != right.store_destinations) {
+            return false;
+        }
+        for (var i: i64 = 0; i < 32; i = i + 1) {
+            if (left.store_contract[i] != right.store_contract[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+fn CallArgument(node: * Node, index: i64) -> * Node {
+    unsafe {
+        var arg = node.a;
+        var remaining = index;
+        while (remaining > 0 && arg != null) {
+            arg = arg.next;
+            remaining = remaining - 1;
+        }
+        return arg;
+    }
+}
+fn BorrowCallStores(node: * Node) {
+    unsafe {
+        if (node.slot < 0) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let function = & raw ctx.v_functions[node.slot];
+        if (function.store_destinations == 0) {
+            return;
+        }
+        for (var dst: i64 = 0; dst < function.argc; dst = dst + 1) {
+            for (var src: i64 = 0; src < function.argc; src = src + 1) {
+                if ((function.store_contract[dst] & (1 << src)) != 0) {
+                    RecordBorrowDestination(CallArgument(node, dst), CallArgument(node, src));
+                }
+            }
+        }
+    }
+}
+fn ReferenceStoreContract(check: * ReferenceCheck, origins: i64, value: * Node, token: * Token) {
+    unsafe {
+        let region = Region(value);
+        if (region == 0) {
+            return;
+        }
+        let function = check.function;
+        if ((origins & 4294967295) != 0 && (region & 1099511627776) != 0) {
+            ErrorAt(token, cast[ * u8]("stored borrow may outlive destination storage; function-local roots cannot be installed in caller storage"));
+        }
+        for (var dst: i64 = 0; dst < function.argc; dst = dst + 1) {
+            if ((origins & (1 << dst)) != 0 && (region & ~function.store_contract[dst]) != 0) {
+                ErrorAt(token, cast[ * u8]("borrowed storage cannot be replaced through a reference without a matching stores(destination,source) contract"));
+            }
+        }
+    }
+}
+// Retain a single capability at the original holder marker. A forced parent
+// preserves physical receiver ancestry when an installed payload gains roots.
+fn ReferenceStoreRetain(check: * ReferenceCheck, target: * Local, source: * ReferenceLoan, value: * Node, stop: * ReferenceLoan, layer: i64, parent: * Local) {
+    unsafe {
+        var marker = stop;
+        while (marker != null && !(marker.root == null && marker.holder == target)) {
+            marker = marker.next;
+        }
+        if (marker == null) {
+            ErrorAt(value.token, cast[ * u8]("borrowed replacement requires tracked destination storage"));
+        }
+        if (source.root.depth > target.depth) {
+            ErrorAt(value.token, cast[ * u8]("assigned borrow may outlive local storage"));
+        }
+        var ancestry = source.parent;
+        if (parent != null) {
+            if (ReferenceAncestor(check, target, parent, source.root)) {
+                ErrorAt(value.token, cast[ * u8]("borrowed replacement would create cyclic receiver ancestry"));
+            }
+            ancestry = parent;
+        } else {
+            if (ReferenceAncestor(check, target, ancestry, source.root)) {
+                let old = ReferenceHolder(check, target, source.root);
+                if (old != null) {
+                    ancestry = old.parent;
+                } else {
+                    ancestry = null;
+                }
+            }
+        }
+        var existing = marker.next;
+        while (existing != null && !(existing.holder == target && existing.root == source.root && existing.parent == ancestry && existing.exclusive == source.exclusive && existing.indirect == layer)) {
+            existing = existing.next;
+        }
+        if (existing == null) {
+            let retained = ReferenceNew(source.root, ancestry, source.exclusive, layer, value, marker.next);
+            retained.holder = target;
+            marker.next = retained;
+        }
+    }
+}
+fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, stop: * ReferenceLoan) {
+    unsafe {
+        var source = check.loans;
+        while (source != stop) {
+            if (source.expression == value && source.root != null && source.holder == null) {
+                var layer = source.indirect;
+                if (NestedReference(target.type)) {
+                    layer = 1;
+                }
+                ReferenceStoreRetain(check, target, source, value, stop, layer, null);
+                // Every live receiver of this physical destination gains the installed
+                // payload roots. Its parent follows the physical reborrow ancestry.
+                var physical = stop;
+                while (physical != null) {
+                    if (physical.root == target && physical.indirect == 0 && physical.holder != null && physical.holder != target && NestedReference(physical.holder.type)) {
+                        var copy = * source;
+                        copy.exclusive = copy.exclusive & Shape(physical.holder.type).count;
+                        var parent = physical.parent;
+                        if (parent == null) {
+                            parent = target;
+                        }
+                        ReferenceStoreRetain(check, physical.holder, & raw copy, value, stop, 1, parent);
+                    }
+                    physical = physical.next;
+                }
+            }
+            source = source.next;
+        }
+    }
+}
+fn ReferenceStoreDestination(check: * ReferenceCheck, destination: * Node, origin: * Node, value: * Node, stop: * ReferenceLoan) {
+    unsafe {
+        let via = BorrowRoot(destination);
+        var resolved = false;
+        // A direct non-reference place has its own original holder.
+        if (origin == null && via != null && !IsReference(via.type)) {
+            ReferenceInstall(check, via, value, stop);
+            return;
+        }
+        var loan = check.loans;
+        while (loan != null) {
+            if (loan.root != null && loan.indirect == 0 && ((origin != null && origin.kind != 3 && loan.holder == null && loan.expression == origin) || (via != null && loan.holder == via))) {
+                ReferenceInstall(check, loan.root, value, stop);
+                resolved = true;
+            }
+            loan = loan.next;
+        }
+        if (!resolved) {
+            ErrorAt(value.token, cast[ * u8]("borrowed replacement requires a tracked physical destination"));
+        }
+    }
+}
+fn ReferenceStore(check: * ReferenceCheck, place: * Node, value: * Node, stop: * ReferenceLoan) {
+    unsafe {
+        ReferenceStoreContract(check, BorrowPlaceRegion(place, true), value, place.token);
+        let origin = ReferencePlaceSource(place);
+        ReferenceStoreDestination(check, place, origin, value, stop);
+    }
+}
+fn ReferenceCallStores(check: * ReferenceCheck, node: * Node, stop: * ReferenceLoan) {
+    unsafe {
+        if (node.slot < 0) {
+            return;
+        }
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let function = & raw ctx.v_functions[node.slot];
+        if (function.store_destinations == 0) {
+            return;
+        }
+        for (var dst: i64 = 0; dst < function.argc; dst = dst + 1) {
+            let destination = CallArgument(node, dst);
+            for (var src: i64 = 0; src < function.argc; src = src + 1) {
+                if ((function.store_contract[dst] & (1 << src)) != 0) {
+                    let value = CallArgument(node, src);
+                    ReferenceStoreContract(check, OriginRegion(destination), value, node.token);
+                    // Call arguments already hold physical layer-zero result loans, including
+                    // named receivers reborrowed for this particular call.
+                    var physical = check.loans;
+                    var resolved = false;
+                    while (physical != stop) {
+                        if (physical.expression == destination && physical.holder == null && physical.indirect == 0 && physical.root != null) {
+                            ReferenceInstall(check, physical.root, value, stop);
+                            resolved = true;
+                            var source = check.loans;
+                            while (source != stop) {
+                                if (source.expression == value && source.holder == null && source.root != null) {
+                                    check.loans = ReferenceNew(source.root, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
+                                }
+                                source = source.next;
+                            }
+                        }
+                        physical = physical.next;
+                    }
+                    if (!resolved) {
+                        ErrorAt(node.token, cast[ * u8]("stores call requires a tracked physical destination"));
+                    }
+                }
+            }
+        }
+    }
+}
+fn ReferenceParameters(check: * ReferenceCheck) {
+    unsafe {
+        var local = check.function.all_locals;
+        while (local != null) {
+            if (local.depth == 0 && TrackedBorrow(local.type)) {
+                var payload = local;
+                if (!IsReference(local.type) || NestedReference(local.type)) {
+                    payload = AllocateLocal();
+                    payload.region = local.region;
+                    payload.place_region = local.place_region;
+                    payload.all_next = check.function.all_locals;
+                    check.function.all_locals = payload;
+                }
+                var physical = local;
+                if (!IsReference(local.type)) {
+                    physical = payload;
+                }
+                check.loans = ReferenceNew(physical, null, ReferenceMode(local.type), 0, null, check.loans);
+                check.loans.holder = local;
+                if (NestedReference(local.type)) {
+                    check.loans = ReferenceNew(payload, null, Shape(local.type).count & ReferenceMode(Shape(local.type).element), 1, null, check.loans);
+                    check.loans.holder = local;
+                }
+                check.loans = ReferenceNew(null, null, 0, 0, null, check.loans);
+                check.loans.holder = local;
+            }
+            local = local.all_next;
+        }
+    }
+}

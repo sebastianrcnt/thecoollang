@@ -4229,6 +4229,7 @@ t48 = (v_f8).token;
 t49 = cast[*u8]("returning borrowed values requires a borrows(parameter) contract");
 ErrorAt(t48, t49);
 }
+StoreSignature(v_f8,true);
 ValidateMethodSignature(v_f8);
 }
 return;
@@ -5089,6 +5090,7 @@ pc = 100;
 continue;
 }
 if (pc == 105) {
+if(!StoreSignatureSame(v_old,v_f9)){ErrorAt(v_f9.token,cast[*u8]("signature change requires a new session"));}
 if (v_old.foreign != v_f9.foreign || v_old.exported != v_f9.exported) { ErrorAt(v_f9.token, cast[*u8]("C ABI change requires a new session")); }
 t97 = ((v_old).argc != (v_f9).argc);
 if (!t97) {
