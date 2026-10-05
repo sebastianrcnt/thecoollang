@@ -3075,6 +3075,17 @@ through ordinary evaluation or library use.
   "useful source diagnostics"; the broader ergonomics and diagnostics audit
   stays Open.
 
+- Borrowed map iteration: `std/map` now exposes `iter`/`Map.iter` returning a
+  private `Iterator[V]` that walks the AVL tree in key order. It holds a `&Map`
+  loan, a raw left spine bounded by the AVL depth (asserted at 64) and a
+  remaining count; `next` yields `Option[&V]` and the value reference borrows
+  the iterator, so `next` cannot run while a result is retained and the map
+  cannot change while the iterator lives. `tools/test_map_iteration.py` checks
+  64-key sorted values against a Python model, `remaining()` countdown,
+  empty-map `None` and the mutation/retention rejections on five engines + O2 on
+  both frontends. This extends G5's borrowed collection iteration; aggregate
+  iteration and the broader G5 audit stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

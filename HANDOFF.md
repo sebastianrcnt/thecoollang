@@ -83,7 +83,8 @@ owner worklist 회피를 구현해 소멸 성능 회귀를 줄였다. `75304cb`�
    인터프리터 shallow-drop fast path를 추가한다. lifetime/destructor 검사를
    유지한다.
 2. G2/G4/G5: 저장된 참조, tracked iteration, 남은 collection API와 임시
-   receiver 제약을 확장한다. 명세/참조 문서의 제약을 갱신한다.
+   receiver 제약을 확장한다(map in-order iterator 추가됨). 명세/참조
+   문서의 제약을 갱신한다.
 3. G6: REPL 세션 자원의 bounded/reclaimable 처리를 완성한다.
 4. G9: slice·aggregate·재배치까지 fuzz를 확장한다(평가 순서·소유권은
    `tools/test_ownership_fuzz.py`, scoped loan은 `tools/test_borrow_fuzz.py`로

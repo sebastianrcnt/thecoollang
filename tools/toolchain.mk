@@ -629,3 +629,9 @@ test: borrow-fuzz-test
 diagnostics-test: build/cool-compiler build/language.BIN
 	python3 tools/test_diagnostics.py
 test: diagnostics-test
+
+# Borrowed in-order map iteration with sorted values and conflict checks.
+.PHONY: map-iteration-test
+map-iteration-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_map_iteration.py --output build/map-iteration-audit.json
+test: map-iteration-test

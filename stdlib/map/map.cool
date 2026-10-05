@@ -250,6 +250,55 @@ pub fn keys[V](map: & Map[V]) -> vector.Vector[text.Text] {
     collect[V](root_pointer[V](map), & mut output);
     return move output;
 }
+// Borrowed in-order iteration. The iterator holds raw node links and a left
+// spine bounded by the AVL depth (64 covers any realistic count). Returned
+// value references borrow the iterator, so next() cannot run while a value
+// result is retained, and the map cannot change while the iterator lives.
+pub struct Iterator[V] {
+    source: & Map[V];
+    stack: [64]* Node[V];
+    depth: usize;
+    count: usize;
+}
+pub fn iter[V](source: & Map[V]) -> Iterator[V]borrows(source) {
+    var result = Iterator[V] {
+        source: source, stack: [64]* Node[V] {}, depth: 0, count: ( * source).count
+    };
+    unsafe {
+        var node = root_pointer[V](source);
+        while (node != null) {
+            assert(result.depth < 64);
+            result.stack[result.depth] = node;
+            result.depth = result.depth + 1;
+            node = pointer[V]( & raw( * node).left);
+        }
+    }
+    return result;
+}
+pub fn Iterator.remaining[V](self: & Iterator[V]) -> usize {
+    return ( * self).count;
+}
+pub fn Iterator.next[V](self: & mut Iterator[V]) -> option.Option[ & V]borrows(self) {
+    unsafe {
+        if (( * self).depth == 0) {
+            return option.Option[ & V].None;
+        }
+        ( * self).depth = ( * self).depth - 1;
+        let node = ( * self).stack[( * self).depth];
+        var child = pointer[V]( & raw( * node).right);
+        while (child != null) {
+            assert(( * self).depth < 64);
+            ( * self).stack[( * self).depth] = child;
+            ( * self).depth = ( * self).depth + 1;
+            child = pointer[V]( & raw( * child).left);
+        }
+        ( * self).count = ( * self).count - 1;
+        return option.Option[ & V].Some(borrow_raw[ & V]( & raw( * node).value, self));
+    }
+}
+pub fn Map.iter[V](self: & Map[V]) -> Iterator[V]borrows(self) {
+    return iter[V](self);
+}
 pub fn Map.len[V](self: & Map[V]) -> usize {
     return ( * self).count;
 }
