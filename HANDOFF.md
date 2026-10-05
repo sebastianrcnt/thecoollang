@@ -52,13 +52,14 @@ git show --stat HEAD
   슬롯에서 worklist를 건너뛴다.
 - Release O2 소멸 마이크로벤치(3회, 7샘플 교대): shallow 원소별 owner drop과
   300-wide 배열은 이전 재귀 코드와 동등, 재귀 체인 ~1.16x, 500k 바이트 vector
-  해제 ~1.33x. 잔여 비용은 재귀 타입에 대한 bounded worklist 비용이며 G8
-  후속 과제다. 인터프리터 backend는 shallow drop에서 iterative-DFS frame
-  비용을 아직 지불한다(fast path 미구현).
+  해제 ~1.35x. 잔여 비용은 재귀 타입에 대한 bounded worklist 비용이며 G8
+  후속 과제다. 두 인터프리터도 shallow 소멸은 native 재귀로 처리하고 깊이
+  예산을 넘을 때만 explicit-frame DFS로 넘어가, tree/interp 소멸 비용이
+  ~1.34x/1.24x에서 ~1.18x/1.19x로 줄었다.
 - 전체 회귀 `make -k -j4 test bootstrap-check editor-distribution-test
   borrowed-vector-sanitize-test nested-reference-slice-sanitize-test
   stores-sanitize-test` exit 0. 두 bootstrap 경로와 self-host 수렴 통과
-  (self-host IR SHA256 `6f186acc8c51245b...`). drop-depth sanitizer는 runtime
+  (self-host IR SHA256 `21f9f88504284a28...`). drop-depth sanitizer는 runtime
   ASan/UBSan + ASan frontend 포함 129 실행 통과.
 
 로컬 증거:

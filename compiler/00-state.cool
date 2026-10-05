@@ -485,6 +485,8 @@ v_execution_mode: i64;
 
 v_owner_live: i64;
 
+v_drop_depth: i64;
+
 v_ir: *Text;
 
 v_globals: *Text;

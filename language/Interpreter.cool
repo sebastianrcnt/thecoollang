@@ -62,9 +62,29 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
     return Normalize(result, n->type);
 }
 I64 owner_live;
+I64 drop_native_depth;
 // Explicit DFS frames bound native stack use while preserving drop order.
 class RuntimeDropFrame {I64 address,type,state,remaining,stride;Field *field;};
+extern U0 DropValue(I64 address, I64 type);
+U0 DropValueRecursive(I64 address, I64 type) {
+    I64 pointer, i, tag; Field *field;
+    if (!Owned(type)) return;
+    if (AggregateKind(type) == A_OWNER) {
+        pointer = address(I64 *)[0]; if (!pointer) return; address(I64 *)[0] = 0;
+        DropValue(pointer, Shape(type)->element); Free(pointer(U8 *)); owner_live--; return;
+    }
+    if (AggregateKind(type) == A_ARRAY) { for (i = 0; i < Shape(type)->count; i++) DropValue(address+i*ByteSize(Shape(type)->element), Shape(type)->element); return; }
+    if (AggregateKind(type) == A_ENUM) { tag = address(I64 *)[0]; for (field = Shape(type)->fields; field; field = field->next) if (field->tag == tag) { DropValue(address+field->offset, field->type); return; } }
+    else for (field = Shape(type)->fields; field; field = field->next) DropValue(address+field->offset, field->type);
+}
+
+extern U0 DropValueIterative(I64 address, I64 type);
 U0 DropValue(I64 address,I64 type){
+ if(!Owned(type))return;
+ if(drop_native_depth<256){drop_native_depth++;DropValueRecursive(address,type);drop_native_depth--;return;}
+ DropValueIterative(address,type);
+}
+U0 DropValueIterative(I64 address,I64 type){
  RuntimeDropFrame inline_frames[32],*inline_pointer=inline_frames,*frames,*frame,*grown;
  I64 pointer,capacity=32,count=1,child_address,child_type,tag;AggregateType *shape;Field *field;Bool descend;
  if(!Owned(type))return;

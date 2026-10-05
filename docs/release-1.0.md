@@ -3022,7 +3022,7 @@ through ordinary evaluation or library use.
   bootstrap-check editor-distribution-test borrowed-vector-sanitize-test
   nested-reference-slice-sanitize-test stores-sanitize-test` exits 0 in
   `build/drop-depth/full-regression.log`; both bootstrap paths converge
-  (self-host IR SHA256 begins `6f186acc8c51245b`).
+  (self-host IR SHA256 begins `21f9f88504284a28`).
 
   Ordinary destruction keeps direct-call cost. Types whose structural drop
   depth is bounded are emitted as direct recursive drops with no dispatcher,
@@ -3033,10 +3033,12 @@ through ordinary evaluation or library use.
   chains / 500k-byte vector teardown at ~1.16x / ~1.33x. The residual is the
   cost of the bounded worklist on recursive types and remains the G8 follow-up
   named below. Evidence and methodology: `tools/bench_drop_depth.py` and
-  `docs/benchmarks/drop-depth-arm64.json`. The interpreter backends still pay
-  the iterative-DFS frame cost on shallow drops; an interpreter fast path is
-  not implemented. Broader depth/store/slice audits, safety fuzzing and every
-  remaining mandatory gate stay Open.
+  `docs/benchmarks/drop-depth-arm64.json`. Both interpreters also recurse
+  natively for shallow destruction and only reach the explicit-frame DFS past a
+  depth budget, so `tools/cool run` on the destruction-heavy shallow program
+  moves from ~1.34x/1.24x (tree/interp) to ~1.18x/1.19x. Broader
+  depth/store/slice audits, safety fuzzing and every remaining mandatory gate
+  stay Open.
 
 ## Next implementation checkpoints
 
