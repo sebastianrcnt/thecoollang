@@ -118,6 +118,21 @@ fn TemplateValueName(f: *Function, scope: *TemplateScope, token: *Token, name: *
         if (qualified && ctx.v_functions[id].public == i8(0)) { ErrorAt(token, cast[*u8]("function is private to its package")); }
     }
 }
+// Completion inside an uninstantiated generic body: template locals are not
+// in ctx.v_locals, so emit them from the template scope, then the general items.
+fn TemplateCompletion(scope: * TemplateScope) {
+    unsafe {
+        if (!CompletionAt()) {
+            return;
+        }
+        var i = 0;
+        while (i < scope.count) {
+            CompletionItem(scope.names[i], 6);
+            i = i + 1;
+        }
+        CompletionGeneral(false);
+    }
+}
 fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
@@ -167,6 +182,7 @@ fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
         } else if (kind == 257 || kind == 268 || kind == 258) {
             ctx.v_pos = ctx.v_pos + 1;
         } else {
+            TemplateCompletion(scope);
             let token = At();
             var name = Ident();
             var package = token.package;
@@ -269,10 +285,26 @@ fn TemplateBlock(f: * Function, scope: * TemplateScope, nesting: i64, loops: i64
         scope.count = saved;
     }
 }
+// Statement-position completion inside a generic body: keywords plus the
+// template locals, then the general items.
+fn TemplateStatementCompletion(scope: * TemplateScope) {
+    unsafe {
+        if (!CompletionAt()) {
+            return;
+        }
+        var i = 0;
+        while (i < scope.count) {
+            CompletionItem(scope.names[i], 6);
+            i = i + 1;
+        }
+        CompletionStatement();
+    }
+}
 fn TemplateStatement(f: * Function, scope: * TemplateScope, nesting: i64, loops: i64) {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         TemplateDepth(nesting);
+        TemplateStatementCompletion(scope);
         if (At().kind == 123) {
             TemplateBlock(f, scope, nesting + 1, loops);
             return;

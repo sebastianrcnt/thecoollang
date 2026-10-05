@@ -206,6 +206,10 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             completion('package main;import "std/|";fn main(){}',{'std/io','std/text'},{'example.test/editor/lib'})
             completion('package main;import "example.test/editor/|";fn main(){}',{'example.test/editor/lib'},{'std/io'})
             completion('package main;import "std/text";import "|";fn main(){}',{'std/io'},{})
+            completion('package main;fn g[T](value:T)->T{let local=1;loc|}',{'local'})
+            completion('package main;fn g[T](value:T)->T{val|}',{'value'})
+            completion('package main;fn g[T](value:T)->T{|}',{'let','return','value','i64'})
+            completion('package main;fn g[T](value:T)->T{ret|}',{'return'})
             completion(pre+'while(true){br|;}}',{'break'})
             completion(pre+'/* finished */pri|',{'prior'})
             assert completion(pre+'// pri|\n}',set())['items']==[]

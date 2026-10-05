@@ -82,8 +82,9 @@ report those errors.
 This is bounded recovery, not a general error-tolerant parser: errors in earlier
 statements of the requested function, invalid declarations/signatures, missing
 dependencies and lexical errors may prevent the cursor from being reached.
-Import strings complete from the stdlib and workspace module graph; uninstantiated
-generic bodies still need completion support.
+Import strings complete from the stdlib and workspace module graph, and
+uninstantiated generic bodies complete their template locals, statement
+keywords and general items.
 The server returns an empty incomplete list when scanning/checking fails. Each
 request uses synchronous analysis with the same native-process timeout; requests
 are not yet cancellable or debounced.

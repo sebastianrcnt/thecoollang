@@ -42,6 +42,18 @@ U0 TemplateValueName(Function *f,TemplateScope *scope,Token *token,U8 *name,U8 *
     if(id<0)ErrorAt(token,"unknown name in template body");
     if(qualified && !functions[id].public)ErrorAt(token,"function is private to its package");
 }
+// Completion inside an uninstantiated generic body: template locals are not
+// in the current function's locals, so emit them from the template scope.
+U0 TemplateCompletion(TemplateScope *scope){
+    I64 i;if(!CompletionAt())return;
+    for(i=0;i<scope->count;i++)CompletionItem(scope->names[i],6);
+    CompletionGeneral(FALSE);
+}
+U0 TemplateStatementCompletion(TemplateScope *scope){
+    I64 i;if(!CompletionAt())return;
+    for(i=0;i<scope->count;i++)CompletionItem(scope->names[i],6);
+    CompletionStatement();
+}
 U0 TemplatePrimary(Function *f,TemplateScope *scope,I64 nesting){
     I64 kind=At()->kind;Bool typed=FALSE,qualified=FALSE;U8 *name,*package;Token *token;
     TemplateDepth(nesting);
@@ -61,6 +73,7 @@ U0 TemplatePrimary(Function *f,TemplateScope *scope,I64 nesting){
     else if(Take('(')){TemplateExpression(f,scope,1,nesting+1);Need(')',"expected ')'");}
     else if(kind==K_INT || kind==K_FLOAT || kind==K_STRING){pos++;}
     else{
+        TemplateCompletion(scope);
         token=At();name=Ident();package=token->package;typed=FindType(package,name)>=0;
         // Imports can qualify a nominal type; local projections remain unresolved.
         if(!typed && !TemplateHasLocal(scope,name) && At()->kind=='.' && tokens[pos+1].kind==K_ID){
@@ -95,7 +108,7 @@ U0 TemplateBlock(Function *f,TemplateScope *scope,I64 nesting,I64 loops){
     scope->count=saved;
 }
 U0 TemplateStatement(Function *f,TemplateScope *scope,I64 nesting,I64 loops){
-    Bool loop;I64 saved;U8 *name;TemplateDepth(nesting);
+    Bool loop;I64 saved;U8 *name;TemplateDepth(nesting);TemplateStatementCompletion(scope);
     if(At()->kind=='{'){TemplateBlock(f,scope,nesting+1,loops);return;}
     if(Is("unsafe")){pos++;TemplateBlock(f,scope,nesting+1,loops);return;}
     if(Is("if") || Is("while")){

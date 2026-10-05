@@ -3108,6 +3108,16 @@ through ordinary evaluation or library use.
   one documented G7 completion gap; uninstantiated generic bodies and broader
   recovery remain Open.
 
+- Generic-body completion: completion inside an uninstantiated generic function
+  body now emits the template locals (generic parameters and body bindings),
+  statement keywords and the general item set, matching the non-generic body.
+  `TemplateBodyCheck` checks generic bodies through a `TemplateScope`; the
+  completion hook emits those locals before the shared statement/general
+  completion. Both frontends implement it and `make lsp-test` adds four
+  generic-body cases (partial local, parameter prefix, empty statement position
+  and `ret` keyword). This closes the second documented G7 completion gap;
+  broader recovery remains Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
