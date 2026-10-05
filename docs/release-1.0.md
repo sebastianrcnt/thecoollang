@@ -1067,6 +1067,24 @@ through ordinary evaluation or library use.
   The encoding decision is explicit pre-freeze behavior; it does not close the
   remaining whole-spec conformance, generics, ownership and release gates.
 
+- Unused generic function signatures: draft 13 makes declaration-time grammar
+  validation explicit. Previously the parser skipped every token between the
+  generic parameter list and the opening body brace, accepting duplicate value
+  parameters, malformed type/parameter/result syntax and unknown names in borrow
+  contracts until a specialization was requested. Both frontends now use a
+  bounded syntax-only type walk and a stack-local parameter-name table without
+  creating concrete type bindings or mutating layouts. The declaration suite
+  covers 15 valid cases and 64 rejections, including unused templates and the
+  nesting/argument limits. A REPL regression rejects an invalid template, then
+  declares and calls a corrected template with the same name while preserving
+  an existing variable. Both frontends and the ASan compiler pass. Full regression,
+  self-host/bootstrap convergence and installed distribution/Neovim checks pass.
+  Evidence:
+  `build/release-audit/template-signature-{build,focused,final,regression,sanitize,distribution}.log`.
+  IR SHA256: `877765896b066ed32b8aa991099fdde9ccceb5219bfa553f5c352a365a3c3b16`.
+  This preflight does not discharge concrete type resolution, unused template
+  body/layout validation or the remaining G1/G4 requirements.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

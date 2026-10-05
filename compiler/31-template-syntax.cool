@@ -1,0 +1,75 @@
+// Template signature grammar is checked even when no specialization is used.
+// Concrete name resolution, layout and ownership remain specialization checks.
+fn TemplateTypeSyntax(nesting: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (nesting > 256) { Error(cast[*u8]("template type syntax nesting limit exceeded")); }
+        if (Take(38) != i8(0)) {
+            if (Is(cast[*u8]("mut")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
+            TemplateTypeSyntax(nesting + 1); return;
+        }
+        if (Take(42) != i8(0)) { TemplateTypeSyntax(nesting + 1); return; }
+        if (Is(cast[*u8]("own")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(91, cast[*u8]("expected '[' after own"));
+            TemplateTypeSyntax(nesting + 1);
+            Need(93, cast[*u8]("expected ']' after owned type")); return;
+        }
+        if (Take(91) != i8(0)) {
+            if (Take(93) == i8(0)) {
+                Need(257, cast[*u8]("array length must be an integer literal"));
+                Need(93, cast[*u8]("expected ']'"));
+            }
+            TemplateTypeSyntax(nesting + 1); return;
+        }
+        Ident(); if (Take(46) != i8(0)) { Ident(); }
+        if (Take(91) != i8(0)) {
+            var count: i64 = 0;
+            while (true) {
+                if (count == 8) { Error(cast[*u8]("generic argument limit exceeded")); }
+                TemplateTypeSyntax(nesting + 1); count = count + 1;
+                if (Take(44) == i8(0)) { break; }
+            }
+            Need(93, cast[*u8]("expected ']' after type arguments"));
+        }
+    }
+}
+fn TemplateSignatureSyntax() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var names: [32]*u8 = [32]*u8{};
+        var count: i64 = 0;
+        Need(40, cast[*u8]("expected '(' after function name"));
+        if (Take(41) == i8(0)) {
+            while (true) {
+                if (count == 32) { Error(cast[*u8]("function argument limit exceeded")); }
+                let name = Ident();
+                for (var i: i64 = 0; i < count; i = i + 1) {
+                    if (Eq(names[i], name) != i8(0)) { Error(cast[*u8]("duplicate parameter name")); }
+                }
+                names[count] = name; count = count + 1;
+                Need(58, cast[*u8]("expected ':' after parameter")); TemplateTypeSyntax(0);
+                if (Take(44) == i8(0)) { break; }
+            }
+            Need(41, cast[*u8]("expected ')'"));
+        }
+        if (Take(265) != i8(0)) { TemplateTypeSyntax(0); }
+        if (Is(cast[*u8]("borrows")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[*u8]("expected '(' after borrows"));
+            if (Take(41) == i8(0)) {
+                while (true) {
+                    let name = Ident(); var i: i64 = 0;
+                    while (i < count) {
+                        if (Eq(names[i], name) != i8(0)) { break; }
+                        i = i + 1;
+                    }
+                    if (i == count) { Error(cast[*u8]("unknown parameter in borrows contract")); }
+                    if (Take(44) == i8(0)) { break; }
+                }
+                Need(41, cast[*u8]("expected ')' after borrows contract"));
+            }
+        }
+        if (At().kind != 123) { Error(cast[*u8]("expected function body after signature")); }
+    }
+}

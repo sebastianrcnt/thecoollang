@@ -22,12 +22,19 @@ valid=[
  'fn f('+','.join(f'p{i}:i64' for i in range(32))+'){}fn main(){}',
  'struct G[A,B,C,D,E,F,G,H]{value:A;}fn main(){let g=G[i64,i64,i64,i64,i64,i64,i64,i64]{};}',
 ]
+valid += [
+ 'fn f[T](x:own[T],y:&mut T,z:[]T,a:[2]*T)->*T{}fn main(){}',
+ 'struct G[T]{value:T;}fn f[T](x:G[G[T]]){}fn main(){}',
+ 'fn f[T](x:&T)->&T borrows(x){return x;}fn main(){let n=1;let r=f[i64](&n);}',
+ 'fn f[T]('+','.join(f'p{i}:T' for i in range(32))+'){}fn main(){}',
+]
 duplicates=[
  'extern "C" fn f(x:i64,x:i64);fn main(){}',
  'extern "C" fn f(x:i64,x:f64);fn main(){}',
  'fn f(x:i64,x:i64){}fn main(){}',
  'export "C" fn f(x:i64,x:i64){}fn main(){}',
  'fn f[T](x:T,x:T){}fn main(){f[i64](1,2);}',
+ 'fn f[T](x:T,x:T){}fn main(){}',
 ]
 invalid=[
  'struct i64{}fn main(){}','struct S{}struct S{}fn main(){}',
@@ -48,6 +55,22 @@ invalid=[
  'fn f('+','.join(f'p{i}:i64' for i in range(33))+'){}fn main(){}',
  'struct G[A,B,C,D,E,F,G,H,I]{}fn main(){}',
 ]
+# Template declaration grammar must not depend on a call being present.
+template_invalid=[
+ 'fn f[T]{}', 'fn f[T](x T){}', 'fn f[T](x:){}',
+ 'fn f[T](x:T,){}', 'fn f[T](x:T {}', 'fn f[T](x:T y:T){}',
+ 'fn f[T]()->{}', 'fn f[T]()->T junk{}', 'fn f[T]();',
+ 'fn f[T](x:own T){}', 'fn f[T](x:own[]){}', 'fn f[T](x:own[T){}',
+ 'fn f[T](x:[1+1]T){}', 'fn f[T](x:[-1]T){}', 'fn f[T](x:[] ){}',
+ 'fn f[T](x:G[]){}', 'fn f[T](x:G[T,]){}', 'fn f[T](x:G[T){}',
+ 'fn f[T](x:p.){}', 'fn f[T](x:* ){}', 'fn f[T](x:&mut ){}',
+ 'fn f[T](x:T) borrows(missing){}', 'fn f[T](x:T) borrows(x,){}',
+ 'fn f[T](x:T) borrows x{}', 'fn f[T](x:T) borrows(x{}',
+ 'fn f[T]('+','.join(f'p{i}:T' for i in range(33))+'){}',
+ 'fn f[T](x:G['+','.join('T' for _ in range(9))+']){}',
+ 'fn f[T](x:'+'*'*258+'T){}',
+]
+invalid += [program+'fn main(){}' for program in template_invalid]
 env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
 with tempfile.TemporaryDirectory(prefix='cool declarations ') as temporary:
  source=Path(temporary)/'main.cool'
@@ -59,4 +82,7 @@ with tempfile.TemporaryDirectory(prefix='cool declarations ') as temporary:
    source.write_text(program);r=subprocess.run([*frontend,'check',source],capture_output=True,text=True,env=env,timeout=30)
    assert r.returncode==2,(frontend,program,r)
    if program in duplicates:assert 'duplicate parameter name' in r.stderr,r
+  recovery='var kept=7;\nfn retry[T](x:T,x:T){}\nfn retry[T](x:T)->T{return move x;}\nretry[i64](kept)\n:quit\n'
+  r=subprocess.run([*frontend,'repl-quiet'],input=recovery,capture_output=True,text=True,env=env,timeout=30)
+  assert r.returncode==0 and r.stdout=='7\n' and r.stderr.count('error:')==1 and 'duplicate parameter name' in r.stderr,r
 print(f'declarations: {len(valid)} valid grammar/boundary cases, {len(duplicates)} duplicate signatures and {len(invalid)} invalid declarations on {len(fronts)} frontends PASS')

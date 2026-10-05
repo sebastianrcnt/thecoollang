@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 12
+# Cool language specification — 1.0 draft 13
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -166,13 +166,19 @@ variable declarations are not supplied by these forms.
 Current checked implementation limits include eight generic parameters/arguments,
 32 function parameters, array lengths up to 65,536, and aggregate layouts up to
 512 KiB. These are resource limits, not permission to accept malformed syntax.
-Generic signatures/bodies and generic type layouts are still validated lazily
-when instantiated; complete validation of unused templates remains release work.
+Generic function signature syntax, unique parameter names, parameter/type-argument
+counts and names in borrow contracts are checked when declared, including unused
+templates. Template signature type syntax is limited to 256 nested type operators
+or argument lists. Concrete type resolution, layout, borrowed-result contracts
+and body semantics are still checked on instantiation. Complete validation of
+unused templates remains release work.
 
-`make declarations-test` covers eleven valid declaration/type/boundary cases and
-35 rejections, including duplicate extern/ordinary/export/instantiated-generic
-parameters, duplicate nominal members, malformed lists, invalid C signatures,
-method owners, borrow contracts and implementation limits, on both frontends.
+`make declarations-test` covers 15 valid declaration/type/boundary cases and
+64 rejections, including duplicate extern/ordinary/export/unused-generic
+parameters, duplicate nominal members, malformed template signatures, invalid C
+signatures, method owners, borrow contracts and implementation limits. REPL
+recovery also verifies that a rejected template does not reserve its name or
+change existing values, on both frontends.
 The wider package/method/reference suites cover visibility and lifetime behavior.
 
 ## Source files and package assembly

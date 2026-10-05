@@ -645,3 +645,17 @@ original file URI and raw bytes rather than redirecting its error to an open
 buffer when decoding fails. Diagnostic position mapping uses replacement
 characters only for malformed byte input. Valid source keeps the existing UTF-16
 mapping. This recovery path must not write replacement bytes back into the file.
+
+## Template signature preflight
+
+`TemplateSignatureSyntax` consumes a generic function signature at declaration
+time without binding type parameters or allocating concrete types. Its type
+syntax walk checks delimiters recursively, with a 256-level bound; parameters
+and type arguments retain the ordinary 32/8 limits. The parameter-name table
+lives on the stack and is used for duplicate and borrow-contract name checks.
+The cursor stops immediately before the required opening body brace. It must
+not populate `Function.argc` or concrete argument types: specialization starts
+with a cleared `Function` and runs the full `FunctionSignature` parser after
+binding real type arguments. Keep both syntax implementations and the concrete
+parser aligned when changing type grammar. Name resolution, borrowed type
+semantics and generic bodies are not certified by the preflight.

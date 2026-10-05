@@ -436,6 +436,46 @@ Bool Returns(Node *n) {
     if (n->kind == N_BLOCK) { n = n->a; while (n) { if (Returns(n)) return TRUE; n = n->next; } }
     return FALSE;
 }
+// Validate template signature grammar without inventing concrete type arguments.
+// Resolution, layout and ownership checks still run during specialization.
+U0 TemplateTypeSyntax(I64 nesting) {
+    I64 count = 0;
+    if (nesting > 256) Error("template type syntax nesting limit exceeded");
+    if (Take('&')) { if (Is("mut")) pos++; TemplateTypeSyntax(nesting+1); return; }
+    if (Take('*')) { TemplateTypeSyntax(nesting+1); return; }
+    if (Is("own")) { pos++; Need('[', "expected '[' after own"); TemplateTypeSyntax(nesting+1); Need(']', "expected ']' after owned type"); return; }
+    if (Take('[')) {
+        if (!Take(']')) { Need(K_INT, "array length must be an integer literal"); Need(']', "expected ']'"); }
+        TemplateTypeSyntax(nesting+1); return;
+    }
+    Ident(); if (Take('.')) Ident();
+    if (Take('[')) {
+        do { if (count == 8) Error("generic argument limit exceeded"); TemplateTypeSyntax(nesting+1); count++; } while (Take(','));
+        Need(']', "expected ']' after type arguments");
+    }
+}
+U0 TemplateSignatureSyntax() {
+    U8 *names[32], *name; I64 count = 0, i;
+    Need('(', "expected '(' after function name");
+    if (!Take(')')) {
+        do {
+            if (count == 32) Error("function argument limit exceeded");
+            name = Ident();
+            for (i = 0; i < count; i++) if (Eq(names[i], name)) Error("duplicate parameter name");
+            names[count++] = name; Need(':', "expected ':' after parameter"); TemplateTypeSyntax(0);
+        } while (Take(','));
+        Need(')', "expected ')'");
+    }
+    if (Take(K_ARROW)) TemplateTypeSyntax(0);
+    if (Is("borrows")) {
+        pos++; Need('(', "expected '(' after borrows");
+        if (!Take(')')) {
+            do { name = Ident(); for (i = 0; i < count; i++) if (Eq(names[i], name)) break; if (i == count) Error("unknown parameter in borrows contract"); } while (Take(','));
+            Need(')', "expected ')' after borrows contract");
+        }
+    }
+    if (At()->kind != '{') Error("expected function body after signature");
+}
 U0 FunctionSignature(Function *f) {
     I64 i; U8 *name; f->borrow_contract = f->has_contract = 0;
     Need('(', "expected '(' after function name");
@@ -511,7 +551,7 @@ U0 ParseProgram() {
             f->foreign = foreign; f->exported = exported; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); ValidateMethodTemplate(f); f->signature = pos;
-            if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); while (At()->kind && At()->kind != '{') pos++; }
+            if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); TemplateSignatureSyntax(); }
             else FunctionSignature(f);
             if (old) {
                 if(old->foreign!=f->foreign || old->exported!=f->exported)ErrorAt(f->token,"C ABI change requires a new session");

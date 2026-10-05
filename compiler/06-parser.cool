@@ -5125,19 +5125,8 @@ if (((v_f9).generic_count != i64(0))) { pc = 110; } else { pc = 112; }
 continue;
 }
 if (pc == 108) {
-t100 = At();
-t101 = ((t100).kind != i64(0));
-if (t101) {
-t102 = At();
-t101 = ((t102).kind != 123);
-}
-if (t101) { pc = 109; } else { pc = 99; }
-continue;
-}
-if (pc == 109) {
-t99 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 108;
+TemplateSignatureSyntax();
+pc = 99;
 continue;
 }
 if (pc == 110) {
