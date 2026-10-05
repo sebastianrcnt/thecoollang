@@ -1698,21 +1698,26 @@ value graphs omit that result root; processing them must not trigger fallback
 root creation. Computed selections leave old temporaries protecting evaluation
 but do not retag proven-absent roots as the result.
 
-`ReferenceSliceProjection` recognizes an entire tokenized body returning an
-equal-typed slice argument through inferred straight-line `let`/`var` aliases,
-optionally with literal/omitted bounds. Each name stores its original argument
-index; unused aliases of other arguments do not enter the final result. It excludes
-foreign declarations, uninstantiated templates and checked stores effects.
-The bounded recognizer checks identifier kinds and the final semicolon/brace;
-assignments, type annotations, shadowing, calls and other statements/expressions
-remain opaque. The recognizer uses stack tables for at most 32 names (including
-arguments) and accepts at most 512 body tokens; exceeding either limit falls
-back to the conservative summary. Every token access is bounded by the closing
-brace. No token/name pointers escape the query. Forward headers have complete
-body token ranges before checking callers. Recognized calls preserve source
-value graphs/capability limits, but discard physical geometry as before.
-Unused overdeclared sources do not enter the result; their argument loans still
-protect evaluation.
+`ReferenceSliceProjection` returns a nonzero i64 argument-origin mask, or -1
+for opaque bodies. Never shift the returned mask as if it were an argument
+index. `SliceProjectionScan` tracks visible alias masks, a returned-origin union
+and block depth in stack storage. Recursive blocks report unsupported,
+fallthrough or definite return separately from the origin union. An `if` is
+terminal only when both arms return; a missing arm continues to later statements.
+Each completed block restores its entering name count. Boolean parameter/literal
+conditions with optional single negation do not introduce effects. Both branches
+contribute even for literal conditions. Unsupported statements, including those
+after an unconditional return, invalidate the proof.
+
+The recognizer excludes foreign declarations, uninstantiated templates and
+checked stores effects. It permits equal-result-typed slice parameters,
+inferred aliases and literal/omitted reslicing bounds. Limits are 32 visible
+names including parameters, 512 body tokens and 16 blocks including the body;
+exhaustion is opaque. Bit 31 remains positive in the i64 mask. Every token read
+is bounded; no scan/name pointers escape. Forward headers contain complete body
+ranges before checking callers. Proven calls preserve actual value graphs and
+capability limits while discarding physical geometry. Unused contracted sources
+remain protected during argument evaluation but do not enter the result.
 
 `ReferenceNewCall` is also reused for stored receiver effects whose destination
 is not a CALL and may have slot -1. Projection lookup must therefore require an

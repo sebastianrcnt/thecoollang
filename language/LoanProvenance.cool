@@ -1,33 +1,39 @@
 Local *ReferenceSyntheticRoot(ReferenceCheck *check){Local *local=CAlloc(sizeof(Local));local->all_next=check->synthetic_roots;check->synthetic_roots=local;return local;}
-// Straight-line aliases preserve the original slice parameter projection.
-I64 ReferenceSliceProjection(Function *f){
- I64 begin=f->begin,end=f->end,count=0,position,selected,origin,duplicate;
- U8 *names[32],*name;I64 origins[32];Bool returning;Token *t=tokens;
- if(f->foreign || f->generic_count || f->store_destinations || AggregateKind(f->result)!=A_SLICE || f->argc>32)return -1;
- if(begin<0 || end>ntok || end-begin<5 || end-begin>512)return -1;
- if(t[begin].kind!='{' || t[end-1].kind!='}')return -1;
- while(count<f->argc){names[count]=f->arg_names[count];origins[count]=-1;if(f->arg_types[count]==f->result && (f->borrow_contract&(1<<count)))origins[count]=count;count++;}
- position=begin+1;
- while(position<end-1){
-  if(t[position].kind!=K_ID)return -1;
-  returning=Eq(t[position].text,"return");name=NULL;
-  if(returning)position++;
+// Pure slice return masks; -1 is opaque, zero is never a proof.
+class SliceProjectionScan {Function *function;Token *tokens;I64 position,end;U8 **names;I64 *origins,count,depth,mask;};
+I64 SliceProjectionValue(SliceProjectionScan *s){I64 selected=0,origin;if(s->position>=s->end || s->tokens[s->position].kind!=K_ID)return -1;while(selected<s->count && !Eq(s->names[selected],s->tokens[s->position].text))selected++;if(selected==s->count || s->origins[selected]<=0)return -1;origin=s->origins[selected];s->position++;if(s->position<s->end && s->tokens[s->position].kind=='['){s->position++;if(s->position<s->end && s->tokens[s->position].kind==K_INT)s->position++;if(s->position>=s->end || s->tokens[s->position].kind!=':')return -1;s->position++;if(s->position<s->end && s->tokens[s->position].kind==K_INT)s->position++;if(s->position>=s->end || s->tokens[s->position].kind!=']')return -1;s->position++;}return origin;}
+I64 SliceProjectionBlock(SliceProjectionScan *s){
+ I64 base,outcome=0,origin,left,right,i;Token *token;U8 *condition,*name;Bool valid;
+ if(s->depth>=16 || s->position>=s->end || s->tokens[s->position].kind!='{')return -1;
+ s->depth++;base=s->count;s->position++;
+ while(s->position<s->end && s->tokens[s->position].kind!='}'){
+  if(outcome==1)return -1;token=&s->tokens[s->position];
+  if(token->kind=='{'){outcome=SliceProjectionBlock(s);if(outcome<0)return -1;}
   else{
-   if(!Eq(t[position].text,"let") && !Eq(t[position].text,"var"))return -1;
-   if(position+3>=end-1 || t[position+1].kind!=K_ID || t[position+2].kind!='=' || count==32)return -1;
-   name=t[position+1].text;duplicate=0;while(duplicate<count){if(Eq(names[duplicate],name))return -1;duplicate++;}position+=3;
+   if(token->kind!=K_ID)return -1;
+   if(Eq(token->text,"return")){s->position++;origin=SliceProjectionValue(s);if(origin<=0 || s->position>=s->end || s->tokens[s->position].kind!=';')return -1;s->mask|=origin;s->position++;outcome=1;}
+   else if(Eq(token->text,"if")){
+    s->position++;if(s->position>=s->end || s->tokens[s->position].kind!='(')return -1;s->position++;
+    if(s->position<s->end && s->tokens[s->position].kind=='!')s->position++;
+    if(s->position>=s->end || s->tokens[s->position].kind!=K_ID)return -1;
+    condition=s->tokens[s->position].text;valid=Eq(condition,"true") || Eq(condition,"false");
+    for(i=0;i<s->function->argc;i++)if(s->function->arg_types[i]==T_BOOL && Eq(s->function->arg_names[i],condition))valid=TRUE;
+    if(!valid)return -1;s->position++;if(s->position>=s->end || s->tokens[s->position].kind!=')')return -1;
+    s->position++;left=SliceProjectionBlock(s);if(left<0)return -1;right=0;
+    if(s->position<s->end && s->tokens[s->position].kind==K_ID && Eq(s->tokens[s->position].text,"else")){s->position++;right=SliceProjectionBlock(s);if(right<0)return -1;}
+    if(left==1 && right==1)outcome=1;
+   }else{
+    if(!Eq(token->text,"let") && !Eq(token->text,"var"))return -1;
+    if(s->position+3>=s->end || s->tokens[s->position+1].kind!=K_ID || s->tokens[s->position+2].kind!='=' || s->count==32)return -1;
+    name=s->tokens[s->position+1].text;for(i=0;i<s->count;i++)if(Eq(s->names[i],name))return -1;
+    s->position+=3;origin=SliceProjectionValue(s);if(origin<=0 || s->position>=s->end || s->tokens[s->position].kind!=';')return -1;
+    s->position++;s->names[s->count]=name;s->origins[s->count]=origin;s->count++;
+   }
   }
-  if(position>=end-1 || t[position].kind!=K_ID)return -1;
-  selected=0;while(selected<count && !Eq(names[selected],t[position].text))selected++;
-  if(selected==count || origins[selected]<0)return -1;
-  origin=origins[selected];position++;
-  if(position<end-1 && t[position].kind=='['){position++;if(position<end-1 && t[position].kind==K_INT)position++;if(position>=end-1 || t[position].kind!=':')return -1;position++;if(position<end-1 && t[position].kind==K_INT)position++;if(position>=end-1 || t[position].kind!=']')return -1;position++;}
-  if(position>=end-1 || t[position].kind!=';')return -1;
-  position++;if(returning){if(position!=end-1)return -1;return origin;}
-  names[count]=name;origins[count]=origin;count++;
  }
- return -1;
+ if(s->position>=s->end)return -1;s->position++;s->count=base;s->depth--;return outcome;
 }
+I64 ReferenceSliceProjection(Function *f){SliceProjectionScan s;U8 *names[32];I64 origins[32],i;if(f->foreign || f->generic_count || f->store_destinations || AggregateKind(f->result)!=A_SLICE || f->argc>32)return -1;if(f->begin<0 || f->end>ntok || f->end-f->begin<5 || f->end-f->begin>512)return -1;for(i=0;i<f->argc;i++){names[i]=f->arg_names[i];origins[i]=-1;if(f->arg_types[i]==f->result && (f->borrow_contract&(1<<i)))origins[i]=1<<i;}MemSet(&s,0,sizeof(SliceProjectionScan));s.function=f;s.tokens=tokens;s.position=f->begin;s.end=f->end;s.names=names;s.origins=origins;s.count=f->argc;if(SliceProjectionBlock(&s)!=1 || s.position!=s.end || s.mask<=0)return -1;return s.mask;}
 extern U0 ReferenceSliceElementGraph(ReferenceCheck *check,ReferenceLoan *target,ReferenceLoan *source,Node *expression,Node *place,Local *via);
 // Manual bootstrap counterpart of production typed loan metadata.
 U0 ReferenceGraphFree(ProvenanceGraph *graph){if(graph){ProvenanceGraphFree(graph);Free(graph);}}

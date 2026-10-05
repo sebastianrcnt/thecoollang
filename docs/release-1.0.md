@@ -2703,6 +2703,46 @@ through ordinary evaluation or library use.
   General body summaries, broader production nested-storage acceptance and all
   remaining mandatory release requirements are unfinished; all gates stay Open.
 
+
+- Pure branch slice-origin unions (specification draft 31): the whole-body
+  recognizer now returns a nonempty parameter-origin mask instead of one index.
+  Pure boolean parameter/literal conditions (optionally negated), scoped aliases,
+  nested blocks and early returns retain every possible returned source while
+  excluding unused contracted arguments. Literal conditions still include both
+  arms. Definite-return state is separate from the accumulated mask; continuing
+  paths must reach a return. Blocks restore visible alias scope. Bounds remain
+  conservative: 32 visible names, 512 body tokens and 16 block levels; overflow,
+  assignments, calls and arbitrary condition expressions are opaque. Source
+  permissions remain intersected, including shared/mutable branch unions.
+
+  Permanent readiness/sanitizer: 232 classifications, 102 positive programs,
+  612 five-engine/O2 executions (102 tree runs under ASan), 42 persistent REPL
+  scenarios and 12 allocation observations PASS with zero gaps. New cases cover
+  sibling alias names, continuing/nested branches, local-root countercases,
+  literal-condition conservatism, bit 31, depth 16/17, branch-local scope and
+  depth-three selection. REPL origin expansion rejects unsafe transitive callers
+  and rolls back; narrowing and same-union branch swapping remain compatible.
+  Success/failure revalidation retains equal tracked final/peak allocations at
+  histories 64 and 1024. A separate public production/seed check covers 32
+  ordinary branch classifications without removing production guards.
+
+  Full test/editor/external-distribution/dependency sanitizer and private slice
+  sanitizer command exits 0 in `build/release-audit/slice-branch-regression.log`.
+  Graph/copy/loan/selection/access/physical-address/descriptor/stores/public slice
+  sanitizer targets exit 0 in `build/release-audit/slice-branch-sanitize.log`.
+  Bootstrap generations 1/2/3 and gen2==gen3 PASS in
+  `build/release-audit/slice-branch-bootstrap.log`. Expanded testing initially
+  rejected one intended positive because its fixture borrowed the same mutable
+  descriptor into two live arrays. The fixture now uses an independent local
+  backing source, preserving its lifetime countercase; no compiler workaround
+  or exclusion was introduced. Corrected readiness and private sanitizer both
+  exit 0 in `build/release-audit/slice-branch-corrected-validation.log`.
+  Both permanent report source hashes match the current compiler/legacy files.
+  Production stage-2 IR SHA256:
+  `31e26395feef7e8df6de841e817ef31ba271561324cd074801128bc48a7e51e5`.
+  General body inference, broader production nested storage and all mandatory
+  release gates remain unfinished/Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

@@ -375,6 +375,57 @@ SLICE_CASES.extend([
 STORE_DIAGNOSTICS['slice_alias_long_body_opaque']='outlive'
 STORE_DIAGNOSTICS.update({'slice_alias_shared_subtree_mutation':'cannot mutate or move through a shared reference','slice_alias_duplicate_name':'duplicate local declaration','slice_alias_truncated_reslice':'expected identifier'})
 
+
+# Branch proofs retain every possible returned source, excluding unused contracts.
+for name,body,expected in [
+ ('union','if(flag){return a;}else{return b;}','accept'),
+ ('early','if(flag){return a;}return b;','accept'),
+ ('negated','if(!flag){return b;}else{return a;}','accept'),
+ ('sibling_alias','if(flag){let copy=a[:];return copy;}else{let copy=b[0:];return copy;}','accept'),
+ ('nested','if(flag){if(other){return a;}else{return b;}}else{return b;}','accept'),
+ ('same_origin','if(flag){return a;}else{return a;}','accept'),
+ ('hidden_local','if(flag){return a;}else{return c;}','reject'),
+ ('literal_other_path','if(true){return a;}else{return c;}','reject'),
+ ('effect_opaque','if(flag){assert(true);return a;}else{return b;}','reject'),
+ ('dynamic_condition_opaque','if(flag==other){return a;}else{return b;}','reject'),
+]:
+    program=('fn pick(a:[]i64,b:[]i64,c:[]i64,flag:bool,other:bool)->[]i64 borrows(a,b,c){'+body+'}'
+      'fn get(x:[]i64,y:[]i64,flag:bool,other:bool)->[]i64 borrows(x,y){var local=[1]i64{11};return pick(x,y,local[:],flag,other);}'
+      'fn main(){var a=[1]i64{7};var b=[1]i64{9};')
+    if expected=='accept':
+        first=7 if name!='nested' else 9
+        second=7 if name=='same_origin' else 9
+        program+=f'assert(get(a[:],b[:],true,false)[0]=={first});assert(get(a[:],b[:],false,true)[0]=={second});'
+    program+='}'
+    case='slice_branch_'+name
+    SLICE_CASES.append((case,expected,program))
+    if expected=='reject':STORE_DIAGNOSTICS[case]='outlive'
+# The top-level block consumes one depth; exhaustion must use opaque provenance.
+for depth,expected in [(16,'accept'),(17,'reject')]:
+    body='{'*(depth-1)+'return a;'+'}'*(depth-1)
+    case='slice_branch_depth_'+str(depth)
+    program='fn pick(a:[]i64,b:[]i64)->[]i64 borrows(a,b){'+body+'}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return pick(x,local[:]);}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'
+    SLICE_CASES.append((case,expected,program))
+    if expected=='reject':STORE_DIAGNOSTICS[case]='outlive'
+# An origin in bit 31 must remain a positive mask, not an argument index.
+params=','.join(['unused:[]i64']+[f'q{i}:bool' for i in range(30)]+['source:[]i64'])
+args=','.join(['local[:]']+['false']*30+['x'])
+SLICE_CASES.append(('slice_branch_bit31','accept','fn pick('+params+')->[]i64 borrows(unused,source){if(q0){return source;}else{return source;}}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return pick('+args+');}fn main(){var a=[1]i64{7};assert(get(a[:])[0]==7);}'))
+
+
+SLICE_CASES.extend([
+ ('slice_branch_continuing_alias','accept','fn pick(a:[]i64,b:[]i64,c:[]i64,flag:bool)->[]i64 borrows(a,b,c){let copy=a;if(flag){return copy;}else{let unused=c;}return b;}fn get(x:[]i64,y:[]i64,flag:bool)->[]i64 borrows(x,y){var local=[1]i64{11};return pick(x,y,local[:],flag);}fn main(){var a=[1]i64{7};var b=[1]i64{9};assert(get(a[:],b[:],true)[0]==7);assert(get(a[:],b[:],false)[0]==9);}'),
+ ('slice_branch_nested_continuation','accept','fn pick(a:[]i64,b:[]i64,c:[]i64,flag:bool,other:bool)->[]i64 borrows(a,b,c){if(flag){if(other){return a;}}return b;}fn get(x:[]i64,y:[]i64,flag:bool,other:bool)->[]i64 borrows(x,y){var local=[1]i64{11};return pick(x,y,local[:],flag,other);}fn main(){var a=[1]i64{7};var b=[1]i64{9};assert(get(a[:],b[:],true,true)[0]==7);assert(get(a[:],b[:],true,false)[0]==9);assert(get(a[:],b[:],false,true)[0]==9);}'),
+ ('slice_branch_nested_hidden_continuation','reject','fn pick(a:[]i64,b:[]i64,c:[]i64,flag:bool,other:bool)->[]i64 borrows(a,b,c){if(flag){if(other){return a;}}return c;}fn bad(x:[]i64,y:[]i64)->[]i64 borrows(x,y){var local=[1]i64{11};return pick(x,y,local[:],true,true);}fn main(){}'),
+ ('slice_branch_shared_union_mutation','reject','fn pick(a:[][]i64,b:[][]i64,flag:bool)->[][]i64 borrows(a,b){if(flag){return a;}else{return b;}}fn bad(a:&[][]i64,b:[][]i64){let copy=pick(*a,b,false);let inner=copy[0];inner[0]=9;}fn main(){}'),
+ ('depth3_slice_branch_union','accept','fn pick(a:[][][]i64,b:[][][]i64,c:[][][]i64,flag:bool)->[][][]i64 borrows(a,b,c){if(flag){let copy=a;return copy;}else{return b;}}fn get(x:[]i64,y:[]i64,flag:bool)->[]i64 borrows(x,y){var rowsx=[1][]i64{x};var rowsy=[1][]i64{y};var layersx=[1][][]i64{rowsx[:]};var layersy=[1][][]i64{rowsy[:]};var storage=[1]i64{11};var rowsz=[1][]i64{storage[:]};var unused=[1][][]i64{rowsz[:]};return pick(layersx[:],layersy[:],unused[:],flag)[0][0];}fn main(){var a=[1]i64{7};var b=[1]i64{9};assert(get(a[:],b[:],true)[0]==7);assert(get(a[:],b[:],false)[0]==9);}'),
+])
+STORE_DIAGNOSTICS.update({'slice_branch_nested_hidden_continuation':'outlive','slice_branch_shared_union_mutation':'cannot mutate or move through a shared reference'})
+
+
+SLICE_CASES.append(('slice_branch_scope_escape','reject','fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){let copy=a;}return copy;}fn main(){}'))
+STORE_DIAGNOSTICS['slice_branch_scope_escape']='unknown variable'
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -545,6 +596,30 @@ SLICE_REPL_CASES.extend([
   'var x=7;\nwork(&x)\n'
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
   'work(&x)\n:quit\n', '7\n7\n', {}),
+])
+
+
+SLICE_REPL_CASES.extend([
+ ('projection_branch_union_expansion_rollback',
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){return a;}\n'
+  'fn middle(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a){return pick(a,b,flag);}\n'
+  'fn use(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a){return middle(a,b,flag);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:],false)[0]\n'
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){return a;}else{return b;}}\n'
+  'use(a[:],b[:],false)[0]\npick(a[:],b[:],false)[0]\n:quit\n',
+  '7\n7\n7\n', {'returned borrow may outlive local storage':1}),
+ ('projection_branch_union_narrowing',
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){return a;}else{return b;}}\n'
+  'fn use(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){return pick(a,b,flag);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:],false)[0]\n'
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){return a;}else{return a;}}\n'
+  'use(a[:],b[:],false)[0]\n:quit\n','9\n7\n',{}),
+ ('projection_branch_same_union_swap',
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){return a;}else{return b;}}\n'
+  'fn use(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){return pick(a,b,flag);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:],true)[0]\n'
+  'fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){return b;}else{return a;}}\n'
+  'use(a[:],b[:],true)[0]\n:quit\n','7\n9\n',{}),
 ])
 
 def main():

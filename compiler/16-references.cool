@@ -718,7 +718,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
                 contract = ctx.v_functions[node.slot].borrow_contract;
                 let projection = ReferenceSliceProjection(&raw ctx.v_functions[node.slot]);
-                if (projection >= 0) { contract = 1 << projection; }
+                if (projection >= 0) { contract = projection; }
                 if (contract == 0 && IsReference(node.type)) {
                     ErrorAt(node.token, cast[ * u8]("reference return requires at least one borrows source"));
                 }

@@ -1,59 +1,83 @@
-// Prove straight-line slice aliases and literal reslicing without effects.
-// All element alternatives are preserved; bounds do not identify elements.
-fn ReferenceSliceProjection(function: *Function) -> i64 { unsafe {
-    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-    if (function.foreign != 0 || function.generic_count != 0 || function.store_destinations != 0 || AggregateKind(function.result) != 3 || function.argc > 32) { return -1; }
-    let begin = function.begin; let end = function.end;
-    if (begin < 0 || end > ctx.v_ntok || end - begin < 5 || end - begin > 512) { return -1; }
-    let tokens = ctx.v_tokens;
-    if (tokens[begin].kind != 123 || tokens[end-1].kind != 125) { return -1; }
-    var names = [32]*u8{}; var origins = [32]i64{};
-    var count:i64 = 0;
-    while (count < function.argc) {
-        names[count] = function.arg_names[count]; origins[count] = -1;
-        if (function.arg_types[count] == function.result && (function.borrow_contract & (1 << count)) != 0) { origins[count] = count; }
-        count = count + 1;
+// Nonzero argument-origin masks for pure slice aliases and boolean branches.
+// Bounds never identify individual elements; -1 denotes an opaque body.
+struct SliceProjectionScan {
+    function:*Function;tokens:*Token;position:i64;end:i64;
+    names:**u8;origins:*i64;count:i64;depth:i64;mask:i64;
+}
+fn SliceProjectionValue(scan:*SliceProjectionScan)->i64 {unsafe{
+    if(scan.position>=scan.end || scan.tokens[scan.position].kind!=256){return -1;}
+    var selected:i64=0;
+    while(selected<scan.count && Eq(scan.names[selected],scan.tokens[scan.position].text)==i8(0)){selected=selected+1;}
+    if(selected==scan.count || scan.origins[selected]<=0){return -1;}
+    let origin=scan.origins[selected];scan.position=scan.position+1;
+    if(scan.position<scan.end && scan.tokens[scan.position].kind==91){
+        scan.position=scan.position+1;
+        if(scan.position<scan.end && scan.tokens[scan.position].kind==257){scan.position=scan.position+1;}
+        if(scan.position>=scan.end || scan.tokens[scan.position].kind!=58){return -1;}
+        scan.position=scan.position+1;
+        if(scan.position<scan.end && scan.tokens[scan.position].kind==257){scan.position=scan.position+1;}
+        if(scan.position>=scan.end || scan.tokens[scan.position].kind!=93){return -1;}
+        scan.position=scan.position+1;
     }
-    var position = begin + 1;
-    while (position < end-1) {
-        if (tokens[position].kind != 256) { return -1; }
-        let returning = Eq(tokens[position].text, cast[*u8]("return")) != i8(0);
-        var name:*u8 = null;
-        if (returning) { position = position + 1; }
-        else {
-            if (Eq(tokens[position].text, cast[*u8]("let")) == i8(0) && Eq(tokens[position].text, cast[*u8]("var")) == i8(0)) { return -1; }
-            if (position + 3 >= end-1 || tokens[position+1].kind != 256 || tokens[position+2].kind != 61 || count == 32) { return -1; }
-            name = tokens[position+1].text;
-            var duplicate:i64 = 0;
-            while (duplicate < count) {
-                if (Eq(names[duplicate], name) != i8(0)) { return -1; }
-                duplicate = duplicate + 1;
+    return origin;
+}}
+// -1 unsupported, 0 fallthrough, 1 all paths return. Scope restoration is
+// independent of the union of returned origins accumulated across branches.
+fn SliceProjectionBlock(scan:*SliceProjectionScan)->i64 {unsafe{
+    if(scan.depth>=16 || scan.position>=scan.end || scan.tokens[scan.position].kind!=123){return -1;}
+    scan.depth=scan.depth+1;let base=scan.count;scan.position=scan.position+1;
+    var outcome:i64=0;
+    while(scan.position<scan.end && scan.tokens[scan.position].kind!=125){
+        if(outcome==1){return -1;}
+        let token=&raw scan.tokens[scan.position];
+        if(token.kind==123){outcome=SliceProjectionBlock(scan);if(outcome<0){return -1;}}
+        else{
+            if(token.kind!=256){return -1;}
+            if(Eq(token.text,cast[*u8]("return"))!=i8(0)){
+                scan.position=scan.position+1;let origin=SliceProjectionValue(scan);
+                if(origin<=0 || scan.position>=scan.end || scan.tokens[scan.position].kind!=59){return -1;}
+                scan.mask=scan.mask|origin;scan.position=scan.position+1;outcome=1;
+            }else if(Eq(token.text,cast[*u8]("if"))!=i8(0)){
+                scan.position=scan.position+1;
+                if(scan.position>=scan.end || scan.tokens[scan.position].kind!=40){return -1;}
+                scan.position=scan.position+1;
+                if(scan.position<scan.end && scan.tokens[scan.position].kind==33){scan.position=scan.position+1;}
+                if(scan.position>=scan.end || scan.tokens[scan.position].kind!=256){return -1;}
+                let condition=scan.tokens[scan.position].text;
+                var valid=Eq(condition,cast[*u8]("true"))!=i8(0) || Eq(condition,cast[*u8]("false"))!=i8(0);
+                for(var i:i64=0;i<scan.function.argc;i=i+1){if(scan.function.arg_types[i]==2 && Eq(scan.function.arg_names[i],condition)!=i8(0)){valid=true;}}
+                if(!valid){return -1;}
+                scan.position=scan.position+1;
+                if(scan.position>=scan.end || scan.tokens[scan.position].kind!=41){return -1;}
+                scan.position=scan.position+1;let left=SliceProjectionBlock(scan);if(left<0){return -1;}
+                var right:i64=0;
+                if(scan.position<scan.end && scan.tokens[scan.position].kind==256 && Eq(scan.tokens[scan.position].text,cast[*u8]("else"))!=i8(0)){
+                    scan.position=scan.position+1;right=SliceProjectionBlock(scan);if(right<0){return -1;}
+                }
+                if(left==1 && right==1){outcome=1;}
+            }else{
+                if(Eq(token.text,cast[*u8]("let"))==i8(0) && Eq(token.text,cast[*u8]("var"))==i8(0)){return -1;}
+                if(scan.position+3>=scan.end || scan.tokens[scan.position+1].kind!=256 || scan.tokens[scan.position+2].kind!=61 || scan.count==32){return -1;}
+                let name=scan.tokens[scan.position+1].text;
+                for(var i:i64=0;i<scan.count;i=i+1){if(Eq(scan.names[i],name)!=i8(0)){return -1;}}
+                scan.position=scan.position+3;let origin=SliceProjectionValue(scan);
+                if(origin<=0 || scan.position>=scan.end || scan.tokens[scan.position].kind!=59){return -1;}
+                scan.position=scan.position+1;scan.names[scan.count]=name;scan.origins[scan.count]=origin;scan.count=scan.count+1;
             }
-            position = position + 3;
         }
-        if (position >= end-1 || tokens[position].kind != 256) { return -1; }
-        var selected:i64 = 0;
-        while (selected < count && Eq(names[selected], tokens[position].text) == i8(0)) { selected = selected + 1; }
-        if (selected == count || origins[selected] < 0) { return -1; }
-        let origin = origins[selected]; position = position + 1;
-        if (position < end-1 && tokens[position].kind == 91) {
-            position = position + 1;
-            if (position < end-1 && tokens[position].kind == 257) { position = position + 1; }
-            if (position >= end-1 || tokens[position].kind != 58) { return -1; }
-            position = position + 1;
-            if (position < end-1 && tokens[position].kind == 257) { position = position + 1; }
-            if (position >= end-1 || tokens[position].kind != 93) { return -1; }
-            position = position + 1;
-        }
-        if (position >= end-1 || tokens[position].kind != 59) { return -1; }
-        position = position + 1;
-        if (returning) {
-            if (position != end-1) { return -1; }
-            return origin;
-        }
-        names[count] = name; origins[count] = origin; count = count + 1;
     }
-    return -1;
+    if(scan.position>=scan.end){return -1;}
+    scan.position=scan.position+1;scan.count=base;scan.depth=scan.depth-1;return outcome;
+}}
+fn ReferenceSliceProjection(function:*Function)->i64 {unsafe{
+    let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    if(function.foreign!=0 || function.generic_count!=0 || function.store_destinations!=0 || AggregateKind(function.result)!=3 || function.argc>32){return -1;}
+    if(function.begin<0 || function.end>ctx.v_ntok || function.end-function.begin<5 || function.end-function.begin>512){return -1;}
+    var names=[32]*u8{};var origins=[32]i64{};
+    for(var i:i64=0;i<function.argc;i=i+1){names[i]=function.arg_names[i];origins[i]=-1;if(function.arg_types[i]==function.result && (function.borrow_contract&(1<<i))!=0){origins[i]=1<<i;}}
+    var scan=SliceProjectionScan{function:function,tokens:ctx.v_tokens,position:function.begin,end:function.end,names:&raw names[0],origins:&raw origins[0],count:function.argc,depth:0,mask:0};
+    if(SliceProjectionBlock(&raw scan)!=1 || scan.position!=scan.end || scan.mask<=0){return -1;}
+    return scan.mask;
 }}
 // Opaque contracts specify possible origins, not field correspondences. Each
 // source root may occur in every borrowed output slot permitted by its type.

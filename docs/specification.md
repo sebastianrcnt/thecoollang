@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 30
+# Cool language specification — 1.0 draft 31
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1050,3 +1050,25 @@ triggers the full retained-body audit. This fallback preserves the same safety
 contract. Temporary graph tables are owned by submission scratch storage and
 are reclaimed after successful checking or transaction rollback. General body
 summary inference and broader nested storage support remain unfinished.
+
+
+## Draft 31: pure branch slice-origin unions
+
+Proven slice returns may use scoped blocks and `if`/`else` with a boolean
+parameter or boolean literal, optionally negated once. Inferred aliases and
+literal/omitted reslicing bounds retain their source origins. The summary is the
+union of all syntactically possible returned parameters, even for literal
+conditions; it does not infer relationships between successive conditions.
+Every path must return. An early return without `else` still requires analysis
+of following statements on the continuing path. Branch-local aliases cease to
+exist when their block ends. Unused contracted parameters do not enter the
+proven result, while argument evaluation continues to protect them.
+
+A proof requires at most 32 visible names including parameters, 512 body tokens
+and 16 nested blocks including the function body. Exhaustion, arbitrary
+condition expressions, calls, assignments, annotated aliases and unsupported
+statements use the conservative contract. The proof never strengthens source
+capabilities. Any change of the nonempty returned-origin set participates in
+transactional dependency-directed REPL revalidation, including expansion and
+narrowing. Existing returned values retain historical provenance. General body
+inference and production nested-storage acceptance remain unfinished.

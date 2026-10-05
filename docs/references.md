@@ -914,4 +914,10 @@ protect their backing bindings. Producer replacement does not retroactively
 change them. Rechecking uses analysis-owned parameter anchors, so repeated
 successful or rejected replacements do not add synthetic locals to functions.
 A missing call registry falls back to checking all retained bodies.
-General body summaries remain required work; see specification draft 30.
+Pure boolean branches and scoped aliases can also prove a union of returned
+sources: `if(flag){return a;}else{return b;}` retains both a and b, excluding
+unused contracted parameters. Both branches contribute for literal conditions.
+Early returns require every continuing path to return. Unsupported statements
+and exhausted inference limits keep the conservative summary. Origin-set
+expansion and narrowing participate in the same REPL revalidation.
+General body summaries remain required work; see specification draft 31.

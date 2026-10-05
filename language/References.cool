@@ -205,7 +205,7 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     if(node->kind==N_LOCAL_ADDRESS || node->kind==N_FIELD_ADDRESS || node->kind==N_INDEX_ADDRESS || node->kind==N_OWN_ADDRESS){ReferenceAddressMode(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);ReferenceAccess(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);return;}
     if(node->kind==N_CALL){
         saved=check->loans;contract=0;results=NULL;
-        if(TrackedBorrow(node->type)){contract=functions[node->slot].borrow_contract;{I64 projection=ReferenceSliceProjection(&functions[node->slot]);if(projection>=0)contract=1<<projection;}if(!contract && IsReference(node->type))ErrorAt(node->token,"reference return requires at least one borrows source");}
+        if(TrackedBorrow(node->type)){contract=functions[node->slot].borrow_contract;{I64 projection=ReferenceSliceProjection(&functions[node->slot]);if(projection>=0)contract=projection;}if(!contract && IsReference(node->type))ErrorAt(node->token,"reference return requires at least one borrows source");}
         for(arg=node->a;arg;arg=arg->next)ReferenceValue(check,arg);
         ReferenceCallStores(check,node,saved);index=0;
         for(arg=node->a;arg;arg=arg->next){
