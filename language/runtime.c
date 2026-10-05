@@ -47,6 +47,51 @@ static int64_t live_owners;
 int64_t cool_owner_alloc(int64_t size) { int64_t p = cool_alloc(size); live_owners++; return p; }
 void cool_owner_free(int64_t p) { if (p) { cool_free(p); live_owners--; } }
 int64_t cool_owner_count(void) { return live_owners; }
+
+// Generated destructors submit typed callbacks. A LIFO worklist runs children
+// before deferred owner frees, without using one native frame per owner depth.
+typedef void (*CoolDropCallback)(int64_t);
+typedef struct { int64_t address; CoolDropCallback callback; } CoolDropTask;
+typedef struct {
+    CoolDropTask *tasks;
+    size_t count, capacity;
+    CoolDropTask inline_tasks[64];
+} CoolDropQueue;
+static _Thread_local CoolDropQueue *active_drop_queue;
+static void drop_push(CoolDropQueue *queue, int64_t address, CoolDropCallback callback) {
+    if (queue->count == queue->capacity) {
+        if (queue->capacity > (size_t)INT64_MAX / (2 * sizeof(CoolDropTask)))
+            fail("destructor worklist exceeds host range");
+        size_t capacity = queue->capacity * 2;
+        CoolDropTask *tasks = (CoolDropTask *)(uintptr_t)cool_alloc((int64_t)(capacity * sizeof(*tasks)));
+        memcpy(tasks, queue->tasks, queue->count * sizeof(*tasks));
+        if (queue->tasks != queue->inline_tasks) cool_free((int64_t)(uintptr_t)queue->tasks);
+        queue->tasks = tasks;
+        queue->capacity = capacity;
+    }
+    queue->tasks[queue->count++] = (CoolDropTask){address, callback};
+}
+void cool_drop_defer_free(int64_t address) {
+    if (active_drop_queue) drop_push(active_drop_queue, address, NULL);
+    else cool_owner_free(address);
+}
+void cool_drop_enqueue(int64_t address, CoolDropCallback callback) {
+    if (active_drop_queue) { drop_push(active_drop_queue, address, callback); return; }
+    CoolDropQueue queue;
+    queue.tasks = queue.inline_tasks;
+    queue.count = 0;
+    queue.capacity = 64;
+    active_drop_queue = &queue;
+    callback(address);
+    while (queue.count) {
+        CoolDropTask task = queue.tasks[--queue.count];
+        if (task.callback) task.callback(task.address);
+        else cool_owner_free(task.address);
+    }
+    active_drop_queue = NULL;
+    if (queue.tasks != queue.inline_tasks) cool_free((int64_t)(uintptr_t)queue.tasks);
+}
+
 int64_t cool_owner_address(int64_t cell) {
     int64_t p = *(int64_t *)(uintptr_t)cell;
     if (!p) fail("empty or moved owner");

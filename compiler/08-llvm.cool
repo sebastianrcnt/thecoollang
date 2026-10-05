@@ -3161,7 +3161,7 @@ pc = 95;
 continue;
 }
 if (pc == 97) {
-t83 = cast[*u8]("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
+t83 = cast[*u8]("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare void @cool_drop_enqueue(i64, ptr)\ndeclare void @cool_drop_defer_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
 IR(t83);
 pc = 96;
 continue;

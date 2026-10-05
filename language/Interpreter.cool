@@ -62,16 +62,38 @@ I64 Arithmetic(Node *n, I64 a, I64 b) {
     return Normalize(result, n->type);
 }
 I64 owner_live;
-U0 DropValue(I64 address, I64 type) {
-    I64 pointer, i, tag; Field *field;
-    if (!Owned(type)) return;
-    if (AggregateKind(type) == A_OWNER) {
-        pointer = address(I64 *)[0]; if (!pointer) return; address(I64 *)[0] = 0;
-        DropValue(pointer, Shape(type)->element); Free(pointer(U8 *)); owner_live--; return;
-    }
-    if (AggregateKind(type) == A_ARRAY) { for (i = 0; i < Shape(type)->count; i++) DropValue(address+i*ByteSize(Shape(type)->element), Shape(type)->element); return; }
-    if (AggregateKind(type) == A_ENUM) { tag = address(I64 *)[0]; for (field = Shape(type)->fields; field; field = field->next) if (field->tag == tag) { DropValue(address+field->offset, field->type); return; } }
-    else for (field = Shape(type)->fields; field; field = field->next) DropValue(address+field->offset, field->type);
+// Explicit DFS frames bound native stack use while preserving drop order.
+class RuntimeDropFrame {I64 address,type,state,remaining,stride;Field *field;};
+U0 DropValue(I64 address,I64 type){
+ RuntimeDropFrame inline_frames[32],*inline_pointer=inline_frames,*frames,*frame,*grown;
+ I64 pointer,capacity=32,count=1,child_address,child_type,tag;AggregateType *shape;Field *field;Bool descend;
+ if(!Owned(type))return;
+ if(AggregateKind(type)==A_OWNER && !Owned(Shape(type)->element)){
+  pointer=address(I64 *)[0];if(pointer){address(I64 *)[0]=0;Free(pointer(U8 *));owner_live--;}return;
+ }
+ MemSet(inline_frames,0,sizeof(inline_frames));frames=inline_pointer;frames[0].address=address;frames[0].type=type;
+ while(count>0){
+  frame=&frames[count-1];child_address=0;child_type=0;descend=FALSE;
+  if(frame->state==1){Free(frame->address(U8 *));owner_live--;count--;}
+  else if(frame->state==2){if(!frame->remaining)count--;else{child_address=frame->address;child_type=frame->type;frame->address+=frame->stride;frame->remaining--;descend=TRUE;}}
+  else if(frame->state==3){if(!frame->field)count--;else{field=frame->field;frame->field=field->next;child_address=frame->address+field->offset;child_type=field->type;descend=TRUE;}}
+  else if(!Owned(frame->type))count--;
+  else{
+   shape=Shape(frame->type);
+   if(shape->kind==A_OWNER){pointer=frame->address(I64 *)[0];if(!pointer)count--;else{frame->address(I64 *)[0]=0;frame->address=pointer;frame->state=1;child_address=pointer;child_type=shape->element;descend=TRUE;}}
+   else if(shape->kind==A_ARRAY){frame->type=shape->element;frame->remaining=shape->count;frame->stride=ByteSize(shape->element);frame->state=2;}
+   else if(shape->kind==A_ENUM){tag=frame->address(I64 *)[0];field=shape->fields;while(field && field->tag!=tag)field=field->next;if(!field)count--;else{frame->address+=field->offset;frame->type=field->type;}}
+   else{frame->field=shape->fields;frame->state=3;}
+  }
+  if(descend && Owned(child_type)){
+   if(count==capacity){
+    if(capacity>9223372036854775807/sizeof(RuntimeDropFrame)/2)Error("drop traversal exceeds host range");
+    grown=CAlloc(capacity*2*sizeof(RuntimeDropFrame));MemCpy(grown(U8 *),frames(U8 *),count*sizeof(RuntimeDropFrame));if(frames!=inline_pointer)Free(frames);frames=grown;capacity*=2;
+   }
+   MemSet(&frames[count],0,sizeof(RuntimeDropFrame));frames[count].address=child_address;frames[count].type=child_type;count++;
+  }
+ }
+ if(frames!=inline_pointer)Free(frames);
 }
 U0 ClearMoved(I64 address,I64 type){
     AggregateType *shape; Field *field; I64 i,tag;

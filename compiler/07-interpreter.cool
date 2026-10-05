@@ -845,127 +845,68 @@ fn Arithmetic(node: *Node, left: i64, right: i64) -> i64 {
     }
 }
 
-fn DropValue(arg_v_address5: i64, arg_v_type32: i64) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_address5: i64 = arg_v_address5;
-var v_type32: i64 = arg_v_type32;
-var v_pointer: i64 = i64(0);
-var v_i13: i64 = i64(0);
-var v_tag1: i64 = i64(0);
-var v_field3: *Field = null;
-var t0: i64 = i64(0);
-var t1: i8 = i8(0);
-var t2: i64 = i64(0);
-var t3: i64 = i64(0);
-var t4: i64 = i64(0);
-var t5: i64 = i64(0);
-var t6: *AggregateType = null;
-var t7: i64 = i64(0);
-var t8: *u8 = null;
-var t9: i64 = i64(0);
-var t10: i64 = i64(0);
-var t11: i64 = i64(0);
-var t12: i64 = i64(0);
-var t13: *AggregateType = null;
-var t14: i64 = i64(0);
-var t15: *AggregateType = null;
-var t16: i64 = i64(0);
-var t17: i64 = i64(0);
-var t18: i64 = i64(0);
-var t19: i64 = i64(0);
-var t20: *AggregateType = null;
-var t21: i64 = i64(0);
-var t22: i64 = i64(0);
-var t23: i64 = i64(0);
-var t24: i64 = i64(0);
-var t25: i64 = i64(0);
-var t26: *AggregateType = null;
-var t27: i64 = i64(0);
-var t28: i64 = i64(0);
-var t29: i64 = i64(0);
-var t30: *AggregateType = null;
-var t31: i64 = i64(0);
-var t32: i64 = i64(0);
-t0 = v_type32;
-t1 = Owned(t0);
-if (!((t1 != i8(0)))) {
-return;
+// Explicit DFS continuations preserve child-before-owner and forward field/
+// array destruction without growing the host stack with the value's depth.
+struct RuntimeDropFrame {
+    address:i64;type:i64;state:i64;remaining:i64;stride:i64;field:*Field;
 }
-t2 = v_type32;
-t3 = AggregateKind(t2);
-if ((t3 == 5)) {
-v_pointer = (cast[*i64](v_address5))[0];
-if (!((v_pointer != i64(0)))) {
-return;
-}
-(cast[*i64](v_address5))[0] = 0;
-t4 = v_pointer;
-t5 = v_type32;
-t6 = Shape(t5);
-t7 = (t6).element;
-DropValue(t4, t7);
-t8 = cast[*u8](v_pointer);
-Free(t8);
-t9 = ctx.v_owner_live;
-ctx.v_owner_live = ctx.v_owner_live - i64(1);
-return;
-}
-t10 = v_type32;
-t11 = AggregateKind(t10);
-if ((t11 == 2)) {
-v_i13 = 0;
-while (true) {
-t12 = v_type32;
-t13 = Shape(t12);
-if (!((v_i13 < (t13).count))) { break; }
-t14 = v_type32;
-t15 = Shape(t14);
-t16 = (t15).element;
-t17 = ByteSize(t16);
-t18 = (v_address5 + (v_i13 * t17));
-t19 = v_type32;
-t20 = Shape(t19);
-t21 = (t20).element;
-DropValue(t18, t21);
-t22 = v_i13;
-v_i13 = v_i13 + i64(1);
-}
-return;
-}
-t23 = v_type32;
-t24 = AggregateKind(t23);
-if ((t24 == 4)) {
-v_tag1 = (cast[*i64](v_address5))[0];
-t25 = v_type32;
-t26 = Shape(t25);
-v_field3 = (t26).fields;
-while (true) {
-if (!((v_field3 != null))) { break; }
-if (((v_field3).tag == v_tag1)) {
-t27 = (v_address5 + (v_field3).offset);
-t28 = (v_field3).type;
-DropValue(t27, t28);
-return;
-}
-v_field3 = (v_field3).next;
-}
-} else {
-t29 = v_type32;
-t30 = Shape(t29);
-v_field3 = (t30).fields;
-while (true) {
-if (!((v_field3 != null))) { break; }
-t31 = (v_address5 + (v_field3).offset);
-t32 = (v_field3).type;
-DropValue(t31, t32);
-v_field3 = (v_field3).next;
-}
-}
-}
-return;
-}
-
+fn DropValue(address:i64,type:i64) { unsafe {
+    if(Owned(type)==i8(0)){return;}
+    let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    // The common owned scalar requires neither a traversal nor heap scratch.
+    if(AggregateKind(type)==5 && Owned(Shape(type).element)==i8(0)){
+        let pointer=*cast[*i64](address);
+        if(pointer!=0){*cast[*i64](address)=0;Free(cast[*u8](pointer));ctx.v_owner_live=ctx.v_owner_live-1;}
+        return;
+    }
+    var inline_frames=[32]RuntimeDropFrame{};
+    let inline_pointer=cast[*RuntimeDropFrame](&raw inline_frames);
+    var frames=inline_pointer;var capacity:i64=32;var count:i64=1;
+    frames[0].address=address;frames[0].type=type;
+    while(count>0){
+        let frame=&raw frames[count-1];
+        var child_address:i64=0;var child_type:i64=0;var descend=false;
+        if(frame.state==1){
+            Free(cast[*u8](frame.address));ctx.v_owner_live=ctx.v_owner_live-1;count=count-1;
+        }else if(frame.state==2){
+            if(frame.remaining==0){count=count-1;}
+            else{child_address=frame.address;child_type=frame.type;frame.address=frame.address+frame.stride;frame.remaining=frame.remaining-1;descend=true;}
+        }else if(frame.state==3){
+            if(frame.field==null){count=count-1;}
+            else{let field=frame.field;frame.field=field.next;child_address=frame.address+field.offset;child_type=field.type;descend=true;}
+        }else if(Owned(frame.type)==i8(0)){count=count-1;}
+        else{
+            let shape=Shape(frame.type);
+            if(shape.kind==5){
+                let pointer=*cast[*i64](frame.address);
+                if(pointer==0){count=count-1;}
+                else{
+                    *cast[*i64](frame.address)=0;
+                    frame.address=pointer;frame.state=1;
+                    child_address=pointer;child_type=shape.element;descend=true;
+                }
+            }else if(shape.kind==2){
+                frame.type=shape.element;frame.remaining=shape.count;frame.stride=ByteSize(shape.element);frame.state=2;
+            }else if(shape.kind==4){
+                let tag=*cast[*i64](frame.address);var field=shape.fields;
+                while(field!=null && field.tag!=tag){field=field.next;}
+                if(field==null){count=count-1;}
+                else{frame.address=frame.address+field.offset;frame.type=field.type;}
+            }else{frame.field=shape.fields;frame.state=3;}
+        }
+        if(descend && Owned(child_type)!=i8(0)){
+            if(count==capacity){
+                if(capacity>9223372036854775807/i64(sizeof(RuntimeDropFrame))/2){Error(cast[*u8]("drop traversal exceeds host range"));}
+                let grown=cast[*RuntimeDropFrame](CAlloc(capacity*2*i64(sizeof(RuntimeDropFrame))));
+                MemCpy(cast[*u8](grown),cast[*u8](frames),count*i64(sizeof(RuntimeDropFrame)));
+                if(frames!=inline_pointer){Free(cast[*u8](frames));}
+                frames=grown;capacity=capacity*2;
+            }
+            frames[count]=RuntimeDropFrame{address:child_address,type:child_type,state:0,remaining:0,stride:0,field:null};count=count+1;
+        }
+    }
+    if(frames!=inline_pointer){Free(cast[*u8](frames));}
+}}
 
 fn MoveValue(destination:i64,source:i64,type:i64)->i64{unsafe{
  if(destination==source){return destination;}

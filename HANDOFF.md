@@ -1,6 +1,6 @@
 # Cool 1.0 작업 인수인계
 
-갱신: 2026-10-06. **1.0 개발 중이며 완료 선언 전이다.**
+갱신: 2026-10-06. 리모트는 등록되어 있지 않다. **1.0 개발 중이며 완료 선언 전이다.**
 
 ## 시작 폴더와 먼저 볼 문서
 
@@ -14,6 +14,7 @@ git status --short
 git log -5 --oneline
 git diff --stat
 git diff
+git show --stat HEAD
 ```
 
 읽는 순서:
@@ -52,15 +53,18 @@ git diff
 `docs/benchmarks/vector-inline-arm64.json`.
 `build/`는 생성물이라 새 clone에는 없을 수 있다. 없는 로그를 검증 증거로 주장하지 않는다.
 
-## 현재 미커밋 작업: 깊은 소유 구조의 자동 해제
+## 현재 체크포인트: 깊은 소유 구조의 자동 해제
 
 1MiB RLIMIT_STACK에서 32,768개 재귀 소유 노드의 scope 종료가 충돌하는
 실제 결함을 발견했다. baseline의 tree/interp/jit/llvm은 exit 139,
 llvm-jit은 exit 132. 단순히 Vector를 clear하도록 사용자에게 요구하는 것으로
 해결하지 않는다. 안전한 일반 소유 구조의 자동 해제를 고친다.
 
-현재 다음 **7개 소스 파일의 변경은 아직 미커밋이며 검증 완료 전**이다.
-기존 변경을 reset/checkout으로 없애거나 완료 코드로 간주하지 않는다.
+현재 다음 **7개 소스 파일의 변경은 체크포인트로 커밋했으며 검증 완료 전**이다.
+커밋 제목: `Checkpoint bounded-depth destruction pending regression validation`.
+사용자가 작업 보존을 위해 커밋을 요청했다. 기존 변경을 reset/checkout으로
+없애거나 완료 코드로 간주하지 않는다. 마지막 전체 검증 완료 소스는 여전히
+`75304cb`이다.
 
 | 파일 | 변경 |
 | --- | --- |
@@ -86,11 +90,11 @@ make -j4 build/cool-compiler build/language.BIN build/language-runtime.o build/l
 **아직 확인하지 않은 것:** 수정 후 깊이 재현 검사, 해제 순서/널/이동/혼합
 소유 구조 검사, sanitizer, 전체 회귀, 새 bootstrap fixed point, 성능 영향.
 이후 작업의 소스 해시는 이전 통과 보고서와 다르므로 과거 보고서로 현재
-미커밋 코드를 통과 처리하지 않는다. ClearMoved의 재귀는 이번 수정과 별개다.
+체크포인트 코드를 통과 처리하지 않는다. ClearMoved의 재귀는 이번 수정과 별개다.
 
 ## 다음 실행 순서
 
-1. git diff와 위 7개 변경을 검토한다. 실행 중인 빌드/검사를 먼저 확인한다.
+1. git status와 체크포인트 커밋의 git show로 위 7개 변경을 검토한다. 실행 중인 빌드/검사를 먼저 확인한다.
    이번 인수인계 시 빌드 session 97554는 exit 0으로 종료 확인했다.
 2. 아래 fixture로 1MiB/32,768 node 재현을 다시 실행한다. 기존 파일이 있으면
    `build/drop-depth/chain.cool`, baseline은 `build/drop-depth/baseline.json`.
