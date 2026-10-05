@@ -147,7 +147,7 @@ U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *t
     if(NestedReference(via->type) && (through || expression->kind==N_LOAD || expression->kind==N_MOVE))layer=1;
     if(!IsReference(via->type) && !bridge)layer=ReferenceAcquisitionLayer(place,via,expression,layer);preserve=nested && TrackedBorrow(via->type) && !physical && !bridge;before=check->loans;
     if(physical){check->loans=ReferenceNew(check,via,via,exclusive,0,expression,check->loans);ReferencePhysicalCapture(check,place,via,expression);found=TRUE;}
-    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
+    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || (physical && nested) || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
 
         if(physical){if(nested){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin,source->physical_provenance);check->loans=ReferenceNewSelected(check,source,via,exclusive & source->exclusive,1,expression,check->loans,place,via,NULL,TRUE);}}
         else{mode=exclusive & source->exclusive;indirect=0;if(preserve)indirect=source->indirect;
@@ -181,7 +181,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
     before=check->loans;
     if(origin->kind==N_LOAD && TrackedBorrow(origin->type) && !BorrowRoot(origin->a))ReferenceProjection(check,origin,mode);
     else ReferenceValue(check,origin);
-    if(mode)ReferenceRequireComputedAuthority(check,node->a,origin,TRUE);for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,0,node,check->loans,node->a,NULL,origin,FALSE);
+    if(mode)ReferenceRequireComputedAuthority(check,node->a,origin,TRUE);for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,NestedReference(node->type)*source->indirect,node,check->loans,node->a,NULL,origin,FALSE);
     ReferenceAddressIndices(check,node->a);
 }
 extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);

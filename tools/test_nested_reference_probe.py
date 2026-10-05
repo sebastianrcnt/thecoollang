@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import tempfile
 
@@ -121,6 +122,7 @@ def main():
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('--unsafe-root-predicate', action='store_true', help='Private countermodel replacing explicit external-root identity with the disproven type predicate')
     parser.add_argument('--assert-expectations', action='store_true')
+    parser.add_argument('--all-engines', action='store_true', help='Run accepted positives on tree/VM/JIT/LLVM/LLVM-JIT and release AOT')
     parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases; currently exposes unsupported deeper acquisition')
     args = parser.parse_args()
     if args.deep: CASES.extend(DEEP_CASES)
@@ -167,6 +169,9 @@ def main():
         assert controlled.returncode==2 and 'returned borrow may outlive local storage' in controlled.stderr,controlled
         observations=[]
         for front_name,front in fronts:
+            runner=tmp/(front_name+'-runner')
+            runner.write_text('#!/bin/sh\nexec '+shlex.join(list(map(str,front)))+' "$@"\n');runner.chmod(0o755)
+            engine_env={**env,'COOL_FRONTEND':str(runner)}
             for name,expected,source in CASES:
                 fixture=tmp/(name+'.cool');fixture.write_text(source);r=run([*front,'check',fixture]);assert r.returncode in (0,2),r
                 observed='accept' if r.returncode==0 else 'reject'
@@ -177,10 +182,22 @@ def main():
                 if observed=='accept' and expected=='accept':
                     r=run([*front,'run',fixture]);row.update(run_exit=r.returncode,run_stdout=r.stdout,run_stderr=r.stderr)
                     assert (r.returncode,r.stdout,r.stderr)==(0,'',''),row
+                    if args.all_engines:
+                        row['engine_runs']=[]
+                        for engine in ('interp','jit','llvm','llvm-jit','O2'):
+                            if engine=='O2':
+                                program=tmp/(front_name+'-'+name+'-program')
+                                command=[ROOT/'tools/cool','build','--release',fixture,'-o',program]
+                            else:command=[ROOT/'tools/cool','run','--backend',engine,fixture]
+                            result=subprocess.run(list(map(str,command)),cwd=ROOT,env=engine_env,capture_output=True,text=True,timeout=240)
+                            assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(front_name,name,engine,result)
+                            if engine=='O2':result=run([program])
+                            row['engine_runs'].append(dict(engine=engine,exit=result.returncode,stdout=result.stdout,stderr=result.stderr))
+                            assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(front_name,name,engine,result)
                 # Accepted negative cases are intentionally never executed.
                 observations.append(row);print(front_name,name,expected,observed)
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs only; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:
             failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]

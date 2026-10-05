@@ -2342,6 +2342,27 @@ through ordinary evaluation or library use.
   intermediate copy without retaining callee frame addresses. All gates remain
   Open; nested-storage guards remain active.
 
+- Deeper payload retention correction: both frontends now keep already-nested
+  payload loans when taking the physical address of borrowed storage. Precise
+  physical reference terminals are distinct from payload graphs; selected
+  terminals become layer zero, nested projections preserve payload layers and
+  computed copies select value paths rather than extra referent paths.
+  The 54-case depth readiness audit now passes all classifications and
+  diagnostics, including the previous eight overrejections. Accepted positives
+  execute across five engines plus O2 on both frontends (120 executions);
+  negatives never execute. The deeper audit is now part of the test target.
+  This fixes the recorded depth-two/three/four return cases without claiming arbitrary alias/store or
+  borrowed-slice completeness. Production restrictions remain active.
+  Validation: `make -j4 test bootstrap-check editor-distribution-test` PASS;
+  normal and deeper readiness targets PASS. Graph, copy, loan, selection,
+  physical-address, descriptor-rollback and stores sanitizer targets PASS.
+  Bootstrap/stage2/stage3 IR and native binaries remain identical.
+  Stage-2 IR SHA256:
+  `e32b177cc1fff9c429da26aac5cbbd6d3bf82847cdef6a943c4675c31c06a8aa`.
+  Evidence: `build/release-audit/nested-depth-{regression,sanitize,engines,fixed-readiness}.log`
+  and `build/nested-reference-depth-readiness-audit.json`.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

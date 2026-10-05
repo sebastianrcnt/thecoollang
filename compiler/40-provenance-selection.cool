@@ -180,15 +180,19 @@ fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: 
             selected.physical_provenance = null;
         }
         ReferenceSelectLoan(check, &raw selected, &raw scoped, place, via, origin, payload);
+        // A precise terminal at the selected reference value denotes its
+        // physical storage. Deeper roots stay in the payload layer.
+        var selected_layer = indirect;
+        if (NestedReference(expression.type) && selected.provenance != null && selected.provenance_known != 0 && selected.provenance.root == source.root && selected.provenance.edges == null) { selected_layer = 0; }
         var old = next;
         while (old != null && old.expression == expression && old.holder == null) {
-            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
+            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == selected_layer) {
                 ReferenceProvenanceJoin(check, old, &raw selected);
                 return next;
             }
             old = old.next;
         }
-        let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
+        let loan = ReferenceNew(check, source.root, parent, exclusive, selected_layer, expression, next);
         loan.physical_provenance = selected.physical_provenance;
         loan.provenance = selected.provenance;
         loan.provenance_known = selected.provenance_known;
@@ -232,10 +236,11 @@ fn ReferenceComputedGraph(check: *ReferenceCheck, loan: *ReferenceLoan, place: *
         source.exclusive = source.exclusive & exclusive;
         var target = source;
         target.provenance_type = expression.type;
-        ReferenceSelectLoan(check, &raw target, &raw source, place, null, origin, loan.indirect != 0 && NestedReference(expression.type));
+        ReferenceSelectLoan(check, &raw target, &raw source, place, null, origin, loan.indirect != 0 && NestedReference(expression.type) && !(expression.kind == 3 || expression.kind == 18 || expression.kind == 29));
         if (expression.kind == 23 && expression.op == 1) { loan.physical_provenance = null; }
         loan.provenance = target.provenance;
         loan.provenance_type = target.provenance_type;
         loan.provenance_known = target.provenance_known;
+        if (NestedReference(expression.type) && target.provenance != null && target.provenance_known != 0 && target.provenance.root == loan.root && target.provenance.edges == null) { loan.indirect = 0; }
     }
 }

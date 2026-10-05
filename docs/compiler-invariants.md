@@ -1454,27 +1454,35 @@ observational countermodel exit zero never means release acceptance.
 
 ## Deeper nested lifetime acceptance
 
-`nested-reference-depth-readiness-test` is a required extension audit while
-production nested storage remains guarded. It invokes the private source-copy
-probe with `--deep --legacy --assert-expectations`. This does not weaken the
-supported-language regression or claim feature availability: it is separate
-because its known failures concern not-yet-enabled storage. Passing the
-baseline twelve fixtures does not establish arbitrary-depth readiness.
+`nested-reference-depth-readiness-test` bypasses only ReferenceStorage in private
+copies of both frontends and checks 27 fixtures each. It is included in test. The corpus contains the
+original twelve plus copy/address external returns at depths two, three and
+four, and frame scalar addresses at every level. All 54 classifications and
+required diagnostics now pass. Its `--all-engines` option executes the twenty
+accepted frontend/case positives on tree, bytecode, ARM64 JIT, LLVM AOT, LLVM JIT
+and optimized AOT (120 runs). No negative fixture executes. This establishes
+execution parity for the corpus, not arbitrary nested storage, alias/store
+completeness or borrowed slice elements. Those features remain guarded and
+required for release.
 
-The expanded corpus contains 27 fixtures per frontend: the original twelve
-plus copy/address external returns at depths two, three and four, and addresses
-of frame scalar fields at every level. Every accepted positive executes in tree
-mode; rejected or unexpectedly accepted negative fixtures are never executed.
-All frame escapes reject with their lifetime diagnostic. Depth-three/four
-external returns currently overreject (eight frontend/case observations).
-The strict target saves all observations, then fails on those gaps.
+Taking the physical address of borrowed storage must retain every payload loan,
+including loans already at layer one. Filtering sources to layer zero at `&l1`
+discarded the external scalar root carried through `l1.next`. The address's
+physical value terminal is precise and separate from the payload loans; its
+physical address mapping may remain unknown without making that terminal an
+opaque value summary. The source's root and entry capability remain unchanged.
 
-The implementation still mixes two-layer scoped records with deeper typed
-value graphs. ReferenceProjection emits layer-zero records, computed selection
-can interpret a copied reference as a payload address, and a physical reference
-to borrowed storage starts as an opaque value leaf. A private attempt to retag
-terminal layers, use precise physical leaves and preserve intermediate layers
-removed the first false lifetime diagnostic but still lost the required tracked
-caller root. It was not promoted to production. Empty known graph roots alone
-also did not fix the original counterexamples. Guards must stay until complete
-copy/address selection and arbitrary-depth root retention are demonstrated.
+Selecting a precise reference terminal with no child edges classifies that
+root as the new reference's physical layer zero. Interior roots retain their
+payload layer. Opaque/mixed graphs do not gain this classification. A nested
+projection preserves its incoming layer rather than flattening every result to
+zero. Computed copies select the reference value path; only address acquisition
+selects and wraps a payload path. Otherwise a copy applies an extra referent
+step, loses field correspondence and retains unrelated local physical roots.
+
+These rules work together: terminal reclassification alone lost all caller
+roots because address acquisition had already filtered them out. The original
+failed baseline and private intermediate attempts remain recorded in
+release-audit artifacts. Normal scoped protection remains conservative; unknown
+roots are not treated as absence and reference-return checks still require
+explicit caller lifetime identity and a matching borrows contract.

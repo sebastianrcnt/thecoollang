@@ -435,7 +435,7 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
         }
         var source = before;
         while (source != null) {
-            if (source.root != null && source.holder == via && (preserve || bridge || source.indirect == layer) && (bridge || ReferencePayloadMayAccess(source, place, via))) {
+            if (source.root != null && source.holder == via && (preserve || bridge || (physical && nested) || source.indirect == layer) && (bridge || ReferencePayloadMayAccess(source, place, via))) {
                 if (physical) {
                     if (nested) {
                         ReferenceSourceAccess(check, before, via, source.root, exclusive & source.exclusive, token, origin, source.physical_provenance);
@@ -588,7 +588,7 @@ fn ReferenceProjection(check: * ReferenceCheck, node: * Node, mode: i64) {
         var source = check.loans;
         while (source != before) {
             if (source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {
-                check.loans = ReferenceNewSelected(check, source, source.parent, mode & source.exclusive, 0, node, check.loans, node.a, null, origin, false);
+                check.loans = ReferenceNewSelected(check, source, source.parent, mode & source.exclusive, BoolInt(NestedReference(node.type)) * source.indirect, node, check.loans, node.a, null, origin, false);
             }
             source = source.next;
         }

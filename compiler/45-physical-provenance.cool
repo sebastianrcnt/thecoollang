@@ -20,7 +20,7 @@ fn ReferencePhysicalCapture(check:*ReferenceCheck,place:*Node,via:*Local,express
   while(step!=null){node=ReferenceGraphParent(check.graph,step.type,step.kind,step.key,node);step=step.next;}
  }
  ReferenceCursorFree(cursor.path);
- var loan=check.loans;while(loan!=null){if(loan.holder==null && loan.expression==expression && loan.root==via && loan.indirect==0){loan.physical_provenance=node;}loan=loan.next;}
+ var loan=check.loans;while(loan!=null){if(loan.holder==null && loan.expression==expression && loan.root==via && loan.indirect==0){loan.physical_provenance=node;loan.provenance=ReferenceGraphValueNode(check.graph,expression.type,via,loan.exclusive,0);loan.provenance_known=1;}loan=loan.next;}
 }}
 fn ReferencePhysicalMayOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,place:*Node,via:*Local)->bool{unsafe{
  if(loan.physical_provenance==null || via==null || ReferenceThroughStored(place)){return true;}
