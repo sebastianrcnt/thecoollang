@@ -1198,4 +1198,37 @@ preserve both through clone/compaction. Private mixed-call checks expect the
 shared x origin in the shared output field, while exclusive y remains a possible
 origin in both fields. A nested mutable-reference summary probe verifies x is
 absent at the outer terminal but present in its shared payload. These admissible
-upper bounds prepare universal write-path checking; that checker remains pending.
+upper bounds support universal payload write-path checking below; full nested
+storage and physical write authorization remain pending.
+
+
+## Universal payload modes for stored referent writes
+
+`ReferencePathWriteModes` accumulates exclusive (1), shared (2) and unknown (4)
+possibilities using finite (node,cursor,mode) states. Entry, edge and terminal
+capabilities intersect. Both alternatives survive even when they reach the same
+node/cursor with different modes; an exclusive alternative cannot erase a shared
+one. A terminal with a remaining projection protects the addressed storage and
+its descendants. A cursor ending at a value slot contributes zero: writing a
+reference value is distinct from writing its referent. Unlike overlap queries,
+write modes never descend payloads after the cursor ends. Unknown/incomplete
+paths retain the established scoped checks. Auxiliary summary ownership is not
+traversed. All query scratch and place cursors are released before diagnostics.
+
+`ReferenceRequirePayloadWrite` rejects a known shared alternative before the
+ordinary conflict scan for stored-referent writes. It currently considers named
+layer-one loans held by the access receiver, excluding its direct physical root.
+Layer-zero, temporary pins and opaque physical anchors retain the existing
+checker. Copy/move authority, arbitrary nested borrowed storage and complete
+physical projection permissions remain unfinished; this is an additional rejection
+check, not a replacement for existing lifetime and permission protection.
+
+An independent selection/overlap/write-mode oracle covers 1,624 cases, including
+shared/exclusive alternatives in both edge orders. Private actual production and
+seed frontend copies inject both alternatives into a declared mutable field,
+confirm an existential query still finds an exclusive path, and require actual
+referent writes to fail. This injected metadata is a checker regression, not a
+claim that ordinary source construction can create that malformed mapping. The
+legacy audit repeats rejection 64/1,024 times and verifies recovery plus zero
+tracked graph allocations at cleanup, with equal 2,704-byte peaks. This sixth
+workload shares the instrumentation exclusions documented above.

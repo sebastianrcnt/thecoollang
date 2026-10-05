@@ -12,11 +12,15 @@ U0 AuditGraphFree(U8 *pointer){AuditAllocation **link=&audit_allocations,*item;w
 U0 AuditGraphMaybeFree(U8 *pointer){AuditAllocation *item=audit_allocations;while(item && item->pointer!=pointer)item=item->next;if(item)AuditGraphFree(pointer);else Free(pointer);}
 U0 AuditGraphReport(){Text *text=TextNew();Append(text,"GRAPH_ALLOCATION_REPORT ");Number(text,audit_live);Append(text," ");Number(text,audit_count);Append(text," ");Number(text,audit_peak);Append(text,"\\n");Out(text->data);Free(text->data);Free(text);}
 '''
+BARRIER='''U0 AuditWriteBarrier(ReferenceCheck *check,Node *node){Local *local=node->local_ref;ReferenceLoan *loan;ProvenanceEdge *edge,*item;ProvenanceNode *group;Field *field;I64 inner;ProvenanceCursor tail,path,referent;Bool changed=FALSE;if(!local || !local->name || !Eq(local->name,"write_probe"))return;inner=Shape(local->type)->element;for(field=Shape(inner)->fields;field;field=field->next)if(Eq(field->name,"right"))break;if(!field)Error("missing audit field");for(loan=check->loans;loan;loan=loan->next)if(loan->holder==local && loan->indirect==1 && loan->root && Eq(loan->root->name,"b")){for(edge=loan->provenance->edges;edge;edge=edge->next)if(edge->kind==3){group=edge->target;for(item=group->edges;item;item=item->next)if(item->kind==1 && item->key==field){if(!ProvenanceEdgeNew(group,1,item->key,item->target,0))Error("audit insertion failed");MemSet(&tail,0,sizeof(ProvenanceCursor));MemSet(&path,0,sizeof(ProvenanceCursor));tail.type=inner;tail.kind=1;tail.key=item->key;path.type=local->type;path.kind=3;path.next=&tail;if(!ProvenanceQueryRoot(loan->provenance,&path,loan->root,loan->exclusive,TRUE))Error("audit exclusive missing");MemSet(&referent,0,sizeof(ProvenanceCursor));referent.type=item->target->type;referent.kind=3;tail.next=&referent;if(ReferencePathWriteModes(loan,&path,1)!=3)Error("audit alternatives missing");changed=TRUE;break;}}}if(!changed)Error("audit holder missing");}
+'''
 def workload(name,count):
  if name=='field_access':
   return ('struct Pair{left:&mut i64;right:&mut i64;}\nvar a=1;\nvar b=2;\nvar pair=Pair{left:&mut a,right:&mut b};\nlet r=&mut pair;\nlet q=&mut *(*r).left;\n'+'*(*r).right=*(*r).right+1;\n'*count+'*(*r).right\n*q\n',f'{count+2}\n1\n',0)
  if name=='opaque_returns':
   return ('struct Pair{left:&i64;right:&i64;}\nfn swap(a:&i64,b:&i64)->Pair borrows(a,b){return Pair{left:b,right:a};}\nvar a=7;\nvar b=8;\nvar pair=Pair{left:&a,right:&b};\n'+'pair=swap(&a,&b);\n'*count+'*pair.left\n*pair.right\n','8\n7\n',0)
+ if name=='write_barrier':
+  return ('struct Pair{left:&mut i64;right:&mut i64;}\nvar a=1;\nvar b=2;\nvar pair=Pair{left:&mut a,right:&mut b};\nlet write_probe=&mut pair;\n'+'*(*write_probe).right=9;\n'*count+'*(*write_probe).right\n','2\n',count)
  if name=='recursive_returns':
   return ('import "std/mem";\nenum Chain{End;Link(Entry);}struct Entry{next:own[Chain];r:&i64;}\nfn identity(p:own[Chain])->own[Chain] borrows(p){return move p;}\nvar a=7;\nvar p=new[Chain](Chain.Link(Entry{next:new[Chain](Chain.End),r:&a}));\n'+'p=identity(move p);\n'*count+'mem.owner_count()\n:forget p\nmem.owner_count()\n','2\n0\n',0)
  if name=='failed_functions':return ('fn fail(){var a=1;let q=&a;a=2;}\n'*count+'var kept=7;\nkept\n','7\n',count)
@@ -27,16 +31,25 @@ with tempfile.TemporaryDirectory(prefix='cool legacy graph lifecycle ') as direc
  for f in files:(tmp/f.name).write_bytes(f.read_bytes())
  graph=tmp/'Provenance.cool';text=graph.read_text();text=re.sub(r'\bCAlloc\(', 'AuditGraphAlloc(',text);text=re.sub(r'\bFree\(', 'AuditGraphFree(',text);graph.write_text(TRACKER+text)
  loan=tmp/'LoanProvenance.cool';loan.write_text(re.sub(r'\bFree\(', 'AuditGraphMaybeFree(',loan.read_text()))
+ loan.write_text(loan.read_text()+BARRIER)
+ refs=tmp/'References.cool';text=refs.read_text()
+ marker='check->loans=loan;return;}'
+ assert text.count(marker)==1
+ text=text.replace(marker,'check->loans=loan;AuditWriteBarrier(check,node);return;}')
+ header='class ReferenceCheck { ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };'
+ assert text.count(header)==1
+ refs.write_text(text.replace(header,header+'\nextern U0 AuditWriteBarrier(ReferenceCheck *check,Node *node);'))
  native=tmp/'Native.cool';text=native.read_text();assert text.endswith('LanguageMain;\n');native.write_text(text+'AuditGraphReport;\n')
  binary=tmp/'frontend.BIN';env={**os.environ,'COOLC_COMPILER_BIN':str(ROOT/'coolc/seed/Compiler.BIN')}
  r=subprocess.run([ROOT/'build/coolc',native,binary],env=env,cwd=ROOT,text=True,capture_output=True,timeout=90);assert r.returncode==0,r
  observations=[]
- for name in ('field_access','opaque_returns','recursive_returns','failed_functions','stores'):
+ for name in ('field_access','opaque_returns','recursive_returns','failed_functions','stores','write_barrier'):
   rows=[]
   for count in args.counts:
    source,output,errors=workload(name,count)
    r=subprocess.run([ROOT/'build/coolc','--run',binary,'repl-quiet'],input=source+':quit\n',cwd=ROOT,text=True,capture_output=True,timeout=120)
    matched=re.findall(r'^GRAPH_ALLOCATION_REPORT (\d+) (\d+) (\d+)\n',r.stdout,re.M);assert len(matched)==1,r
+   assert (name!='write_barrier' or r.stderr.count('cannot mutate or move through a shared reference')==count),r
    assert r.returncode==0 and r.stdout.split('GRAPH_ALLOCATION_REPORT ')[0]==output and r.stderr.count('error:')==errors,(name,count,r)
    live,allocations,peak=map(int,matched[0]);assert (live,allocations)==(0,0),(name,count,matched)
    row={'workload':name,'submissions':count,'live_bytes':live,'live_count':allocations,'peak_bytes':peak};rows.append(row);observations.append(row)

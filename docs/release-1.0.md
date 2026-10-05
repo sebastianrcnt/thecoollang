@@ -1998,6 +1998,33 @@ through ordinary evaluation or library use.
   Universal graph write-path authorization and arbitrary nested borrowed storage
   remain required; all release gates stay Open.
 
+- Stored referent writes now reject any known shared payload path, even when
+  another possible path is exclusive. Both frontends accumulate modes over
+  finite (node,cursor,mode) states and preserve mode barriers. A cursor ending
+  at a reference value slot contributes zero; replacing that slot is distinct
+  from writing its external referent. Unknown/incomplete paths retain existing
+  scoped permission checks, and all scratch is freed before diagnostics.
+
+  Private actual production/seed frontend hooks inject shared and exclusive
+  alternatives into one mutable-field loan: the old existential query succeeds,
+  but actual referent writes are rejected. This validates rejection of malformed
+  metadata; it does not claim ordinary source can create that mapping. The
+  independent selection/overlap/write-mode oracle passes 1,624 cases, including
+  reversed alternative order. Six legacy graph allocation workloads at
+  64/1,024 submissions end at zero tracked allocations with equal peaks; the
+  new rejection workload peaks at 2,704 bytes. Instrumentation scope excludes
+  graph arenas, loans, other metadata and JIT mappings.
+
+  Full regression, production/seed bootstrap convergence, generated LLVM ASan,
+  host/runtime ASan/UBSan and external editor/distribution installation pass.
+  Compiler IR SHA-256:
+  `175ba5d63912fa3ff02ff08a4559bf0d434ce4ac17ca709e337bb1e7b2589fa3`.
+  Evidence: `build/release-audit/provenance-write-final-{build,focused,regression,sanitize,distribution}.log`.
+  This additional rejection check covers named layer-one stored-referent loans;
+  complete physical projection and copy/move authority, arbitrary nested borrowed
+  storage and remaining release gates still require implementation. All gates
+  remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

@@ -292,6 +292,7 @@ fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
         if (writing && IsReference(via.type) && Shape(via.type).count == 0 && place.kind != 22 && place.kind != 8) {
             ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
         }
+        if (writing) { ReferenceRequirePayloadWrite(check, place, via); }
         var loan = check.loans;
         while (loan != null) {
             if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root, writing) && !ReferenceAncestor(check, loan.holder, via, loan.root) && !(loan.holder == null && loan.expression == ReferencePlaceSource(place))) {

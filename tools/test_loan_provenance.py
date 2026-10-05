@@ -97,6 +97,26 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
   }ProvenanceGraphFree(&raw copy);
  }loan=loan.next;}
 }}
+fn WriteBarrierProbe(check:*ReferenceCheck,node:*Node){unsafe{
+ let local=node.local_ref;if(local==null || local.name==null || Eq(local.name,cast[*u8]("write_probe"))==0){return;}
+ let inner=Shape(local.type).element;let field=ParameterField(inner,cast[*u8]("right"));
+ var loan=check.loans;var changed=false;
+ while(loan!=null){if(loan.holder==local && loan.indirect==1 && loan.root!=null && Eq(loan.root.name,cast[*u8]("b"))!=0){
+  var edge=loan.provenance.edges;while(edge!=null){if(edge.kind==3){
+   let group=edge.target;var item=group.edges;
+   while(item!=null){if(item.kind==1 && item.key==cast[i64](field)){
+    if(!ProvenanceEdgeNew(group,1,item.key,item.target,0)){NativeExit(91);}
+    var tail=ProvenanceCursor{type:inner,kind:1,key:item.key,next:null};
+    var path=ProvenanceCursor{type:local.type,kind:3,key:0,next:&raw tail};
+    var referent=ProvenanceCursor{type:item.target.type,kind:3,key:0,next:null};
+    let existential=ReferenceLoanQuery(loan,&raw path,loan.root,true);tail.next=&raw referent;
+    if(!existential || ReferencePathWriteModes(loan,&raw path,1)!=3){NativeExit(92);}
+    changed=true;break;
+   }item=item.next;}
+  }edge=edge.next;}
+ }loan=loan.next;}
+ if(!changed){NativeExit(93);}
+}}
 fn LoanAudit(check:*ReferenceCheck,node:*Node){unsafe{
  let local=node.local_ref;if(local==null || local.name==null){return;}
  if(Eq(local.name,cast[*u8]("receiver"))!=0 && IsReference(local.type)){
@@ -213,7 +233,7 @@ fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();AuditStores();Au
 '''
 with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  tmp=Path(directory);source=(ROOT/'compiler/16-references.cool').read_text();
- needle='            check.loans = marker;\n            return;';assert source.count(needle)==1;source=source.replace(needle,'            check.loans = marker;\n            LoanAudit(check,node);\n            return;')
+ needle='            check.loans = marker;\n            return;';assert source.count(needle)==1;source=source.replace(needle,'            check.loans = marker;\n            LoanAudit(check,node);\n            WriteBarrierProbe(check,node);\n            return;')
  needle='        if (node.kind != 15) {';assert source.count(needle)==1;source=source.replace(needle,'        if(node.kind==8){LoanAudit(check,node);}\n'+needle)
  copied=tmp/'references.cool';copied.write_text(source)
  stores_source=(ROOT/'compiler/36-stores.cool').read_text();needle='                check.loans = ReferenceNew(check, null, null, 0, 0, null, check.loans);\n                check.loans.holder = local;';assert stores_source.count(needle)==1
@@ -291,6 +311,8 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
   assert all(line.startswith('LOAN ') for line in r.stderr.splitlines()),r
  native=tmp/'native';r=run([ROOT/'tools/cool','build','--release',program,'-o',native],env={**env,'COOL_FRONTEND':str(binary)});assert r.returncode==0,r
  r=run([native],env=env);assert (r.returncode,r.stdout,r.stderr)==(0,'42\n',''),r
+ probe=tmp/'write-probe.cool';probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let write_probe=&mut pair;*(*write_probe).right=9;}')
+ r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot mutate or move through a shared reference' in r.stderr,r
  repl='struct Pair{left:&i64;right:&i64;}\nvar x=7;\nvar y=8;\nvar assigned=Pair{left:&x,right:&y};\n{assigned=Pair{left:&x,right:&y};assert(false);}\nfn broken(){var a=1;let r=&a;a=2;}\nassigned=assigned;\n*assigned.left\n*assigned.right\n:forget assigned\nx=3;\nx\n:quit\n'
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r
  assert 'AddressSanitizer' not in r.stderr and 'runtime error:' not in r.stderr,r

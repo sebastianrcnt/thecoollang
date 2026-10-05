@@ -33,6 +33,21 @@ def overlap(nodes,edges,path,start,complete,known):
    _,kind,key,nxt=path[c]
    pending.update((t,nxt) for s,k,v,t,m in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
  return 0
+def write_modes(nodes,edges,path,start,mode,complete,known):
+ if not complete:return 4
+ if start<0:return 0 if known else 4
+ pending=[(start,0 if path else -1,mode)];visited=set();result=0
+ while pending:
+  n,c,m=pending.pop()
+  if n<0 or (n,c,m) in visited:continue
+  visited.add((n,c,m));typ,root,cap,opaque=nodes[n]
+  if c<0:continue
+  if opaque or typ!=path[c][0]:result|=4
+  elif root==0:result|=1 if m&cap else 2
+  else:
+   _,kind,key,nxt=path[c]
+   pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
+ return result
 def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  # Independent selection returns a union of original endpoint states and
  # opaque root alternatives, then queries that union with another cursor.
@@ -121,7 +136,7 @@ export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mo
  var source=ReferenceLoan{};source.root=&raw root;source.exclusive=mode;source.provenance_known=known;if(start>=0){source.provenance=nodes[start];}
  var path:*ProvenanceCursor=null;if(c>0){path=paths;}var extra:*ProvenanceCursor=null;if(q>0){extra=&raw paths[c];}
  var selected=ReferenceSelectGraph(&raw check,&raw source,path,complete,type);
- let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete));
+ let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete))+8*ReferencePathWriteModes(&raw source,path,complete);
  Free(cast[*u8](paths));Free(cast[*u8](nodes));ProvenanceGraphFree(&raw graph);return result;
 }}
 '''
@@ -156,6 +171,13 @@ edges=[(0,1,100,1,1),(0,1,101,2,1),(0,3,0,3,0),(3,3,0,0,1)]
 for path in ([],[(10,1,100,-1)],[(10,1,101,-1)],[(10,1,999,-1)],[(10,3,0,1),(10,3,0,0)]):
  for mode in (0,1):
   for writing in (0,1):cases.append((nodes,edges,path,0,mode,1,20,1,[],writing))
+# Same field/root reached through both capabilities must retain shared status,
+# irrespective of edge order, even when an exclusive alternative arrives first.
+for es in ([(0,1,100,1,1),(0,1,100,2,0)],[(0,1,100,2,0),(0,1,100,1,1)]):
+ ns=[(10,-1,1,0),(20,0,1,0),(20,0,1,0)]
+ for mode in (0,1):
+  case=(ns,es,[(10,1,100,1),(20,3,0,-1)],0,mode,1,20,1,[],1);cases.append(case)
+  assert write_modes(ns,es,case[2],0,mode,1,1)==(3 if mode else 2)
 with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directory:
  tmp=Path(directory);audit=tmp/'audit.cool';audit.write_text(AUDIT);files=sorted((ROOT/'compiler').glob('*.cool'));manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(f)+'\n' for f in files)+'__main\t'+str(audit)+'\n');ir=tmp/'compiler.ll'
  frontend=args.frontend.resolve() if args.frontend else ROOT/'build/cool-compiler';env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
@@ -175,10 +197,10 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  lines=[];expected=[]
  for nodes,edges,path,start,mode,complete,typ,known,extra,write in cases:
   lines.append(' '.join(map(str,[len(nodes),len(edges),len(path),len(extra),start,mode,complete,typ,known,write,*[v for row in nodes+edges+path+extra for v in row]])))
-  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known))
+  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known)+8*write_modes(nodes,edges,path,start,mode,complete,known))
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and mode-independent access overlap oracles; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent access overlap/universal write-mode oracles; shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
  print(f'provenance selection/overlap: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))

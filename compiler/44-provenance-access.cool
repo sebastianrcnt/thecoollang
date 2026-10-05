@@ -47,3 +47,57 @@ fn ReferencePayloadMayAccess(source: *ReferenceLoan, place: *Node, via: *Local) 
         return found;
     }
 }
+
+// Bit 1: an exclusive terminal; bit 2: a shared terminal; bit 4: unknown.
+// Every possible path contributes. An exclusive alternative cannot erase a
+// shared alternative. Unknown paths retain the established scoped checks.
+fn ReferencePathWriteModes(source: *ReferenceLoan, path: *ProvenanceCursor, complete: i64) -> i64 {
+    unsafe {
+        if (complete == 0) { return 4; }
+        if (source.provenance == null) {
+            if (source.provenance_known != 0) { return 0; }
+            return 4;
+        }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = source.provenance; first.cursor = path; first.exclusive = source.exclusive;
+        var current = first; var tail = first; var modes: i64 = 0;
+        while (current != null) {
+            let node = current.node; let cursor = current.cursor;
+            // A cursor ending at a value writes that slot, not its referents.
+            if (cursor == null) { }
+            else if (node.opaque != 0 || node.type != cursor.type) { modes = modes | 4; }
+            else if (node.root == source.root && node.root != null) {
+                if ((current.exclusive & node.exclusive) != 0) { modes = modes | 1; }
+                else { modes = modes | 2; }
+            } else {
+                var edge = node.edges;
+                while (edge != null) {
+                    if (edge.kind == cursor.kind && (cursor.kind != 1 || edge.key == cursor.key)) {
+                        tail = ProvenanceQueryAppend(first, tail, edge.target, cursor.next, current.exclusive & edge.exclusive);
+                    }
+                    edge = edge.next;
+                }
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+        return modes;
+    }
+}
+fn ReferenceRequirePayloadWrite(check: *ReferenceCheck, place: *Node, via: *Local) {
+    unsafe {
+        if (!ReferenceThroughStored(place)) { return; }
+        var cursor = ReferencePlaceCursor(place, via, null);
+        var source = check.loans;
+        var shared = false;
+        while (source != null) {
+            if (source.holder == via && source.indirect == 1 && source.root != null && source.root != via) {
+                if ((ReferencePathWriteModes(source, cursor.path, cursor.complete) & 2) != 0) { shared = true; }
+            }
+            source = source.next;
+        }
+        ReferenceCursorFree(cursor.path);
+        if (shared) { ErrorAt(place.token, cast[*u8]("cannot mutate or move through a shared reference")); }
+    }
+}
