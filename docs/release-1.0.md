@@ -1220,6 +1220,24 @@ through ordinary evaluation or library use.
   `670a1b5804d7c9ef84f372e5ee43fd28f79195529ab4bc61645215b1b1abeecd`.
   Dependent layouts, expression semantics and other release-wide gates remain open.
 
+- Floating arithmetic/unordered comparison audit: draft 19 records binary64
+  primitive evaluation, per-operation f32 normalization, signed zero/subnormal/
+  infinity/NaN results and unordered comparisons. An exact rational oracle for
+  386 finite operand pairs reproduced the retained bootstrap seed returning
+  true for NaN equality. Both frontend Arithmetic paths now inspect carrier
+  magnitude bits before comparisons and return true only for != when either
+  operand is NaN; this avoids using the seed's faulty floating comparison to
+  detect the condition. LLVM already uses ordered/une predicates. Regression
+  compares 1,711 exact bit/classification/comparison outputs and seven invalid
+  operators on five engines plus O2 in both frontends. Full regression and
+  bootstrap convergence, compiler ASan and generated LLVM/runtime ASan/UBSan,
+  and installed editor/distribution validation pass. NaN payloads are unspecified;
+  the finite oracle cases are deterministic evidence, not exhaustive arithmetic
+  equivalence. Evidence:
+  `build/release-audit/float-arithmetic-{focused,build,final-focused,regression,sanitize,distribution}.log`.
+  IR SHA256: `23bfb606877c2cdcc29784bbde7b725184a0c11705e2d67ec2855da3d8d7490d`.
+  Remaining whole-spec, template semantics and release-wide gates stay open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

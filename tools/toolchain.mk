@@ -409,3 +409,10 @@ template-aggregate-test: build/cool-compiler build/language.BIN build/language-r
 test: template-aggregate-test
 template-aggregate-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_template_aggregate.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: float-arithmetic-test float-arithmetic-sanitize-test
+float-arithmetic-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_float_arithmetic.py
+test: float-arithmetic-test
+float-arithmetic-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_float_arithmetic.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

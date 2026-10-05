@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 18
+# Cool language specification — 1.0 draft 19
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -624,7 +624,32 @@ subnormals, and NaN/infinite/out-of-range
 rejections across both frontends, five engines and optimized binaries. The
 sanitizer target additionally checks the compiler with ASan and generated LLVM
 with ASan, linking the runtime with UBSan and float-cast-overflow checks enabled.
-This section does not yet specify the full floating arithmetic/rounding contract.
+## Floating operations
+
+`f64` is IEEE binary64 and `f32` is IEEE binary32 in stored values. The default
+supported floating environment rounds halfway values to even. Arithmetic `+`,
+`-`, `*`, `/` evaluates each primitive operation separately: the implementation
+uses binary64 carriers and normalizes an f32 operation's result back to binary32
+before further use. It does not contract an expression into a fused operation.
+Overflow yields signed infinity; underflow may yield a signed subnormal or zero.
+Floating division by zero follows IEEE infinity/NaN behavior and does not use
+the integer division error. Zero divided by zero, infinity minus itself and
+zero times infinity produce NaN. NaN payload bits are not specified.
+
+Comparisons involving either NaN are unordered: `!=` is true and `==`, `<`, `<=`,
+`>`, `>=` are false. Signed positive/negative zero compare equal. Infinities are
+ordered beyond finite values. Integer bitwise/remainder/shift operators and
+logical negation do not accept floating operands. Unsafe foreign changes to
+rounding mode or exception behavior remain outside the default environment
+contract.
+
+`make float-arithmetic-test` checks finite operand bit patterns with an exact
+Python rational oracle, including independent tie-to-even rounding, subnormal,
+overflow and signed-zero boundaries. It also checks NaN/ordered comparisons,
+infinities and invalid operators on both frontends, five engines and optimized
+binaries. The sanitizer target adds compiler instrumentation and generated LLVM
+with the instrumented C runtime. These deterministic cases support this contract;
+they are not an exhaustive numerical equivalence proof.
 
 ## Memory layout on the supported target
 
@@ -698,6 +723,8 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 19: specify primitive floating operation normalization and unordered
+  comparisons; correct bootstrap NaN comparison behavior with carrier-bit tests.
 - Draft 18: validate unused generic nominal member grammar, uniqueness, type
   names/privacy/arity, void fields, literal array limits and nonempty enums.
 - Draft 17: specify binding/literal inference and implicit conversions; remove

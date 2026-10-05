@@ -832,6 +832,11 @@ v_z = 0.0;
 t2 = ((v_n24).a).type;
 t3 = Floating(t2);
 if ((t3 != i8(0))) {
+// Check NaN carriers explicitly, including the bootstrap seed's unordered flags.
+if ((v_op2 == 259 || v_op2 == 260 || v_op2 == 60 || v_op2 == 62 || v_op2 == 261 || v_op2 == 262) &&
+    ((v_a8 & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000 || (v_b4 & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000)) {
+    return BoolInt(v_op2 == 260);
+}
 t4 = v_a8;
 t5 = AsFloat(t4);
 v_x = t5;

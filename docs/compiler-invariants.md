@@ -732,3 +732,11 @@ are recovery-owned scratch allocations, so a rejected REPL declaration retains
 no fields or temporary names. The cursor is restored on success; nonlocal error
 recovery restores the parser and declaration transaction. Concrete Layout still
 constructs fields and validates recursion/size/storage after specialization.
+
+Floating comparisons must handle NaN before the retained seed's native comparison
+instructions: its unordered CPU flags otherwise make `NaN == NaN` true. For the
+binary64 carrier, magnitude bits above `0x7ff0000000000000` denote NaN for either
+sign. Return true only for K_NE in that case, before the scalar switch. LLVM
+ordered comparisons/une already match this rule; VM and native JIT share
+Arithmetic. Do not test NaN through `x != x` in bootstrap compiler code, because
+that would rely on the defective seed operation itself.

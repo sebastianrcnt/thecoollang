@@ -26,6 +26,10 @@ I64 ConvertNumber(I64 value, I64 from, I64 to, Token *t) {
 I64 Arithmetic(Node *n, I64 a, I64 b) {
     I64 op = n->op, result = 0; Bool unsigned = Unsigned(n->a->type); F64 x, y, z = 0.0;
     if (Floating(n->a->type)) {
+        // The retained seed treats unordered CPU comparison flags as equality.
+        // Detect NaN from the double-bit carrier before any floating comparison.
+        if ((op==K_EQ || op==K_NE || op=='<' || op=='>' || op==K_LE || op==K_GE) &&
+            ((a & 0x7FFFFFFFFFFFFFFF)>0x7FF0000000000000 || (b & 0x7FFFFFFFFFFFFFFF)>0x7FF0000000000000)) return op==K_NE;
         x = AsFloat(a); y = AsFloat(b);
         switch (op) {
             case '+': z = x + y; break; case '-': z = x - y; break;
