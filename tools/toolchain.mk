@@ -586,3 +586,11 @@ nested-reference-slice-readiness-test: build/cool-compiler build/language.BIN bu
 test: nested-reference-slice-readiness-test
 nested-reference-slice-sanitize-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
 	python3 tools/test_nested_reference_probe.py --legacy --slices --repl --sanitize --assert-expectations --output build/nested-reference-slice-asan-audit.json
+
+# Observe retained-body analysis, including transitive callers and fallback.
+.PHONY: repl-dependencies-test repl-dependencies-sanitize-test
+repl-dependencies-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_repl_dependencies.py --legacy --output build/repl-dependencies-audit.json
+test: repl-dependencies-test
+repl-dependencies-sanitize-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_repl_dependencies.py --legacy --sanitize --output build/repl-dependencies-asan-audit.json

@@ -2668,6 +2668,41 @@ through ordinary evaluation or library use.
   General body summaries, dependency-directed revalidation and the remaining
   production nested-storage acceptance stay mandatory; all gates remain Open.
 
+- Dependency-directed projection revalidation (specification draft 30): changed
+  established projections now seed a reverse graph from retained ReplNode CALL
+  allocations, including value-copy clones. A bounded queue reaches transitive
+  callers once across cycles, diamonds and multiple changed producers. New
+  bodies were already checked against final headers. Missing node registries
+  and positive slots outside the snapshot fall back to the full retained audit.
+  Temporary adjacency/queue tables use submission scratch ownership, including
+  nonlocal rollback cleanup. Inference and borrow permissions are unchanged.
+
+  Added permanent `repl-dependencies-test` and sanitizer targets. Actual compiler
+  analysis entry traces match an independent Python reachability model in 20
+  cases on both production and legacy frontends (40 observations each at O2 and
+  with the production frontend instrumented by ASan/UBSan). Cases cover indirect
+  chains, cycles, diamonds, duplicated edges, multiple seeds and 12 deterministic
+  random graphs. Missing/invalid/value-copy metadata probes preserve the AST and
+  restore allocation ownership before checking. The rejected-caller case then
+  executes the restored producer/caller, both yielding 7. A chain with 256
+  unrelated bodies analyzes exactly three retained bodies; this is an analysis
+  count result, not an elapsed-time speedup claim.
+
+  Full `make -j4 test bootstrap-check editor-distribution-test
+  repl-dependencies-sanitize-test nested-reference-slice-sanitize-test` exits 0
+  in `build/release-audit/repl-dependency-regression.log`. After adding the two
+  metadata boundary cases and rollback execution assertion, both expanded
+  permanent dependency targets exit 0 in
+  `build/release-audit/repl-dependency-expanded-validation.log`. Source/audit
+  hashes in `build/repl-dependencies-{audit,asan-audit}.json` match current files.
+  Existing slice readiness retains 194 classifications/80 positives/480 engine
+  executions; slice sanitizer, 36 REPL scenarios and 12 allocation observations
+  PASS. Revalidation success/failure allocations and peaks stay equal at 64/1024
+  histories. Production stage-2 IR SHA256:
+  `dbe6aa51997d7d98f77e0bdafdb965b3e07ed495ed48f25106095df6ce3e0fa6`.
+  General body summaries, broader production nested-storage acceptance and all
+  remaining mandatory release requirements are unfinished; all gates stay Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

@@ -19,4 +19,28 @@ U0 ReplRollbackFunctions() {
 }
 U0 ReplCommitFunctions() {I64 i;for(i=1;i<repl_saved_nfun;i++)FreeFunctionChanges(&repl_snapshot[i],&functions[i]);}
 
-U0 ReplRevalidateBorrowProjections(){I64 i;Bool changed=FALSE;Function *old,*current;if(!allow_redefinition || !repl_snapshot)return;for(i=1;i<repl_saved_nfun;i++){old=&repl_snapshot[i];current=&functions[i];if(old->body!=current->body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current))changed=TRUE;}if(!changed)return;for(i=1;i<repl_saved_nfun;i++){current=&functions[i];if(current->body && current->body==repl_snapshot[i].body && !current->generic_count)AnalyzeReferences(current);}}
+U0 ReplRevalidateBorrowProjections(){
+ I64 i,count,tail=0,front=0,edge_count=0,edge=0,link,caller;
+ I64 *affected,*queue,*heads,*callers,*links;Bool changed=FALSE,fallback=FALSE;
+ Function *old,*current;ReplNode *allocation;Node *node;
+ if(!allow_redefinition || !repl_snapshot)return;
+ for(i=1;i<repl_saved_nfun;i++){old=&repl_snapshot[i];current=&functions[i];if(old->body!=current->body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current))changed=TRUE;}
+ if(!changed)return;count=repl_saved_nfun;
+ affected=ScratchAllocate(count*8);queue=ScratchAllocate(count*8);heads=ScratchAllocate(count*8);
+ for(i=1;i<count;i++){
+  heads[i]=-1;old=&repl_snapshot[i];current=&functions[i];
+  if(old->body!=current->body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current)){affected[i]=1;queue[tail++]=i;}
+  if(current->body && current->body==old->body && !current->generic_count){
+   if(!current->nodes)fallback=TRUE;
+   for(allocation=current->nodes;allocation;allocation=allocation->next){node=&allocation->value;if(node->kind==N_CALL){if(node->slot>=count)fallback=TRUE;if(node->slot>0 && node->slot<count)edge_count++;}}
+  }
+ }
+ callers=ScratchAllocate(edge_count*8);links=ScratchAllocate(edge_count*8);
+ for(i=1;i<count;i++){
+  current=&functions[i];if(current->body && current->body==repl_snapshot[i].body && !current->generic_count){
+   for(allocation=current->nodes;allocation;allocation=allocation->next){node=&allocation->value;if(node->kind==N_CALL && node->slot>0 && node->slot<count){callers[edge]=i;links[edge]=heads[node->slot];heads[node->slot]=edge++;}}
+  }
+ }
+ while(front<tail){link=heads[queue[front++]];while(link>=0){caller=callers[link];if(!affected[caller]){affected[caller]=1;queue[tail++]=caller;}link=links[link];}}
+ for(i=1;i<count;i++){current=&functions[i];if((fallback || affected[i]) && current->body && current->body==repl_snapshot[i].body && !current->generic_count)AnalyzeReferences(current);}
+}

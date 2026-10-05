@@ -904,8 +904,8 @@ still require that array's lifetime. Other function bodies use conservative
 return summaries.
 
 A live session can change the proven source when retained callers remain safe.
-After all new bodies pass checking, the compiler checks retained concrete bodies
-against the changed projection. A lifetime or permission failure rejects the
+After all new bodies pass checking, the compiler checks retained callers and
+their transitive callers against the changed projection. A lifetime or permission failure rejects the
 whole submission and preserves the old bodies. Affected callers can be replaced
 in the same submission with compatible signatures and valid new bodies.
 
@@ -913,5 +913,5 @@ Existing returned values keep their actual earlier origins and continue to
 protect their backing bindings. Producer replacement does not retroactively
 change them. Rechecking uses analysis-owned parameter anchors, so repeated
 successful or rejected replacements do not add synthetic locals to functions.
-General body summaries and dependency-directed revalidation remain required work;
-see specification draft 29.
+A missing call registry falls back to checking all retained bodies.
+General body summaries remain required work; see specification draft 30.

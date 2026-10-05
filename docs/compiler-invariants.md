@@ -1722,8 +1722,9 @@ passing. Stored receiver summaries keep the original conservative path.
 
 REPL replacement compares the snapshot's established projection with the final
 installed body after ParseProgram checks all new declarations. A changed source
-or transition to opaque triggers AnalyzeReferences for every retained concrete
-body whose AST matches its snapshot. New bodies were already checked. Function
+or transition to opaque triggers AnalyzeReferences for reverse-reachable
+retained concrete bodies whose AST matches the snapshot. Incomplete dependency
+metadata falls back to checking every retained concrete body. New bodies were already checked. Function
 signatures remain stable; static regions still conservatively describe declared
 contracts. Existing values retain historical loans. Analysis failure propagates
 through the normal transaction rollback before execution or publication.
@@ -1737,6 +1738,26 @@ re-seeding old synthetic physical roots and assigning their ownership to an
 unrelated current function. Check-owned roots must not escape into persistent
 session loans or AST fields. Calls in session analysis use actual caller roots.
 
-The current audit rechecks all retained concrete bodies on a changed established
-projection; ordinary scalar updates and same-origin replacement skip it. General
-body summaries and dependency-directed invalidation remain required work.
+A changed established projection seeds reverse reachability over the retained
+ReplNode allocation registry. Allocation links are outside copied Node values,
+so coercion clones preserve CALL dependencies. Unreachable or duplicate CALLs
+can cause extra edges but cannot erase a dependency. Two passes count/build
+reverse adjacency before any analysis; each queue insertion marks the function,
+so recursion and diamonds are bounded by the snapshot function count. The graph
+construction and traversal are linear in retained allocations/edges/functions.
+
+A retained concrete body without its node registry or a CALL with positive slot
+outside the snapshot selects the full audit. Builtin negative slots are ignored.
+The five graph arrays use ScratchAllocate, including zero-edge arrays, and follow
+normal nonlocal recovery cleanup. This scratch never enters function registries.
+Ordinary scalar updates and same-origin replacement skip graph construction.
+General body summary inference remains required work.
+
+`tools/test_repl_dependencies.py` traces the actual AnalyzeReferences entry in
+copied emitted IR and the equivalent legacy entry. An independent Python graph
+computes expected reverse closure for chains, cycles, diamonds, duplicate edges,
+multiple seeds and seeded graphs. Temporary missing/invalid/copy metadata hooks
+retain the real AST and restore ownership before analysis. The rejection case
+executes the old producer/caller after rollback. A chain with 256 unrelated
+functions checks exactly three retained bodies; this measures analysis count,
+not elapsed-time speedup.

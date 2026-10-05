@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 29
+# Cool language specification — 1.0 draft 30
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1033,3 +1033,20 @@ This implementation checks every retained concrete body when an established
 projection changes. Dependency-directed invalidation and broader body summaries
 remain required compiler/performance work. Arbitrary nested storage restrictions
 and all remaining release gates still apply.
+
+
+## Draft 30: dependency-directed projection revalidation
+
+The draft 29 transaction and historical-value rules remain unchanged. When an
+established projection changes, the compiler now rechecks its retained callers
+and their transitive callers instead of every retained body. Dependency edges
+come from retained function call allocations, including cloned and conservative
+unreachable calls. Multiple changed producers share one traversal; recursion
+and repeated edges do not cause repeated checks. New declaration bodies have
+already been checked against the final headers in the submission.
+
+Missing call allocation metadata or a positive callee ID outside the snapshot
+triggers the full retained-body audit. This fallback preserves the same safety
+contract. Temporary graph tables are owned by submission scratch storage and
+are reclaimed after successful checking or transaction rollback. General body
+summary inference and broader nested storage support remain unfinished.

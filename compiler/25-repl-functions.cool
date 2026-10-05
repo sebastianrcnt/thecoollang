@@ -86,8 +86,59 @@ fn ReplRevalidateBorrowProjections(){unsafe{
         if(old.body!=current.body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current)){changed=true;}
     }
     if(!changed){return;}
-    for(var i:i64=1;i<ctx.v_repl_saved_nfun;i=i+1){
+    let count=ctx.v_repl_saved_nfun;
+    let affected=cast[*i64](ScratchAllocate(count*8));
+    let queue=cast[*i64](ScratchAllocate(count*8));
+    let heads=cast[*i64](ScratchAllocate(count*8));
+    var tail:i64=0;var edge_count:i64=0;var fallback=false;
+    for(var i:i64=1;i<count;i=i+1){
+        heads[i]=-1;
+        let old=&raw ctx.v_repl_snapshot[i];let current=&raw ctx.v_functions[i];
+        if(old.body!=current.body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current)){
+            affected[i]=1;queue[tail]=i;tail=tail+1;
+        }
+        if(current.body!=null && current.body==old.body && current.generic_count==0){
+            if(current.nodes==null){fallback=true;}
+            var allocation=current.nodes;
+            while(allocation!=null){
+                let node=&raw allocation.value;
+                if(node.kind==4){
+                    if(node.slot>=count){fallback=true;}
+                    if(node.slot>0 && node.slot<count){edge_count=edge_count+1;}
+                }
+                allocation=allocation.next;
+            }
+        }
+    }
+    // Scratch ownership survives nonlocal errors and is reclaimed at the end
+    // of the submission. Allocation wrappers include every cloned CALL node.
+    let callers=cast[*i64](ScratchAllocate(edge_count*8));
+    let links=cast[*i64](ScratchAllocate(edge_count*8));
+    var edge:i64=0;
+    for(var i:i64=1;i<count;i=i+1){
         let current=&raw ctx.v_functions[i];
-        if(current.body!=null && current.body==ctx.v_repl_snapshot[i].body && current.generic_count==0){AnalyzeReferences(current);}
+        if(current.body!=null && current.body==ctx.v_repl_snapshot[i].body && current.generic_count==0){
+            var allocation=current.nodes;
+            while(allocation!=null){
+                let node=&raw allocation.value;
+                if(node.kind==4 && node.slot>0 && node.slot<count){
+                    callers[edge]=i;links[edge]=heads[node.slot];heads[node.slot]=edge;edge=edge+1;
+                }
+                allocation=allocation.next;
+            }
+        }
+    }
+    var front:i64=0;
+    while(front<tail){
+        var link=heads[queue[front]];front=front+1;
+        while(link>=0){
+            let caller=callers[link];
+            if(affected[caller]==0){affected[caller]=1;queue[tail]=caller;tail=tail+1;}
+            link=links[link];
+        }
+    }
+    for(var i:i64=1;i<count;i=i+1){
+        let current=&raw ctx.v_functions[i];
+        if((fallback || affected[i]!=0) && current.body!=null && current.body==ctx.v_repl_snapshot[i].body && current.generic_count==0){AnalyzeReferences(current);}
     }
 }}
