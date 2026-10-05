@@ -43,7 +43,7 @@ U0 EmitClearFunctions() {
     for (i = 0; i < naggregates; i++) {
         type = T_AGG+i; a = Shape(type); if (a->generic_count || !Owned(type)) goto drop_next;
         IR("define void @__cool_clear"); RI(type); IR("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n");
-        if (!Borrowed(type)) {
+        if (a->kind==A_OWNER || !Borrowed(type)) {
             IR("  call void @cool_zero(i64 %address, i64 ");RI(ByteSize(type));IR(")\n  ret void\n");
         } else if (a->kind == A_ARRAY) {
             IR("  br label %loop\nloop:\n  %index = phi i64 [0, %entry], [%next, %body]\n  %more = icmp ult i64 %index, "); RI(a->count); IR("\n  br i1 %more, label %body, label %done\nbody:\n  %offset = mul i64 %index, "); RI(ByteSize(a->element));

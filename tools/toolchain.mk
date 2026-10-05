@@ -454,3 +454,10 @@ mixed-owned-references-test: build/cool-compiler build/language.BIN build/langua
 test: mixed-owned-references-test
 mixed-owned-references-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_mixed_owned_references.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: heap-borrows-test heap-borrows-sanitize-test
+heap-borrows-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_heap_borrows.py
+test: heap-borrows-test
+heap-borrows-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_heap_borrows.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

@@ -73,9 +73,9 @@ with unsafe code. There is no implicit reference-to-pointer conversion.
 This is a development foundation, not completion of the 1.0 borrowing gate.
 
 - Shared and exclusive references can be stored in structs, arrays and enums,
-  including aggregates that also contain slices and owning fields with borrow-free
-  payloads. A stored reference's pointee must not itself contain borrowed storage.
-  Reference-containing owned allocations remain rejected. Reassignment of reference
+  including aggregates that also contain slices and owning fields. Owning
+  payloads retain their own external loans. A stored reference's pointee must not itself contain borrowed storage.
+  Stored references to borrowed pointees still need nested lifetime tracking. Reassignment of reference
   bindings/fields and general nested stored lifetimes need further tracking.
 - Function-body slices use the same lexical provenance as references. A slice
   exclusively borrows its elements; element references reborrow it, and disjoint
@@ -713,8 +713,8 @@ underlying root. Return contracts retain all selected roots conservatively:
 anchor as well, so `len(*s)` can conflict while its returned element reference is
 live. Projection-specific return contracts are not implemented.
 
-Aggregates may combine slice fields, reference fields and owning fields with
-borrow-free owned payloads. Direct
+Aggregates may combine slice fields, reference fields and owning fields;
+borrowed heap payloads retain their external roots. Direct
 references to these aggregates preserve physical and payload loans separately.
 Slices of owning elements support reading, explicit moves and replacement through
 an exclusive descriptor reference; moving their backing owner remains rejected.
@@ -722,7 +722,7 @@ Replacing a slice or slice-containing field through a reference is currently
 rejected, because cross-call replacement lifetimes are not tracked. Ordinary
 local descriptor reassignment retains the existing lifetime checks. Stored
 `&[]T` fields, references to references, borrowed slice elements and
-reference-containing owned allocations still require further implementation.
+general replacement contracts still require further implementation.
 
 `make slice-descriptors-test` verifies both frontends, five engines and O2,
 31 negative programs, 30 independent permission-model queries and persistent
@@ -757,7 +757,7 @@ fn payload(value: &Mixed) -> &i64 borrows(value) { return &*(*value).payload; }
 ```
 
 The outer struct, fixed array or enum stores borrowed handles; each owned
-allocation must contain a borrow-free payload. Moving it preserves the borrowed
+allocation may contain borrowed fields under the heap rules below. Moving it preserves the borrowed
 handles' root sets and return regions. Loans into its own physical storage or
 owned pointees prevent a move, including shared physical loans. The owned
 payload getter above retains the receiver's physical root; a getter for `label`
@@ -776,9 +776,47 @@ holders; moving a value does not remove its lexical or persistent root record.
 
 This supports nested ordinary aggregates and generic layouts, shared/exclusive
 fields, arrays, named/anonymous enum matches and aggregates combining slices and
-owners. It does not support `own[BorrowedType]`, stored references to borrowed
-pointees or general heap lifetimes. `make mixed-owned-references-test` checks both
+owners. Borrowed owning heaps are supported as described below; stored references
+to borrowed pointees and general cross-call replacement lifetimes remain incomplete. `make mixed-owned-references-test` checks both
 frontends, five engines and O2, zero leaked owners, checked empty-owner faults,
 17 rejected programs, 14 independent permission queries and persistent REPL
 roots. `make mixed-owned-references-sanitize-test` adds an ASan compiler and
 instrumented LLVM runtime verification.
+
+## Borrowed owning heaps
+
+```cool
+struct View { value: &i64; }
+fn box(value: &i64) -> own[View] borrows(value) {
+    return new[View](View { value: value });
+}
+fn unbox(box: own[View]) -> &i64 borrows(box) { return (*box).value; }
+```
+
+The owning handle protects the allocation; its payload's external references
+protect their own roots. A move transports those external roots and clears the
+old handle. It never drops the allocation being transported. A consumed owner
+can yield an external reference, including an exclusive reference, under its
+return contract. It cannot yield its own heap address. `&*owner` keeps the owning
+root alive and prevents moving or replacing that root while the loan is live.
+References through receivers retain conservative physical/payload root sets.
+
+Recursive owned nominal layouts, nested owners, owning enum payloads, fixed
+arrays and generic wrappers use the same rules. `new[&i64](&value)` is supported;
+`new[View]()` is rejected because zero initialization cannot create a valid
+scoped reference. Empty owner handles and empty slice descriptors can still be
+initialized where the ordinary type rules permit them.
+
+Local owner replacement may retain new external roots at the original binding's
+lifetime marker. Earlier possible roots remain pinned conservatively until that
+binding ends. A borrow from a shorter block cannot be installed into a longer
+lived heap. Reference-field assignment and cross-call borrowed storage
+replacement through a receiver remain rejected. Heap storage containing a
+reference to an already-borrowed pointee is also still rejected; arbitrary nested
+stored lifetimes require further work.
+
+`make heap-borrows-test` exercises both frontends, five engines and O2, recursive
+and generic owners, consumed exclusive getters, nested moves and enum cleanup, a 64-link chain with exactly 65 live owners and
+zero after scope exit, twenty rejected programs, twelve independent capability
+queries and persistent REPL roots. `make heap-borrows-sanitize-test` adds an ASan
+compiler and LLVM load/store plus C runtime ASan/UBSan instrumentation.

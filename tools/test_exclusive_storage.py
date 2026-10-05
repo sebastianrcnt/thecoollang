@@ -75,7 +75,7 @@ WHOLE=[
  ('fn bad(a:&i64,b:&mut i64)->Mixed borrows(a){return create(a,b);}fn main(){}','outlive'),
  ('fn main(){let v=[2]&mut i64{};}','explicit initializer'),
  ('fn main(){var x=1;let a=[2]&mut i64{&mut x,&mut x};}','conflicts'),
- ('fn main(){var a=1;var b=2;let v=create(&a,&mut b);let h=new[Mixed](v);}','owned storage'),
+ ('fn main(){var a=1;var b=2;let v=create(&a,&mut b);let h=new[&Mixed](&v);}','owned storage'),
  ('fn main(){var a=1;let o=optional(&mut a);let c=o;match(o){Maybe.None=>{}Maybe.Some(r)=>{*r=2;}}}','conflicts'),
 ]
 def run(command):return subprocess.run([str(x) for x in command],cwd=ROOT,text=True,capture_output=True,timeout=120)

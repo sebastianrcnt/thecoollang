@@ -58,8 +58,8 @@ invalid=[
  'fn main(){var x=1;var v=Exclusive{r:&mut x,p:new[i64](7)};let r=&mut v;let gone=move *r;*(*r).r=2;}',
  'fn main(){var x=1;var v=Mixed{r:&x,p:new[i64](7)};let r=&mut v;let gone=take(r);x=2;}',
  'fn main(){var x=1;var v=Mixed{r:&x,p:new[i64](7)};let r=&mut v;let p=&*(*r).p;let gone=take(r);}',
- 'fn main(){var x=1;let p=new[Mixed](Mixed{r:&x,p:new[i64](7)});}',
- 'struct Bad{r:&i64;p:own[&i64];}fn main(){}',
+ 'fn main(){var x=1;let v=Mixed{r:&x,p:new[i64](7)};let p=new[&Mixed](&v);}',
+ 'struct Bad{r:&i64;p:own[&Mixed];}fn main(){}',
  'fn main(){var x=1;var a=[2]Mixed{Mixed{r:&x,p:new[i64](7)},Mixed{r:&x,p:new[i64](8)}};let r=&a;let gone=move a;}',
 ]
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)

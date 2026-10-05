@@ -76,7 +76,7 @@ U0 DropValue(I64 address, I64 type) {
 U0 ClearMoved(I64 address,I64 type){
     AggregateType *shape; Field *field; I64 i,tag;
     if(!Owned(type))return;
-    if(!Borrowed(type)){MemSet(address(U8 *),0,ByteSize(type));return;}
+    if(AggregateKind(type)==A_OWNER || !Borrowed(type)){MemSet(address(U8 *),0,ByteSize(type));return;}
     shape=Shape(type);
     if(shape->kind==A_ARRAY){for(i=0;i<shape->count;i++)ClearMoved(address+i*ByteSize(shape->element),shape->element);return;}
     if(shape->kind==A_ENUM){tag=address(I64 *)[0];for(field=shape->fields;field;field=field->next)if(field->tag==tag){ClearMoved(address+field->offset,field->type);return;}return;}

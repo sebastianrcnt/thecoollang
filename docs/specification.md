@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 23
+# Cool language specification — 1.0 draft 24
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -411,8 +411,9 @@ must satisfy the raw-memory validity obligations in [references](references.md).
 This construct does not infer allocation validity from an arbitrary pointer.
 
 `new[T](value)` allocates an owner initialized from the supplied value;
-`new[T]()` requests default initialization. Borrowed values cannot be hidden in
-owned storage contrary to the current storage rules. Moving an owned binding or
+`new[T]()` requests default initialization. Stored scoped references require an
+explicit initializer. Owners can retain external borrows from their payloads
+under the heap lifetime rules in draft 24. Moving an owned binding or
 projection requires `move` where ownership transfers; a fresh owned result can
 transfer directly. Direct moved bindings follow whole-root checking and are
 unusable until validly reinitialized. Moves through exclusive receivers preserve
@@ -871,6 +872,31 @@ owned handles fault on dereference. Direct moved bindings remain unusable under
 existing whole-root move tracking; this revision does not introduce granular
 partial-move tracking or permit reference-field replacement.
 
-`own[BorrowedType]`, borrowed owned heap allocations and nested stored references
-remain rejected pending lifetime-aware heap tracking. See
+At this revision, borrowed owned heap allocations and nested stored references
+remained rejected. Draft 24 below extends the owned heap boundary. See
 [mixed aggregate rules](references.md#owning-aggregates-with-stored-borrows).
+
+## Draft 24: borrowed owning heaps
+
+`own[T]` carries the external borrow provenance of its payload `T`. An explicit
+`new[T](value)` initializer transfers those external loans to the owning handle;
+returning it requires a matching `borrows` contract. Pointers into a by-value
+owner's heap cannot escape that owner, even when the owner contains an external
+borrow. A by-value owner may return one of its external reference fields under
+its declared contract. An address into the heap instead pins its physical owner.
+
+Ownership transfer always clears the owning handle itself, including when the
+payload is borrowed; it must not clear or drop the allocation being transferred.
+Recursive nominal types linked through owners are supported. Shared/exclusive
+reference fields, slices, fixed arrays, enum payloads, generic and nested owning
+heaps retain their existing capability and escape checks. Default initialization
+cannot create null scoped reference fields. Empty owning handles remain valid
+and fault when dereferenced.
+
+Replacement of a local borrowed owner or an owned subobject uses the binding's
+original lifetime marker and accumulates possible external roots. References
+from a shorter nested scope cannot be installed into longer-lived heap storage.
+Cross-call replacement through reference receivers remains rejected until
+mutation contracts carry destination lifetimes. Stored references whose pointees
+also contain borrows, and slices whose elements contain borrows, remain separate
+unfinished lifetime work; this revision does not declare the 1.0 gate complete.

@@ -1,3 +1,4 @@
+extern Bool ReferenceStorage(I64 type);
 // Aggregate layouts and structural array/slice types. Pointer depth uses T_PTR.
 I64 FindType(U8 *package, U8 *name) {
     I64 i; for (i = 0; i < naggregates; i++) if ((aggregate_types[i].kind == A_STRUCT || aggregate_types[i].kind == A_ENUM) && !aggregate_types[i].origin && Eq(aggregate_types[i].package, package) && Eq(aggregate_types[i].name, name)) return T_AGG + i;
@@ -80,26 +81,32 @@ Bool Owned(I64 type) {
     if (Shape(type)->kind == A_ARRAY) return Owned(Shape(type)->element);
     for (f = Shape(type)->fields; f; f = f->next) if (Owned(f->type)) return TRUE; return FALSE;
 }
-Bool Borrowed(I64 type) {
-    Field *f;
-    if (!Aggregate(type)) return FALSE;
-    Layout(type);
-    if (Shape(type)->kind == A_SLICE || Shape(type)->kind == 6) return TRUE;
-    if (Shape(type)->kind == A_ARRAY) return Borrowed(Shape(type)->element);
-    for (f = Shape(type)->fields; f; f = f->next) if (Borrowed(f->type)) return TRUE;
-    return FALSE;
+class BorrowTypePath{I64 type;BorrowTypePath *next;};
+Bool BorrowTypeProperty(I64 type,Bool mode,BorrowTypePath *path){
+ AggregateType *shape;Field *field;BorrowTypePath entry,*previous;
+ if(!Aggregate(type))return FALSE;
+ for(previous=path;previous;previous=previous->next)if(previous->type==type)return FALSE;
+ Layout(type);shape=Shape(type);
+ if(shape->kind==6){if(mode)return shape->count;return TRUE;}
+ if(shape->kind==A_SLICE)return TRUE;
+ entry.type=type;entry.next=path;
+ if(shape->kind==A_ARRAY || shape->kind==A_OWNER)return BorrowTypeProperty(shape->element,mode,&entry);
+ for(field=shape->fields;field;field=field->next)if(BorrowTypeProperty(field->type,mode,&entry))return TRUE;
+ return FALSE;
 }
-U0 ValidateBorrowedElements(I64 type) {
-    Field *field;
-    ValidateReferenceStorage(type,At());
-    if (!Aggregate(type)) return;
-    Layout(type);
-    if (Shape(type)->kind == A_OWNER) { if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "owned storage cannot contain borrowed references"); }
-    else if (Shape(type)->kind == A_SLICE) {
-        if (Borrowed(Shape(type)->element)) ErrorAt(Shape(type)->token, "slice elements cannot contain borrowed slices until lifetime analysis exists");
-    } else if (Shape(type)->kind == A_ARRAY) ValidateBorrowedElements(Shape(type)->element);
-    else for (field = Shape(type)->fields; field; field = field->next) ValidateBorrowedElements(field->type);
+Bool Borrowed(I64 type){return BorrowTypeProperty(type,FALSE,NULL);}
+U0 ValidateBorrowedPath(I64 type,BorrowTypePath *path){
+ AggregateType *shape;Field *field;BorrowTypePath entry,*previous;
+ if(!Aggregate(type))return;
+ for(previous=path;previous;previous=previous->next)if(previous->type==type)return;
+ ValidateReferenceStorage(type,At());Layout(type);shape=Shape(type);entry.type=type;entry.next=path;
+ if(shape->kind==A_SLICE){if(Borrowed(shape->element))ErrorAt(shape->token,"slice elements cannot contain borrowed slices until lifetime analysis exists");return;}
+ if(shape->kind==A_OWNER && !ReferenceStorage(shape->element))ErrorAt(shape->token,"owned storage cannot contain nested borrowed references");
+ if(shape->kind==A_ARRAY || shape->kind==A_OWNER){ValidateBorrowedPath(shape->element,&entry);return;}
+ for(field=shape->fields;field;field=field->next)ValidateBorrowedPath(field->type,&entry);
 }
+U0 ValidateBorrowedElements(I64 type){ValidateBorrowedPath(type,NULL);}
+
 Field *FindField(I64 type, U8 *name, Token *token) {
     Field *f; Layout(type);
     for (f = Shape(type)->fields; f; f = f->next) if (Eq(f->name, name)) {

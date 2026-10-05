@@ -17,7 +17,7 @@ NEGATIVE = [
     ('let p = new[i64](1); while (consume(move p)) {}', 'outer owner'),
     ('var a = [1]own[i64]{new[i64](1)}; let s = a[:]; let gone=move a;', 'conflicts'),
     ('let p = new[[2]i64](); let s = (*p)[:]; let gone=move p;', 'conflicts'),
-    ('var a = [1]i64{1}; let p = new[[]i64](a[:]);', 'borrowed references'),
+    ('var p = new[[]i64](); {var a = [1]i64{1}; p = new[[]i64](a[:]);}', 'outlive local storage'),
 ]
 with tempfile.TemporaryDirectory(prefix='cool-owners-') as tmp:
     source = Path(tmp)/'main.cool'; source.write_text(PROGRAM)

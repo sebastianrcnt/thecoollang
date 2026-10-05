@@ -470,7 +470,7 @@ fn EmitClearFunctions(){unsafe{
   let type=1000+i;let shape=Shape(type);i=i+1;
   if(shape.generic_count==0 && Owned(type)!=i8(0)){
    IR(cast[*u8]("define void @__cool_clear"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));
-   if(Borrowed(type)==i8(0)){
+   if(shape.kind==5 || Borrowed(type)==i8(0)){
     IR(cast[*u8]("  call void @cool_zero(i64 %address, i64 "));RI(ByteSize(type));IR(cast[*u8](")\n  ret void\n"));
    }else if(shape.kind==2){
     IR(cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 [0, %entry], [%next, %body]\n  %more = icmp ult i64 %index, "));RI(shape.count);

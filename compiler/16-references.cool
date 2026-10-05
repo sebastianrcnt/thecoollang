@@ -124,7 +124,7 @@ fn ReferenceStorage(type: i64) -> bool {
         let shape = Shape(type);
         if (shape.kind == 3) { return Borrowed(shape.element) == i8(0); }
         if (shape.kind == 5) {
-            return Borrowed(shape.element) == i8(0);
+            return true;
         }
         if (shape.kind == 2) {
             return ReferenceStorage(shape.element);
@@ -141,33 +141,7 @@ fn ReferenceStorage(type: i64) -> bool {
 }
 // Per-root modes are retained in loans. This maximum is only the permission
 // required to copy a typed value; it must never upgrade a shared source root.
-fn ReferenceMode(type: i64) -> i64 {
-    unsafe {
-        if (IsReference(type)) {
-            return Shape(type).count;
-        }
-        if (Aggregate(type) == i8(0)) {
-            return 0;
-        }
-        Layout(type);
-        let shape = Shape(type);
-        if (shape.kind == 5) {
-            return 0;
-        }
-        if (shape.kind == 3) { return 1; }
-        if (shape.kind == 2) {
-            return ReferenceMode(shape.element);
-        }
-        var field = shape.fields;
-        while (field != null) {
-            if (ReferenceMode(field.type) != 0) {
-                return 1;
-            }
-            field = field.next;
-        }
-        return 0;
-    }
-}
+fn ReferenceMode(type:i64)->i64{return i64(BorrowTypeProperty(type,true,null));}
 fn ValidateReferenceStorage(type: i64, token: * Token) {
     unsafe {
         if (IsReference(type)) {
@@ -176,7 +150,7 @@ fn ValidateReferenceStorage(type: i64, token: * Token) {
             }
         } else {
             if (ContainsReference(type) && !ReferenceStorage(type)) {
-                ErrorAt(token, cast[ * u8]("stored references require single-layer aggregate storage and borrow-free owned payloads"));
+                ErrorAt(token, cast[ * u8]("stored references require single-layer aggregate storage"));
             }
         }
     }
@@ -472,7 +446,9 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                     if (AggregateKind(node.a.type) == 5 && node.a.kind == 18) {
                         ReferenceAddressMode(check, node.a.a, writing);
                         ReferenceAccess(check, node.a.a, false);
-                    } else { ReferenceValue(check, node.a); }
+                    } else {
+                        if(AggregateKind(node.a.type)==5 && node.a.kind==3){ReferenceAccess(check,node.a,false);}else{ReferenceValue(check,node.a);}
+                    }
                 }
                 if (AggregateKind(node.a.type) == 5) {
                     let origin = ReferencePlaceSource(node);
@@ -676,7 +652,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
             }
             return;
         }
-        if (node.kind == 23) {
+        if (node.kind == 23 || node.kind == 28) {
             if (ContainsReference(node.type) && node.a == null) {
                 ErrorAt(node.token, cast[ * u8]("reference storage requires an explicit initializer"));
             }

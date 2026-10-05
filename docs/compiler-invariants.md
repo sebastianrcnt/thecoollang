@@ -774,17 +774,18 @@ provenance can be attached to the actual destination lifetime across calls.
 
 `Borrowed(type)` classifies value-level provenance: slices and references retain
 external roots, arrays inherit their element provenance, and nominal aggregates
-inherit their fields. An owning handle itself has no borrowed value provenance;
-its allocation contents are a separate storage boundary. Keep `Layout` before
+inherit their fields. Owning handles inherit their payload's external provenance;
+the heap's physical storage lifetime is separately anchored to its owner. Keep `Layout` before
 reading field lists, including lazy nominal and generic layouts.
 
 `ValidateBorrowedElements` first enforces reference-storage restrictions, then
-checks owning allocations and slice elements for borrowed payloads and recursively
-validates arrays/nominal fields. The predicate and storage validator have distinct
-roles; simply recursing through owners in `Borrowed` changes return/move semantics
-and can introduce cycles through recursive owning layouts. Extending owned
-borrowed storage requires destination lifetimes and escape analysis, not only
-relaxing this validator. The production implementations use direct control flow
+checks owner payloads for unsupported nested stored references and slice
+elements for borrowed payloads, recursively validating owner/array/nominal fields. The predicate and storage validator have distinct
+roles. `BorrowTypeProperty` walks borrowed/mutability properties with a local
+type path, stopping recursive owned cycles. `ValidateBorrowedPath` uses its own
+cycle guard. Both paths keep lazy `Layout` resolution before reading fields. Heap
+initializers propagate external loans, while addresses into an owned allocation
+use physical owner roots; relaxing the validator alone would not establish this. The production implementations use direct control flow
 and remain semantically aligned with the compact bootstrap `Types.cool` helpers.
 
 ## Template expression-root resolution
@@ -840,3 +841,19 @@ zeroing behavior. Borrowed aggregate fields and enum tags remain initialized;
 this prevents a retained exclusive receiver from exposing null scoped references
 after a move. Destruction of emptied handles remains a no-op. Both interpreter
 paths, native JIT's bytecode operation and LLVM AOT/JIT use this contract.
+
+## Heap payload provenance
+
+`N_NEW` carries its initializer's regions and loan expressions. An owner LOAD
+retains its original owning value as `origin_source`; borrowed payload projections
+follow that value. `ReferenceMode` includes owned payload capabilities, with the
+same recursive type-cycle guard as `Borrowed`. Reading a named owner handle to
+form an address uses physical access checking rather than prematurely acquiring
+its payload's exclusive reborrow, avoiding a self-conflict in consumed exclusive
+getters. Assignment keeps the original holder marker and checks source root depth.
+
+`ClearMoved` and generated `__cool_clearTYPE` routines special-case owning
+handles before classifying borrowed payloads. The handle is always zeroed, never
+recursively cleared in its allocation. Typed destructor traversal still frees
+only owned subobjects. Compiler and runtime checks preserve the distinction
+between externally borrowed heap fields and references to the heap itself.

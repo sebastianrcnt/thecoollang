@@ -1,3 +1,4 @@
+extern Bool ContainsReference(I64 type);
 I64 TypeName(U8 *s) {
     if (Eq(s, "void")) return T_VOID;
     if (Eq(s, "i64")) return T_INT;
@@ -103,9 +104,8 @@ Node *Atom() {
     }
     if (Is("new")) {
         pos++; Need('[', "expected '[' after new"); ty = ParseType(); Need(']', "expected ']'"); ValidateBorrowedElements(ty);
-        if (Borrowed(ty)) ErrorAt(t, "owned storage cannot contain borrowed references");
-        n = NewNode(N_NEW, t); n->type = SequenceType(A_OWNER, ty, 0, t); n->storage = Storage(n->type);
-        Need('(', "expected '(' after new type"); if (!Take(')')) { n->a = Expr(1); Coerce(n->a, ty); Transfer(n->a); Need(')', "expected ')' after new initializer"); } return n;
+        n = NewNode(N_NEW, t); n->type = SequenceType(A_OWNER, ty, 0, t);ValidateBorrowedElements(n->type); n->storage = Storage(n->type);
+        Need('(', "expected '(' after new type"); if (!Take(')')) { n->a = Expr(1); Coerce(n->a, ty); Transfer(n->a); Need(')', "expected ')' after new initializer"); } if(!n->a && ContainsReference(ty))ErrorAt(t,"reference storage requires an explicit initializer");return n;
     }
     if (At()->kind == '[') { ty = ParseType(); return AggregateLiteral(ty, t); }
     if (Is("sizeof")) { pos++; Need('(', "expected '('"); ty = ParseType(); Need(')', "expected ')'"); n = NewNode(N_INT, t); n->type = T_U64; n->value = ByteSize(ty); return n; }
@@ -133,7 +133,7 @@ Node *Atom() {
     if (Take('*')) {
         n = NewNode(N_LOAD, t); n->a = Primary();
         if(IsReference(n->a->type)) return ReferenceLoad(n->a,t);
-        if (AggregateKind(n->a->type) == A_OWNER) { arg = NewNode(N_OWN_ADDRESS, t); arg->a = n->a; arg->type = T_PTR+Shape(n->a->type)->element; n->a = arg; }
+        if (AggregateKind(n->a->type) == A_OWNER) { n->origin_source=n->a;arg = NewNode(N_OWN_ADDRESS, t); arg->a = n->a; arg->type = T_PTR+Shape(n->a->type)->element; n->a = arg; }
         else { if (!unsafe_depth) ErrorAt(t, "pointer dereference requires unsafe"); if (!Pointer(n->a->type) || n->a->type == T_PTR) ErrorAt(t, "dereference requires a typed pointer"); }
         n->type = n->a->type - T_PTR; n->mutable = TRUE; if (Aggregate(n->type)) n->storage = Storage(n->type); return n;
     }

@@ -15,6 +15,7 @@ I64 Region(Node *n) {
     if (!n || !Borrowed(n->type)) return 0;
     if(IsReference(n->type) && n->kind==N_AGG_LITERAL){if(n->op==1)return Region(n->origin_source);return PlaceRegion(n->a);}
     if (n->kind == N_MOVE) return Region(n->origin_source);
+    if (n->kind == N_NEW) return Region(n->a);
     if (n->kind == N_LOCAL && n->local_ref) return n->local_ref->region;
     if (n->kind == N_SLICE) { if (n->op == A_ARRAY) return PlaceRegion(n->a); return Region(n->origin_source); }
     if (n->kind == N_LOAD) { if (n->origin_source) return Region(n->origin_source); return REGION_FRAME; }

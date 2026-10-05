@@ -1437,9 +1437,37 @@ through ordinary evaluation or library use.
   This extends ordinary borrowed aggregate use; G2 and the overall release gates
   remain open for the documented heap/nested/replacement lifetime work.
 
+
+- Borrowed owning heap implementation (specification draft 24): owners now carry
+  the external borrowed provenance/capabilities of their payloads. A recursion
+  path terminates nominal-own cycles in borrowed/mutability property queries and
+  storage validation. New expressions promote initializer regions and loans;
+  owner dereference loads retain the owning value as their source. A consumed
+  owner may return an external shared/exclusive reference under its contract,
+  while references into its own heap remain tied to physical ownership and
+  cannot escape a by-value owner. Fixed a consumed exclusive getter's temporary
+  self-loan conflict by reading the owner handle without prematurely acquiring
+  its payload capability. Owner handles always clear on transfer, irrespective
+  of borrowed payloads, preventing dropped/double-owned transferred allocations.
+  Tests cover recursive and generic heaps, nested owners, arrays, enum/anonymous
+  cleanup, slices, local lifetime-aware owner replacement and persistent REPL
+  roots. Twenty rejected programs and twelve independent capability queries pass
+  on both frontends, five engines and O2; a 64-link recursive enum chain has
+  exactly 65 live owners and returns to zero after transfer/destruction. The
+  instrumented compiler and LLVM/C runtime ASan/UBSan pass, as do full regression,
+  native/legacy bootstrap convergence and clean external editor/distribution.
+  Earlier fixtures rejecting all borrowed owning heaps were replaced by actual
+  nested-storage/lifetime violations, including shorter-scope slice installation.
+  Evidence: `build/release-audit/heap-borrows-{build,focused,final-focused,regression,sanitize,distribution}.log`.
+  Current IR SHA256:
+  `6547cf8399019ff45eb8beef008ee94498b926dea23af261fdaac3bf6fe88817`.
+  Cross-call replacement lifetimes, stored references to already-borrowed pointees
+  and borrowed slice elements remain mandatory unfinished work. G2 and 1.0 remain
+  open; this implementation does not replace those requirements with unsafe code.
+
 ## Next implementation checkpoints
 
-- Extend reference-containing owned/nested storage and lifetime-aware slice
+- Complete nested stored references and lifetime-aware heap/slice
   descriptor replacement; keep unsafe raw pointers separate and add rejection regressions
   before removing restrictions.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
