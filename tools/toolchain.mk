@@ -559,3 +559,9 @@ descriptor-rollback-test: build/cool-compiler build/language.BIN build/coolc bui
 test: descriptor-rollback-test
 descriptor-rollback-sanitize-test: build/cool-compiler build/coolc
 	python3 tools/test_descriptor_rollback.py --sanitize --output build/descriptor-rollback-asan-audit.json
+
+# Private guard-bypass audit; this does not enable nested storage in production.
+.PHONY: nested-reference-readiness-test
+nested-reference-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_nested_reference_probe.py --legacy --assert-expectations --output build/nested-reference-readiness-audit.json
+test: nested-reference-readiness-test

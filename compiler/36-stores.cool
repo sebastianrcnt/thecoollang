@@ -160,6 +160,20 @@ fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, sto
                     layer = 1;
                 }
                 var installed = ReferenceInstalledGraph(check, source, target.type, destination, opaque);
+                // A caller storage root is distinct from the parameter slot.
+                // Self-stores must keep the original receiver ancestry rather
+                // than linking caller storage back through that same receiver.
+                if (target.reference_external != 0) {
+                    var receiver = stop;
+                    while (receiver != null) {
+                        if (receiver.root == target && receiver.indirect == 0 && receiver.holder != null && receiver.parent == null && ReferenceAncestor(check, receiver.holder, installed.parent, installed.root)) {
+                            let old = ReferenceHolder(check, receiver.holder, installed.root);
+                            if (old != null) { installed.parent = old.parent; }
+                            else { installed.parent = null; }
+                        }
+                        receiver = receiver.next;
+                    }
+                }
                 ReferenceStoreRetain(check, target, &raw installed, value, stop, layer, null);
                 // Every live receiver of this physical destination gains the installed
                 // payload roots. Its parent follows the physical reborrow ancestry.
@@ -262,10 +276,23 @@ fn ReferenceParameters(check: * ReferenceCheck) {
                     payload = AllocateLocal();
                     payload.region = local.region;
                     payload.place_region = local.place_region;
+                    payload.reference_external = 1;
                     payload.all_next = check.function.all_locals;
                     check.function.all_locals = payload;
                 }
                 var physical = local;
+                if (IsReference(local.type)) {
+                    physical = AllocateLocal();
+                    physical.type = local.type;
+                    physical.region = local.region;
+                    physical.place_region = local.place_region;
+                    physical.reference_external = 1;
+                    physical.all_next = check.function.all_locals;
+                    check.function.all_locals = physical;
+                    // Stores install into caller storage, with its own marker.
+                    check.loans = ReferenceNew(check, null, null, 0, 0, null, check.loans);
+                    check.loans.holder = physical;
+                }
                 if (!IsReference(local.type)) {
                     physical = payload;
                 }

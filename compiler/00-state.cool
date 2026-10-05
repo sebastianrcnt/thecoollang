@@ -55,6 +55,9 @@ raw: *u8;
 
 struct Local {
 
+// Synthetic caller storage has a lifetime distinct from parameter value slots.
+reference_external: i64;
+
 name: *u8;
 
 type: i64;

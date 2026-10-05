@@ -389,7 +389,9 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
             var loan = check.loans;
             var found = false;
             while (loan != null) {
-                if (origin != null && loan.expression == origin && loan.holder == null) {
+                if (origin != null && loan.expression == origin && loan.holder == null &&
+                    (!(expression.kind == 3 || expression.kind == 18 || expression.kind == 29) ||
+                     !NestedReference(origin.type) || nested || loan.indirect != 0)) {
                     if (exclusive > ReferenceMode(origin.type)) {
                         ErrorAt(token, cast[ * u8]("cannot make an exclusive borrow from a shared reference"));
                     }
@@ -422,7 +424,8 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
         if (NestedReference(via.type) && (through || expression.kind == 18 || expression.kind == 29)) {
             layer = 1;
         }
-        let preserve = nested && NestedReference(via.type) && !physical && !bridge;
+        if (!IsReference(via.type) && !bridge) { layer = ReferenceAcquisitionLayer(place, via, expression, layer); }
+        let preserve = nested && TrackedBorrow(via.type) && !physical && !bridge;
         let before = check.loans;
         var found = false;
         if (physical) {
@@ -449,7 +452,7 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
                     if (bridge) { selected_source.physical_provenance = null; }
                     ReferenceSourceAccess(check, before, via, source.root, mode, token, origin, selected_source.physical_provenance);
                     check.loans = ReferenceNewSelected(check, &raw selected_source, via, mode, indirect, expression, check.loans, place, via, null, false);
-                    if (nested && !preserve) {
+                    if (nested && (!preserve || (source.indirect == 0 && source.root.reference_external != 0 && source.root.type == 0))) {
                         check.loans = ReferenceNewSelected(check, source, via, mode & ReferenceMode(Shape(expression.type).element), 1, expression, check.loans, place, via, null, true);
                     }
                     found = true;
@@ -879,6 +882,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
                 }
             }
         }
+        if (node.kind == 9 && IsReference(check.function.result)) { ReferenceCheckReturn(check, node.a, saved); }
         if (node.kind != 15) {
             ReferenceRelease(check, saved);
         }
@@ -1004,4 +1008,44 @@ fn ReferenceWriteCapability(place: *Node) { unsafe {
   if(PlaceProjectionKind(current)==3 && Shape(current.a.type).count==0){ErrorAt(current.token,cast[*u8]("cannot mutate or move through a shared reference"));}
   current=PlaceProjectionParent(current);
  }
+}}
+
+// Select payload lifetime layers from a complete typed path. A scalar address
+// within the first referent still belongs to that referent's physical storage.
+fn ReferenceAcquisitionLayer(place: *Node, via: *Local, expression: *Node, fallback: i64) -> i64 { unsafe {
+    var cursor = ReferencePlaceCursor(place, via, null);
+    var layer = fallback;
+    var seen = false;
+    let copying = expression.kind == 3 || expression.kind == 18 || expression.kind == 29;
+    let address = expression.kind == 23 && expression.op == 0;
+    if (cursor.complete != 0) {
+        var step = cursor.path;
+        while (step != null) {
+            if (step.kind == 3) {
+                if (address && seen) { layer = 1; }
+                if (NestedReference(step.type)) { seen = true; if (copying) { layer = 1; } }
+            }
+            step = step.next;
+        }
+    }
+    ReferenceCursorFree(cursor.path);
+    return layer;
+}}
+// Every retained result root must be caller storage named by the contract.
+// Parameter descriptor slots and local physical roots are never external.
+fn ReferenceCheckReturn(check: *ReferenceCheck, value: *Node, stop: *ReferenceLoan) { unsafe {
+    var loan = check.loans;
+    var found = false;
+    while (loan != stop) {
+        if (loan.expression == value && loan.holder == null && loan.root != null) {
+            let root = loan.root;
+            found = true;
+            if (root.reference_external == 0 || root.depth != 0 || root.place_region == 0 ||
+                (root.place_region & ~check.function.borrow_contract) != 0) {
+                ErrorAt(value.token, cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));
+            }
+        }
+        loan = loan.next;
+    }
+    if (!found) { ErrorAt(value.token, cast[*u8]("returned borrow may outlive local storage or violate its borrows contract")); }
 }}

@@ -945,9 +945,11 @@ channel. Body stores and forwarded effects check binding-origin parameter bits
 against the caller's effect matrix. Frame bits may never flow into external
 storage. Installed sources participate in return checking as well.
 
-`ReferenceParameters` gives nested parameters separate physical and payload
-roots. Synthetic payload Locals have type 0 and depth 0, no runtime slot or
-lexical name, and are linked into the function's allocation ownership list.
+`ReferenceParameters` gives reference parameters a distinct synthetic caller
+physical root and nested parameters a separate payload root. Synthetic payload
+Locals have type 0; caller physical roots retain the declared reference type.
+Both have depth 0, no runtime slot or lexical name, and are linked into the
+function's allocation ownership list. Actual parameter slots are separate.
 Conflating the two roots makes valid self-stores conflict with their own RHS.
 Ordinary borrowed by-value parameters use synthetic payload roots but addresses
 of their local physical storage still carry the frame region.
@@ -1398,41 +1400,53 @@ frontend plus host/runtime. The seed BIN/host remains an unsanitized parity
 control, including during `--sanitize` runs.
 
 
-## Nested reference root identity: experimental counterexamples
+## Nested reference root identity
 
-`tools/test_nested_reference_probe.py` builds private source copies and leaves
-production guards intact. Its normal bypass replaces only `ReferenceStorage`;
-`--routing` additionally tests typed-copy/address layer routing and retaining
-both layers when a nonreference aggregate supplies a nested reference. These
-changes alone do not allow returning an external scalar reference through a
-function-local Inner/Outer pair: coarse `CheckBorrowReturns` still sees FRAME.
-The direct named-holder path is not the whole acquisition path; stored LOAD
-origins also enter the computed-origin branch before that routing executes.
+An actual parameter Local denotes its callee value slot; it never has
+`reference_external` set. ReferenceParameters allocates a distinct synthetic
+Local for each reference parameter's caller storage, with that flag set and
+parameter place-region bits. Borrowed aggregate/owner payload summaries also
+use separate external synthetic roots. These are function-owned analysis
+metadata, not runtime slots. All reference-result loans must have an external
+root, depth zero, nonzero parameter origins and origins contained in the
+function's borrows contract. Missing roots reject. Aggregate, slice and owned
+borrowed result forms retain their Region return checks.
 
-The private `--graph-returns` experiment replaces the reference-result Region
-check with temporary loan-root checks. It is deliberately retained as a failed
-hypothesis, not a valid compiler implementation. Checking depth zero, parameter
-place-region bits and a reference root type accepts this invalid program:
+This distinction is required for this invalid program:
 
 ```cool
 fn bad(p: &i64) -> & &i64 borrows(p) { return &p; }
 ```
 
-Here `p` is a by-value reference descriptor in the callee's frame. Its referent
-is external; the descriptor slot is not. Existing `ReferenceParameters` uses
-that same Local identity for a simple reference parameter's external root,
-while acquiring `&p` can use it for the descriptor slot. Root type and parameter
-bits cannot distinguish the two roles. The real frontend and the control
-retaining Region correctly reject the program. Accepted negative experiments
-are checked only and never executed.
+`p` points to caller storage, but `&p` points to the callee's descriptor slot.
+Depth, parameter bits and reference root type cannot distinguish those roles.
+The private `--unsafe-root-predicate` countermodel deliberately reinstates that
+failed predicate and accepts this invalid case in both frontends. It checks
+accepted negatives without executing them; the real frontend rejects the slot
+escape independently. Historical failed experiments remain in release-audit
+reports, not as alternate production semantics.
 
-A sound replacement must distinguish parameter descriptor storage from external
-referent roots, preserve that distinction through copying, summaries and alias
-stores, and keep local physical roots separate from external payload roots
-through computed projections. Do not remove the Region guard based on the failed
-root predicate. Twelve private source probes include by-value aggregate and owner
-slot returns, computed temporary-owner addressing, stores from an undeclared
-borrows source, short Inner escape and a shared/mutable barrier. The failed
-hypothesis additionally overrejects two valid local-Inner external-return forms.
-`--assert-expectations` fails on these three gaps after saving the full report;
-an observational exit zero never means release acceptance.
+Typed acquisition paths distinguish copying a stored external reference from
+addressing its enclosing local storage. Computed stored LOAD origins must drop
+the physical layer when extracting a nonnested borrowed value. Nested copies
+retain physical and payload alternatives; incoming borrowed aggregate summary
+roots supply their separate payload layer. Unknown/incomplete paths retain the
+conservative fallback. Arbitrary nested stores and borrowed slice elements
+remain guarded; these changes do not authorize removing those restrictions.
+
+Caller storage roots have holder markers so checked stores retain installed
+origins. Installing through an original parameter receiver must preserve its
+old payload ancestry for self-stores, rather than making a cycle through the
+new synthetic caller root. Other aliases and child receivers retain their
+physical ancestry. The existing stores suite exercises self-stores, forwarding,
+recursive calls, shared/exclusive/reference/slice/owner replacement and return
+contracts across both frontends and execution engines.
+
+`tools/test_nested_reference_probe.py` copies actual sources and bypasses only
+ReferenceStorage by default. Twelve source probes per frontend cover local
+Inner/Outer external-return copies and addresses, callee descriptor/owner slot
+escapes, undeclared return origins, short storage escape and shared authority.
+`nested-reference-readiness-test` requires all classifications and diagnostics.
+Positive private cases run in tree mode; this is lifetime-model readiness,
+not production feature availability or cross-engine safety proof. An
+observational countermodel exit zero never means release acceptance.

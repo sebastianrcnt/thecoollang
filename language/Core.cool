@@ -165,7 +165,7 @@ U8 *Ident() { U8 *s = At()->text; Need(K_ID, "expected identifier"); return s; }
 #define N_NEW 28
 #define N_MOVE 29
 #define N_OWN_ADDRESS 30
-class Local { U8 *name; I64 type, slot, mutable, depth, region, place_region, moved, loop_level; Local *next, *all_next, *repl_next; I64 repl_mark; U8 *sources; U8 *destination_mark; I64 reference_visit; Local *reference_next; };
+class Local { I64 reference_external; U8 *name; I64 type, slot, mutable, depth, region, place_region, moved, loop_level; Local *next, *all_next, *repl_next; I64 repl_mark; U8 *sources; U8 *destination_mark; I64 reference_visit; Local *reference_next; };
 class Node { I64 kind, type, value, op, slot, storage, offset, mutable, field_key; Token *token; U8 *name; Node *a, *b, *c, *next, *origin_source; Local *local_ref; };
 class ReplNode { Node value; ReplNode *next; };
 ReplNode *repl_nodes;

@@ -16,9 +16,9 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def function_span(text, name):
+def function_span(text, name, prefix='fn '):
     """Locate exactly one ordinary Cool function, counting lexical braces."""
-    needle = 'fn ' + name + '('
+    needle = prefix + name + '('
     assert text.count(needle) == 1, name
     start = text.index(needle)
     opening = text.index('{', start)
@@ -96,125 +96,70 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frontend', type=Path, default=ROOT / 'build/cool-compiler')
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--graph-returns', action='store_true', help='Privately replace scalar reference return Region check with actual loan root validation')
-    parser.add_argument('--routing', action='store_true', help='Apply experimental private typed copy/address layer routing')
-    parser.add_argument('--assert-expectations', action='store_true', help='Assert all expanded expected classifications after writing report')
+    parser.add_argument('--legacy', action='store_true')
+    parser.add_argument('--unsafe-root-predicate', action='store_true', help='Private countermodel replacing explicit external-root identity with the disproven type predicate')
+    parser.add_argument('--assert-expectations', action='store_true')
     args = parser.parse_args()
-    assert len({name for name, _, _ in CASES}) == len(CASES), 'duplicate fixture names'
-    sources = sorted((ROOT / 'compiler').glob('*.cool'))
-    hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources}
-    artifacts = [args.frontend.resolve(), ROOT / 'build/compiler-host.o', ROOT / 'build/language-runtime.o']
+    assert len({name for name, _, _ in CASES}) == len(CASES)
+    sources = sorted((ROOT/'compiler').glob('*.cool'))
+    legacy_sources = sorted((ROOT/'language').glob('*.cool')) if args.legacy else []
+    hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources+legacy_sources}
+    artifacts = [args.frontend.resolve(), ROOT/'build/compiler-host.o', ROOT/'build/language-runtime.o']
     artifact_hashes = {str(p): digest(p) for p in artifacts}
-    env = {**os.environ, 'ASAN_OPTIONS': 'halt_on_error=1', 'UBSAN_OPTIONS': 'halt_on_error=1:print_stacktrace=1'}
+    env = {**os.environ, 'COOLC_COMPILER_BIN':str(ROOT/'coolc/seed/Compiler.BIN')}
     def run(cmd, **kw):
-        return subprocess.run(list(map(str, cmd)), cwd=ROOT, env=env,
-                              capture_output=True, text=True, timeout=240, **kw)
+        return subprocess.run(list(map(str,cmd)),cwd=ROOT,env=env,capture_output=True,text=True,timeout=240,**kw)
     with tempfile.TemporaryDirectory(prefix='cool nested reference probe ') as directory:
-        tmp = Path(directory)
-        private = tmp / 'compiler'; private.mkdir()
-        for original in sources: shutil.copy2(original, private / original.name)
-        copies = []
+        tmp=Path(directory);private=tmp/'compiler';private.mkdir()
+        for original in sources:shutil.copy2(original,private/original.name)
+        copies=[]
         for original in artifacts:
-            copy = tmp / original.name; shutil.copy2(original, copy); copies.append(copy)
-        assert hashes == {str(p.relative_to(ROOT)): digest(p) for p in sources}, 'source changed during snapshot'
-        assert all(digest(copy) == artifact_hashes[str(original)] for original, copy in zip(artifacts, copies)), 'artifact changed during snapshot'
-        target = private / '16-references.cool'
-        original = target.read_text(); start, end = function_span(original, 'ReferenceStorage')
-        patched = original[:start] + 'fn ReferenceStorage(type: i64) -> bool { return true; }' + original[end:]
-        if args.routing:
-            old = 'let preserve = nested && NestedReference(via.type) && !physical && !bridge;'
-            assert patched.count(old) == 1
-            patched = patched.replace(old, 'if (!IsReference(via.type) && !bridge) { layer = ReferenceCopiedPayloadLayer(place, via, expression, layer); }\n        let preserve = nested && TrackedBorrow(via.type) && !physical && !bridge;')
-            patched += """
-fn ReferenceCopiedPayloadLayer(place:*Node,via:*Local,expression:*Node,fallback:i64)->i64{unsafe{
- var cursor=ReferencePlaceCursor(place,via,null);var layer=fallback;var seen=false;
- let copying=expression.kind==3 || expression.kind==18 || expression.kind==29;
- let address=expression.kind==23 && expression.op==0;
- if(cursor.complete!=0){var step=cursor.path;while(step!=null){
-  if(step.kind==3){
-   if(address && seen){layer=1;}
-   if(NestedReference(step.type)){seen=true;if(copying){layer=1;}}
-  }step=step.next;
- }}
- ReferenceCursorFree(cursor.path);return layer;
-}}
-"""
-        if args.graph_returns:
-            borrow = private / '04-borrow.cool'
-            text = borrow.read_text()
-            old = 'if(node.kind==9 && Borrowed(function.result)!=i8(0) && (Region(node.a)&~function.borrow_contract)!=0)'
-            assert text.count(old) == 1
-            borrow.write_text(text.replace(old, 'if(node.kind==9 && !IsReference(function.result) && Borrowed(function.result)!=i8(0) && (Region(node.a)&~function.borrow_contract)!=0)'))
-            start, end = function_span(patched, 'ReferenceStatement')
-            statement = patched[start:end]
-            old = '        if (node.kind != 15) {'
-            assert statement.count(old) == 1
-            statement = statement.replace(old, '        if (node.kind == 9 && IsReference(check.function.result)) { ReferenceReturnRoots(check, node.a, saved); }\n' + old)
-            patched = patched[:start] + statement + patched[end:]
-            patched += """
-fn ReferenceReturnRoots(check:*ReferenceCheck,value:*Node,stop:*ReferenceLoan){unsafe{
- var loan=check.loans;var found=false;
- while(loan!=stop){if(loan.expression==value && loan.holder==null && loan.root!=null){
-  let root=loan.root;found=true;
-  if(root.depth!=0 || root.place_region==0 || (root.type!=0 && !IsReference(root.type)) || (root.place_region & ~check.function.borrow_contract)!=0){ErrorAt(value.token,cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));}
- }loan=loan.next;}
- if(!found){ErrorAt(value.token,cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));}
-}}
-"""
-        target.write_text(patched)
-        manifest = tmp / 'sources'
-        manifest.write_text(''.join('__main\t' + str(p) + '\n' for p in sorted(private.glob('*.cool'))))
-        ir = tmp / 'compiler.ll'
-        result = run([copies[0], 'llvm-bundle', manifest, ir]); assert result.returncode == 0, result
-        frontend = tmp / 'probe-frontend'
-        result = run(['clang', '-Wno-override-module', '-O2', ir, *copies[1:], '-lffi', '-o', frontend])
-        assert result.returncode == 0, result
-        # Keep the real frontend's slot-lifetime rejection as an independent
-        # control. Accepted negative experiments are checked only, never run.
-        control_source = next(source for name, expected, source in CASES
-                              if name == 'reference_parameter_slot_return')
-        control = tmp / 'production-slot-control.cool'; control.write_text(control_source)
-        controlled = run([copies[0], 'check', control])
-        assert controlled.returncode == 2 and 'returned borrow may outlive local storage' in controlled.stderr, controlled
-        production_control = dict(source=control_source, check_exit=controlled.returncode,
-                                  check_stdout=controlled.stdout, check_stderr=controlled.stderr)
-        observations = []
-        for name, expected, source in CASES:
-            fixture = tmp / (name + '.cool'); fixture.write_text(source)
-            checked = run([frontend, 'check', fixture])
-            assert checked.returncode in (0, 2), checked
-            observed = 'accept' if checked.returncode == 0 else 'reject'
-            row = dict(name=name, expected=expected, observed=observed,
-                       matches_expectation=observed == expected, source=source,
-                       source_sha256=digest(fixture), check_exit=checked.returncode,
-                       check_stdout=checked.stdout, check_stderr=checked.stderr)
-            if expected == 'reject':
-                diagnostic = ('assigned borrow may outlive local storage' if name == 'short_inner_escape'
-                              else 'returned borrow may outlive local storage' if name in ('local_inner_scalar_address_return', 'byvalue_parameter_slot_return', 'byvalue_owner_payload_return', 'stores_uncontracted_source_return', 'reference_parameter_slot_return')
-                              else 'cannot mutate or move through a shared reference')
-                row['expected_diagnostic'] = diagnostic
-                if name == 'temporary_owner_slot_return':
-                    diagnostic = 'reference requires a tracked local or parameter root'
-                    row['expected_diagnostic'] = diagnostic
-                row['matches_diagnostic'] = diagnostic in checked.stderr
-            if observed == 'accept' and expected == 'accept':
-                executed = run([frontend, 'run', fixture])
-                row.update(run_exit=executed.returncode, run_stdout=executed.stdout, run_stderr=executed.stderr)
-                row['valid_output'] = (executed.returncode, executed.stdout, executed.stderr) == (0, '', '')
-                assert row['valid_output'], row
-            observations.append(row)
-            print(name + ': expected ' + expected + ', observed ' + observed)
-        report = dict(production_slot_control=production_control,
-                      gaps=[dict(name=r['name'], kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],
-                      graph_returns=args.graph_returns, routing=args.routing, source_sha256=hashes, artifact_sha256=artifact_hashes,
-                      private_references_sha256=digest(target), private_borrow_sha256=digest(private / '04-borrow.cool'), private_ir_sha256=digest(ir),
-                      observations=observations,
-                      method='Private source copy: only ReferenceStorage function replaced with true using lexical balanced brace scan. Existing frontend emitted LLVM; private executable linked existing host/runtime object copies. Optional routing changes only private Acquire preserve and copy payload-layer selection. Optional graph-returns replaces coarse Region for reference outputs only with actual temporary loan root validation. Other guards unchanged. Accepted negative or rejected positive cases are experimental gaps; this is not nested-storage safety or release acceptance.')
-        if args.output: args.output.write_text(json.dumps(report, indent=2) + '\n')
-        if args.assert_expectations:
-            assert all(r['matches_expectation'] and r.get('matches_diagnostic', True) for r in observations), observations
+            copy=tmp/original.name;shutil.copy2(original,copy);copies.append(copy)
+        assert all(digest(copy)==artifact_hashes[str(original)] for original,copy in zip(artifacts,copies))
+        target=private/'16-references.cool';text=target.read_text()
+        start,end=function_span(text,'ReferenceStorage')
+        text=text[:start]+'fn ReferenceStorage(type:i64)->bool{return true;}'+text[end:]
+        if args.unsafe_root_predicate:
+            assert text.count('root.reference_external == 0')==1
+            text=text.replace('root.reference_external == 0','(root.type != 0 && !IsReference(root.type))')
+        target.write_text(text)
+        manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(p)+'\n' for p in sorted(private.glob('*.cool'))))
+        ir=tmp/'compiler.ll';r=run([copies[0],'llvm-bundle',manifest,ir]);assert r.returncode==0,r
+        frontend=tmp/'probe-frontend';r=run(['clang','-Wno-override-module','-O2',ir,*copies[1:],'-lffi','-o',frontend]);assert r.returncode==0,r
+        fronts=[('production',[frontend])]
+        if args.legacy:
+            seed=tmp/'language';seed.mkdir()
+            for original in legacy_sources:shutil.copy2(original,seed/original.name)
+            refs=seed/'References.cool';text=refs.read_text();start,end=function_span(text,'ReferenceStorage','Bool ')
+            text=text[:start]+'Bool ReferenceStorage(I64 type){return TRUE;}'+text[end:]
+            if args.unsafe_root_predicate:
+                assert text.count('!root->reference_external')==1
+                text=text.replace('!root->reference_external','(root->type && !IsReference(root->type))')
+            refs.write_text(text);binary=tmp/'frontend.BIN';r=run([ROOT/'build/coolc',seed/'Native.cool',binary]);assert r.returncode==0,r
+            fronts.append(('seed',[ROOT/'build/coolc','--run',binary]))
+        control_source=next(source for name,_,source in CASES if name=='reference_parameter_slot_return')
+        control=tmp/'production-slot-control.cool';control.write_text(control_source)
+        controlled=run([copies[0],'check',control])
+        assert controlled.returncode==2 and 'returned borrow may outlive local storage' in controlled.stderr,controlled
+        observations=[]
+        for front_name,front in fronts:
+            for name,expected,source in CASES:
+                fixture=tmp/(name+'.cool');fixture.write_text(source);r=run([*front,'check',fixture]);assert r.returncode in (0,2),r
+                observed='accept' if r.returncode==0 else 'reject'
+                row=dict(frontend=front_name,name=name,expected=expected,observed=observed,matches_expectation=observed==expected,source=source,source_sha256=digest(fixture),check_exit=r.returncode,check_stdout=r.stdout,check_stderr=r.stderr)
+                if expected=='reject':
+                    diagnostic=('assigned borrow may outlive local storage' if name=='short_inner_escape' else 'cannot mutate or move through a shared reference' if name=='shared_outer_mutable_inner' else 'reference requires a tracked local or parameter root' if name=='temporary_owner_slot_return' else 'returned borrow may outlive local storage')
+                    row.update(expected_diagnostic=diagnostic,matches_diagnostic=diagnostic in r.stderr)
+                if observed=='accept' and expected=='accept':
+                    r=run([*front,'run',fixture]);row.update(run_exit=r.returncode,run_stdout=r.stdout,run_stderr=r.stderr)
+                    assert (r.returncode,r.stdout,r.stderr)==(0,'',''),row
+                # Accepted negative cases are intentionally never executed.
+                observations.append(row);print(front_name,name,expected,observed)
+        assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs only; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
+        if args.assert_expectations:assert all(r['matches_expectation'] and r.get('matches_diagnostic',True) for r in observations),observations
     return 0
 
 
-if __name__ == '__main__':
-    raise SystemExit(main())
+if __name__=='__main__':raise SystemExit(main())

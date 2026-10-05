@@ -2298,6 +2298,32 @@ through ordinary evaluation or library use.
   stored aliases, and select external payloads through computed origins before
   replacing Region checks. All release gates remain Open.
 
+- Explicit caller-root identity: both frontends now distinguish callee
+  parameter descriptor slots from synthetic caller storage. Reference returns
+  validate actual loan roots against the borrows contract; other borrowed result
+  forms retain their Region check. Typed nested paths and computed stored loads
+  select payload lifetimes, while all existing nested-storage restrictions stay
+  active. Public regressions cover reference-parameter descriptor slots,
+  by-value aggregate reference slots and by-value owner scalar payloads.
+  Caller-root store markers preserve checked replacement; the full regression
+  first exposed a self-store ancestry cycle, fixed by retaining the original
+  receiver's payload ancestry.
+  The private readiness target checks 12 cases on each frontend with only
+  ReferenceStorage bypassed. A separate failed type-predicate countermodel still
+  accepts parameter-slot escape in both frontends; accepted negatives are never
+  executed. This readiness evidence does not certify arbitrary nested stores.
+  Validation: `make -j4 test bootstrap-check editor-distribution-test` PASS;
+  bootstrap/stage2/stage3 IR and native binaries are identical. References now
+  exercise 47 public rejections; stores retain 26 contract/lifetime negatives.
+  Graph, copy, loan, selection, physical-address and descriptor-rollback sanitizer
+  targets PASS; stores also pass with the sanitized third frontend and runtime.
+  Stage-2 IR SHA256:
+  `7a2af3e69f547fc36c7f1ef0c073e276851ff10b4243023f452f5a0639f78fe4`.
+  Evidence: `build/release-audit/external-root-{regression-final,sanitize-final,stores-sanitize,references}.log`,
+  `build/nested-reference-readiness-audit.json` and
+  `build/release-audit/external-root-countermodel.json`.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

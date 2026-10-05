@@ -104,7 +104,7 @@ fn BorrowStoredEdges(node:*Node){unsafe{
 }}
 fn CheckBorrowReturns(node:*Node,function:*Function){unsafe{
  if(node==null){return;}
- if(node.kind==9 && Borrowed(function.result)!=i8(0) && (Region(node.a)&~function.borrow_contract)!=0){ErrorAt(node.token,cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));}
+ if(node.kind==9 && !IsReference(function.result) && Borrowed(function.result)!=i8(0) && (Region(node.a)&~function.borrow_contract)!=0){ErrorAt(node.token,cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));}
  CheckBorrowReturns(node.a,function);CheckBorrowReturns(node.b,function);CheckBorrowReturns(node.c,function);CheckBorrowReturns(node.next,function);
 }}
 fn PropagateBorrowRegions(function:*Function){unsafe{
