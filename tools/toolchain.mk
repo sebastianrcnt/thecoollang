@@ -565,3 +565,9 @@ descriptor-rollback-sanitize-test: build/cool-compiler build/coolc
 nested-reference-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
 	python3 tools/test_nested_reference_probe.py --legacy --assert-expectations --output build/nested-reference-readiness-audit.json
 test: nested-reference-readiness-test
+
+# Required deeper lifetime acceptance audit; intentionally separate from the
+# supported-language regression suite while deeper storage remains guarded.
+.PHONY: nested-reference-depth-readiness-test
+nested-reference-depth-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_nested_reference_probe.py --legacy --deep --assert-expectations --output build/nested-reference-depth-readiness-audit.json

@@ -92,6 +92,28 @@ fn main(){var a=7;var inner=Inner{r:&mut a};let outer=Outer{inner:&inner};let q=
 ]
 
 
+DEEP_CASES=[]
+# Distinct physical descriptors at every level, with the final scalar caller
+# root shared by copy/address returns. Rejection variants address a frame field
+# at each depth, not only the outermost descriptor.
+for depth in (2, 3, 4):
+    declarations = 'struct L0{r:&i64;v:i64;}' + ''.join(
+        f'struct L{i}{{next:&L{i-1};v:i64;}}' for i in range(1, depth))
+    setup = 'let l0=L0{r:x,v:7};' + ''.join(
+        f'let l{i}=L{i}{{next:&l{i-1},v:7}};' for i in range(1, depth))
+    access = f'l{depth-1}'
+    expressions = [(depth-1, access)]
+    for level in reversed(range(depth-1)):
+        access = f'(*{access}.next)'
+        expressions.append((level, access))
+    for form, value in (('copy', access+'.r'), ('address', '&*'+access+'.r')):
+        source = declarations + f'fn get(x:&i64)->&i64 borrows(x){{{setup}return {value};}}' + 'fn main(){var a=7;let q=get(&a);assert(*q==7);}'
+        DEEP_CASES.append((f'depth{depth}_{form}_external_return', 'accept', source))
+    for level, projected in expressions:
+        source = declarations + f'fn bad(x:&i64)->&i64 borrows(x){{{setup}return &{projected}.v;}}' + 'fn main(){}'
+        DEEP_CASES.append((f'depth{depth}_level{level}_frame_return', 'reject', source))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frontend', type=Path, default=ROOT / 'build/cool-compiler')
@@ -99,7 +121,9 @@ def main():
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('--unsafe-root-predicate', action='store_true', help='Private countermodel replacing explicit external-root identity with the disproven type predicate')
     parser.add_argument('--assert-expectations', action='store_true')
+    parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases; currently exposes unsupported deeper acquisition')
     args = parser.parse_args()
+    if args.deep: CASES.extend(DEEP_CASES)
     assert len({name for name, _, _ in CASES}) == len(CASES)
     sources = sorted((ROOT/'compiler').glob('*.cool'))
     legacy_sources = sorted((ROOT/'language').glob('*.cool')) if args.legacy else []
@@ -156,9 +180,11 @@ def main():
                 # Accepted negative cases are intentionally never executed.
                 observations.append(row);print(front_name,name,expected,observed)
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs only; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs only; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
-        if args.assert_expectations:assert all(r['matches_expectation'] and r.get('matches_diagnostic',True) for r in observations),observations
+        if args.assert_expectations:
+            failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]
+            assert not failures,failures
     return 0
 
 

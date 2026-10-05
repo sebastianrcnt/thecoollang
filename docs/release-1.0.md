@@ -2324,6 +2324,24 @@ through ordinary evaluation or library use.
   `build/release-audit/external-root-countermodel.json`.
   All release gates remain Open.
 
+- Deeper nested lifetime audit: the existing 12-case-per-frontend readiness
+  target still passes. The required `nested-reference-depth-readiness-test`
+  expands to 27 fixtures per frontend: depth-two/three/four external-return
+  copies and addresses plus frame scalar addresses at each level. All negative
+  classifications and lifetime diagnostics pass; the eight depth-three/four
+  external-return observations overreject in both frontends. The strict target
+  correctly exits with failure after saving the complete evidence. These gaps
+  are required unfinished 1.0 work, not an exclusion from the language goal.
+  A private terminal-layer/physical-leaf correction also loses tracked roots
+  during computed projections, so no experimental semantic changes were
+  promoted. Production compiler sources and stage-2 IR are unchanged.
+  Evidence: `build/nested-reference-depth-readiness-audit.json`,
+  `build/release-audit/nested-depth-{required-readiness,supported-readiness}.log`
+  and the private `nested-depth-terminal-layers.json` report.
+  The next correction must preserve external payload roots through each
+  intermediate copy without retaining callee frame addresses. All gates remain
+  Open; nested-storage guards remain active.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

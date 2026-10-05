@@ -1450,3 +1450,31 @@ escapes, undeclared return origins, short storage escape and shared authority.
 Positive private cases run in tree mode; this is lifetime-model readiness,
 not production feature availability or cross-engine safety proof. An
 observational countermodel exit zero never means release acceptance.
+
+
+## Deeper nested lifetime acceptance
+
+`nested-reference-depth-readiness-test` is a required extension audit while
+production nested storage remains guarded. It invokes the private source-copy
+probe with `--deep --legacy --assert-expectations`. This does not weaken the
+supported-language regression or claim feature availability: it is separate
+because its known failures concern not-yet-enabled storage. Passing the
+baseline twelve fixtures does not establish arbitrary-depth readiness.
+
+The expanded corpus contains 27 fixtures per frontend: the original twelve
+plus copy/address external returns at depths two, three and four, and addresses
+of frame scalar fields at every level. Every accepted positive executes in tree
+mode; rejected or unexpectedly accepted negative fixtures are never executed.
+All frame escapes reject with their lifetime diagnostic. Depth-three/four
+external returns currently overreject (eight frontend/case observations).
+The strict target saves all observations, then fails on those gaps.
+
+The implementation still mixes two-layer scoped records with deeper typed
+value graphs. ReferenceProjection emits layer-zero records, computed selection
+can interpret a copied reference as a payload address, and a physical reference
+to borrowed storage starts as an opaque value leaf. A private attempt to retag
+terminal layers, use precise physical leaves and preserve intermediate layers
+removed the first false lifetime diagnostic but still lost the required tracked
+caller root. It was not promoted to production. Empty known graph roots alone
+also did not fix the original counterexamples. Guards must stay until complete
+copy/address selection and arbitrary-depth root retention are demonstrated.
