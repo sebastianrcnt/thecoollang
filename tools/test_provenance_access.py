@@ -60,7 +60,8 @@ with tempfile.TemporaryDirectory(prefix='cool payload access ') as directory:
   for front in fronts:
    r=run([*front,'check',source]);assert r.returncode==2 and 'conflicts' in r.stderr,(body,r)
  repl='struct Pair{left:&mut i64;right:&mut i64;}\nvar a=1;\nvar b=2;\nvar pair=Pair{left:&mut a,right:&mut b};\nlet r=&mut pair;\nlet q=&mut *(*r).left;\n*(*r).right=7;\n*(*r).left=8;\n*q=9;\n*(*r).right\n*q\n:forget q\n:forget r\n:forget pair\na=10;\na\n:quit\n'
- r=run([frontend,'repl-quiet'],input=repl);assert r.returncode==0 and r.stdout=='7\n9\n10\n' and r.stderr.count('error:')==1,r
+ for front in fronts:
+  r=run([*front,'repl-quiet'],input=repl);assert r.returncode==0 and r.stdout=='7\n9\n10\n' and r.stderr.count('error:')==1,r
  report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':4,'seed':20261005,'seeded_cases':24,'negative_cases':len(NEGATIVE)+len(seeded_negative),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual typed payload access/reborrow precision; unrelated field roots, shared paths, physical root protection, array union and opaque call conservatism; persistent REPL rejection/recovery/forget. Nested storage restrictions remain.'}
  if args.output:args.output.write_text(json.dumps(report,indent=2)+'\n')
 print(f'payload access: 4 disjoint-root and 24 seeded permutation cases, {len(NEGATIVE)+len(seeded_negative)} physical/alias/opaque/element rejections, five engines/O2 and persistent REPL PASS'+(' on both frontends' if args.legacy else ' on production frontend'))

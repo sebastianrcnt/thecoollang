@@ -1162,5 +1162,16 @@ root mutation and parent storage replacement stay blocked. Private helper probes
 cover shared mode-zero overlap, borrow-free field absence, physical prefixes,
 unknown/incomplete paths and recursive graphs with cyclic cursors before/after
 clone. Persistent REPL recovery and bounded repeated accesses are checked.
-Legacy acceptance parity is still being integrated; the new access suite's
-`--legacy` mode must pass before this behavior is certified on both frontends.
+Legacy graph construction, selection, store/call upper bounds and access
+predicates now mirror production. The access suite enforces `--legacy`, including
+persistent REPL rejection/recovery/forget. HolyC helpers returning structs use
+explicit output pointers; every early return must set that output. Legacy
+recursive type-summary scratch is submission-owned in REPL and immediately
+freed in ordinary checking. It is never retained by graph nodes. Heap reference
+checks register for abort cleanup before layout rollback. REPL candidates clone
+all surviving roots jointly, compact on commit/forget and free independent
+arenas on rejection/session cleanup. A private actual legacy frontend audit
+tracks node/edge/query/copy allocations originating in `Provenance.cool`,
+including their frees in `LoanProvenance.cool`; five 64/1,024-submission histories
+finish at zero tracked allocations with equal peaks. Graph arenas, loans,
+other compiler metadata and JIT mappings are outside that audit's scope.

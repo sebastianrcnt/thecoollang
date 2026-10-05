@@ -17,6 +17,22 @@ def query(nodes,edges,path,start,mode,write):
    _,kind,key,nxt=path[c]
    todo += [(t,nxt,m&cap) for s,k,v,t,cap in edges if s==n and k==kind and (kind!=1 or v==key)]
  return 0
+def overlap(nodes,edges,path,start,complete,known):
+ # Access overlap is a different relation: modes never erase shared roots,
+ # a terminal root protects descendants, and a whole value includes children.
+ if not complete:return 1
+ if start<0:return int(not known)
+ pending={(start,0 if path else -1)};visited=set()
+ while pending:
+  n,c=pending.pop()
+  if n<0 or (n,c) in visited:continue
+  visited.add((n,c));typ,root,cap,opaque=nodes[n]
+  if root==0 or opaque or (c>=0 and typ!=path[c][0]):return 1
+  if c<0:pending.update((t,-1) for s,k,key,t,m in edges if s==n and t>=0)
+  else:
+   _,kind,key,nxt=path[c]
+   pending.update((t,nxt) for s,k,v,t,m in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
+ return 0
 def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  # Independent selection returns a union of original endpoint states and
  # opaque root alternatives, then queries that union with another cursor.
@@ -105,7 +121,7 @@ export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mo
  var source=ReferenceLoan{};source.root=&raw root;source.exclusive=mode;source.provenance_known=known;if(start>=0){source.provenance=nodes[start];}
  var path:*ProvenanceCursor=null;if(c>0){path=paths;}var extra:*ProvenanceCursor=null;if(q>0){extra=&raw paths[c];}
  var selected=ReferenceSelectGraph(&raw check,&raw source,path,complete,type);
- let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known;
+ let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete));
  Free(cast[*u8](paths));Free(cast[*u8](nodes));ProvenanceGraphFree(&raw graph);return result;
 }}
 '''
@@ -159,10 +175,10 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  lines=[];expected=[]
  for nodes,edges,path,start,mode,complete,typ,known,extra,write in cases:
   lines.append(' '.join(map(str,[len(nodes),len(edges),len(path),len(extra),start,mode,complete,typ,known,write,*[v for row in nodes+edges+path+extra for v in row]])))
-  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise)
+  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known))
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query oracle; same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and mode-independent access overlap oracles; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print(f'provenance selection: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print(f'provenance selection/overlap: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))

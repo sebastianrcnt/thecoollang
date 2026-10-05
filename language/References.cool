@@ -1,7 +1,18 @@
 extern U0 ReferenceWriteCapability(Node *place);
 // Scoped lexical loans. Keep semantics aligned with compiler/16-references.cool.
-class ReferenceLoan { Local *root, *holder, *parent; I64 exclusive, indirect; Node *expression; ReferenceLoan *next; };
-class ReferenceCheck { ReferenceLoan *loans; Function *function; };
+class ReferenceLoan { ProvenanceNode *provenance; I64 provenance_type,provenance_known; Local *root, *holder, *parent; I64 exclusive, indirect; Node *expression; ReferenceLoan *next; };
+class ReferenceCheck { ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };
+ReferenceCheck *reference_checks;
+extern U0 ReferenceChecksAbort();
+extern U0 ReferenceCheckFree(ReferenceCheck *check);
+extern ProvenanceNode *ReferenceGraphLeaf(ProvenanceGraph *graph,I64 type,Local *root,I64 mode);
+extern U0 ReferenceProvenanceJoin(ReferenceCheck *check,ReferenceLoan *loan,ReferenceLoan *source);
+extern ReferenceLoan *ReferenceNewFrom(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
+extern ReferenceLoan *ReferenceNewSelected(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next,Node *place,Local *via,Node *origin,Bool payload);
+extern ReferenceLoan *ReferenceNewCall(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
+extern U0 ReferenceComputedGraph(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Node *origin,Node *expression,I64 exclusive);
+extern Bool ReferencePayloadMayAccess(ReferenceLoan *source,Node *place,Local *via);
+extern U0 ReferenceAggregateProvenance(ReferenceCheck *check,ReferenceLoan *loan,Node *aggregate,Node *item);
 Bool IsReference(I64 type) { return AggregateKind(type)==6; }
 I64 ReferenceType(Token *token) {
     I64 exclusive=0;
@@ -67,7 +78,7 @@ Bool ReferenceMatches(ReferenceCheck *check,Node *place,Local *via,Local *root,B
     if(!IsReference(via->type) && AggregateKind(via->type)!=A_SLICE && !through)return FALSE;
     if(place->kind==N_LOCAL_ADDRESS || place->kind==N_ASSIGN)return FALSE;
     if(NestedReference(via->type) && through)layer=1;
-    for(loan=check->loans;loan;loan=loan->next)if(loan->holder==via && loan->indirect==layer && loan->root==root && (!writing || loan->exclusive))return TRUE;
+    for(loan=check->loans;loan;loan=loan->next)if(loan->holder==via && loan->indirect==layer && loan->root==root && (!writing || loan->exclusive) && ReferencePayloadMayAccess(loan,place,via))return TRUE;
     return FALSE;
 }
 // Query-local visited queue follows every parent and clears marks on all exits.
@@ -90,10 +101,10 @@ U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing){
     if(writing && IsReference(via->type) && !Shape(via->type)->count && place->kind!=N_LOCAL_ADDRESS && place->kind!=N_ASSIGN)ErrorAt(place->token,"cannot mutate or move through a shared reference");
     for(loan=check->loans;loan;loan=loan->next)if((writing || loan->exclusive) && ReferenceMatches(check,place,via,loan->root,writing) && !ReferenceAncestor(check,loan->holder,via,loan->root) && !(loan->holder==NULL && loan->expression==ReferencePlaceSource(place)))ErrorAt(place->token,"access conflicts with a live scoped reference");
 }
-ReferenceLoan *ReferenceNew(Local *root,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next){
+ReferenceLoan *ReferenceNew(ReferenceCheck *check,Local *root,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next){
     ReferenceLoan *loan,*old=next;
     while(old && old->expression==expression && !old->holder){if(old->root==root && old->parent==parent && old->exclusive==exclusive && old->indirect==indirect)return next;old=old->next;}
-    loan=CAlloc(sizeof(ReferenceLoan));loan->root=root;loan->parent=parent;loan->exclusive=exclusive;loan->indirect=indirect;loan->expression=expression;loan->next=next;return loan;
+    loan=CAlloc(sizeof(ReferenceLoan));if(root){if(!check->graph)check->graph=CAlloc(sizeof(ProvenanceGraph));loan->provenance_type=root->type;if(expression)loan->provenance_type=expression->type;loan->provenance=ReferenceGraphLeaf(check->graph,loan->provenance_type,root,exclusive);loan->provenance_known=!loan->provenance->opaque;}loan->root=root;loan->parent=parent;loan->exclusive=exclusive;loan->indirect=indirect;loan->expression=expression;loan->next=next;return loan;
 }
 Node *ReferencePlaceSource(Node *place){
     if(!place)return NULL;if(place->kind==N_INDEX_ADDRESS && place->op==A_SLICE)return place->a;if(place->kind==N_OWN_ADDRESS && IsReference(place->a->type))return place->a;
@@ -108,7 +119,7 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
     origin=ReferencePlaceSource(place);
     if(!via || (origin && origin->kind!=N_LOCAL)){
         for(source=check->loans;source;source=source->next)if(origin && source->expression==origin && !source->holder){
-            if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");source->exclusive=exclusive & source->exclusive;
+            if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");ReferenceComputedGraph(check,source,place,origin,expression,exclusive);source->exclusive=exclusive & source->exclusive;
             if(!nested)source->indirect=0;source->expression=expression;found=TRUE;
         }
         if(!found)ErrorAt(token,"reference result requires a tracked root");return;
@@ -119,16 +130,16 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
     through=ReferenceThroughStored(place);physical=address && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);
     if(NestedReference(via->type) && (through || expression->kind==N_LOAD || expression->kind==N_MOVE))layer=1;
     preserve=nested && NestedReference(via->type) && !physical && !bridge;before=check->loans;
-    if(physical){check->loans=ReferenceNew(via,via,exclusive,0,expression,check->loans);found=TRUE;}
-    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || source->indirect==layer)){
+    if(physical){check->loans=ReferenceNew(check,via,via,exclusive,0,expression,check->loans);found=TRUE;}
+    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
 
-        if(physical){if(nested){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin);check->loans=ReferenceNew(source->root,via,exclusive & source->exclusive,1,expression,check->loans);}}
+        if(physical){if(nested){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin);check->loans=ReferenceNewSelected(check,source,via,exclusive & source->exclusive,1,expression,check->loans,place,via,NULL,TRUE);}}
         else{mode=exclusive & source->exclusive;indirect=0;if(preserve)indirect=source->indirect;
-            ReferenceSourceAccess(check,before,via,source->root,mode,token,origin);check->loans=ReferenceNew(source->root,via,mode,indirect,expression,check->loans);
-            if(nested && !preserve)check->loans=ReferenceNew(source->root,via,mode & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans);found=TRUE;
+            ReferenceSourceAccess(check,before,via,source->root,mode,token,origin);check->loans=ReferenceNewSelected(check,source,via,mode,indirect,expression,check->loans,place,via,NULL,FALSE);
+            if(nested && !preserve)check->loans=ReferenceNewSelected(check,source,via,mode & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans,place,via,NULL,TRUE);found=TRUE;
         }
     }
-    if(!found){check->loans=ReferenceNew(via,via,exclusive,0,expression,check->loans);if(nested)check->loans=ReferenceNew(via,via,exclusive & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans);}
+    if(!found){check->loans=ReferenceNew(check,via,via,exclusive,0,expression,check->loans);if(nested)check->loans=ReferenceNew(check,via,via,exclusive & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans);}
 }
 U0 ReferenceRelease(ReferenceCheck *check,ReferenceLoan *stop){ReferenceLoan *old;while(check->loans!=stop){old=check->loans;check->loans=old->next;Free(old);}}
 extern U0 ReferenceValue(ReferenceCheck *check,Node *node);
@@ -154,7 +165,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
     before=check->loans;
     if(origin->kind==N_LOAD && TrackedBorrow(origin->type) && !BorrowRoot(origin->a))ReferenceProjection(check,origin,mode);
     else ReferenceValue(check,origin);
-    for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNew(source->root,source->parent,mode & source->exclusive,0,node,check->loans);
+    for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,0,node,check->loans,node->a,NULL,origin,FALSE);
     ReferenceAddressIndices(check,node->a);
 }
 extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);
@@ -188,7 +199,7 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
             if(contract & (1<<index)){
                 if(!TrackedBorrow(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
                 found=FALSE;
-                for(source=check->loans;source!=saved;source=source->next)if(!source->holder && source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(NestedReference(node->type) && NestedReference(arg->type)){indirect=source->indirect;}results=ReferenceNew(source->root,source->parent,mode,indirect,node,results);if(NestedReference(node->type) && !NestedReference(arg->type))results=ReferenceNew(source->root,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
+                for(source=check->loans;source!=saved;source=source->next)if(!source->holder && source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(NestedReference(node->type) && NestedReference(arg->type)){indirect=source->indirect;}results=ReferenceNewCall(check,source,source->parent,mode,indirect,node,results);if(NestedReference(node->type) && !NestedReference(arg->type))results=ReferenceNewCall(check,source,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
                 if(!found && IsReference(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
             }
             index++;
@@ -200,26 +211,26 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     }
     if(node->kind==N_AGG_LITERAL || node->kind==N_NEW){
         if(ContainsReference(node->type) && !node->a)ErrorAt(node->token,"reference storage requires an explicit initializer");
-        for(item=node->a;item;item=item->next){before=check->loans;ReferenceValue(check,item);if(TrackedBorrow(node->type))for(source=check->loans;source!=before;source=source->next)if(source->expression==item)source->expression=node;}
+        for(item=node->a;item;item=item->next){before=check->loans;ReferenceValue(check,item);if(TrackedBorrow(node->type))for(source=check->loans;source!=before;source=source->next)if(source->expression==item){ReferenceAggregateProvenance(check,source,node,item);source->expression=node;}}
         return;
     }
     ReferenceValue(check,node->a);ReferenceValue(check,node->b);ReferenceValue(check,node->c);
 }
-U0 ReferenceAssign(ReferenceCheck *check,Local *target,Node *value,ReferenceLoan *stop){ReferenceLoan *marker=stop,*loan,*retained,*previous,*existing;Local *parent;while(marker && !(marker->root==NULL && marker->holder==target))marker=marker->next;if(!marker)ErrorAt(value->token,"borrowed assignment requires local tracked storage");for(loan=check->loans;loan!=stop;loan=loan->next)if(loan->expression==value && loan->root){if(loan->root->depth>target->depth)ErrorAt(value->token,"assigned borrow may outlive local storage");parent=loan->parent;if(ReferenceAncestor(check,target,parent,loan->root)){previous=ReferenceHolder(check,target,loan->root);if(previous)parent=previous->parent;else parent=NULL;}for(existing=marker->next;existing;existing=existing->next)if(existing->holder==target && existing->root==loan->root && existing->parent==parent && existing->exclusive==loan->exclusive && existing->indirect==loan->indirect)break;if(!existing){retained=ReferenceNew(loan->root,parent,loan->exclusive,loan->indirect,value,marker->next);retained->holder=target;marker->next=retained;}}}
+U0 ReferenceAssign(ReferenceCheck *check,Local *target,Node *value,ReferenceLoan *stop){ReferenceLoan *marker=stop,*loan,*retained,*previous,*existing;Local *parent;while(marker && !(marker->root==NULL && marker->holder==target))marker=marker->next;if(!marker)ErrorAt(value->token,"borrowed assignment requires local tracked storage");for(loan=check->loans;loan!=stop;loan=loan->next)if(loan->expression==value && loan->root){if(loan->root->depth>target->depth)ErrorAt(value->token,"assigned borrow may outlive local storage");parent=loan->parent;if(ReferenceAncestor(check,target,parent,loan->root)){previous=ReferenceHolder(check,target,loan->root);if(previous)parent=previous->parent;else parent=NULL;}for(existing=marker->next;existing;existing=existing->next)if(existing->holder==target && existing->root==loan->root && existing->parent==parent && existing->exclusive==loan->exclusive && existing->indirect==loan->indirect)break;if(existing)ReferenceProvenanceJoin(check,existing,loan);if(!existing){retained=ReferenceNewFrom(check,loan,parent,loan->exclusive,loan->indirect,value,marker->next);retained->holder=target;marker->next=retained;}}}
 extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);
 extern U0 ReferenceStore(ReferenceCheck *check,Node *place,Node *value,ReferenceLoan *stop);
 extern U0 ReferenceParameters(ReferenceCheck *check);
 U0 ReferenceStatement(ReferenceCheck *check,Node *node){
     ReferenceLoan *saved,*loan,**link;Node *statement;if(!node)return;saved=check->loans;
     if(node->kind==N_BLOCK){for(statement=node->a;statement;statement=statement->next)ReferenceStatement(check,statement);ReferenceRelease(check,saved);return;}
-    if(node->kind==N_BIND && TrackedBorrow(node->type)){ReferenceValue(check,node->a);link=&check->loans;while(*link!=saved){loan=*link;if(loan->expression==node->a){loan->holder=node->local_ref;link=&loan->next;}else{*link=loan->next;Free(loan);}}loan=ReferenceNew(NULL,NULL,0,0,node,check->loans);loan->holder=node->local_ref;check->loans=loan;return;}
+    if(node->kind==N_BIND && TrackedBorrow(node->type)){ReferenceValue(check,node->a);link=&check->loans;while(*link!=saved){loan=*link;if(loan->expression==node->a){loan->holder=node->local_ref;link=&loan->next;}else{*link=loan->next;Free(loan);}}loan=ReferenceNew(check,NULL,NULL,0,0,node,check->loans);loan->holder=node->local_ref;check->loans=loan;return;}
     if(node->kind==N_ASSIGN){ReferenceValue(check,node->a);ReferenceAccess(check,node,TRUE);if(TrackedBorrow(node->type))ReferenceAssign(check,node->local_ref,node->a,saved);}
     else if(node->kind==N_STORE){ReferenceWriteCapability(node->a);ReferenceAddressMode(check,node->a,FALSE);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type)){ReferenceStore(check,node->a,node->b,saved);}}
     else if(node->kind==N_IF || node->kind==N_WHILE || node->kind==N_FOR){ReferenceValue(check,node->a);ReferenceRelease(check,saved);ReferenceStatement(check,node->b);ReferenceStatement(check,node->c);}
     else ReferenceValue(check,node->a);
     if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
 }
-U0 AnalyzeReferences(Function *function){ReferenceCheck check;check.loans=NULL;check.function=function;ReferenceParameters(&check);ReferenceStatement(&check,function->body);ReferenceRelease(&check,NULL);}
+U0 AnalyzeReferences(Function *function){ReferenceCheck *check=CAlloc(sizeof(ReferenceCheck));check->function=function;check->next=reference_checks;reference_checks=check;ReferenceParameters(check);ReferenceStatement(check,function->body);reference_checks=check->next;ReferenceCheckFree(check);}
 Node *RawReferenceExpression(){
     Token *token=At();I64 type;Node *pointer,*anchor,*result;pos++;
     if(!unsafe_depth)ErrorAt(token,"borrow_raw requires unsafe");

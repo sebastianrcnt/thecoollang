@@ -1,0 +1,63 @@
+// Arena-owned typed metadata. These queries do not authorize scoped accesses.
+// Local roots and descriptor keys remain borrowed; cursors are query-owned.
+class ProvenanceGraph { U8 *nodes; };
+class ProvenanceNode { ProvenanceGraph *graph; I64 type; Local *root; I64 exclusive,opaque; U8 *edges; ProvenanceNode *next,*summary_base; Local *summary_root; I64 summary_kind,summary_mode; };
+class ProvenanceEdge { I64 kind,key,exclusive; ProvenanceNode *target; ProvenanceEdge *next; };
+class ProvenanceCursor { I64 type,kind,key; ProvenanceCursor *next; };
+class ProvenanceQueryState { ProvenanceNode *node; ProvenanceCursor *cursor; I64 exclusive; ProvenanceQueryState *next; };
+class ProvenanceCopyState { ProvenanceNode *source,*target; ProvenanceCopyState *next; };
+ProvenanceNode *ProvenanceNodeNew(ProvenanceGraph *graph,I64 type,Local *root,I64 exclusive){
+ ProvenanceNode *node=CAlloc(sizeof(ProvenanceNode));node->graph=graph;node->type=type;node->root=root;node->exclusive=exclusive!=0;node->next=graph->nodes;graph->nodes=node;return node;
+}
+Bool ProvenanceEdgeNew(ProvenanceNode *node,I64 kind,I64 key,ProvenanceNode *target,I64 exclusive){
+ ProvenanceEdge *edge,*fresh;I64 mode=exclusive!=0;
+ if(!node || kind<1 || kind>4 || (target && target->graph!=node->graph))return FALSE;
+ for(edge=node->edges;edge;edge=edge->next)if(edge->kind==kind && edge->key==key && edge->target==target && edge->exclusive==mode)return TRUE;
+ fresh=CAlloc(sizeof(ProvenanceEdge));fresh->kind=kind;fresh->key=key;fresh->target=target;fresh->exclusive=mode;fresh->next=node->edges;node->edges=fresh;return TRUE;
+}
+U0 ProvenanceGraphFree(ProvenanceGraph *graph){
+ ProvenanceNode *node=graph->nodes,*next;ProvenanceEdge *edge,*following;graph->nodes=NULL;
+ while(node){next=node->next;edge=node->edges;while(edge){following=edge->next;Free(edge);edge=following;}Free(node);node=next;}
+}
+ProvenanceQueryState *ProvenanceQueryAppend(ProvenanceQueryState *head,ProvenanceQueryState *tail,ProvenanceNode *node,ProvenanceCursor *cursor,I64 exclusive){
+ ProvenanceQueryState *state,*fresh;if(!node)return tail;
+ for(state=head;state;state=state->next)if(state->node==node && state->cursor==cursor && state->exclusive==exclusive)return tail;
+ fresh=CAlloc(sizeof(ProvenanceQueryState));fresh->node=node;fresh->cursor=cursor;fresh->exclusive=exclusive;tail->next=fresh;return fresh;
+}
+Bool ProvenanceQueryRoot(ProvenanceNode *start,ProvenanceCursor *cursor,Local *root,I64 exclusive,Bool writing){
+ ProvenanceQueryState *first,*tail,*current,*next;ProvenanceNode *node;ProvenanceCursor *path;ProvenanceEdge *edge;Bool found=FALSE;
+ if(!start || !root)return FALSE;
+ first=CAlloc(sizeof(ProvenanceQueryState));first->node=start;first->cursor=cursor;first->exclusive=exclusive!=0;tail=first;current=first;
+ while(current){node=current->node;path=current->cursor;
+  if(!path){if(node->root==root && (!writing || (current->exclusive & node->exclusive))){found=TRUE;break;}}
+  else if(path->type==node->type){for(edge=node->edges;edge;edge=edge->next)if(edge->kind==path->kind && (path->kind!=1 || edge->key==path->key))tail=ProvenanceQueryAppend(first,tail,edge->target,path->next,current->exclusive & edge->exclusive);}
+  current=current->next;
+ }
+ current=first;while(current){next=current->next;Free(current);current=next;}return found;
+}
+ProvenanceCopyState *ProvenanceCopyFind(ProvenanceCopyState *head,ProvenanceNode *source){while(head){if(head->source==source)return head;head=head->next;}return NULL;}
+ProvenanceCopyState *ProvenanceCopyNew(ProvenanceGraph *graph,ProvenanceNode *source){
+ ProvenanceCopyState *state=CAlloc(sizeof(ProvenanceCopyState));state->source=source;state->target=ProvenanceNodeNew(graph,source->type,source->root,source->exclusive);
+ state->target->opaque=source->opaque;state->target->summary_root=source->summary_root;state->target->summary_kind=source->summary_kind;state->target->summary_mode=source->summary_mode;return state;
+}
+// Input/output arrays must not overlap. One map spans all roots and auxiliaries.
+Bool ProvenanceGraphCopyRoots(ProvenanceGraph *graph,ProvenanceNode **sources,ProvenanceNode **targets,I64 count){
+ ProvenanceNode *before,*base,*node,*next;ProvenanceCopyState *first=NULL,*tail=NULL,*mapped,*current,*following;ProvenanceEdge *edge,*after;Bool valid=TRUE;I64 i,input,output,span;
+ if(count<0 || count>1152921504606846975)return FALSE;
+ if(count>0){if(!sources || !targets)return FALSE;input=sources;output=targets;span=count*8;if((input<=output && output-input<span) || (output<input && input-output<span))return FALSE;}
+ before=graph->nodes;
+ for(i=0;i<count;i++){targets[i]=NULL;if(sources[i]){mapped=ProvenanceCopyFind(first,sources[i]);if(!mapped){mapped=ProvenanceCopyNew(graph,sources[i]);if(tail)tail->next=mapped;else first=mapped;tail=mapped;}targets[i]=mapped->target;}}
+ current=first;
+ while(current && valid){
+  base=current->source->summary_base;
+  if(base){if(base->graph!=current->source->graph)valid=FALSE;else{mapped=ProvenanceCopyFind(first,base);if(!mapped){mapped=ProvenanceCopyNew(graph,base);tail->next=mapped;tail=mapped;}current->target->summary_base=mapped->target;}}
+  edge=current->source->edges;
+  while(edge && valid){node=NULL;if(edge->target){if(edge->target->graph!=current->source->graph)valid=FALSE;else{mapped=ProvenanceCopyFind(first,edge->target);if(!mapped){mapped=ProvenanceCopyNew(graph,edge->target);tail->next=mapped;tail=mapped;}node=mapped->target;}}
+   if(valid)valid=ProvenanceEdgeNew(current->target,edge->kind,edge->key,node,edge->exclusive);edge=edge->next;
+  }current=current->next;
+ }
+ current=first;while(current){following=current->next;Free(current);current=following;}
+ if(!valid){node=graph->nodes;graph->nodes=before;while(node!=before){next=node->next;edge=node->edges;while(edge){after=edge->next;Free(edge);edge=after;}Free(node);node=next;}for(i=0;i<count;i++)targets[i]=NULL;}
+ return valid;
+}
+ProvenanceNode *ProvenanceGraphCopy(ProvenanceGraph *graph,ProvenanceNode *source){ProvenanceNode *output=NULL;if(!ProvenanceGraphCopyRoots(graph,&source,&output,1))Error("invalid internal provenance graph copy");return output;}

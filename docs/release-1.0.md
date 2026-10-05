@@ -1939,6 +1939,43 @@ through ordinary evaluation or library use.
   Evidence: `build/release-audit/provenance-access-{build,cases,cases-sanitize,focused,helper-sanitize,sanitize,contracts,ancestry,lifecycle,selfhost,legacy-build}.log`.
   All release gates remain Open.
 
+- Legacy payload-graph integration now matches production construction,
+  selection, partial stores, declared parameter/call upper bounds and access
+  overlap. HolyC struct-return helpers use explicit output pointers with
+  initialized normal/early returns. Graph checks register for failure cleanup;
+  persistent candidates jointly clone/compact reachable nodes and pin root and
+  summary-key Locals. The missing initializer wrapper `provenance_known=1`
+  assignment found in review was corrected before final validation. This
+  resolves the legacy parity work left open in the preceding access entry.
+
+  The mandatory access suite now checks both frontends, including persistent
+  REPL rejection/recovery/forget, four explicit cases, 24 deterministic
+  permutations and 31 rejected accesses; production execution passes five
+  engines/O2. A separate mode-independent product-state overlap oracle is
+  checked alongside all 1,620 selection cases, including physical prefixes,
+  whole-value descendants, opaque/type/incomplete fallback, exact absence and
+  cyclic paths/graphs. Generated LLVM ASan and host/runtime ASan/UBSan pass.
+
+  Private copies of the actual seed-compiled legacy frontend track allocations
+  originating in `Provenance.cool` (nodes, edges and query/copy scratch), including
+  frees in its loan helpers. At 64/1,024 submissions, field access, opaque
+  returns, recursive owning returns, failed analysis and stores all end with
+  zero tracked bytes/counts and equal peaks: respectively 2,872, 4,016, 3,648,
+  88 and 5,128 bytes. Arena allocations, loan records, other compiler metadata
+  and JIT mappings are outside this instrumentation scope. Recursive owners
+  release to zero on forget. Reports:
+  `build/legacy-graph-lifecycle-audit.json`,
+  `build/provenance-access{,-asan}-audit.json`,
+  `build/provenance-selection{,-asan}-audit.json`.
+
+  Final full regression and production/seed convergence pass after integration,
+  as does external editor/distribution installation. Production compiler IR
+  remains `d387dc147076df57a16d30beae9fd46576b35f3a77ae1969aafb0a57c2c55f36`.
+  Evidence: `build/release-audit/provenance-parity-{build,focused,selection,sanitize,legacy-lifecycle,regression,distribution}.log`.
+  This certifies matching payload absence decisions, not graph-based write
+  authorization, arbitrary nested stored references, full physical projection
+  overlap or descriptor lifetime completion. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

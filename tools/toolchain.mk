@@ -536,7 +536,12 @@ provenance-selection-sanitize-test: repl-loans-sanitize-test
 
 .PHONY: provenance-access-test provenance-access-sanitize-test
 provenance-access-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
-	python3 tools/test_provenance_access.py --output build/provenance-access-audit.json
+	python3 tools/test_provenance_access.py --legacy --output build/provenance-access-audit.json
 test: provenance-access-test
 provenance-access-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_provenance_access.py --frontend build/repl-loans-asan/cool-compiler --output build/provenance-access-asan-audit.json
+
+.PHONY: legacy-graph-lifecycle-test
+legacy-graph-lifecycle-test: build/coolc
+	python3 tools/test_legacy_graph_lifecycle.py --output build/legacy-graph-lifecycle-audit.json
+test: legacy-graph-lifecycle-test

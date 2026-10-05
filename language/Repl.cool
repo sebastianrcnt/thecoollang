@@ -24,10 +24,11 @@ U0 ReplFreeNodes() {
     repl_nodes=NULL;
 }
 U0 ReplReclaimLocals() {
-    Local *local,**link,**tail;ReferenceLoan *loan;BorrowSource *edge,*next;
+    Local *local,**link,**tail;ProvenanceNode *node;ReferenceLoan *loan;BorrowSource *edge,*next;
     for(local=repl_allocated_locals;local;local=local->repl_next)local->repl_mark=0;
     for(local=repl_locals;local;local=local->next)local->repl_mark=1;
     for(loan=repl_loans;loan;loan=loan->next){if(loan->root)loan->root->repl_mark|=2;if(loan->holder)loan->holder->repl_mark|=2;if(loan->parent)loan->parent->repl_mark|=2;}
+    if(repl_graph)for(node=repl_graph->nodes;node;node=node->next){if(node->root)node->root->repl_mark|=2;if(node->summary_root)node->summary_root->repl_mark|=2;}
     functions[0].all_locals=NULL;tail=&functions[0].all_locals;link=&repl_allocated_locals;
     while(*link){local=*link;if(local->repl_mark){if(!(local->repl_mark&1))local->next=NULL;*tail=local;tail=&local->all_next;link=&local->repl_next;}
         else{*link=local->repl_next;edge=local->sources;while(edge){next=edge->next;Free(edge);edge=next;}Free(local->name);Free(local);}}
@@ -164,6 +165,6 @@ U0 Repl(Bool prompt) {
 repl_next:
         Free(text->data); Free(text);
     }
-    ReplLoanListFree(repl_loans);repl_loans=NULL;
+    ReplLoanListFree(repl_loans);repl_loans=NULL;ReferenceGraphFree(repl_graph);repl_graph=NULL;ReferenceChecksAbort();
     for (d = functions[0].drops; d; d = d->next) DropValue(&repl_values[d->slot], d->type);
 }

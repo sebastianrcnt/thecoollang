@@ -99,8 +99,8 @@ anchors. Typed graph paths now exclude proven absent layer-one payload roots
 from production conflict matching and reborrow acquisition. Overlap ignores
 shared/exclusive mode; terminal physical roots overlap remaining projections.
 Unknown/opaque/incomplete paths remain conservative. This first access step
-does not remove nested storage restrictions; legacy acceptance integration
-remains in progress. Field loads and partial stores now select/update
+does not remove nested storage restrictions. Legacy metadata/arena integration
+and both-frontend access/REPL acceptance now pass. Field loads and partial stores now select/update
 metadata; parameter and opaque return summaries describe declared possible
 structure. Opaque return bounds are per source root/capability, with recursive
 skeleton reuse preserved through owned auxiliary clone edges. These are upper
