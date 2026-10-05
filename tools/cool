@@ -60,13 +60,32 @@ def frontend_digest():
 def metadata_many(paths, work, overlays=None, editor=False):
     overlays = overlays or {}
     cached, missing = {}, {}
+    # One directory snapshot avoids hundreds of metadata opens on a warm graph.
+    # Content hashes and rediscovered membership still decide every cache hit.
+    keys = {}
     for path in paths:
         if '\t' in str(path) or '\n' in str(path):
             raise ValueError('source paths cannot contain tabs or newlines')
         actual = overlays.get(path, path)
-        key = hashlib.sha256(b'cool-scan-v2\0' + frontend_digest() + actual.read_bytes()).hexdigest()
+        keys[path] = hashlib.sha256(b'cool-scan-v2\0' + frontend_digest() + actual.read_bytes()).hexdigest()
+    snapshot = None
+    previous = {}
+    if not overlays and paths and not editor:
+        identity = hashlib.sha256(b'cool-scan-directory-v1\0' + frontend_digest() +
+                                  str(paths[0].parent).encode()).hexdigest()
+        snapshot = cache_home() / 'scan' / ('directory-' + identity)
+        if snapshot.exists():
+            previous = json.loads(snapshot.read_text())
+            if not isinstance(previous, dict) or any(not isinstance(k, str) or not isinstance(v, str)
+                                                     for k, v in previous.items()):
+                raise ValueError('invalid directory scan cache')
+    for path in paths:
+        actual = overlays.get(path, path)
+        key = keys[path]
         cache = cache_home() / 'scan' / key
-        if path not in overlays and cache.exists():
+        if path not in overlays and key in previous:
+            cached[path] = previous[key]
+        elif path not in overlays and cache.exists():
             cached[path] = cache.read_text()
         else:
             missing[str(actual)] = (path, None if path in overlays else cache)
@@ -86,7 +105,12 @@ def metadata_many(paths, work, overlays=None, editor=False):
             if cache is not None:
                 atomic_write(cache, lines.encode())
             cached[path] = lines
-    return {path: parse_metadata(path, cached[path]) for path in paths}
+    parsed = {path: parse_metadata(path, cached[path]) for path in paths}
+    if snapshot is not None:
+        current = {keys[path]: cached[path] for path in paths}
+        if current != previous:
+            atomic_write(snapshot, json.dumps(current).encode())
+    return parsed
 
 
 def parse_metadata(path, lines):

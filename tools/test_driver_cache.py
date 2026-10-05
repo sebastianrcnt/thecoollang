@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Batch scan counts and content-addressed invalidation, including unchanged mtimes."""
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 import shutil
@@ -28,6 +29,44 @@ os.execv({str(ROOT/'build/cool-compiler')!r},[{str(ROOT/'build/cool-compiler')!r
   return [row for row in calls()[before:] if row[0]=='scan-bundle'],p
  rows,_=check();assert len(rows)==1 and len(rows[0][1].splitlines())==2,rows
  rows,_=check();assert rows==[],rows
+ # Missing snapshots must recover from old per-file records without rescanning.
+ snapshots=list((tmp/'cache/scan').glob('directory-*'));assert len(snapshots)==1,snapshots
+ snapshot=snapshots[0];snapshot.unlink()
+ rows,_=check();assert rows==[] and snapshot.is_file(),rows
+ def current_keys():
+  digest=hashlib.sha256(wrapper.read_bytes()).digest()
+  return {hashlib.sha256(b'cool-scan-v2\0'+digest+source.read_bytes()).hexdigest()
+          for source in project.glob('*.cool')}
+ assert set(json.loads(snapshot.read_text()))==current_keys()
+ # Two paths can share a content record; membership must still be rediscovered.
+ duplicate=project/'duplicate.cool';twin=project/'twin.cool'
+ duplicate.write_text('package main;');twin.write_text(duplicate.read_text())
+ rows,_=check();assert len(rows)==1 and len(rows[0][1].splitlines())==2,rows
+ assert set(json.loads(snapshot.read_text()))==current_keys()
+ duplicate.unlink();rows,_=check();assert rows==[],rows
+ assert set(json.loads(snapshot.read_text()))==current_keys()
+ twin.unlink();rows,_=check();assert rows==[],rows
+ assert set(json.loads(snapshot.read_text()))==current_keys()
+ # Cache corruption is an explicit error, never silently a cache miss/hit.
+ valid=snapshot.read_text()
+ for corrupt in ('{', '[]', 'null', '{"key": 1}', '{"key": {}}',
+                 json.dumps({next(iter(current_keys())):'package\tmain\npackage\tmain\n'})):
+  snapshot.write_text(corrupt)
+  before=len(calls());rows,p=check(2)
+  assert rows==[] and len(calls())==before and 'cool:' in p.stderr,(corrupt,p,rows)
+  assert snapshot.read_text()==corrupt
+  snapshot.write_text(valid)
+ rows,_=check();assert rows==[],rows
+ # Only current records remain in the snapshot despite repeated edits; older
+ # content-addressed per-file entries remain available for reverted sources.
+ original=b.read_text()
+ for index in range(8):
+  b.write_text(original+f'\n// bounded history {index}\n')
+  rows,_=check();assert len(rows)==1 and len(rows[0][1].splitlines())==1,rows
+  records=json.loads(snapshot.read_text())
+  assert set(records)==current_keys() and len(records)==2,records
+ b.write_text(original);rows,_=check();assert rows==[],rows
+ assert set(json.loads(snapshot.read_text()))==current_keys()
  old=b.stat();b.write_text(b.read_text().replace('return 0','return 1'));os.utime(b,ns=(old.st_atime_ns,old.st_mtime_ns))
  rows,_=check();assert len(rows)==1 and len(rows[0][1].splitlines())==1,rows
  c=project/'c.cool';c.write_text('package main;fn added(){}');rows,_=check();assert len(rows)==1 and len(rows[0][1].splitlines())==1,rows
@@ -73,4 +112,4 @@ os.execv({str(ROOT/'build/cool-compiler')!r},[{str(ROOT/'build/cool-compiler')!r
  old=obj.stat();subprocess.run(['clang','-O2','-c',alternate,'-o',obj],check=True,capture_output=True);os.utime(obj,ns=(old.st_atime_ns,old.st_mtime_ns))
  subprocess.run(command,env=native_env,check=True,capture_output=True)
  assert subprocess.check_output([binary],text=True)=='1!\n'
-print('driver cache: one scan per cold package, warm hits, same-mtime content changes, add/remove/import/frontend invalidation, concurrent readers, batch equivalence and rebuilt runtime objects PASS')
+print('driver cache: snapshot legacy fallback, duplicate-content membership, corruption rejection, bounded snapshot history, one scan per cold package, warm hits, same-mtime content changes, add/remove/import/frontend invalidation, concurrent readers, batch equivalence and rebuilt runtime objects PASS')

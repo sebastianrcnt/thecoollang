@@ -1136,6 +1136,24 @@ through ordinary evaluation or library use.
   Concrete expression typing, return coverage, moves/loans and unused nominal
   template layouts still need audit; mandatory gates remain open.
 
+- Project performance and directory scan snapshots: seven repetitions on the
+  same pinned frontend separate direct check/LLVM emission, native O2 link,
+  cold/warm/edited CLI graphs and acknowledged REPL updates. The expanded Tally
+  has 526 sources in 11 packages. Warm CLI checks improve from 133.253 to
+  121.029 ms median; one-file edits from 135.125 to 124.052 ms. An atomic
+  per-directory snapshot reduces metadata opens while content hashing,
+  membership rediscovery and old per-file fallback preserve invalidation. The
+  snapshot retains only current records. Permanent cache regressions cover
+  fallback without scanning, identical-content paths and membership changes,
+  malformed JSON/shape/record failures and bounded edit histories, plus existing
+  same-mtime/frontend/runtime/concurrent checks. Native project JSON agrees with
+  Python Counter; seven REPL sessions verify 448 replacements and zero owners.
+  Raw reports and methodology: `docs/benchmarks/project-{before,after}-arm64.json`,
+  `tools/bench_project.py`, `docs/performance.md`. These comparisons use the
+  pre-coercion-audit frontend; compiler startup, frontend work and driver work
+  are not conflated. External downloads, ordinary CLI make overhead and broader
+  application workloads remain outside these samples; G8 stays open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
