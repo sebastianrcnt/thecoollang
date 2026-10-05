@@ -3168,6 +3168,17 @@ through ordinary evaluation or library use.
   contain generated dispatch sections (02-lexer, 08-llvm, 15-native) plus the
   parser's `SpecializeFunction`/`ParseProgram`; G3's complete audit stays Open.
 
+- Compiler maintenance: `compiler/06-parser.cool` no longer contains a generated
+  dispatch state machine for generic instantiation. `SpecializeFunction` reuses a
+  specialization keyed by origin and argument list, or parses the template
+  signature and body under the argument bindings, then restores the caller's
+  parser state. Behavior is unchanged: the generic, template-body,
+  template-aggregate, template-names and methods suites pass, the full regression
+  suite exits 0, and both bootstrap paths converge (self-host IR SHA256 begins
+  `52f3808c6de6a7bb`). Three modules still contain generated dispatch sections
+  (02-lexer, 08-llvm, 15-native) plus the parser's `ParseProgram`; G3's complete
+  audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

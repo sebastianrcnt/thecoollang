@@ -498,400 +498,94 @@ fn Expr(min: i64) -> *Node {
 }
 
 
-fn SpecializeFunction(arg_v_template_id: i64, arg_v_types2: *i64, arg_v_count6: i64) -> i64 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_template_id: i64 = arg_v_template_id;
-var v_types2: *i64 = arg_v_types2;
-var v_count6: i64 = arg_v_count6;
-var v_base2: *Function = null;
-var v_f7: *Function = null;
-var v_i9: i64 = i64(0);
-var v_j3: i64 = i64(0);
-var v_id: i64 = i64(0);
-var v_saved_pos: i64 = i64(0);
-var v_saved_fun: i64 = i64(0);
-var v_saved_depth: i64 = i64(0);
-var v_saved_loop: i64 = i64(0);
-var v_saved_unsafe: i64 = i64(0);
-var v_saved_locals: *Local = null;
-var v_saved_bindings1: *TypeBinding = null;
-var v_parameter: *Local = null;
-var t0: i64 = i64(0);
-var t1: *Token = null;
-var t2: *u8 = null;
-var t3: bool = false;
-var t4: *Node = null;
-var t5: i8 = i8(0);
-var t6: *Function = null;
-var t7: *Function = null;
-var t8: *Node = null;
-var t9: i64 = i64(0);
-var t10: i64 = i64(0);
-var t11: i8 = i8(0);
-var t12: *u8 = null;
-var t13: i64 = i64(0);
-var t14: i8 = i8(0);
-var t15: *Local = null;
-var t16: *Function = null;
-var t17: **u8 = null;
-var t18: *i64 = null;
-var t19: i64 = i64(0);
-var t20: i64 = i64(0);
-var t21: *u8 = null;
-var t22: i64 = i64(0);
-var t23: i64 = i64(0);
-var t24: *u8 = null;
-var t25: i64 = i64(0);
-var t26: *u8 = null;
-var t27: bool = false;
-var t28: i64 = i64(0);
-var t29: i64 = i64(0);
-var t30: *u8 = null;
-var pc: i64 = 63;
-while (true) {
-if (pc == 1) {
-pc = 48;
-continue;
-}
-if (pc == 2) {
-return i64(0);
-}
-if (pc == 3) {
-return v_id;
-}
-if (pc == 4) {
-t0 = ctx.v_specialization_depth;
-ctx.v_specialization_depth = ctx.v_specialization_depth - i64(1);
-pc = 3;
-continue;
-}
-if (pc == 5) {
-ctx.v_type_bindings = v_saved_bindings1;
-pc = 4;
-continue;
-}
-if (pc == 6) {
-ctx.v_locals = v_saved_locals;
-pc = 5;
-continue;
-}
-if (pc == 7) {
-ctx.v_unsafe_depth = v_saved_unsafe;
-pc = 6;
-continue;
-}
-if (pc == 8) {
-ctx.v_loop_depth = v_saved_loop;
-pc = 7;
-continue;
-}
-if (pc == 9) {
-ctx.v_depth = v_saved_depth;
-pc = 8;
-continue;
-}
-if (pc == 10) {
-ctx.v_current_fun = v_saved_fun;
-pc = 9;
-continue;
-}
-if (pc == 11) {
-ctx.v_pos = v_saved_pos;
-pc = 10;
-continue;
-}
-if (pc == 12) {
-t3 = ((v_f7).result != 0);
-if (t3) {
-t4 = (v_f7).body;
-t5 = Returns(t4);
-t3 = !((t5 != i8(0)));
-}
-if (t3) { pc = 13; } else { pc = 11; }
-continue;
-}
-if (pc == 13) {
-t1 = (v_f7).token;
-t2 = cast[*u8]("not every path returns a value");
-ErrorAt(t1, t2);
-pc = 11;
-continue;
-}
-if (pc == 14) {
-(v_f7).end = ctx.v_pos;
-pc = 12;
-continue;
-}
-if (pc == 15) {
-t6 = v_f7;
-InjectDrops(t6);
-pc = 14;
-continue;
-}
-if (pc == 16) {
-t7 = v_f7;
-AnalyzeBorrows(t7);
-AnalyzeReferences(t7);
-pc = 15;
-continue;
-}
-if (pc == 17) {
-t8 = Block();
-(v_f7).body = t8;
-pc = 16;
-continue;
-}
-if (pc == 18) {
-if ((v_j3 < (v_f7).argc)) { pc = 22; } else { pc = 17; }
-continue;
-}
-if (pc == 19) {
-t9 = v_j3;
-v_j3 = v_j3 + i64(1);
-pc = 18;
-continue;
-}
-if (pc == 20) {
-t10 = (v_parameter).type;
-t11 = Borrowed(t10);
-if ((t11 != i8(0))) { pc = 21; } else { pc = 19; }
-continue;
-}
-if (pc == 21) {
-(v_parameter).region = (1 << v_j3);
-(v_parameter).place_region = (v_parameter).region;
-pc = 19;
-continue;
-}
-if (pc == 22) {
-t12 = (&raw ((v_f7).arg_names)[0])[v_j3];
-t13 = (&raw ((v_f7).arg_types)[0])[v_j3];
-t14 = i8(0);
-t15 = AddLocal(t12, t13, t14);
-v_parameter = t15;
-pc = 20;
-continue;
-}
-if (pc == 23) {
-v_j3 = 0;
-pc = 18;
-continue;
-}
-if (pc == 24) {
-ctx.v_unsafe_depth = 0;
-ctx.v_loop_depth = ctx.v_unsafe_depth;
-ctx.v_depth = ctx.v_loop_depth;
-pc = 23;
-continue;
-}
-if (pc == 25) {
-ctx.v_locals = null;
-pc = 24;
-continue;
-}
-if (pc == 26) {
-ctx.v_current_fun = v_id;
-pc = 25;
-continue;
-}
-if (pc == 27) {
-(v_f7).begin = ctx.v_pos;
-pc = 26;
-continue;
-}
-if (pc == 28) {
-t16 = v_f7;
-FunctionSignature(t16);
-pc = 27;
-continue;
-}
-if (pc == 29) {
-ctx.v_pos = (v_base2).signature;
-pc = 28;
-continue;
-}
-if (pc == 30) {
-t17 = &raw ((v_base2).generic_names)[0];
-t18 = v_types2;
-t19 = v_count6;
-BindTypes(t17, t18, t19);
-pc = 29;
-continue;
-}
-if (pc == 31) {
-if ((v_j3 < v_count6)) { pc = 33; } else { pc = 30; }
-continue;
-}
-if (pc == 32) {
-t20 = v_j3;
-v_j3 = v_j3 + i64(1);
-pc = 31;
-continue;
-}
-if (pc == 33) {
-(&raw ((v_f7).generic_args)[0])[v_j3] = (v_types2)[v_j3];
-pc = 32;
-continue;
-}
-if (pc == 34) {
-v_j3 = 0;
-pc = 31;
-continue;
-}
-if (pc == 35) {
-(v_f7).origin = (v_template_id + 1);
-pc = 34;
-continue;
-}
-if (pc == 36) {
-(v_f7).token = (v_base2).token;
-pc = 35;
-continue;
-}
-if (pc == 37) {
-(v_f7).public = (v_base2).public;
-pc = 36;
-continue;
-}
-if (pc == 38) {
-(v_f7).package = (v_base2).package;
-pc = 37;
-continue;
-}
-if (pc == 39) {
-(v_f7).name = (v_base2).name;
-pc = 38;
-continue;
-}
-if (pc == 40) {
-t21 = cast[*u8](v_f7);
-t22 = 0;
-t23 = i64(sizeof(Function));
-t24 = MemSet(t21, t22, t23);
-pc = 39;
-continue;
-}
-if (pc == 41) {
-v_f7 = &raw ((ctx.v_functions)[v_id]);
-pc = 40;
-continue;
-}
-if (pc == 42) {
-t25 = ctx.v_nfun;
-ctx.v_nfun = ctx.v_nfun + i64(1);
-v_id = t25;
-pc = 41;
-continue;
-}
-if (pc == 43) {
-ctx.v_specialization_depth = ctx.v_specialization_depth + i64(1);
-t27 = (ctx.v_specialization_depth > 64);
-if (!t27) {
-t27 = (ctx.v_nfun == 4096);
-}
-if (t27) { pc = 44; } else { pc = 42; }
-continue;
-}
-if (pc == 44) {
-t26 = cast[*u8]("generic specialization limit exceeded");
-Error(t26);
-pc = 42;
-continue;
-}
-if (pc == 45) {
-if ((v_i9 < ctx.v_nfun)) { pc = 47; } else { pc = 43; }
-continue;
-}
-if (pc == 46) {
-t28 = v_i9;
-v_i9 = v_i9 + i64(1);
-pc = 45;
-continue;
-}
-if (pc == 47) {
-if ((((ctx.v_functions)[v_i9]).origin == (v_template_id + 1))) { pc = 54; } else { pc = 46; }
-continue;
-}
-if (pc == 48) {
-pc = 46;
-continue;
-}
-if (pc == 49) {
-return v_i9;
-}
-if (pc == 50) {
-if ((v_j3 < v_count6)) { pc = 52; } else { pc = 49; }
-continue;
-}
-if (pc == 51) {
-t29 = v_j3;
-v_j3 = v_j3 + i64(1);
-pc = 50;
-continue;
-}
-if (pc == 52) {
-if (((&raw (((ctx.v_functions)[v_i9]).generic_args)[0])[v_j3] != (v_types2)[v_j3])) { pc = 53; } else { pc = 51; }
-continue;
-}
-if (pc == 53) {
-pc = 1;
-continue;
-}
-if (pc == 54) {
-v_j3 = 0;
-pc = 50;
-continue;
-}
-if (pc == 55) {
-v_i9 = 0;
-pc = 45;
-continue;
-}
-if (pc == 56) {
-if (!((v_count6 != i64(0)))) { pc = 57; } else { pc = 55; }
-continue;
-}
-if (pc == 57) {
-return v_template_id;
-}
-if (pc == 58) {
-if ((v_count6 != (v_base2).generic_count)) { pc = 59; } else { pc = 56; }
-continue;
-}
-if (pc == 59) {
-t30 = cast[*u8]("wrong generic argument count");
-Error(t30);
-pc = 56;
-continue;
-}
-if (pc == 60) {
-v_saved_bindings1 = ctx.v_type_bindings;
-pc = 58;
-continue;
-}
-if (pc == 61) {
-v_saved_locals = ctx.v_locals;
-pc = 60;
-continue;
-}
-if (pc == 62) {
-v_saved_pos = ctx.v_pos;
-v_saved_fun = ctx.v_current_fun;
-v_saved_depth = ctx.v_depth;
-v_saved_loop = ctx.v_loop_depth;
-v_saved_unsafe = ctx.v_unsafe_depth;
-pc = 61;
-continue;
-}
-if (pc == 63) {
-v_base2 = &raw ((ctx.v_functions)[v_template_id]);
-pc = 62;
-continue;
-}
-}
-}
-return i64(0);
+// Instantiate (or reuse) a generic function for concrete type arguments.
+// Reuse is keyed by origin and the argument list; a new specialization parses
+// the template signature and body under the argument bindings, then restores
+// the caller's parser state.
+fn SpecializeFunction(template_id: i64, types: *i64, count: i64) -> i64 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let base = & raw(ctx.v_functions)[template_id];
+        let saved_pos = ctx.v_pos;
+        let saved_fun = ctx.v_current_fun;
+        let saved_depth = ctx.v_depth;
+        let saved_loop = ctx.v_loop_depth;
+        let saved_unsafe = ctx.v_unsafe_depth;
+        let saved_locals = ctx.v_locals;
+        let saved_bindings = ctx.v_type_bindings;
+        if (count != base.generic_count) {
+            Error(cast[*u8]("wrong generic argument count"));
+        }
+        if (count == 0) {
+            return template_id;
+        }
+        var i: i64 = 0;
+        while (i < ctx.v_nfun) {
+            if (ctx.v_functions[i].origin == template_id + 1) {
+                var j: i64 = 0;
+                while (j < count && ctx.v_functions[i].generic_args[j] == types[j]) {
+                    j = j + 1;
+                }
+                if (j == count) {
+                    return i;
+                }
+            }
+            i = i + 1;
+        }
+        ctx.v_specialization_depth = ctx.v_specialization_depth + 1;
+        if (ctx.v_specialization_depth > 64 || ctx.v_nfun == 4096) {
+            Error(cast[*u8]("generic specialization limit exceeded"));
+        }
+        let id = ctx.v_nfun;
+        ctx.v_nfun = ctx.v_nfun + 1;
+        let f = & raw(ctx.v_functions)[id];
+        MemSet(cast[*u8](f), 0, i64(sizeof(Function)));
+        f.name = base.name;
+        f.package = base.package;
+        f.public = base.public;
+        f.token = base.token;
+        f.origin = template_id + 1;
+        var j: i64 = 0;
+        while (j < count) {
+            f.generic_args[j] = types[j];
+            j = j + 1;
+        }
+        BindTypes( & raw base.generic_names[0], types, count);
+        ctx.v_pos = base.signature;
+        FunctionSignature(f);
+        f.begin = ctx.v_pos;
+        ctx.v_current_fun = id;
+        ctx.v_locals = null;
+        ctx.v_unsafe_depth = 0;
+        ctx.v_loop_depth = 0;
+        ctx.v_depth = 0;
+        j = 0;
+        while (j < f.argc) {
+            let parameter = AddLocal(f.arg_names[j], f.arg_types[j], i8(0));
+            if (Borrowed(parameter.type) != i8(0)) {
+                parameter.region = 1 << j;
+                parameter.place_region = parameter.region;
+            }
+            j = j + 1;
+        }
+        f.body = Block();
+        AnalyzeBorrows(f);
+        AnalyzeReferences(f);
+        InjectDrops(f);
+        f.end = ctx.v_pos;
+        if (f.result != 0 && Returns(f.body) == i8(0)) {
+            ErrorAt(f.token, cast[*u8]("not every path returns a value"));
+        }
+        ctx.v_pos = saved_pos;
+        ctx.v_current_fun = saved_fun;
+        ctx.v_depth = saved_depth;
+        ctx.v_loop_depth = saved_loop;
+        ctx.v_unsafe_depth = saved_unsafe;
+        ctx.v_locals = saved_locals;
+        ctx.v_type_bindings = saved_bindings;
+        ctx.v_specialization_depth = ctx.v_specialization_depth - 1;
+        return id;
+    }
 }
 
 
