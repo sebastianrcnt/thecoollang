@@ -117,3 +117,19 @@ See [editor integration](editor.md) for setup and the exact supported capabiliti
 `make editor-distribution-test` exercises that installed configuration and server
 from a read-only prefix, using the pinned or explicitly supplied Neovim client.
 The client binary itself is downloaded only for explicit tests and is not shipped.
+
+## Module reproducibility
+
+The installed driver's module formats and resolution rules are documented in
+[the module contract](modules.md). `cool.mod` records MVS minimum requirements;
+`cool.sum` verifies immutable dependency contents, and `--offline --frozen`
+requires cached/vendored sources with previously recorded checksums. These flags
+do not lock mutable workspaces or local replacements, and no exact whole-graph
+`cool.lock` protocol is implemented. Future/unknown manifest, workspace, checksum
+and vendor formats fail explicitly instead of being reinterpreted.
+
+`python3 tools/test_module_contract.py` exercises actual tagged Git fetching via
+temporary local repositories, MVS prerelease selection, `/v10` identities,
+offline/frozen CLI execution and checksum/identity rejection. This is local
+contract evidence; it does not certify public network availability or signed
+module provenance.

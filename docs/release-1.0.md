@@ -1186,6 +1186,22 @@ through ordinary evaluation or library use.
   IR SHA256: `566dc496751ff2afb17b0ca1f1ad0ec92e124d16179973f415f8ace25d05e3c0`.
   This structural cleanup does not freeze the language or close G3.
 
+- Module format/resolution audit: malformed/future workspace selectors and
+  block structures, unused unsupported checksum rows and wrong cached/vendor
+  identities previously passed unchecked; normal `/v10` paths were rejected.
+  These now fail or resolve according to the documented contract in
+  `modules.md`. Quoted paths preserve `//`, including manifest write/read;
+  canonical SHA-256 h1 records and vendor map shape/duplicate keys are checked.
+  Temporary real tagged Git repositories exercise fetch/archive, transitive MVS
+  prerelease selection, offline/frozen CLI execution, tamper and identity
+  rejection. `module-contract-test` is part of the full test target and CI.
+  Installed editor/distribution validation passes. Evidence:
+  `build/release-audit/module-contract-distribution.log` and the module-contract
+  and project results in `coercion-refactor-regression.log`.
+  Checksums are verification records, not an exact graph lock; local workspaces
+  remain mutable, and there is no public proxy/checksum service or cool.lock
+  protocol. No 1.0 gate is closed by this local module audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

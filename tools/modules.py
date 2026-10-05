@@ -17,6 +17,61 @@ import tempfile
 from driver_common import cache_home, atomic_write, find_root
 
 
+MAJOR_SUFFIX = r'/v([2-9]|[1-9][0-9]+)$'
+
+
+def directive_words(raw, filename, number):
+    # // comments begin only outside shell-style quoted local filesystem paths.
+    quote = None
+    escaped = False
+    for index, char in enumerate(raw):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif raw[index:index+2] == '//':
+            raw = raw[:index]
+            break
+    try:
+        return shlex.split(raw)
+    except ValueError as error:
+        raise ValueError(f'{filename}:{number}: {error}') from error
+
+
+def quote_local_path(path):
+    # shlex.quote leaves // unquoted, but our manifest treats it as a comment.
+    if '//' in path:
+        return "'" + path.replace("'", "'\"'\"'") + "'"
+    return shlex.quote(path)
+
+
+def vendor_records(pairs):
+    records = {}
+    for key, value in pairs:
+        if key in records:
+            raise ValueError(f'duplicate vendor index module: {key}')
+        records[key] = value
+    return records
+
+
+def validate_digest(digest):
+    if not isinstance(digest, str) or not digest.startswith('h1:'):
+        raise ValueError(f'unsupported checksum format: {digest}')
+    try:
+        decoded = base64.b64decode(digest[3:], validate=True)
+    except ValueError as error:
+        raise ValueError(f'invalid h1 checksum: {digest}') from error
+    if len(decoded) != 32 or base64.b64encode(decoded).decode() != digest[3:]:
+        raise ValueError(f'invalid h1 checksum: {digest}')
+
+
 def version_key(version):
     match = re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?', version)
     if not match:
@@ -41,7 +96,7 @@ def validate_path(path):
 
 def validate_version(path, version):
     major = version_key(version)[0]
-    suffix = re.search(r'/v([2-9][0-9]*)$', path)
+    suffix = re.search(MAJOR_SUFFIX, path)
     if major >= 2 and (not suffix or int(suffix[1]) != major):
         raise ValueError(f'{path}@{version}: major versions >= 2 require /v{major}')
     if suffix and int(suffix[1]) != major:
@@ -61,16 +116,16 @@ class Manifest:
         root = Path(root).resolve()
         result = cls(root)
         block = None
+        language_seen = False
         for number, raw in enumerate((root / 'cool.mod').read_text().splitlines(), 1):
-            line = raw.split('//', 1)[0].strip()
-            if not line:
+            words = directive_words(raw, 'cool.mod', number)
+            if not words:
                 continue
-            if line == ')':
+            if words == [')']:
                 if block is None:
                     raise ValueError(f'cool.mod:{number}: unexpected )')
                 block = None
                 continue
-            words = shlex.split(line)
             if len(words) == 2 and words[1] == '(':
                 if block or words[0] not in ('require', 'replace'):
                     raise ValueError(f'cool.mod:{number}: invalid block')
@@ -82,6 +137,9 @@ class Manifest:
             if kind == 'module' and len(args) == 1 and not result.module:
                 validate_path(args[0]); result.module = args[0]
             elif kind == 'cool' and len(args) == 1:
+                if language_seen:
+                    raise ValueError(f'cool.mod:{number}: duplicate cool directive')
+                language_seen = True
                 if args[0] != '1.0':
                     raise ValueError(f'unsupported language version: {args[0]}')
                 result.language = args[0]
@@ -106,7 +164,7 @@ class Manifest:
         if self.requires:
             lines += ['require (', *(f'    {p} {v}' for p, v in sorted(self.requires.items())), ')', '']
         if self.replaces:
-            lines += ['replace (', *(f'    {p} => {shlex.quote(v)}' for p, v in sorted(self.replaces.items())), ')', '']
+            lines += ['replace (', *(f'    {p} => {quote_local_path(v)}' for p, v in sorted(self.replaces.items())), ')', '']
         atomic_write(self.root / 'cool.mod', '\n'.join(lines).encode())
 
 
@@ -142,9 +200,13 @@ class Graph:
         self._workspace()
         sums = manifest.root / 'cool.sum'
         if sums.exists():
-            for line in sums.read_text().splitlines():
+            for number, line in enumerate(sums.read_text().splitlines(), 1):
                 if line.strip():
-                    path, version, digest = line.split()
+                    words = line.split()
+                    if len(words) != 3:
+                        raise ValueError(f'cool.sum:{number}: expected module version h1-checksum')
+                    path, version, digest = words
+                    validate_path(path); validate_version(path, version); validate_digest(digest)
                     if (path, version) in self.sums and self.sums[path, version] != digest:
                         raise ValueError(f'conflicting checksums for {path}@{version}')
                     self.sums[path, version] = digest
@@ -154,23 +216,39 @@ class Graph:
             work = parent / 'cool.work'
             if work.exists():
                 block = False
-                for raw in work.read_text().splitlines():
-                    words = shlex.split(raw.split('//', 1)[0])
-                    if not words or words[0] == 'cool':
+                language_seen = False
+                for number, raw in enumerate(work.read_text().splitlines(), 1):
+                    words = directive_words(raw, 'cool.work', number)
+                    if not words:
+                        continue
+                    if words[0] == 'cool':
+                        if block or language_seen or len(words) != 2:
+                            raise ValueError(f'cool.work:{number}: invalid or duplicate cool directive')
+                        if words[1] != '1.0':
+                            raise ValueError(f'unsupported workspace language version: {words[1]}')
+                        language_seen = True
                         continue
                     if words == ['use', '(']:
-                        block = True; continue
+                        if block:
+                            raise ValueError(f'cool.work:{number}: nested use block')
+                        block = True
+                        continue
                     if words == [')']:
-                        block = False; continue
+                        if not block:
+                            raise ValueError(f'cool.work:{number}: unexpected )')
+                        block = False
+                        continue
                     if not block:
                         if words[0] != 'use':
-                            raise ValueError('cool.work: expected use directive')
+                            raise ValueError(f'cool.work:{number}: expected use directive')
                         words = words[1:]
                     if len(words) != 1:
-                        raise ValueError('cool.work: expected one path')
+                        raise ValueError(f'cool.work:{number}: expected one path')
                     root = (parent / words[0]).resolve()
                     module = Manifest.read(root)
                     self.local[module.module] = str(root)
+                if block:
+                    raise ValueError('cool.work: unclosed use block')
                 return
 
     def source(self, path, version):
@@ -181,17 +259,25 @@ class Graph:
             return root
         vendor_index = self.manifest.root / 'vendor/cool.vendor.json'
         if self.use_vendor and vendor_index.exists():
-            index = json.loads(vendor_index.read_text())
+            index = json.loads(vendor_index.read_text(), object_pairs_hook=vendor_records)
+            if not isinstance(index, dict):
+                raise ValueError('unsupported vendor index format: expected module/version object')
+            for module, selected in index.items():
+                if not isinstance(selected, str):
+                    raise ValueError('unsupported vendor index format: expected version strings')
+                validate_path(module); validate_version(module, selected)
             root = self.manifest.root / 'vendor' / path if index.get(path) == version else self.manifest.root / 'vendor/.versions' / (path + '@' + version)
             if not root.is_dir():
                 raise ValueError(f'vendor contents are stale for {path}@{version}; regenerate vendor')
+            if Manifest.read(root).module != path:
+                raise ValueError(f'vendored module path mismatch: {path}')
             self.verify_sum(path, version, tree_hash(root))
             return root
         root = cache_home() / 'mod' / (path + '@' + version)
         if not root.exists():
             if self.offline:
                 raise ValueError(f'offline: missing cached module {path}@{version}')
-            repository = re.sub(r'/v[2-9][0-9]*$', '', path)
+            repository = re.sub(MAJOR_SUFFIX, '', path)
             if len(repository.split('/')) != 3 or '.' not in repository.split('/')[0]:
                 raise ValueError('direct fetching currently requires host/owner/repo module paths')
             root.parent.mkdir(parents=True, exist_ok=True)
@@ -221,6 +307,8 @@ class Graph:
                     unpack.rename(root)
                 except FileExistsError:
                     pass
+        if Manifest.read(root).module != path:
+            raise ValueError(f'cached module path mismatch: {path}')
         self.verify_sum(path, version, tree_hash(root))
         return root
 
@@ -264,4 +352,7 @@ class Graph:
         if not candidates:
             raise ValueError(f'no module supplies {path}; add it with cool get or replace')
         module = max(candidates, key=len)
+        if module in self.local and module != self.manifest.module:
+            if Manifest.read(self.roots[module]).module != module:
+                raise ValueError(f'replacement module path mismatch: {module}')
         return self.roots[module] / path[len(module):].lstrip('/')

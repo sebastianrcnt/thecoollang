@@ -397,3 +397,8 @@ coercion-test: build/cool-compiler build/language.BIN build/language-runtime.o b
 test: coercion-test
 coercion-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_coercion.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: module-contract-test
+module-contract-test: build/cool-compiler
+	python3 tools/test_module_contract.py
+test: module-contract-test
