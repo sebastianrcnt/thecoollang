@@ -22,6 +22,7 @@ PRELUDE = '''package main;
 import "std/mem";import "std/io";
 struct View { items: []i64; }
 fn total(values: []i64) -> i64 { var sum: i64 = 0; for (var i: usize = 0; i < len(values); i = i + 1) { sum = sum + values[i]; } return sum; }
+fn deref_total(values: []&i64) -> i64 borrows(values) { var sum: i64 = 0; for (var i: usize = 0; i < len(values); i = i + 1) { sum = sum + *values[i]; } return sum; }
 '''
 
 
@@ -140,6 +141,43 @@ def generate_owned(seed, steps):
     return '\n'.join(lines) + '\n', ['2468135']
 
 
+def generate_borrowed(seed, steps):
+    """Borrowed-element slices: model referents across reads, rebinding and calls."""
+    rng = random.Random(seed)
+    lines = [PRELUDE, 'fn main(){']
+    for _ in range(steps):
+        size = rng.randrange(2, 6)
+        values = [rng.randrange(-999, 1000) for _ in range(size)]
+        chosen = list(range(size))
+        lines.append('  {')
+        for index, value in enumerate(values):
+            lines.append(f'    var x{index} = {value};')
+        pointers = ', '.join(f'&x{index}' for index in range(size))
+        lines.append(f'    var refs = [{size}]&i64{{{pointers}}};')
+        lines.append('    {')
+        lines.append('      let s = refs[:];')
+        lines.append(f'      assert(len(s) == {size});')
+        for _ in range(rng.randrange(2, 6)):
+            index = rng.randrange(0, size)
+            if rng.random() < 0.5:
+                lines.append(f'      assert(*s[{index}] == {values[chosen[index]]});')
+            else:
+                target = rng.randrange(0, size)
+                chosen[index] = target
+                lines.append(f'      s[{index}] = &x{target};')
+                lines.append(f'      assert(*s[{index}] == {values[chosen[index]]});')
+        if rng.random() < 0.5:
+            expected = sum(values[chosen[index]] for index in range(size))
+            lines.append(f'      assert(deref_total(s) == {expected});')
+        lines.append('    }')
+        for index in range(size):
+            lines.append(f'    assert(*refs[{index}] == {values[chosen[index]]});')
+        lines.append('  }')
+    lines.append('  io.println(1357246);')
+    lines.append('}')
+    return '\n'.join(lines) + '\n', ['1357246']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seeds', default='7,42,2026,1,99')
@@ -160,7 +198,7 @@ def main():
             frontends.append(Path(args.frontend))
         observations = []
         for seed in (int(value) for value in args.seeds.split(',')):
-          for workload, generator, marker in (('scalar', generate, 7654321), ('owned', generate_owned, 2468135)):
+          for workload, generator, marker in (('scalar', generate, 7654321), ('owned', generate_owned, 2468135), ('borrowed', generate_borrowed, 1357246)):
             program, expected = generator(seed, args.steps)
             source = work / f'seed-{seed}-{workload}.cool'
             source.write_text(program)

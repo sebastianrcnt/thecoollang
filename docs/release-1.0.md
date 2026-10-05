@@ -3249,8 +3249,11 @@ through ordinary evaluation or library use.
   releases every loan and verifies the whole backing array directly. The owned
   workload builds an `own[i64]` array, reads and moves elements out through the
   deepest slice and asserts the exact live-owner count after every move, then
-  verifies the surviving slots and requires zero owners at scope exit. An
-  independent Python model decides every expected read and owner count. Seeds
+  verifies the surviving slots and requires zero owners at scope exit. The
+  borrowed workload builds a `[]&i64` slice over local referents, reads through
+  it, rebinds elements to other live referents, calls a slice-consuming function
+  and then verifies every element after the loan releases. An independent Python
+  model decides every expected read, referent and owner count. Seeds
   7/42/2026/1/99 at 40 steps pass on five engines + release O2 on both frontends;
   `slice-fuzz-sanitize-test` adds runtime ASan/UBSan and an ASan-instrumented
   frontend. The target is wired into `make test` and the ARM64 CI workflow. This
