@@ -53,3 +53,24 @@ fn CoerceBinary(a: * Node, b: * Node, op: i64) {
         Coerce(b, a.type);
     }
 }
+// Keep conversion eligibility in CanImplicitCoerce; preserve AST list topology.
+fn Coerce(n: * Node, type: i64) {
+    unsafe {
+        if (n.type == type) {
+            return;
+        }
+        if (CanImplicitCoerce(n, type) == i8(0)) {
+            ErrorAt(n.token, cast[ * u8]("incompatible types; use an explicit cast for narrowing conversions"));
+        }
+        if (n.type == 13 || (n.kind == 1 && Integer(n.type) != i8(0) && Integer(type) != i8(0) && Fits(n.value, type) != i8(0))) {
+            n.type = type;
+            return;
+        }
+        let child = AllocateNode();
+        MemCpy(cast[ * u8](child), cast[ * u8](n), i64(sizeof(Node)));
+        child.next = null;
+        n.kind = 17;
+        n.a = child;
+        n.type = type;
+    }
+}

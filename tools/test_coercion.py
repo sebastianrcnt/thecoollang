@@ -42,7 +42,9 @@ invalid += ['let a=f32(1.0);let b=i32(2);let result=a+b;','let a=f32(1.0);let b=
  'let a:f32=1.0;','let a=i64(1);let b:i8=a;','let a=u64(1);let b:i64=a;',
  'let a=f64(1.0);let b:f32=a;','let a=f64(1.0);let b=16777217;let result=a+b;',
  'let a=f64(1.0);let result=a+16777217;','let a=f64(1.0);let result=16777217+a;']
-program='import "std/io";fn main(){'+''.join(body)+'}'
+body.append('let narrow=i8(7);let fraction=f32(1.5);io.println(combine(narrow,fraction,narrow));let pair=Pair{y:fraction,x:narrow};io.println(pair.x);io.println(pair.y);')
+expected+=['15.5','7','1.5']
+program='import "std/io";struct Pair{x:i64;y:f64;}fn combine(a:i64,b:f64,c:i64)->f64{return f64(a)+b+f64(c);}fn main(){'+''.join(body)+'}'
 output=''.join(line+'\n' for line in expected)
 def run(command,env):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,capture_output=True,text=True,timeout=180)
 with tempfile.TemporaryDirectory(prefix='cool coercion ') as temporary:

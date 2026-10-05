@@ -696,8 +696,8 @@ unused rejection suite whenever grammar changes.
 
 ## Binary implicit typing
 
-`CanImplicitCoerce` is a side-effect-free predicate for the conversions performed
-by `Coerce`; keep their rules aligned. `CoerceBinary` first adopts representable
+`CanImplicitCoerce` is the single side-effect-free eligibility predicate used by
+both `CoerceBinary` and `Coerce`. `Coerce` applies only the AST transformation. `CoerceBinary` first adopts representable
 literals, then chooses a lossless conversion direction. It does not create a
 third inferred type or permit narrowing. Comparisons use the same normalized
 operands before producing bool. Shift counts remain independently typed, with
@@ -709,3 +709,11 @@ Implicit float range tests inspect the mathematical integer value. A u64 literal
 above i64 maximum has negative internal bits; it must not pass a small-signed
 range test in either `CanImplicitCoerce` or `Coerce`. Explicit numeric casts use
 the original unsigned type and retain the published rounding behavior.
+
+`Coerce` is readable new-syntax code in `33-implicit-types.cool`, replacing the
+old generated core implementation. Identity conversion leaves the node untouched;
+permitted null/integer literal adoption changes its type in place. Other eligible
+conversions clone the old node through `AllocateNode`, clear the clone's `next`,
+and wrap it with N_CAST. The original node's `next` remains the surrounding
+argument/initializer list link. Keep allocation tracking and source/provenance
+metadata intact: conversion must not copy a sibling into its operand subtree.

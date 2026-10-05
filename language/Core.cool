@@ -269,24 +269,14 @@ Bool CanImplicitCoerce(Node *n,I64 type){
     }
     return FALSE;
 }
+// Eligibility is defined once; this function only applies the AST conversion.
 U0 Coerce(Node *n, I64 type) {
     Node *child;
-    if(n->kind==N_INT && Integer(n->type) && Unsigned(n->type) && n->value<0 && Floating(type))ErrorAt(n->token,"incompatible types; use an explicit cast for narrowing conversions");
-    if (n->type == type) return;
-    if (n->type == T_NULL && Pointer(type)) { n->type = type; return; }
-    if (Pointer(n->type) && type == T_PTR) { child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL; n->kind = N_CAST; n->a = child; n->type = type; return; }
-    if ((n->type == T_F32 && type == T_F64) || (n->kind == N_INT && Integer(n->type) && Floating(type) && -16777216 <= n->value <= 16777216)) {
-        child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL;
-        n->kind = N_CAST; n->a = child; n->type = type; return;
-    }
-    if (Integer(n->type) && Integer(type)) {
-        if (n->kind == N_INT && !(Unsigned(n->type) && n->value < 0 && type != T_U64) && Fits(n->value, type)) { n->type = type; return; }
-        if ((Unsigned(type) == Unsigned(n->type) && Width(type) > Width(n->type)) || (!Unsigned(type) && Unsigned(n->type) && Width(type) > Width(n->type))) {
-            child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL;
-            n->kind = N_CAST; n->a = child; n->type = type; return;
-        }
-    }
-    ErrorAt(n->token, "incompatible types; use an explicit cast for narrowing conversions");
+    if(n->type==type)return;
+    if(!CanImplicitCoerce(n,type))ErrorAt(n->token,"incompatible types; use an explicit cast for narrowing conversions");
+    if(n->type==T_NULL || (n->kind==N_INT && Integer(n->type) && Integer(type) && Fits(n->value,type))){n->type=type;return;}
+    child=AllocateNode();MemCpy(child,n,sizeof(Node));child->next=NULL;
+    n->kind=N_CAST;n->a=child;n->type=type;
 }
 
 // Prefer contextual literal adoption, then choose a lossless widening direction.

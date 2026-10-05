@@ -82,4 +82,5 @@ Normal specialization remains responsible for typing, ownership and borrowing.
 
 `33-implicit-types.cool` selects permitted binary operand conversions without
 operand-order bias; shifts preserve the left type and independently check their
-integer count. Keep its side-effect-free eligibility rules aligned with `Coerce`.
+integer count. `CanImplicitCoerce` is the sole eligibility predicate, and the
+readable `Coerce` applies the permitted AST conversion while preserving list links.

@@ -1174,6 +1174,18 @@ through ordinary evaluation or library use.
   This is an explicit pre-freeze numeric behavior decision; floating arithmetic,
   whole-spec conformance, dependent templates and other release gates remain open.
 
+- Coercion maintenance: replaced the 236-line port-generated application path
+  with readable `Coerce` in `33-implicit-types.cool`. Both binary selection and
+  conversion application now consult `CanImplicitCoerce`; literal adoption,
+  clone allocation/provenance and sibling-list topology remain intact. Expanded
+  the independent numeric regression to 544 outputs with multiargument and
+  named-field initialization ordering. Focused checks, compiler-instrumented
+  ASan, full regression, bootstrap convergence and installed editor/distribution
+  checks pass.
+  Evidence: `build/release-audit/coercion-refactor-{build,focused,regression,sanitize}.log`.
+  IR SHA256: `566dc496751ff2afb17b0ca1f1ad0ec92e124d16179973f415f8ace25d05e3c0`.
+  This structural cleanup does not freeze the language or close G3.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
