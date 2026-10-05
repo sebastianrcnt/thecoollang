@@ -1,5 +1,23 @@
 // Explicit stored-provenance relations, aligned with compiler/36-stores.cool.
-U0 StoreSignature(Function *f,Bool concrete){I64 i,dst,src,type;U8 *destination,*source;f->store_destinations=0;for(i=0;i<32;i++)f->store_contract[i]=0;while(Is("stores")){pos++;Need('(',"expected '(' after stores");destination=Ident();Need(',',"expected source after stores destination");source=Ident();Need(')',"expected ')' after stores contract");for(dst=0;dst<f->argc;dst++)if(Eq(f->arg_names[dst],destination))break;for(src=0;src<f->argc;src++)if(Eq(f->arg_names[src],source))break;if(dst==f->argc || src==f->argc)Error("unknown parameter in stores contract");if(f->store_contract[dst]&(1<<src))Error("duplicate stores relation");{type=f->arg_types[dst];if((concrete || type>=0) && (!IsReference(type) || !Shape(type)->count || !TrackedBorrow(Shape(type)->element)))Error("stores destination requires an exclusive reference to borrowed storage");if((concrete || f->arg_types[src]>=0) && !TrackedBorrow(f->arg_types[src]))Error("stores source must contain borrowed references");if(f->foreign)Error("extern C stores contracts require a checked Cool body");}f->store_destinations|=1<<dst;f->store_contract[dst]|=1<<src;}}
+U0 StoreSignature(Function *f,Bool concrete){
+ I64 i,dst,src,type,seen[32];U8 *destination,*source;Bool inactive;
+ f->store_destinations=0;for(i=0;i<32;i++){f->store_contract[i]=0;seen[i]=0;}
+ while(Is("stores")){
+  pos++;Need('(',"expected '(' after stores");destination=Ident();Need(',',"expected source after stores destination");source=Ident();Need(')',"expected ')' after stores contract");
+  for(dst=0;dst<f->argc;dst++)if(Eq(f->arg_names[dst],destination))break;
+  for(src=0;src<f->argc;src++)if(Eq(f->arg_names[src],source))break;
+  if(dst==f->argc || src==f->argc)Error("unknown parameter in stores contract");
+  if(seen[dst]&(1<<src))Error("duplicate stores relation");seen[dst]|=1<<src;
+  type=f->arg_types[dst];inactive=concrete && f->origin>0 && !f->foreign && IsReference(type) && Shape(type)->count && !TrackedBorrow(Shape(type)->element) && !TrackedBorrow(f->arg_types[src]);
+  if(!inactive){
+   if((concrete || type>=0) && (!IsReference(type) || !Shape(type)->count || !TrackedBorrow(Shape(type)->element)))Error("stores destination requires an exclusive reference to borrowed storage");
+   if((concrete || f->arg_types[src]>=0) && !TrackedBorrow(f->arg_types[src]))Error("stores source must contain borrowed references");
+   if(f->foreign)Error("extern C stores contracts require a checked Cool body");
+   f->store_destinations|=1<<dst;f->store_contract[dst]|=1<<src;
+  }
+ }
+}
+
 Bool StoreSignatureSame(Function *a,Function *b){I64 i;if(a->store_destinations!=b->store_destinations)return FALSE;for(i=0;i<32;i++)if(a->store_contract[i]!=b->store_contract[i])return FALSE;return TRUE;}
 Node *CallArgument(Node *n,I64 index){Node *arg=n->a;while(index>0 && arg){arg=arg->next;index--;}return arg;}
 U0 BorrowCallStores(Node *n){Function *f;I64 dst,src;if(n->slot<0)return;f=&functions[n->slot];if(!f->store_destinations)return;for(dst=0;dst<f->argc;dst++)for(src=0;src<f->argc;src++)if(f->store_contract[dst]&(1<<src))RecordBorrowDestination(CallArgument(n,dst),CallArgument(n,src));}

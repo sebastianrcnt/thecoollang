@@ -2859,6 +2859,41 @@ through ordinary evaluation or library use.
   Broader alias/relocation fuzzing, borrowed collection APIs, general body
   inference and every outstanding mandatory gate remain Open.
 
+- Generic inactive storage effects (specification draft 34): a validated
+  dependent template can specialize its `stores(dst,src)` relation to plain
+  values without inventing a borrowed lifetime effect. The relation is inactive
+  only for a concrete nonforeign specialization with an exclusive destination
+  and no scoped borrows on either destination pointee or source. Other active
+  pairs remain enforced. Parsed pair masks are separate from active effects,
+  preserving duplicate detection. Unused known-invalid templates, shared
+  receivers, nongeneric invalid declarations and foreign promises remain errors.
+
+  Expanded permanent stores tests cover scalar/array/owning specialization,
+  generic forwarding and a mixed inactive/active two-destination function. The
+  active borrowed destination still prevents mutation of its installed source;
+  the plain destination remains writable. 31 required rejection cases and
+  existing lifetime/receiver/REPL models pass across production/legacy and the
+  instrumented production frontend, five engines/O2 and runtime ASan/UBSan.
+  Tracked store lifecycle histories 64/1024 finish at zero bytes/allocations
+  with equal peak 6,168 bytes. Initial focused validation passes in
+  `build/release-audit/generic-stores-validation.log`.
+
+  Full `make -k -j4 test bootstrap-check editor-distribution-test
+  stores-sanitize-test` exits 0 in
+  `build/release-audit/generic-stores-final-regression.log`. Both bootstrap
+  paths converge; production stage-2 IR SHA256:
+  `abc17d2743be84f44635b86f1977539d16d67025e07187f9064d06e80d084ca7`.
+  This is a prerequisite for one collection API across plain and borrowed T,
+  not a completed borrowed-vector implementation. An isolated Option-slot
+  Vector prototype exposed a production overrejection: installing direct
+  `new[Maybe](Maybe.None)` into a borrowed owner slot succeeds, while passing
+  the same reference-free value through a named local fails. A named unit
+  variant similarly fails. Baseline fixtures/report are retained in
+  `build/release-audit/empty-borrowed-{direct,named,unit}.cool` and
+  `empty-borrowed-baseline.json`. Root-free value transport must be corrected
+  before promoting the prototype; it is not release acceptance evidence.
+  All mandatory gates remain Open.
+
 ## Next implementation checkpoints
 
 - Expand adversarial/model coverage for production nested references and

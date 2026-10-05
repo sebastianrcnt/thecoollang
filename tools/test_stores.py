@@ -15,6 +15,8 @@ fn refset(dst:&mut &i64,src:&i64) stores(dst,src){*dst=src;}
 fn slicep(dst:&mut []i64,src:[]i64) stores(dst,src){*dst=src;}
 fn owners(dst:&mut own[View],src:own[View]) stores(dst,src){*dst=move src;}
 fn replace[T](dst:&mut T,src:T) stores(dst,src){*dst=move src;}
+fn generic_forward[T](dst:&mut T,src:T) stores(dst,src){replace[T](dst,move src);}
+fn combined[T](a:&mut T,b:&mut View,src:T,r:&i64) stores(a,src) stores(b,r){*a=move src;set(b,r);}
 fn forward(dst:&mut View,src:&i64) stores(dst,src){set(dst,src);}
 fn returned(dst:&mut View,src:&i64)->&i64 borrows(dst,src) stores(dst,src){set(dst,src);return (*dst).r;}
 fn selfset(dst:&mut View) stores(dst,dst){(*dst).r=(*dst).r;}
@@ -38,6 +40,10 @@ program=prelude+'''fn tests(){var x=7;var y=8;var z=9;
  {var v=View{r:&x};let r=returned(&mut v,&y);assert(*r==8);}
  {var a=View{r:&x};var b=View{r:&y};double(&mut a,&mut b,&z);assert(*a.r==9);assert(*b.r==9);reversed(&mut a,&mut b,&x);assert(*a.r==7);assert(*b.r==7);}
  {var v=View{r:&x};chain(&mut v,&y,4);assert(*v.r==8);}
+ {var scalar=1;generic_forward[i64](&mut scalar,7);assert(scalar==7);}
+ {var array=[2]i64{1,2};replace[[2]i64](&mut array,[2]i64{7,8});assert(array[0]+array[1]==15);}
+ {var owner=new[i64](1);replace[own[i64]](&mut owner,new[i64](7));assert(*owner==7);}
+ {var scalar=1;var v=View{r:&x};combined[i64](&mut scalar,&mut v,7,&y);assert(scalar==7);assert(*v.r==8);scalar=9;}
  assert(mem.owner_count()==0);x=18;y=8;io.println(x+y);}
 fn main(){tests();assert(mem.owner_count()==0);}
 '''
@@ -69,6 +75,17 @@ invalid=[
  ('fn bad(v:View)->&View borrows(v){return &v;}fn main(){}','outlive'),
  ('fn main(){var x=1;var y=2;var v=Mut{r:&mut x};mset(&mut v,&mut y);y=3;}','conflicts'),
 ]
+invalid.extend([
+ ('fn assign[T](dst:&T,src:T) stores(dst,src){}fn main(){var x=1;assign[i64](&x,2);}','stores destination'),
+ ('fn assign[T](dst:&mut T,src:T) stores(dst,src) stores(dst,src){*dst=src;}fn main(){var x=1;assign[i64](&mut x,2);}','duplicate stores'),
+ ('fn bad[T](dst:&mut T,src:&i64) stores(dst,src){}fn main(){var x=1;var y=2;bad[i64](&mut x,&y);}','stores destination'),
+])
+
+invalid.extend([
+ ('fn plain(dst:&mut i64,src:i64) stores(dst,src){*dst=src;}fn main(){}','stores destination'),
+ ('fn main(){var x=1;var y=2;var v=View{r:&x};var scalar=3;combined[i64](&mut scalar,&mut v,4,&y);y=5;}','conflicts'),
+])
+
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)
 with tempfile.TemporaryDirectory(prefix='cool borrowed heaps ') as temporary:
  root=Path(temporary);source=root/'main.cool';binary=root/'program';wrapper=root/'bootstrap'

@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 33
+# Cool language specification — 1.0 draft 34
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1118,3 +1118,22 @@ Changed established reference-origin sets use the same dependency-directed REPL
 revalidation and rollback as slice projections. Historical values keep their
 original roots. General body inference and all outstanding release gates remain
 required.
+
+
+## Draft 34: inactive generic storage effects
+
+A validated dependent template's `stores(destination, source)` relation is
+inactive in a concrete specialization when the destination is still an exclusive
+reference, neither its pointee nor the source contains scoped borrows, and the
+function is a checked Cool definition. This permits the same generic replacement
+API to handle plain values and values containing borrows. Active relations retain
+the previous checked lifetime and capability semantics. Inactive relations do
+not remove other active relations in the same specialization.
+
+Known incompatible types remain errors in unused templates. Nongeneric functions
+retain strict destination/source requirements. Shared destinations, unknown names,
+duplicate relations and foreign promises remain invalid. The parsed relation set
+is checked separately from active effects, so duplicate detection does not depend
+on whether a relation becomes inactive. Forwarding through another specialization
+uses its concrete active effects. This revision does not complete the collection
+API or the 1.0 release gates.

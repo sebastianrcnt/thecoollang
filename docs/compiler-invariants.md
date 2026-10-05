@@ -1822,3 +1822,15 @@ an address to a nested borrowed value wraps selected payload graphs under the
 new reference's Referent edge instead of replacing them with a type-mismatch
 fallback. Pure reference return proofs use the same bounds, capabilities and
 REPL invalidation as slice proofs and never accept reference reslicing syntax.
+
+
+## Conditional generic store specialization
+
+StoreSignature tracks parsed relation pairs in a separate 32-element seen mask.
+Active store_contract/store_destinations fields contain only lifetime effects
+needed by the concrete signature. An inactive pair requires concrete checking,
+a positive template origin, a nonforeign definition, an exclusive reference
+destination and no TrackedBorrow on either its pointee or source. This condition
+must not erase other active pairs. Nontemplate declarations and unresolved known
+incompatible types keep strict validation. Both frontend implementations keep
+these rules aligned; forwarding and caller analysis use the active concrete masks.

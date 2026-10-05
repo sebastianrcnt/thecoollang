@@ -3,6 +3,7 @@
 fn StoreSignature(function: * Function, concrete: bool) {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var seen = [32]i64{};
         function.store_destinations = 0;
         for (var i: i64 = 0; i < 32; i = i + 1) {
             function.store_contract[i] = 0;
@@ -25,11 +26,15 @@ fn StoreSignature(function: * Function, concrete: bool) {
             if (dst == function.argc || src == function.argc) {
                 Error(cast[ * u8]("unknown parameter in stores contract"));
             }
-            if ((function.store_contract[dst] & (1 << src)) != 0) {
+            if ((seen[dst] & (1 << src)) != 0) {
                 Error(cast[ * u8]("duplicate stores relation"));
             }
+            seen[dst] = seen[dst] | (1 << src);
             {
                 let type = function.arg_types[dst];
+                // A validated dependent template's storage effect is inactive
+                // when neither concrete endpoint carries scoped borrows.
+                if (concrete && function.origin > 0 && function.foreign == 0 && IsReference(type) && Shape(type).count != 0 && !TrackedBorrow(Shape(type).element) && !TrackedBorrow(function.arg_types[src])) { continue; }
                 if ((concrete || type >= 0) && (!IsReference(type) || Shape(type).count == 0 || !TrackedBorrow(Shape(type).element))) {
                     Error(cast[ * u8]("stores destination requires an exclusive reference to borrowed storage"));
                 }

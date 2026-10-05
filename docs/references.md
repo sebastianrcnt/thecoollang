@@ -968,3 +968,14 @@ unions. This permits a returned value to exclude an unused contracted argument.
 Changing that proven origin set in a REPL rechecks retained callers and rolls
 back an unsafe replacement. Argument evaluation still protects every argument,
 and shared paths cannot move or mutate owned storage.
+
+
+### Generic storage effects
+
+A generic replacement function can declare `stores(dst, value)` for `dst: &mut T`
+and `value: T`. Its plain-value specializations have no scoped provenance effect;
+its borrowed-value specializations retain the ordinary checked store contract.
+This permits one API for scalar, array, owning and borrowed values. A shared
+destination is never made writable by this rule. Other active relations in the
+same function remain enforced. Known invalid unused templates and nongeneric
+invalid declarations still fail (specification draft 34).
