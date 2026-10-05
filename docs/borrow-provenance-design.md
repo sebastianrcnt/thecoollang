@@ -96,10 +96,11 @@ entry capability before following graph barriers.
 
 The existing two-layer checker still protects physical anchors and supplies
 opaque permission fallback. Universal typed payload mode queries additionally
-reject shared alternatives for named stored-referent writes and exclusive-handle
-value copies/moves. Handle copies stop at reference/slice nodes; their internal
+reject shared alternatives for named and computed stored-referent writes and
+exclusive-handle value copies/moves. Computed projection read pins query their
+original live source with the full place cursor, preserving shared barriers. Handle copies stop at reference/slice nodes; their internal
 payload graphs retain lifetime protection without requiring exclusive copy
-authority. Computed receivers and full physical protection remain required. Typed graph paths now exclude proven absent layer-one payload roots
+authority. Full physical protection and opaque authority remain required. Typed graph paths now exclude proven absent layer-one payload roots
 from production conflict matching and reborrow acquisition. Overlap ignores
 shared/exclusive mode; terminal physical roots overlap remaining projections.
 Unknown/opaque/incomplete paths remain conservative. This first access step

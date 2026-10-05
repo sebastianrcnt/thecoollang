@@ -11,6 +11,7 @@ extern ReferenceLoan *ReferenceNewFrom(ReferenceCheck *check,ReferenceLoan *sour
 extern ReferenceLoan *ReferenceNewSelected(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next,Node *place,Local *via,Node *origin,Bool payload);
 extern ReferenceLoan *ReferenceNewCall(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
 extern U0 ReferenceComputedGraph(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Node *origin,Node *expression,I64 exclusive);
+extern U0 ReferenceRequireComputedAuthority(ReferenceCheck *check,Node *place,Node *origin,Bool copying);
 extern U0 ReferenceRequirePayloadCopy(ReferenceCheck *check,Node *place,Local *via);
 extern U0 ReferenceRequirePayloadWrite(ReferenceCheck *check,Node *place,Local *via);
 extern Bool ReferencePayloadMayAccess(ReferenceLoan *source,Node *place,Local *via);
@@ -99,7 +100,7 @@ Bool ReferenceAncestor(ReferenceCheck *check,Local *holder,Local *via,Local *roo
     return found;
 }
 U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing){
-    Local *via=BorrowRoot(place);ReferenceLoan *loan;if(!via)return;
+    Local *via=BorrowRoot(place);ReferenceLoan *loan;Node *origin=ReferencePlaceSource(place);if(writing && !via && origin && origin->kind!=N_LOCAL)ReferenceRequireComputedAuthority(check,place,origin,FALSE);if(!via)return;
     if(writing && IsReference(via->type) && !Shape(via->type)->count && place->kind!=N_LOCAL_ADDRESS && place->kind!=N_ASSIGN)ErrorAt(place->token,"cannot mutate or move through a shared reference");
     if(writing)ReferenceRequirePayloadWrite(check,place,via);
     for(loan=check->loans;loan;loan=loan->next)if((writing || loan->exclusive) && ReferenceMatches(check,place,via,loan->root,writing) && !ReferenceAncestor(check,loan->holder,via,loan->root) && !(loan->holder==NULL && loan->expression==ReferencePlaceSource(place)))ErrorAt(place->token,"access conflicts with a live scoped reference");
@@ -121,6 +122,7 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
     Bool nested=NestedReference(expression->type),found=FALSE,address,bridge,through,physical,preserve;
     origin=ReferencePlaceSource(place);
     if(!via || (origin && origin->kind!=N_LOCAL)){
+        if(exclusive)ReferenceRequireComputedAuthority(check,place,origin,expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE);
         for(source=check->loans;source;source=source->next)if(origin && source->expression==origin && !source->holder){
             if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");ReferenceComputedGraph(check,source,place,origin,expression,exclusive);source->exclusive=exclusive & source->exclusive;
             if(!nested)source->indirect=0;source->expression=expression;found=TRUE;
@@ -168,7 +170,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
     before=check->loans;
     if(origin->kind==N_LOAD && TrackedBorrow(origin->type) && !BorrowRoot(origin->a))ReferenceProjection(check,origin,mode);
     else ReferenceValue(check,origin);
-    for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,0,node,check->loans,node->a,NULL,origin,FALSE);
+    if(mode)ReferenceRequireComputedAuthority(check,node->a,origin,TRUE);for(source=check->loans;source!=before;source=source->next)if(source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,0,node,check->loans,node->a,NULL,origin,FALSE);
     ReferenceAddressIndices(check,node->a);
 }
 extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);

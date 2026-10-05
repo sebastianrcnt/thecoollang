@@ -2052,6 +2052,33 @@ through ordinary evaluation or library use.
   additional rejection coverage, not full universal authorization or completion
   of any release gate. All gates remain Open.
 
+- Computed receiver acquisition, borrowed-value projection and final writes now
+  apply the universal shared-alternative rejection query before origin retagging
+  or mode coarsening. Named projection paths redirect to original holder graphs.
+  Unnamed LOAD projections query the highest still-live temporary source with
+  the complete original place cursor. This avoids treating destination read-pin
+  mode zero as an original shared capability while retaining intermediate shared
+  barriers and all root alternatives. Explicit borrow constructors are not
+  crossed. Unknown/incomplete/opaque origins keep existing scoped fallback.
+
+  Actual private production/seed hooks inject mixed alternatives into a returned
+  receiver payload; field/whole copies, writes and exclusive reborrows reject at
+  the first failing operation. Nine legacy 64/1,024-submission workloads end at
+  zero tracked graph allocations with equal peaks; computed writes/copies peak
+  at 2,976/2,320 bytes respectively, under the existing instrumentation exclusions.
+  Five ordinary source cases for read pins, field/whole copies, consecutive calls
+  and stores followed by returned receiver use pass five engines/O2 and both
+  frontends. Two shared receiver cases reject mutable field extraction/reborrow.
+
+  Full regression, production/seed bootstrap convergence, 1,630 independent
+  graph authority oracle cases, generated LLVM ASan, host/runtime ASan/UBSan and
+  external editor/distribution installation pass. Compiler IR SHA-256:
+  `1b159b7dfd109a77350ba316365351f3934497d8af65c1b66059865743845c9c`.
+  Evidence: `build/release-audit/provenance-computed-authority-{build,focused,access,regression,sanitize,distribution}.log`.
+  Full physical projection protection (including deeper authority after physical
+  terminal prefixes), opaque permissions, descriptor lifetime and arbitrary
+  nested stored borrowing remain required. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

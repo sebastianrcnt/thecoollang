@@ -12,6 +12,10 @@ struct Shared{left:&i64;right:&mut i64;}
 struct Box{inner:Pair;count:i64;}
 struct Quad{f0:&mut i64;f1:&mut i64;f2:&mut i64;f3:&mut i64;}
 fn opaque(a:&mut i64,b:&mut i64)->Pair borrows(a,b){return Pair{left:a,right:b};}
+fn receiver(p:&mut Shared)->&mut Shared borrows(p){return p;}
+fn readonly(p:&Shared)->&Shared borrows(p){return p;}
+fn install(p:&mut Shared,s:&mut i64)->&mut Shared borrows(p,s) stores(p,s){(*p).right=s;return p;}
+
 '''
 POSITIVE=PRELUDE+'''fn main(){
  var a=1;var b=2;
@@ -23,6 +27,11 @@ POSITIVE=PRELUDE+'''fn main(){
   *(*r).right=13;assert(*q==11);assert(*(*r).right==13);}
  {var box=Box{inner:Pair{left:&mut a,right:&mut b},count:0};let r=&mut box;let q=&mut *(*r).inner.left;
   *(*r).inner.right=14;(*r).count=3;assert(*q==11);assert((*r).count==3);}
+ {var pair=Shared{left:&a,right:&mut b};*(*receiver(&mut pair)).right=15;assert(*pair.right==15);}
+ {var pair=Shared{left:&a,right:&mut b};let q=(*receiver(&mut pair)).right;*q=16;assert(*q==16);}
+ {var pair=Shared{left:&a,right:&mut b};let q=*receiver(&mut pair);*q.right=17;assert(*q.left==11);}
+ {var pair=Shared{left:&a,right:&mut b};*(*receiver(receiver(&mut pair))).right=18;assert(*pair.right==18);}
+ {var c=19;var pair=Shared{left:&a,right:&mut b};*(*install(&mut pair,&mut c)).right=20;assert(*pair.right==20);assert(*pair.left==11);}
  io.println(42);
 }
 '''
@@ -59,9 +68,13 @@ with tempfile.TemporaryDirectory(prefix='cool payload access ') as directory:
   source.write_text(PRELUDE+'fn main(){'+('' if body in seeded_negative else 'var a=1;var b=2;')+body+'}')
   for front in fronts:
    r=run([*front,'check',source]);assert r.returncode==2 and 'conflicts' in r.stderr,(body,r)
+ for statement in ('let q=(*readonly(&pair)).right;', 'let q=&mut *(*readonly(&pair)).right;'):
+  source.write_text(PRELUDE+'fn main(){var a=1;var b=2;var pair=Shared{left:&a,right:&mut b};'+statement+'}')
+  for front in fronts:
+   r=run([*front,'check',source]);assert r.returncode==2 and 'shared reference' in r.stderr,(statement,r)
  repl='struct Pair{left:&mut i64;right:&mut i64;}\nvar a=1;\nvar b=2;\nvar pair=Pair{left:&mut a,right:&mut b};\nlet r=&mut pair;\nlet q=&mut *(*r).left;\n*(*r).right=7;\n*(*r).left=8;\n*q=9;\n*(*r).right\n*q\n:forget q\n:forget r\n:forget pair\na=10;\na\n:quit\n'
  for front in fronts:
   r=run([*front,'repl-quiet'],input=repl);assert r.returncode==0 and r.stdout=='7\n9\n10\n' and r.stderr.count('error:')==1,r
- report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':4,'seed':20261005,'seeded_cases':24,'negative_cases':len(NEGATIVE)+len(seeded_negative),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual typed payload access/reborrow precision; unrelated field roots, shared paths, physical root protection, array union and opaque call conservatism; persistent REPL rejection/recovery/forget. Nested storage restrictions remain.'}
+ report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':4,'computed_positive_cases':5,'computed_shared_rejections':2,'seed':20261005,'seeded_cases':24,'negative_cases':len(NEGATIVE)+len(seeded_negative),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual typed payload access/reborrow precision; unrelated field roots, shared paths, physical root protection, array union and opaque call conservatism; persistent REPL rejection/recovery/forget. Nested storage restrictions remain.'}
  if args.output:args.output.write_text(json.dumps(report,indent=2)+'\n')
-print(f'payload access: 4 disjoint-root and 24 seeded permutation cases, {len(NEGATIVE)+len(seeded_negative)} physical/alias/opaque/element rejections, five engines/O2 and persistent REPL PASS'+(' on both frontends' if args.legacy else ' on production frontend'))
+print(f'payload access: 4 disjoint-root, 5 computed receiver and 24 seeded permutation cases, {len(NEGATIVE)+len(seeded_negative)} physical/alias/opaque/element and 2 computed-shared rejections, five engines/O2 and persistent REPL PASS'+(' on both frontends' if args.legacy else ' on production frontend'))

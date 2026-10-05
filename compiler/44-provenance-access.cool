@@ -140,3 +140,44 @@ fn ReferenceRequirePayloadCopy(check: *ReferenceCheck, place: *Node, via: *Local
         if (shared) { ErrorAt(place.token, cast[*u8]("cannot copy or move an exclusive reference through a shared path")); }
     }
 }
+
+// Query temporary origins before selection/retagging destroys their identity.
+fn ReferenceRequireComputedAuthority(check: *ReferenceCheck, place: *Node, origin: *Node, copying: bool) {
+    unsafe {
+        if (origin == null) { return; }
+        let via = BorrowRoot(place);
+        if (via != null) {
+            if (copying) { ReferenceRequirePayloadCopy(check, place, via); }
+            else { ReferenceRequirePayloadWrite(check, place, via); }
+            return;
+        }
+        // Projection read pins deliberately lower their loan mode. Original
+        // temporary source loans remain live until the enclosing operation ends.
+        var boundary = origin;
+        var current = origin;
+        while (current != null && current.kind == 18) {
+            let parent = ReferencePlaceSource(current.a);
+            if (parent == null || parent == current) { break; }
+            var candidate = check.loans;
+            while (candidate != null) {
+                if (candidate.holder == null && candidate.expression == parent && candidate.root != null) { boundary = parent; }
+                candidate = candidate.next;
+            }
+            current = parent;
+        }
+        var cursor = ReferencePlaceCursor(place, null, boundary);
+        var source = check.loans;
+        var shared = false;
+        while (source != null) {
+            if (source.holder == null && source.expression == boundary && source.root != null) {
+                if ((ReferencePathAuthorityModes(source, cursor.path, cursor.complete, copying) & 2) != 0) { shared = true; }
+            }
+            source = source.next;
+        }
+        ReferenceCursorFree(cursor.path);
+        if (shared) {
+            if (copying) { ErrorAt(place.token, cast[*u8]("cannot copy or move an exclusive reference through a shared path")); }
+            ErrorAt(place.token, cast[*u8]("cannot mutate or move through a shared reference"));
+        }
+    }
+}

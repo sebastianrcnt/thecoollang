@@ -286,6 +286,8 @@ fn ReferenceAncestor(check: * ReferenceCheck, holder: * Local, via: * Local, roo
 fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
     unsafe {
         let via = BorrowRoot(place);
+        let origin = ReferencePlaceSource(place);
+        if (writing && via == null && origin != null && origin.kind != 3) { ReferenceRequireComputedAuthority(check, place, origin, false); }
         if (via == null) {
             return;
         }
@@ -366,6 +368,9 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
         let nested = NestedReference(expression.type);
         let origin = ReferencePlaceSource(place);
         if (via == null || (origin != null && origin.kind != 3)) {
+            if (exclusive != 0) {
+                ReferenceRequireComputedAuthority(check, place, origin, expression.kind == 3 || expression.kind == 18 || expression.kind == 29);
+            }
             var loan = check.loans;
             var found = false;
             while (loan != null) {
@@ -557,6 +562,7 @@ fn ReferenceProjection(check: * ReferenceCheck, node: * Node, mode: i64) {
         } else {
             ReferenceValue(check, origin);
         }
+        if (mode != 0) { ReferenceRequireComputedAuthority(check, node.a, origin, true); }
         var source = check.loans;
         while (source != before) {
             if (source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {

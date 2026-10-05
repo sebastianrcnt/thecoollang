@@ -1264,3 +1264,36 @@ capabilities and reject both field extraction and whole aggregate copies. Seven
 legacy 64/1,024-submission workloads include alternating field/aggregate copy
 rejections, recovery and final zero graph allocations. The allocation scope
 remains restricted to the documented graph-node/edge/query/copy instrumentation.
+
+
+## Computed receiver authority and destination read pins
+
+`ReferenceRequireComputedAuthority` checks temporary origin loans before computed
+acquisition retags them, and after origin evaluation but before a projection
+creates reduced-mode selected loans. Final computed writes also query before the
+ordinary access scan. A named syntactic root redirects to the original holder
+queries, preserving the full place path instead of treating a temporary read pin
+as its original capability.
+
+Assignments intentionally establish destination pins in read mode while checking
+the RHS. Such a pin's zero mode is not proof that the original receiver is shared.
+For an unnamed LOAD projection, the authority boundary follows LOAD origin syntax
+only when its parent still has live temporary source loans. The highest available
+source is queried with the complete original place cursor. This preserves all
+intermediate shared barriers and every root alternative while avoiding false
+rejection from the read pin. Explicit borrow constructors are not crossed. The
+AST parent walk assumes parser-produced acyclic nodes, like other place walks;
+provenance graph/cursor product queries remain cycle-safe and free all scratch.
+Missing/incomplete/opaque boundaries retain existing permission fallback.
+
+Actual private frontend copies inject shared/exclusive alternatives into a
+returned receiver payload. Production checks reject field extraction, whole
+aggregate copies, writes and exclusive reborrows at their first failing operation.
+Two additional legacy workloads repeat computed write/copy rejection and recovery
+64/1,024 times, with zero tracked graph allocations and equal peaks (2,976 and
+2,320 bytes). Nine workloads now share the existing instrumentation exclusions.
+Five ordinary source acceptance cases exercise destination read pins, field and
+aggregate copies, consecutive calls and store-then-return source propagation on
+five engines/O2 and both frontends. Two ordinary shared receiver cases reject
+mutable field extraction/reborrowing. Arbitrary nested borrowed storage, full
+physical place protection and opaque permission authority are still unfinished.
