@@ -686,8 +686,8 @@ parameter names come from the already checked signature. Bindings enter after
 their initializer. Blocks restore the entry count; for loops additionally restore
 the initializer scope, and each match arm restores its payload binding. This is
 needed to distinguish imported nominal constructors from ordinary projections
-when a local shadows an import alias. The scope does not certify local resolution
-or lifetimes. The cursor/recursive-depth limits bound grammar work and stack
+when a local shadows an import alias. The scope supports root-name resolution but does not certify inferred local
+types or lifetimes. The cursor/recursive-depth limits bound grammar work and stack
 usage; all state disappears on normal return or native error recovery.
 
 Expressions use the ordinary `Prec` table. Type-list lookahead is limited to
@@ -785,3 +785,15 @@ and can introduce cycles through recursive owning layouts. Extending owned
 borrowed storage requires destination lifetimes and escape analysis, not only
 relaxing this validator. The production implementations use direct control flow
 and remain semantically aligned with the compact bootstrap `Types.cool` helpers.
+
+## Template expression-root resolution
+
+`TemplateValueName` resolves bare and import-qualified roots against lexical
+scope, the template's generic parameter names and the already collected nominal
+and function tables. It preserves forward functions and import-alias shadowing,
+and checks public visibility when an alias qualifies a type/function. Intrinsic
+names must match the ordinary parser's builtin categories. It never creates
+layouts, nodes, slots, move state or loans. Member names after a local/dependent
+root remain deferred to concrete specialization; rejecting every unknown-looking
+member here would break valid generic code. Undefined root names are independent
+of substitutions and must be rejected even when the template is unused.

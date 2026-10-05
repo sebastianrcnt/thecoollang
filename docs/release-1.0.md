@@ -1356,6 +1356,23 @@ through ordinary evaluation or library use.
   `82ca7a0dd7ee1b507a61c4d41e8a8d2bd9be1aa1fb5b400893e94c60eeecf47c`.
   Remaining generated compiler sections and the complete G3 audit stay open.
 
+- Template expression-root audit (specification draft 21): unused generic
+  functions previously accepted undefined expression names. Both frontends now
+  resolve independent lexical/type/function/import roots after declaration
+  collection, reject unknown or out-of-scope locals and private imported symbols,
+  and preserve forward declarations and import shadowing. Nineteen rejection
+  cases, successful dependent-member specialization and failed concrete member
+  checks pass on both frontends and five engines/O2; REPL rejected-declaration
+  retries pass. The older failed-specialization fixture now uses a genuinely
+  type-dependent missing field, preserving artifact cleanup coverage after names
+  are rejected earlier. Full regression/bootstrap convergence, compiler ASan,
+  REPL function ASan/UBSan and installed editor/distribution checks pass.
+  Evidence: `build/release-audit/template-names-{build,final-build,focused,final-focused,repl,final-regression,sanitize,repl-sanitize,distribution}.log`.
+  Current compiler IR SHA256:
+  `c1296e446a6f165e468cb76f9e6756a8e78e2931127b3957d53fa8e5a6b6286d`.
+  Type-dependent members and full unused-body typing/arity/ownership remain
+  separate semantic work; the language conformance gate remains open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and lifetime-aware slice

@@ -428,3 +428,10 @@ slice-descriptors-sanitize-test: repl-loans-sanitize-test
 repl-lifecycle-test: build/cool-compiler build/compiler-host.o build/language-runtime.o
 	python3 tools/test_repl_lifecycle.py --output build/repl-lifecycle-audit.json
 test: repl-lifecycle-test
+
+.PHONY: template-names-test template-names-sanitize-test
+template-names-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_template_names.py
+test: template-names-test
+template-names-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_template_names.py --frontend build/repl-loans-asan/cool-compiler

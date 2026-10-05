@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 20
+# Cool language specification — 1.0 draft 21
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -183,8 +183,10 @@ indexing, conditions, loop headers and match arms are errors before any call.
 Loop control must be inside a loop. This syntax pass has a 256-level nesting
 budget and room for 4,096 simultaneously tracked parameter/local names. It tracks
 block, for and match scopes so locals may shadow file import aliases. Expression
-name resolution, operand types, return coverage, moves and loans still require
-specialization; complete semantic validation of unused templates remains work.
+root names resolve against lexical scope, generic parameters and collected
+type/function names; qualified symbols must be public. Member resolution, operand
+types, return coverage, moves and loans still require specialization; complete
+semantic validation of unused templates remains work.
 
 Generic nominal declarations also validate fields and variants before any
 instantiation: names must be unique, delimiters must follow the declaration
@@ -813,3 +815,22 @@ Borrowed storage replacement through a reference, stored descriptor references
 and borrowed slice elements remain explicitly rejected pending lifetime tracking.
 This revision extends accepted programs; it does not close the whole-language
 conformance or ownership release gates.
+
+## Draft 21: template body name preflight
+
+Unused generic function bodies now resolve expression roots that are independent
+of type arguments: lexical parameters/locals, generic parameters, nominal type
+names, collected function names and import-qualified public symbols. Undefined
+names, use before a local declaration, use after a lexical block/for/match arm,
+and private imported type/function names are errors before specialization. Forward
+function declarations remain available. Import aliases are resolved only when not
+shadowed by a local; the alias resumes after that local scope ends. Boolean/null
+literals, numeric casts and the intrinsic names follow the ordinary parser's
+lookup categories. `make template-names-test` checks these rules on both frontends
+and five engines/O2, with unused-body rejection and REPL retry coverage.
+
+Type-dependent member/operator checks still occur during concrete specialization.
+This preflight does not yet typecheck every nondependent subexpression, validate
+all call/constructor arities or establish ownership/loan validity in an unused
+body; those remain part of the complete semantic audit. It does not manufacture a
+substitute type for a generic parameter or run placeholder specializations.

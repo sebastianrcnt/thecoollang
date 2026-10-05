@@ -1,7 +1,7 @@
 class TemplateScope { U8 *names[4096]; I64 count; };
 Bool TemplateHasLocal(TemplateScope *scope,U8 *name){I64 i;for(i=scope->count-1;i>=0;i--)if(Eq(scope->names[i],name))return TRUE;return FALSE;}
 U0 TemplateLocal(TemplateScope *scope,U8 *name){if(scope->count==4096)Error("template local syntax limit exceeded");scope->names[scope->count++]=name;}
-// Allocation-free grammar checking for templates before specialization.
+// Allocation-free grammar and nondependent name preflight before specialization.
 extern U0 TemplateExpression(Function *f,TemplateScope *scope,I64 minimum,I64 nesting);
 extern U0 TemplateBlock(Function *f,TemplateScope *scope,I64 nesting,I64 loops);
 extern U0 TemplateStatement(Function *f,TemplateScope *scope,I64 nesting,I64 loops);
@@ -27,8 +27,23 @@ U0 TemplateArguments(Function *f,TemplateScope *scope,I64 nesting){
     do{if(count++==8)Error("generic argument limit exceeded");if(TemplateTypeSyntax(f,nesting+1))Error("generic argument cannot be void");}while(Take(','));
     Need(']',"expected ']' after type arguments");
 }
+U0 TemplateValueName(Function *f,TemplateScope *scope,Token *token,U8 *name,U8 *package,Bool qualified){
+    I64 i,type,id;
+    if(!qualified){
+        if(TemplateHasLocal(scope,name))return;
+        for(i=0;i<f->generic_count;i++)if(Eq(name,f->generic_names[i]))return;
+        if(TypeName(name)>=0 || Eq(name,"true") || Eq(name,"false") || Eq(name,"null") || Eq(name,"len") || Eq(name,"assert"))return;
+    }
+    type=FindType(package,name);
+    if(type>=0){if(qualified && !Shape(type)->public)ErrorAt(token,"type is private to its package");return;}
+    if(qualified && Eq(package,"std/io") && (Eq(name,"print") || Eq(name,"println")))return;
+    if(qualified && Eq(package,"std/mem") && (Eq(name,"owner_count") || Eq(name,"alloc") || Eq(name,"free") || Eq(name,"copy")))return;
+    id=FindFunIn(package,name);
+    if(id<0)ErrorAt(token,"unknown name in template body");
+    if(qualified && !functions[id].public)ErrorAt(token,"function is private to its package");
+}
 U0 TemplatePrimary(Function *f,TemplateScope *scope,I64 nesting){
-    I64 kind=At()->kind;Bool typed=FALSE;U8 *name,*package;Token *token;
+    I64 kind=At()->kind;Bool typed=FALSE,qualified=FALSE;U8 *name,*package;Token *token;
     TemplateDepth(nesting);
     if(kind=='-' || kind=='!' || kind=='~' || kind=='*' || kind=='&' || Is("move")){
         pos++;if(kind=='&' && (Is("mut") || Is("raw")))pos++;
@@ -49,8 +64,9 @@ U0 TemplatePrimary(Function *f,TemplateScope *scope,I64 nesting){
         token=At();name=Ident();package=token->package;typed=FindType(package,name)>=0;
         // Imports can qualify a nominal type; local projections remain unresolved.
         if(!typed && !TemplateHasLocal(scope,name) && At()->kind=='.' && tokens[pos+1].kind==K_ID){
-            Alias *a;for(a=aliases;a;a=a->next)if(Eq(a->file,token->file)&&Eq(a->name,name)){package=a->path;pos++;name=Ident();typed=FindType(package,name)>=0;break;}
+            Alias *a;for(a=aliases;a;a=a->next)if(Eq(a->file,token->file)&&Eq(a->name,name)){package=a->path;qualified=TRUE;pos++;name=Ident();typed=FindType(package,name)>=0;break;}
         }
+        TemplateValueName(f,scope,token,name,package,qualified);
         if(At()->kind=='[' && (typed || TemplateArgumentsAhead()))TemplateArguments(f,scope,nesting);
         if(Take('{'))TemplateList(f,scope,'}',1,nesting);
         else if(Take('('))TemplateList(f,scope,')',0,nesting);

@@ -22,7 +22,7 @@ fn TemplateLocal(scope: * TemplateScope, name: * u8) {
         scope.count = scope.count + 1;
     }
 }
-// Allocation-free grammar checking; semantic checks remain in specialization.
+// Allocation-free preflight; concrete type and lifetime checks remain in specialization.
 fn TemplateDepth(nesting: i64) {
     if (nesting > 256) {
         unsafe {
@@ -94,6 +94,30 @@ fn TemplateArguments(f: * Function, scope: * TemplateScope, nesting: i64) {
         Need(93, cast[ * u8]("expected ']' after type arguments"));
     }
 }
+// Resolve names independent of generic argument types before specialization.
+// Local member types/operators still require the concrete specialization.
+fn TemplateValueName(f: *Function, scope: *TemplateScope, token: *Token, name: *u8, package: *u8, qualified: bool) {
+    unsafe {
+        if (!qualified) {
+            if (TemplateHasLocal(scope, name)) { return; }
+            for (var i = 0; i < f.generic_count; i = i + 1) {
+                if (Eq(name, f.generic_names[i]) != i8(0)) { return; }
+            }
+            if (TypeName(name) >= 0 || Eq(name, cast[*u8]("true")) != i8(0) || Eq(name, cast[*u8]("false")) != i8(0) || Eq(name, cast[*u8]("null")) != i8(0) || Eq(name, cast[*u8]("len")) != i8(0) || Eq(name, cast[*u8]("assert")) != i8(0)) { return; }
+        }
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let type = FindType(package, name);
+        if (type >= 0) {
+            if (qualified && Shape(type).public == i8(0)) { ErrorAt(token, cast[*u8]("type is private to its package")); }
+            return;
+        }
+        if (qualified && Eq(package, cast[*u8]("std/io")) != i8(0) && (Eq(name, cast[*u8]("print")) != i8(0) || Eq(name, cast[*u8]("println")) != i8(0))) { return; }
+        if (qualified && Eq(package, cast[*u8]("std/mem")) != i8(0) && (Eq(name, cast[*u8]("owner_count")) != i8(0) || Eq(name, cast[*u8]("alloc")) != i8(0) || Eq(name, cast[*u8]("free")) != i8(0) || Eq(name, cast[*u8]("copy")) != i8(0))) { return; }
+        let id = FindFunIn(package, name);
+        if (id < 0) { ErrorAt(token, cast[*u8]("unknown name in template body")); }
+        if (qualified && ctx.v_functions[id].public == i8(0)) { ErrorAt(token, cast[*u8]("function is private to its package")); }
+    }
+}
 fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
     unsafe {
         let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
@@ -147,11 +171,13 @@ fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
             var name = Ident();
             var package = token.package;
             var typed = FindType(package, name) >= 0;
+            var qualified = false;
             if (!typed && !TemplateHasLocal(scope, name) && At().kind == 46 && ctx.v_tokens[ctx.v_pos + 1].kind == 256) {
                 var a = ctx.v_aliases;
                 while (a != null) {
                     if (Eq(a.file, token.file) != i8(0) && Eq(a.name, name) != i8(0)) {
                         package = a.path;
+                        qualified = true;
                         ctx.v_pos = ctx.v_pos + 1;
                         name = Ident();
                         typed = FindType(package, name) >= 0;
@@ -160,6 +186,7 @@ fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
                     a = a.next;
                 }
             }
+            TemplateValueName(f, scope, token, name, package, qualified);
             if (At().kind == 91 && (typed || TemplateArgumentsAhead())) {
                 TemplateArguments(f, scope, nesting);
             }

@@ -69,11 +69,11 @@ for front in fronts:
     check(front, 'rejected definitions preserve old syntax, bytecode and JIT', source, '7\n'*5,
           ['unknown variable', 'function storage limit exceeded', 'signature change'] * 80)
 
-    source = 'fn broken[T](value:T)->i64{var owned=new[i64](7);return missing;}\nvar survivor=9;\n'
-    source += 'broken[i64](1)\n' * 160
+    source = 'struct Input{value:i64;}\nfn broken[T](value:T)->i64{var owned=new[i64](7);return value.missing;}\nvar survivor=9;\n'
+    source += 'broken[Input](Input{value:1})\n' * 160
     source += 'survivor\nfn fresh()->i64{return 42;}\nfresh()\n:stats'
     check(front, 'rejected specialization disposes its artifacts', source,
-          '9\n42\nfunctions=2 compiled=1 bytecode_compilations=1 jit_compilations=0\n', ['unknown variable'] * 160)
+          '9\n42\nfunctions=2 compiled=1 bytecode_compilations=1 jit_compilations=0\n', ['unknown field'] * 160)
 
     prefix = 'import "std/mem";\nvar total=0;\nfn bomb(n:i64)->i64{var owner=new[i64](n);assert(n<4);return *owner;}\n'
     failing = '{total=bomb(1);total=bomb(2);total=bomb(3);total=bomb(4);}\n'
