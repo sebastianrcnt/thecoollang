@@ -369,3 +369,10 @@ package-rules-test: build/cool-compiler build/language.BIN build/language-runtim
 test: package-rules-test
 package-rules-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_package_rules.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: layout-contract-test layout-contract-sanitize-test
+layout-contract-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_layout_contract.py
+test: layout-contract-test
+layout-contract-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_layout_contract.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime

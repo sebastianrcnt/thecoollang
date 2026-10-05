@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 10
+# Cool language specification — 1.0 draft 11
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -527,8 +527,80 @@ sanitizer target additionally checks the compiler with ASan and generated LLVM
 with ASan, linking the runtime with UBSan and float-cast-overflow checks enabled.
 This section does not yet specify the full floating arithmetic/rounding contract.
 
+## Memory layout on the supported target
+
+The first supported target is little-endian 64-bit Apple Silicon macOS. Sizes
+and alignments below are in bytes. These are language value layouts on that
+target, not the compiler's internal register/stack-slot representation. A value
+occupying an eight-byte interpreter slot does not make an `i8` field eight bytes.
+
+| Type | Size | Alignment |
+| --- | --- | --- |
+| bool, i8, u8 | 1 | 1 |
+| i16, u16 | 2 | 2 |
+| i32, u32, f32 | 4 | 4 |
+| i64, u64, isize, usize, f64 | 8 | 8 |
+| Raw pointer, reference, owner, literal string handle | 8 | 8 |
+| Slice descriptor | 16 | 8 |
+| Empty struct | 0 | 1 |
+
+`sizeof(void)` is zero; void is not a storable element type. Bool values use zero
+for false and one for true. Floating storage uses binary32/binary64 respectively;
+internal widening during evaluation does not change an f32 field's storage size.
+A literal string handle points to its immutable text; it is not an owned UTF-8
+container or a C ABI string parameter. A reference and an owner each carry one
+address, with lifetime/ownership obligations checked separately. Their size is
+not a guarantee that arbitrary integers or null constitute valid safe references.
+
+A struct preserves declaration order. Each field begins at the smallest offset
+at least as large as the previous field's end and divisible by that field's
+alignment. The struct alignment is the maximum of one and its field alignments.
+Its size rounds the last field's end up to that alignment. Packing, explicit
+alignment annotations, bitfields and field reordering are not supplied. Padding
+bytes are not a stable value/serialization contract.
+
+An array has its element's alignment, size `length * sizeof(element)`, and
+contiguous element stride `sizeof(element)`. Nesting therefore follows row-major
+storage. A zero-length array has size zero while retaining element alignment.
+Zero-sized fields/elements may share an address; distinct object identity must
+not be inferred merely from their numerical addresses. An instantiated generic
+nominal type is laid out using its concrete substituted field types.
+
+An enum begins with an eight-byte signed tag at offset zero. Tags are zero-based
+variant declaration indices. Every payload begins at offset eight; the payload
+area is large enough for the largest variant. The enum alignment is eight and
+its total size is `round_up(8 + maximum_payload_size, 8)`. A unit-only enum still
+occupies eight bytes. Only the active variant's payload is valid to inspect as
+that type. Unsafe code must not manufacture invalid tags or interpret an inactive
+payload as a valid owner/reference/value.
+
+A slice consists of its data address followed by an eight-byte length. Ownership
+and exclusive/shared access are not encoded as extra descriptor fields. Bounds
+and loan rules still apply. Layout does not give a slice ownership of its data.
+The owner allocation strategy and allocator metadata are not part of the value
+layout contract.
+
+By-value layout cycles are rejected. An indirection can break a size dependency,
+but this does not lift separate borrowed-storage or ownership restrictions.
+The current aggregate-size limit is 512 KiB and array-length limit is 65,536;
+these checks apply before allocating source-language aggregate storage.
+The C ABI currently accepts scalars and raw pointers, not by-value Cool
+aggregates. Layout compatibility with a particular C struct is not permission
+to pass that aggregate by value through an unsupported foreign signature.
+
+`make layout-contract-test` compares 24 generated structures and alignment
+wrappers to Python ctypes' native C ABI layout, including nested and zero-sized
+members. It also checks primitive/sequence sizes, enum tag/payload positions,
+little-endian bytes, size limits and by-value cycles: 191 expected values and
+four rejection cases across both frontends, five engines and optimized binaries.
+The sanitizer target adds the ASan compiler and ASan-instrumented emitted LLVM
+linked with the ASan/UBSan runtime. Dedicated ownership/reference/ABI tests remain
+necessary for validity and lifetime properties that a size/offset test cannot prove.
+
 ## Draft revisions
 
+- Draft 11: specify supported-target sizes, alignments, structure/array/enum
+  layout and representation obligations, with an independent native ABI oracle.
 - Draft 10: specify source-file/package assembly, file-local import aliases and
   test selection; exclude dependency test files when testing a root package.
 - Draft 9: complete the primary-expression productions and record call,

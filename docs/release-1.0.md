@@ -1033,6 +1033,21 @@ through ordinary evaluation or library use.
   its language contract. Module-format/version/checksum policy, complete encoding
   and semantic conformance remain open release requirements.
 
+- Supported-target layout contract: specification draft 11 defines scalar and
+  handle sizes/alignments, field order/padding, array stride and zero-sized cases,
+  enum tags/payloads, slice descriptors and representation validity obligations.
+  A ctypes oracle independently models 24 nested/random structures and alignment
+  wrappers; explicit byte probes verify enum declaration tags, payload offset and
+  little-endian storage. The suite compares 191 values and rejects four oversized/
+  recursive cases on both frontends and the instrumented compiler, with five
+  engines and optimized binaries. Generated LLVM and the C runtime are also
+  checked with ASan/UBSan. Evidence:
+  `build/release-audit/layout-contract-{focused,sanitize}.log`.
+  Compiler/runtime sources are unchanged. The new suite is wired into ordinary
+  tests and sanitizer CI; remote CI has not been observed. Layout tests do not
+  discharge ownership/aliasing validity, full cross-language ABI, encoding or
+  whole-spec conformance gates, which remain under audit.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
