@@ -15,7 +15,7 @@ packages are bundled sources and need no module download.
 | `std/text` | owning UTF-8 `Text`, strict validation, byte/scalar lengths, scalar access, append/clone/clear, byte conversion, ordering/prefix/suffix |
 | `std/math` | numeric `min`, `max`, `clamp`; `add_i64`, `divide_i64` returning arithmetic errors |
 | `std/vector` | move-only `Vector[T]`, `create`, `len`, `append`, `pop`, `at`, `at_mut`, `clear`, `iter`/`iter_mut`, `Iterator`/`IteratorMut.remaining`/`next`; raw `cursor`/`next` |
-| `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys` |
+| `std/map` | ordered text-key `Map[V]`, `create`, `len`, `contains`, `insert`, `remove`, `at`, `at_mut`, `clear`, independent sorted `keys`, borrowed in-order `iter`/`Iterator.remaining`/`next`/`key` |
 | `std/json` | owned JSON trees, strict parsing, deterministic encoding, exact number text, borrowed access and mutation |
 | `std/fs` | binary `read`/`write` with `Result`, supporting embedded NUL bytes; errors are Darwin errno values |
 | `std/path` | lexical POSIX path `clean`, `join`, `name`, `parent`, `extension`, `is_absolute` on owned text |
@@ -170,8 +170,12 @@ Missing keys trap; call `contains` when absence is expected. A live value loan
 prevents structural changes or incompatible access to the map. Like vectors,
 map values cannot yet contain borrowed references. `keys` returns an independent
 owned `Vector[Text]` in sorted order; it remains valid after changing or dropping
-the map and takes O(n + total key bytes) time and memory. It is a copied snapshot,
-not a replacement for the still-planned tracked iterator API.
+the map and takes O(n + total key bytes) time and memory. `iter`/`Map.iter`
+instead returns a borrowed in-order `Iterator[V]`: `remaining` is O(1), `next`
+yields `Option[&V]` in key order and `Iterator.key` returns the current key, both
+rooted in the iterator. A live iterator blocks structural changes to the map, and
+a retained value result blocks further `next` calls; scope the iterator before
+mutating.
 
 `make map-test` checks public APIs and two deterministic Python-dictionary
 models. A test-only companion module independently checks all ordering bounds,
@@ -179,8 +183,10 @@ AVL balance, stored heights and node counts after every operation. Tests cover
 all four rotation patterns, two-child deletion, sorted insertion, random
 replacement/removal/clear/moves, exact live-owner counts, narrow integers,
 floats, owned values and loan conflicts on five engines plus O2.
-`make map-sanitize-test` also instruments Cool memory accesses with ASan and the
-C runtime with ASan/UBSan. Generated projects remain in `build/map-tests/` for
+`make map-iteration-test` checks 48-key sorted values and keys against a Python
+model, `remaining()` countdown, empty-map `None` and the mutation/retention
+rejections on five engines plus O2. `make map-sanitize-test` also instruments
+Cool memory accesses with ASan and the C runtime with ASan/UBSan. Generated projects remain in `build/map-tests/` for
 reproduction; additional seeds/steps can be supplied to `tools/test_map.py`.
 
 ## JSON
