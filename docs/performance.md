@@ -180,3 +180,92 @@ frontend scan formats and an isolated runtime rebuild that invalidates native
 artifacts. G8's remaining release assessment must consider these boundaries and
 the broader representative-workload scope; these numbers alone do not certify
 the whole 1.0 release.
+
+## Default development CLI with real dependency checks
+
+The separate `--default-cli` mode measures normal development CLI invocation
+without `COOL_FRONTEND`. It captures an independent source checkout containing
+actual Makefile/toolchain dependencies, standard libraries and already built
+frontend/runtime artifacts. Source/artifact SHA256 and mtimes must match the
+original checkout across capture. `make -q` must confirm that the copied frontend
+and runtime are up to date before any sample is taken. This prevents an accidental
+compiler rebuild from being reported as normal invocation overhead.
+
+Timed default CLI calls use the actual driver lock and `make` dependency checks.
+The original checkout may change after capture without affecting this fixture;
+artifact hashes are checked after every sample. Source inventory, captured
+revision, artifact identities and raw values are recorded in the JSON report.
+Snapshot preparation, correctness checks and artifact hashing are outside timers.
+The snapshot preserves dependency timestamps rather than setting artificial
+future timestamps or substituting a trivial Makefile.
+
+The mode measures cold/warm metadata and one-file-edit checking/default execution,
+cold/cached/one-file-edit optimized native builds, and cached LLVM execution.
+Native cold samples clear only the artifact cache; metadata remains warm. Edits
+append unique comments, so they change content identities while preserving the
+expected program output. They still perform a full frontend compile, including
+unused functions in the expanded workload. Native build samples include output
+copying; their execution oracle is outside the timer. Run samples include program
+execution and JSON file output. All 40-label outputs must match Python Counter.
+
+Alternating paired warm checks compare the default invocation and an explicit
+frontend invocation in the same snapshot, with identical source/cache contents.
+Their observed difference includes dependency checks and the driver's override
+branch; it is not a compiler speedup or an isolated `make` microbenchmark.
+Separate real `make -s` frontend/runtime up-to-date samples give additional context.
+The real Tally application and its synthetic 512-function size extension remain
+separate workloads; the extension is not evidence of broader application coverage.
+
+```sh
+python3 tools/bench_project.py --default-cli --repeats 7 --files 512 \
+  --output build/default-cli-performance.json
+```
+
+The host must have completed its build beforehand. If snapshot files change
+during capture, or real dependencies are stale, the harness fails and requires a
+fresh capture after the build completes. Default invocation costs during an
+actual compiler-source edit/rebuild are intentionally outside these observations.
+
+Seven repetitions of this mode on Apple Silicon macOS are published in
+[default-cli-arm64.json](benchmarks/default-cli-arm64.json). The captured frontend
+SHA256 is `0f72540478d9af1a93593ad5a003cd4f7a0f1d2800a6746886f9f6a9d36026e4`;
+the report records 371 source/artifact content and timestamp entries. This is a
+later compiler revision than the earlier isolated frontend measurements above.
+Compare the paired checks within this report when assessing dependency-check
+cost, rather than attributing differences between revisions to `make` alone.
+
+| Default CLI workload (median ms) | Tally | Tally + 512 functions |
+| --- | ---: | ---: |
+| Check, cold metadata | 136.373 | 249.496 |
+| Check, warm metadata | 106.381 | 147.630 |
+| Check, one-file edit | 109.233 | 147.487 |
+| Default adaptive run, cold metadata | 162.670 | 277.834 |
+| Default adaptive run, warm metadata | 133.488 | 172.254 |
+| Default adaptive run, one-file edit | 137.642 | 175.656 |
+| O2 build, cold native artifact | 414.439 | 511.995 |
+| O2 build, cached native artifact | 105.067 | 121.149 |
+| O2 build, one-file edit | 389.601 | 511.109 |
+| LLVM run, cached native artifact | 104.807 | 124.468 |
+
+The 14-source real app and 526-source expanded corpus each use 11 packages. The
+LLVM run uses the driver's default O0 artifact, primed separately outside the
+timer; the O2 build uses its distinct optimization-keyed artifact. A native cache
+hit still performs source/metadata discovery, runtime/frontend dependency checks,
+artifact hashing and a `clang --version` process. A comment-only edit invalidates
+the native artifact even though output semantics remain the same.
+
+Within-snapshot alternating pairs observe a median default-minus-explicit warm
+check difference of 14.575 ms for Tally and 13.296 ms for the expanded corpus.
+Direct frontend up-to-date `make` observations have median 11.414 ms; runtime
+up-to-date checks 6.936 ms; `clang --version` processes 7.503 ms. These observations
+identify concrete remaining orchestration costs. They are not additive predicted
+speedups: paired invocation differences include driver locking and branch costs,
+and microbenchmark timings occur in different call contexts.
+
+A possible next improvement is combining the native command's frontend/runtime
+up-to-date checks into one locked `make` invocation, while retaining all actual
+content/dependency invalidation rules. Avoiding repeated toolchain-version
+queries would require a correctly invalidated Clang identity cache. Neither
+change was implemented or benchmarked here; the measured numbers are the current
+behavior. Cold native optimization/linking and full-graph checking still remain
+outside true incremental compilation.

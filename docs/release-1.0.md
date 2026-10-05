@@ -1238,6 +1238,21 @@ through ordinary evaluation or library use.
   IR SHA256: `23bfb606877c2cdcc29784bbde7b725184a0c11705e2d67ec2855da3d8d7490d`.
   Remaining whole-spec, template semantics and release-wide gates stay open.
 
+- Default development CLI performance: the benchmark now captures a separate
+  source/artifact checkout, preserves dependency mtimes, verifies make -q
+  readiness and keeps actual driver lock/make checks inside default invocation
+  timers. Seven repetitions measure Tally and its synthetic 512-function
+  extension separately; source/artifact inventory and all raw samples are in
+  `docs/benchmarks/default-cli-arm64.json`. Warm default checking is 106.381 ms
+  and 147.630 ms respectively. Alternating same-snapshot default/explicit pairs
+  observe 14.575/13.296 ms additional default-path cost; this is not a predicted
+  speedup. Check/run/cold-cached-edited O2 and cached LLVM costs are separately
+  reported in `performance.md`, and every run/native output matches the JSON
+  Counter oracle. The snapshot pins the pre-NaN-fix frontend by digest; later
+  source changes cannot affect these observations. Source rebuild, public
+  dependency transport and a wider real application corpus remain outside this
+  measurement; G8 stays open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

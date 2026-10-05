@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Measure real project frontend/CLI costs and acknowledged REPL edit latency.
-Never builds the compiler. All timings include the indicated process/pipe costs.
+The default mode never builds the compiler; --default-cli uses a copied, verified
+up-to-date development checkout with actual make dependency checks.
 """
 import argparse
 import hashlib
@@ -18,9 +19,148 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def benchmark_default_cli(args):
+    """Measure actual default driver calls in an independent source checkout."""
+    from collections import Counter
+    folders = ('compiler', 'language', 'tools', 'stdlib', 'coolc', 'examples/tally')
+    artifacts = ('coolc', 'language.BIN', 'compiler.sources', 'compiler-stage1.ll',
+                 'compiler-stage1', 'compiler-stage2.ll', 'compiler-host.o',
+                 'language-runtime.o', 'cool-compiler')
+    def inventory(root):
+        paths = [root/'Makefile', root/'VERSION']
+        for folder in folders:
+            paths.extend(path for path in (root/folder).rglob('*')
+                         if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc')
+        paths.extend(root/'build'/name for name in artifacts)
+        return {str(path.relative_to(root)):dict(sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                                                mtime_ns=path.stat().st_mtime_ns)
+                for path in sorted(paths)}
+    revision = subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    initial = inventory(ROOT)
+    results = {}
+    with tempfile.TemporaryDirectory(prefix='cool-default-cli-bench-') as directory:
+        tmp = Path(directory); snapshot = tmp/'checkout'; snapshot.mkdir()
+        for folder in folders:
+            shutil.copytree(ROOT/folder, snapshot/folder, ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+        for name in ('Makefile','VERSION'):
+            shutil.copy2(ROOT/name,snapshot/name)
+        (snapshot/'build').mkdir()
+        for name in artifacts:
+            shutil.copy2(ROOT/'build'/name,snapshot/'build'/name)
+        if inventory(ROOT) != initial or inventory(snapshot) != initial:
+            raise RuntimeError('Source/artifact snapshot changed during capture; discard and rerun')
+        env = dict(os.environ, COOL_CACHE=str(tmp/'cache'))
+        env.pop('COOL_FRONTEND',None)
+        for key in ('MAKEFLAGS','MFLAGS','MAKELEVEL'):
+            env.pop(key,None)
+        # This checks real prerequisites; failure never causes a timed rebuild.
+        ready = subprocess.run(['make','-q','-C',snapshot,'build/cool-compiler','build/language-runtime.o'],
+                               env=env,text=True,capture_output=True,timeout=60)
+        if ready.returncode:
+            raise RuntimeError('Captured checkout is not up to date; build beforehand: '+ready.stderr)
+        print('Independent source/artifact snapshot captured; real make dependencies are up to date.', flush=True)
+        frontend = snapshot/'build/cool-compiler'
+        selected = {name:initial['build/'+name]['sha256'] for name in artifacts}
+        def unchanged():
+            for name,digest in selected.items():
+                if hashlib.sha256((snapshot/'build'/name).read_bytes()).hexdigest()!=digest:
+                    raise RuntimeError('Build artifact changed in timed snapshot: '+name)
+        def measure(name, command, expected='', setup=None, oracle=None, selected_env=None):
+            samples=[]
+            for index in range(args.repeats):
+                if setup:setup(index)
+                started=time.perf_counter_ns()
+                p=subprocess.run(command,cwd=tmp,env=selected_env or env,text=True,capture_output=True,timeout=180)
+                samples.append((time.perf_counter_ns()-started)/1e6)
+                if (p.returncode,p.stdout,p.stderr)!=(0,expected,''):
+                    raise RuntimeError((command,p.returncode,p.stdout,p.stderr))
+                if oracle:oracle()
+                unchanged()
+            results[name]=dict(median_ms=statistics.median(samples),min_ms=min(samples),
+                               max_ms=max(samples),samples_ms=samples)
+        measure('make_frontend_up_to_date', ['make','-s','-C',snapshot,'build/cool-compiler'])
+        measure('make_runtime_up_to_date', ['make','-s','-C',snapshot,'build/language-runtime.o'])
+        clang_version=subprocess.check_output(['clang','--version'],text=True,env=env)
+        measure('clang_version_process', ['clang','--version'],expected=clang_version)
+        workloads={};paired={}
+        for label,extra in [('tally',0),('tally_expanded',args.files)]:
+            project=tmp/label;shutil.copytree(snapshot/'examples/tally',project)
+            for index in range(extra):
+                (project/f'part-{index:04}.cool').write_text(
+                    f'package main;fn bench_{index}(x:i64)->i64{{var value=x;'
+                    'for(var j=0;j<20;j=j+1){value=value+j;}return value;}\n')
+            cli=snapshot/'tools/cool';edited=project/'main.cool';original=edited.read_text()
+            command=[str(cli),'check',str(project),'--offline','--frozen']
+            clear_scan=lambda _:shutil.rmtree(tmp/'cache/scan',ignore_errors=True)
+            measure(label+'_default_check_cold_metadata',command,setup=clear_scan)
+            measure(label+'_default_check_warm_metadata',command)
+            measure(label+'_default_check_one_file_edit',command,
+                    setup=lambda i:edited.write_text(original+f'\n// default check edit {i}\n'))
+            # Alternate order within pairs to reduce ordering bias. Both calls
+            # see exactly the same source/cache contents and frontend revision.
+            explicit={**env,'COOL_FRONTEND':str(frontend)};pairs=[]
+            for repetition in range(args.repeats):
+                row={}
+                for mode in (('default','explicit') if repetition%2==0 else ('explicit','default')):
+                    started=time.perf_counter_ns()
+                    p=subprocess.run(command,cwd=tmp,env=env if mode=='default' else explicit,
+                                     text=True,capture_output=True,timeout=180)
+                    row[mode+'_ms']=(time.perf_counter_ns()-started)/1e6
+                    if (p.returncode,p.stdout,p.stderr)!=(0,'',''):raise AssertionError(p)
+                    unchanged()
+                row['default_minus_explicit_ms']=row['default_ms']-row['explicit_ms'];pairs.append(row)
+            paired[label]=dict(samples=pairs,median_default_minus_explicit_ms=statistics.median(
+                               row['default_minus_explicit_ms'] for row in pairs))
+            output=tmp/(label+'-model.json');labels=['apple','한글','','🙂','apple']*8
+            def oracle():
+                if json.loads(output.read_text())!=dict(Counter(labels)):
+                    raise AssertionError('CLI result differs from Python Counter')
+            run=[str(cli),'run',str(project),'--offline','--frozen','--',str(output),*labels]
+            measure(label+'_default_run_cold_metadata',run,'40\n',setup=clear_scan,oracle=oracle)
+            measure(label+'_default_run_warm_metadata',run,'40\n',oracle=oracle)
+            measure(label+'_default_run_one_file_edit',run,'40\n',oracle=oracle,
+                    setup=lambda i:edited.write_text(original+f'\n// default run edit {i}\n'))
+            binary=tmp/(label+'-native')
+            build=[str(cli),'build','--release',str(project),'--offline','--frozen','-o',str(binary)]
+            def native_oracle():
+                p=subprocess.run([str(binary),str(output),*labels],text=True,capture_output=True,timeout=60)
+                if (p.returncode,p.stdout,p.stderr)!=(0,'40\n',''):raise AssertionError(p)
+                oracle()
+            measure(label+'_default_O2_build_cold_artifact',build,oracle=native_oracle,
+                    setup=lambda _:shutil.rmtree(tmp/'cache/build',ignore_errors=True))
+            measure(label+'_default_O2_build_cached_artifact',build,oracle=native_oracle)
+            measure(label+'_default_O2_build_one_file_edit',build,oracle=native_oracle,
+                    setup=lambda i:edited.write_text(original+f'\n// default build edit {i}\n'))
+            llvm=[str(cli),'run','--backend','llvm',str(project),'--offline','--frozen','--',str(output),*labels]
+            prime=subprocess.run(llvm,cwd=tmp,env=env,text=True,capture_output=True,timeout=180)
+            if (prime.returncode,prime.stdout,prime.stderr)!=(0,'40\n',''):raise AssertionError(prime)
+            oracle();unchanged()
+            measure(label+'_default_llvm_run_cached_artifact',llvm,'40\n',oracle=oracle)
+            saved=dict(os.environ)
+            try:
+                os.environ.update(explicit)
+                driver=runpy.run_path(str(cli),run_name='benchmark_snapshot_driver')
+                work=tmp/(label+'-manifest');work.mkdir()
+                _,files=driver['bundle'](project,work,offline=True,frozen=True)
+            finally:
+                os.environ.clear();os.environ.update(saved)
+            workloads[label]=dict(source_files=len(files),packages=len({identity for identity,_ in files}),
+                                  source_bytes=sum(path.stat().st_size for _,path in files),extra_functions=extra)
+        unchanged()
+        report=dict(platform=platform.platform(),machine=platform.machine(),python=platform.python_version(),
+                    mode='default_development_cli',source_revision=revision,repeats=args.repeats,workloads=workloads,results=results,
+                    paired_warm_checks=paired,frontend_sha256=selected['cool-compiler'],
+                    runtime_sha256=selected['language-runtime.o'],clang_version=clang_version,source_snapshot=initial,
+                    methodology='Real copied checkout preserves source/artifact mtimes and verifies original/copy SHA256+mtime inventories during capture. make -q confirms frontend/runtime up to date before timing; timed default CLI unsets COOL_FRONTEND and includes actual locked make dependency checks. Artifact digests checked after every sample. Original checkout changes after snapshot cannot affect samples. Cold metadata clears only scan cache; cold O2 builds clear only native artifact cache, retaining warm metadata. Every edit is a unique comment and still a full frontend check/compile; edited O2 builds miss content-keyed artifacts. Program/standalone JSON output matches Python Counter outside timing. Native build timers include output copy but exclude oracle execution. Run timers include execution/JSON writing. Paired warm checks alternate order between default and explicit frontend; differences include the override branch and actual make checks, not a pure isolated make timer. No compiler/runtime rebuild is permitted or included.')
+        args.output.parent.mkdir(parents=True,exist_ok=True)
+        args.output.write_text(json.dumps(report,indent=2)+'\n')
+        for name,row in results.items():print(f'{name}: {row["median_ms"]:.3f} ms')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--frontend', type=Path, default=ROOT/'build/cool-compiler')
+    parser.add_argument('--default-cli', action='store_true', help='Measure default development CLI in an up-to-date independent source snapshot')
+    parser.add_argument('--frontend', type=Path, default=ROOT/'build/cool-compiler', help='Pinned frontend for the original separated mode')
     parser.add_argument('--repeats', type=int, default=7)
     parser.add_argument('--files', type=int, default=512)
     parser.add_argument('--replacements', type=int, default=64)
@@ -28,6 +168,11 @@ def main():
     args = parser.parse_args()
     if min(args.repeats, args.files, args.replacements) < 1:
         parser.error('counts must be positive')
+    if args.default_cli:
+        if args.frontend.resolve() != (ROOT/'build/cool-compiler').resolve():
+            parser.error('--frontend cannot override the default CLI snapshot frontend')
+        benchmark_default_cli(args)
+        return
     frontend = args.frontend.resolve()
     digest = hashlib.sha256(frontend.read_bytes()).hexdigest()
     results = {}
