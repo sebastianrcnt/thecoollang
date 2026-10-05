@@ -1,3 +1,4 @@
+extern U0 ReferenceWriteCapability(Node *place);
 // Scoped lexical loans. Keep semantics aligned with compiler/16-references.cool.
 class ReferenceLoan { Local *root, *holder, *parent; I64 exclusive, indirect; Node *expression; ReferenceLoan *next; };
 class ReferenceCheck { ReferenceLoan *loans; Function *function; };
@@ -40,7 +41,7 @@ Bool ReferenceStorage(I64 type){
     AggregateType *shape;Field *field;
     if(IsReference(type))return !Borrowed(Shape(type)->element);
     if(!Aggregate(type))return TRUE;shape=Shape(type);
-    if(shape->kind==A_SLICE || shape->kind==A_OWNER)return FALSE;
+    if(shape->kind==A_SLICE)return !Borrowed(shape->element);if(shape->kind==A_OWNER)return FALSE;
     if(shape->kind==A_ARRAY)return ReferenceStorage(shape->element);
     for(field=shape->fields;field;field=field->next)if(!ReferenceStorage(field->type))return FALSE;
     return TRUE;
@@ -55,7 +56,7 @@ I64 ReferenceMode(I64 type){
 }
 U0 ValidateReferenceStorage(I64 type,Token *token){
     if(IsReference(type)){if(Borrowed(Shape(type)->element) && !ReferenceStorage(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
-    else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references currently require non-owning, slice-free, single-layer aggregate storage");
+    else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references currently require non-owning, single-layer aggregate storage");
 }
 U0 ReferenceMatchBinding(Node *binding){
     Local *local;if(!TrackedBorrow(binding->type))return;
@@ -133,11 +134,13 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
 U0 ReferenceRelease(ReferenceCheck *check,ReferenceLoan *stop){ReferenceLoan *old;while(check->loans!=stop){old=check->loans;check->loans=old->next;Free(old);}}
 extern U0 ReferenceValue(ReferenceCheck *check,Node *node);
 extern U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode);
+extern U0 ReferenceSliceValue(ReferenceCheck *check,Node *node,Bool writing);
+extern Bool ReferenceLength(ReferenceCheck *check,Node *node);
 U0 ReferenceAddressMode(ReferenceCheck *check,Node *node,Bool writing){
     Node *origin;I64 mode;ReferenceLoan *pin;Bool retained;
     if(!node)return;if(node->kind==N_LOCAL_ADDRESS)return;
     if(node->kind==N_FIELD_ADDRESS){ReferenceAddressMode(check,node->a,writing);return;}
-    if(node->kind==N_INDEX_ADDRESS){if(node->op==A_SLICE && node->a->kind==N_LOCAL)ReferenceAccess(check,node->a,FALSE);else ReferenceAddressMode(check,node->a,writing);ReferenceValue(check,node->b);return;}
+    if(node->kind==N_INDEX_ADDRESS){if(node->op==A_SLICE)ReferenceSliceValue(check,node->a,writing);else ReferenceAddressMode(check,node->a,writing);ReferenceValue(check,node->b);return;}
     if(node->kind==N_OWN_ADDRESS){if(writing && IsReference(node->a->type) && !Shape(node->a->type)->count)ErrorAt(node->token,"cannot mutate or move through a shared reference");if(IsReference(node->a->type) && node->a->kind==N_LOCAL)ReferenceAccess(check,node->a,FALSE);else{if(IsReference(node->a->type) && node->a->kind==N_LOAD){mode=Shape(node->a->type)->count;if(!writing)mode=0;if(BorrowRoot(node->a->a)){ReferenceAddressMode(check,node->a->a,FALSE);ReferenceAcquire(check,node->a->a,mode,node->a->token,node->a);}else ReferenceProjection(check,node->a,mode);}else{if(AggregateKind(node->a->type)==A_OWNER && node->a->kind==N_LOAD){ReferenceAddressMode(check,node->a->a,writing);ReferenceAccess(check,node->a->a,FALSE);}else ReferenceValue(check,node->a);}if(AggregateKind(node->a->type)==A_OWNER){origin=ReferencePlaceSource(node);if(origin){retained=FALSE;for(pin=check->loans;pin;pin=pin->next)if(!pin->holder && pin->expression==origin)retained=TRUE;if(!retained)ReferenceAcquire(check,origin,0,node->token,origin);}}}return;}
     ReferenceValue(check,node);
 }
@@ -158,7 +161,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
 U0 ReferenceValue(ReferenceCheck *check,Node *node){
     ReferenceLoan *saved,*loan,*before,*results,*source;Node *arg,*item;I64 contract,index,mode,indirect;Bool found;
     if(!node)return;
-    if(node->kind==N_LENGTH && AggregateKind(node->a->type)==A_SLICE && node->a->kind==N_LOCAL)return;
+    if(node->kind==N_LENGTH && ReferenceLength(check,node->a))return;
     if(node->kind==N_SLICE){if(node->op==A_ARRAY){ReferenceAddressMode(check,node->a,TRUE);ReferenceAcquire(check,node->a,1,node->token,node);}else{before=check->loans;ReferenceValue(check,node->a);for(loan=check->loans;loan!=before;loan=loan->next)if(loan->expression==node->a)loan->expression=node;}ReferenceValue(check,node->b);ReferenceValue(check,node->c);return;}
     if(TrackedBorrow(node->type) && (node->kind==N_LOCAL || node->kind==N_LOAD)){
         mode=ReferenceMode(node->type);
@@ -208,7 +211,7 @@ U0 ReferenceStatement(ReferenceCheck *check,Node *node){
     if(node->kind==N_BLOCK){for(statement=node->a;statement;statement=statement->next)ReferenceStatement(check,statement);ReferenceRelease(check,saved);return;}
     if(node->kind==N_BIND && TrackedBorrow(node->type)){ReferenceValue(check,node->a);link=&check->loans;while(*link!=saved){loan=*link;if(loan->expression==node->a){loan->holder=node->local_ref;link=&loan->next;}else{*link=loan->next;Free(loan);}}loan=ReferenceNew(NULL,NULL,0,0,node,check->loans);loan->holder=node->local_ref;check->loans=loan;return;}
     if(node->kind==N_ASSIGN){if(ContainsReference(node->type))ErrorAt(node->token,"scoped reference bindings cannot be reassigned");ReferenceValue(check,node->a);ReferenceAccess(check,node,TRUE);if(TrackedBorrow(node->type))ReferenceAssign(check,node->local_ref,node->a,saved);}
-    else if(node->kind==N_STORE){if(ContainsReference(node->type))ErrorAt(node->token,"stored reference fields cannot be reassigned");ReferenceAddress(check,node->a);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type))ReferenceAssign(check,BorrowRoot(node->a),node->b,saved);}
+    else if(node->kind==N_STORE){if(ContainsReference(node->type))ErrorAt(node->token,"stored reference fields cannot be reassigned");ReferenceWriteCapability(node->a);ReferenceAddressMode(check,node->a,FALSE);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type)){if(BorrowRoot(node->a) && IsReference(BorrowRoot(node->a)->type))ErrorAt(node->token,"borrowed storage cannot be replaced through a reference");ReferenceAssign(check,BorrowRoot(node->a),node->b,saved);}}
     else if(node->kind==N_IF || node->kind==N_WHILE || node->kind==N_FOR){ReferenceValue(check,node->a);ReferenceRelease(check,saved);ReferenceStatement(check,node->b);ReferenceStatement(check,node->c);}
     else ReferenceValue(check,node->a);
     if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
@@ -229,4 +232,33 @@ Node *ReferencePointerCast(Node *value,I64 type,Token *token){
     Node *result;if(!unsafe_depth)ErrorAt(token,"reference pointer casts require unsafe");
     if(type!=T_PTR+Shape(value->type)->element)ErrorAt(token,"reference pointer cast element type mismatch");
     result=NewNode(N_OWN_ADDRESS,token);result->a=value;result->type=type;result->op=1;return result;
+}
+
+// Slice descriptors and their elements have separate physical/payload loans.
+U0 ReferenceSliceValue(ReferenceCheck *check,Node *node,Bool writing){
+    if(node->kind==N_LOCAL){ReferenceAccess(check,node,FALSE);return;}
+    if(node->kind==N_LOAD){
+        ReferenceAddressMode(check,node->a,FALSE);ReferenceAccess(check,node->a,FALSE);
+        if(BorrowRoot(node->a))ReferenceAcquire(check,node->a,writing,node->token,node);
+        else ReferenceProjection(check,node,writing);
+        return;
+    }
+    ReferenceValue(check,node);
+}
+Bool ReferenceLength(ReferenceCheck *check,Node *node){
+    Local *via;ReferenceLoan *loan;
+    if(AggregateKind(node->type)!=A_SLICE)return FALSE;
+    if(node->kind==N_LOCAL){
+        via=node->local_ref;
+        for(loan=check->loans;loan;loan=loan->next)if(loan->root==via && loan->exclusive && !ReferenceAncestor(check,loan->holder,via,via))ErrorAt(node->token,"access conflicts with a live scoped reference");
+        return TRUE;
+    }
+    if(node->kind==N_LOAD){ReferenceAddressMode(check,node->a,FALSE);ReferenceAccess(check,node->a,FALSE);return TRUE;}
+    return FALSE;
+}
+
+U0 ReferenceWriteCapability(Node *place){
+    if(!place)return;
+    if(place->kind==N_OWN_ADDRESS && IsReference(place->a->type) && !Shape(place->a->type)->count)ErrorAt(place->token,"cannot mutate or move through a shared reference");
+    if(place->kind==N_LOAD || place->kind==N_FIELD_ADDRESS || place->kind==N_INDEX_ADDRESS || place->kind==N_OWN_ADDRESS)ReferenceWriteCapability(place->a);
 }

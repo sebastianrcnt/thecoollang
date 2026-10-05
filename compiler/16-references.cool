@@ -110,8 +110,8 @@ fn ContainsReference(type: i64) -> bool {
         return false;
     }
 }
-// Stored references are copied as reborrows. Owning and slice payloads need
-// further lifetime-aware storage tracking before they can participate.
+// Stored references are copied as reborrows. Owning payloads and stored
+// references to borrowed storage still need further lifetime tracking.
 fn TrackedBorrow(type: i64) -> bool { return Borrowed(type) != i8(0); }
 fn ReferenceStorage(type: i64) -> bool {
     unsafe {
@@ -122,7 +122,8 @@ fn ReferenceStorage(type: i64) -> bool {
             return true;
         }
         let shape = Shape(type);
-        if (shape.kind == 3 || shape.kind == 5) {
+        if (shape.kind == 3) { return Borrowed(shape.element) == i8(0); }
+        if (shape.kind == 5) {
             return false;
         }
         if (shape.kind == 2) {
@@ -175,7 +176,7 @@ fn ValidateReferenceStorage(type: i64, token: * Token) {
             }
         } else {
             if (ContainsReference(type) && !ReferenceStorage(type)) {
-                ErrorAt(token, cast[ * u8]("stored references currently require non-owning, slice-free, single-layer aggregate storage"));
+                ErrorAt(token, cast[ * u8]("stored references currently require non-owning, single-layer aggregate storage"));
             }
         }
     }
@@ -445,8 +446,8 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
             return;
         }
         if (node.kind == 25) {
-            if (node.op == 3 && node.a.kind == 3) {
-                ReferenceAccess(check, node.a, false);
+            if (node.op == 3) {
+                ReferenceSliceValue(check, node.a, writing);
             } else { ReferenceAddressMode(check, node.a, writing); }
             ReferenceValue(check, node.b);
             return;
@@ -537,8 +538,8 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         if (node == null) {
             return;
         }
-        // len of a named slice observes only its descriptor, not its elements.
-        if (node.kind == 27 && AggregateKind(node.a.type) == 3 && node.a.kind == 3) { return; }
+        // len observes descriptor storage, not its element capability.
+        if (node.kind == 27 && ReferenceLength(check, node.a)) { return; }
         if (node.kind == 26) {
             if (node.op == 2) {
                 ReferenceAddressMode(check, node.a, true);
@@ -769,10 +770,17 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
                 if (ContainsReference(node.type)) {
                     ErrorAt(node.token, cast[ * u8]("stored reference fields cannot be reassigned"));
                 }
-                ReferenceAddress(check, node.a);
+                // Pin the destination while evaluating the value; require write
+                // access only after scalar reads in the value have completed.
+                ReferenceWriteCapability(node.a);
+                ReferenceAddressMode(check, node.a, false);
                 ReferenceValue(check, node.b);
                 ReferenceAccess(check, node.a, true);
-                if (TrackedBorrow(node.type)) { ReferenceAssign(check, BorrowRoot(node.a), node.b, saved); }
+                if (TrackedBorrow(node.type)) {
+                    let target = BorrowRoot(node.a);
+                    if (target != null && IsReference(target.type)) { ErrorAt(node.token, cast[*u8]("borrowed storage cannot be replaced through a reference")); }
+                    ReferenceAssign(check, target, node.b, saved);
+                }
             } else {
                 if (node.kind == 10 || node.kind == 11 || node.kind == 21) {
                     ReferenceValue(check, node.a);
@@ -850,5 +858,57 @@ fn ReferencePointerCast(value: * Node, type: i64, token: * Token) -> * Node {
         result.type = type;
         result.op = 1;
         return result;
+    }
+}
+
+// Accessing elements must carry payload loans without copying an exclusive slice.
+fn ReferenceSliceValue(check: *ReferenceCheck, node: *Node, writing: bool) {
+    unsafe {
+        if (node.kind == 3) { ReferenceAccess(check, node, false); return; }
+        if (node.kind == 18) {
+            ReferenceAddressMode(check, node.a, false);
+            ReferenceAccess(check, node.a, false);
+            if (BorrowRoot(node.a) != null) { ReferenceAcquire(check, node.a, BoolInt(writing), node.token, node); }
+            else { ReferenceProjection(check, node, BoolInt(writing)); }
+            return;
+        }
+        ReferenceValue(check, node);
+    }
+}
+// len reads physical descriptor storage, not the element capability.
+fn ReferenceLength(check: *ReferenceCheck, node: *Node) -> bool {
+    unsafe {
+        if (AggregateKind(node.type) != 3) { return false; }
+        if (node.kind == 3) {
+            let via = node.local_ref;
+            var loan = check.loans;
+            while (loan != null) {
+                if (loan.root == via && loan.exclusive != 0 && !ReferenceAncestor(check, loan.holder, via, via)) {
+                    ErrorAt(node.token, cast[*u8]("access conflicts with a live scoped reference"));
+                }
+                loan = loan.next;
+            }
+            return true;
+        }
+        if (node.kind == 18) {
+            ReferenceAddressMode(check, node.a, false);
+            ReferenceAccess(check, node.a, false);
+            return true;
+        }
+        return false;
+    }
+}
+
+// Read-mode destination pins must not erase write permission of any enclosing
+// reference, including computed receivers and stored reference projections.
+fn ReferenceWriteCapability(place: *Node) {
+    unsafe {
+        if (place == null) { return; }
+        if (place.kind == 30 && IsReference(place.a.type) && Shape(place.a.type).count == 0) {
+            ErrorAt(place.token, cast[*u8]("cannot mutate or move through a shared reference"));
+        }
+        if (place.kind == 18 || place.kind == 24 || place.kind == 25 || place.kind == 30) {
+            ReferenceWriteCapability(place.a);
+        }
     }
 }

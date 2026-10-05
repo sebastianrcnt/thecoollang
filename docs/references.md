@@ -72,15 +72,16 @@ with unsafe code. There is no implicit reference-to-pointer conversion.
 
 This is a development foundation, not completion of the 1.0 borrowing gate.
 
-- Shared and exclusive references can be stored in non-owning, slice-free
-  structs, arrays and enums. A stored reference's pointee must not itself contain
+- Shared and exclusive references can be stored in non-owning structs, arrays
+  and enums, including aggregates that also contain slices. A stored reference's pointee must not itself contain
   borrowed storage. Reference-containing owned allocations and aggregates mixing
-  references with owners/slices remain rejected. Reassignment of reference
+  references with owners remain rejected. Reassignment of reference
   bindings/fields and general nested stored lifetimes need further tracking.
 - Function-body slices use the same lexical provenance as references. A slice
   exclusively borrows its elements; element references reborrow it, and disjoint
-  lexical scopes can reuse the source. References to a slice descriptor and
-  slice elements containing borrowed storage remain unsupported.
+  lexical scopes can reuse the source. Direct references to slice descriptors
+  are supported; stored references to descriptors and slice elements containing
+  borrowed storage remain unsupported.
 - REPL submissions retain reference and slice loans across inputs under the
   same checking rules as functions. Top-level bindings stay live until
   `:forget name` or session exit. See the persistent-loan and recovery rules
@@ -622,10 +623,11 @@ failed package loads with a large source comment followed by a successful retry.
 
 
 Lazy type layouts participate in the same transaction. A failed layout can be
-retried; declaring a previously missing type can repair it. Rejected declarations
+retried with a valid specialization. Unknown member type names are rejected
+at declaration time even in unused generic aggregates. Rejected declarations
 also restore completed layouts that were first computed while checking that input,
 so their field types cannot accidentally refer to reused descriptor IDs. The
-`repl-types-test` and `repl-types-sanitize-test` targets verify retries, repair,
+`repl-types-test` and `repl-types-sanitize-test` targets verify specialization retries, rejected-name reuse,
 field reclamation, type ID reuse, owner destruction and staged text lifetime.
 
 
@@ -684,3 +686,44 @@ rejection, JIT calls and restoration of the session namespace on both frontends.
 ASan-instrumented self-hosted compiler and sanitized C host/runtime. Distribution
 tests exercise project and standard imports from a read-only installed prefix
 with no seed or working `make` command.
+
+## References to slice descriptors
+
+A named slice may be borrowed as `&[]T` or `&mut []T`. The reference protects
+both its descriptor binding and the underlying elements. Shared descriptor
+references allow `len(*ref)` and element reads, including shared element
+references. Exclusive descriptor references allow element updates and exclusive
+reborrows. Taking a shared descriptor reference does not permit copying the
+exclusive slice value out of it or creating an exclusive reslice.
+
+```cool
+fn count(values: &[]i64) -> usize { return len(*values); }
+fn increment(values: &mut []i64) {
+    for (var i: usize = 0; i < len(*values); i = i + 1) {
+        (*values)[i] = (*values)[i] + 1;
+    }
+}
+```
+
+`len(*ref)` reads the descriptor and may coexist with a direct element reborrow.
+`len(slice)` requires access to the original descriptor, so it conflicts with a
+live exclusive descriptor reference. Element loans still protect the entire
+underlying root. Return contracts retain all selected roots conservatively:
+`fn first(s: &mut []i64) -> &mut i64 borrows(s)` may retain an exclusive descriptor
+anchor as well, so `len(*s)` can conflict while its returned element reference is
+live. Projection-specific return contracts are not implemented.
+
+Non-owning aggregates may combine slice fields and reference fields. Direct
+references to these aggregates preserve physical and payload loans separately.
+Slices of owning elements support reading, explicit moves and replacement through
+an exclusive descriptor reference; moving their backing owner remains rejected.
+Replacing a slice or slice-containing field through a reference is currently
+rejected, because cross-call replacement lifetimes are not tracked. Ordinary
+local descriptor reassignment retains the existing lifetime checks. Stored
+`&[]T` fields, references to references, borrowed slice elements and
+reference-containing owned allocations still require further implementation.
+
+`make slice-descriptors-test` verifies both frontends, five engines and O2,
+31 negative programs, 30 independent permission-model queries and persistent
+REPL loans. `make slice-descriptors-sanitize-test` adds an ASan compiler and
+instrumented generated LLVM/C runtime checks.

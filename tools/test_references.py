@@ -96,7 +96,7 @@ WHOLE_NEGATIVE=[
  ('fn bad(x:&i64)->&i64 borrows(x){let y=1;return &y;}fn main(){}', 'outlive'),
  ('fn id(x:&i64)->&i64 borrows(x){return x;}fn bad(x:&i64)->&i64 borrows(x){let y=1;return id(id(&y));}fn main(){}', 'outlive'),
  ('struct S{r:&mut &i64;}fn main(){}', 'aggregate storage'),
- ('fn f(x:&[]i64){}fn main(){}', 'nested borrowed'),
+ ('fn f(x:&[][]i64){}fn main(){}', 'nested borrowed'),
  ('fn main(){var x=1;let p=new[&i64](&x);}', 'owned storage'),
 ]
 PRELUDE='fn consume(p:own[i64])->i64{return 0;}fn observe(p:&i64,n:i64){}fn hold(p:&mut i64,n:i64){}fn set(x:&mut i64){*x=1;}fn both(x:&mut i64,y:&mut i64){}fn identity(x:&mut i64)->&mut i64 borrows(x){return x;} '

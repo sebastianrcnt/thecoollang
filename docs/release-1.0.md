@@ -1306,10 +1306,45 @@ through ordinary evaluation or library use.
   fixed source identity is not a frozen-content guarantee or exact graph lock.
   Whole-language and remaining distribution gates stay open.
 
+- Slice descriptor references (specification draft 20): both frontends accept
+  direct shared/exclusive references to slices and non-owning aggregates mixing
+  slices with reference fields. Descriptor length reads and element capability
+  loans are distinct; owner-element moves/replacement retain their backing roots.
+  Store address evaluation pins storage for RHS reads, while a separate enclosing
+  capability check preserves rejection through computed shared receivers. The
+  existing exclusive-storage suite caught and verified this capability regression
+  during development. Obsolete rejection fixtures now cover still-unsupported
+  nested descriptor storage. Thirty-one negative programs, thirty independent
+  permission-model queries, five engines/O2 and persistent REPL tests pass on
+  both frontends. Full regression and native/legacy bootstrap convergence pass,
+  as do instrumented compiler and generated LLVM/runtime checks and installed
+  editor/distribution verification. Evidence:
+  `build/release-audit/slice-descriptors-capability-focused.log`,
+  `slice-descriptors-verified-regression.log`,
+  `slice-descriptors-verified-sanitize.log` and
+  `slice-descriptors-verified-distribution.log`. Replacement through borrowed
+  descriptors, stored descriptor references, reference-containing owners and
+  projection-specific return anchors remain mandatory lifetime work; G2/G4 are
+  not closed by this extension.
+
+- REPL allocation lifecycle audit: a private copy of emitted compiler IR wraps
+  compiler calls to CAlloc/StrNew/FileRead/Free without modifying production
+  allocator behavior. Fourteen fixed-history rollback, source-compaction,
+  replacement, scratch and framed package-load failure workloads finish with
+  identical tracked live bytes/count after 64 and 1,024 submissions. Distinct
+  executed literals intentionally retain session text (146 to 2,066 allocations
+  in the control workload). `repl-lifecycle-test` is part of ordinary regression
+  and CI. `docs/repl-memory.md` inventories roots and transaction cleanup, cache
+  limits, escaped literal policy and excluded host/JIT allocation paths. Equal
+  totals do not prove leak freedom or constant RSS; no missing release was
+  reproduced, so no production reclamation fix was invented. The final full
+  suite passes and `build/repl-lifecycle-audit.json` pins measured artifacts.
+  G6 remains open for host/JIT accounting and complete resource acceptance.
+
 ## Next implementation checkpoints
 
-- Extend reference-containing owned/nested storage and references to slice
-  descriptors; keep unsafe raw pointers separate and add rejection regressions
+- Extend reference-containing owned/nested storage and lifetime-aware slice
+  descriptor replacement; keep unsafe raw pointers separate and add rejection regressions
   before removing restrictions.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
   packages, persistent loans and runtime-error recovery.

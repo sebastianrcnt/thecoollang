@@ -749,3 +749,22 @@ comparison handling and final integer normalization. The bootstrap's compact
 switch implementation remains intentionally separate. Numeric refactors must
 pass independent integer/rational oracles on both frontends and all engines;
 bootstrap convergence alone cannot establish arithmetic correctness.
+
+## Slice descriptor reference projections
+
+`ReferenceSliceValue` reads a projected descriptor without treating that read as
+an exclusive slice-value copy, and acquires the selected payload capability for
+an element address. `ReferenceLength` observes only physical descriptor storage;
+it must not bypass a live exclusive loan of the descriptor binding. Physical
+and indirect roots of a nested receiver remain distinct. Direct element reborrows
+may allow descriptor reads; ambiguous returned-reference contracts retain their
+physical anchors conservatively.
+
+A store pins its destination with read-mode address evaluation before evaluating
+the RHS, then requires write access after the RHS. `ReferenceWriteCapability`
+checks every enclosing reference in the destination projection before read-mode
+pins are established, including computed shared receivers and stored references. This allows ordinary scalar
+read/modify/write without weakening owner-address liveness or live child-loan
+conflicts. Do not discard pending address pins before evaluating RHS/index calls.
+Borrowed-storage writes through a reference are rejected until replacement
+provenance can be attached to the actual destination lifetime across calls.

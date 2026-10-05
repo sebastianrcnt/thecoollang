@@ -416,3 +416,15 @@ float-arithmetic-test: build/cool-compiler build/language.BIN build/language-run
 test: float-arithmetic-test
 float-arithmetic-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_float_arithmetic.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: slice-descriptors-test slice-descriptors-sanitize-test
+slice-descriptors-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_slice_descriptors.py
+test: slice-descriptors-test
+slice-descriptors-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_slice_descriptors.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: repl-lifecycle-test
+repl-lifecycle-test: build/cool-compiler build/compiler-host.o build/language-runtime.o
+	python3 tools/test_repl_lifecycle.py --output build/repl-lifecycle-audit.json
+test: repl-lifecycle-test

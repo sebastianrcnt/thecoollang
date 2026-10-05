@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 19
+# Cool language specification — 1.0 draft 20
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -800,3 +800,16 @@ a link is not proof that a release gate is closed.
 
 These are unfinished mandatory specification tasks. Existing tests and links are
 supporting evidence, not a substitute for a complete, reviewed language contract.
+
+## Draft 20: slice descriptor references
+
+Direct `&[]T` and `&mut []T` references protect descriptor storage and its element
+roots. Shared references permit descriptor length and element reads; exclusive
+references permit element mutation and reborrowing. Non-owning aggregates may
+mix slices and scoped reference fields. Whole-root conflict checks and lexical
+loan lifetimes remain unchanged. See [descriptor rules](references.md#references-to-slice-descriptors)
+for copy/reslice restrictions and conservative return-contract anchors.
+Borrowed storage replacement through a reference, stored descriptor references
+and borrowed slice elements remain explicitly rejected pending lifetime tracking.
+This revision extends accepted programs; it does not close the whole-language
+conformance or ownership release gates.
