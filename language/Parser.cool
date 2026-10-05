@@ -522,6 +522,7 @@ I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
     pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
 }
 extern U0 TemplateBodyCheck(Function *f);
+extern U0 TemplateAggregateSyntax(I64 type);
 U0 ParseProgram() {
     Function previous,*f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign, exported; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -538,7 +539,7 @@ U0 ParseProgram() {
             pos++; Need(';', "expected ';' after import");
         } else {
             public = FALSE; if (Is("pub")) { public = TRUE; pos++; }
-            if (Is("struct") || Is("enum")) { pos++; name = Ident(); id = FindType(At()->package, name); if (!Shape(id)->generic_count) { Layout(id); ValidateBorrowedElements(id); } pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
+            if (Is("struct") || Is("enum")) { pos++; name = Ident(); id = FindType(At()->package, name); if (!Shape(id)->generic_count) { Layout(id); ValidateBorrowedElements(id); } else TemplateAggregateSyntax(id); pos = Shape(id)->end+1; Take(';'); goto declaration_next; }
             foreign = FALSE; exported = FALSE;
             if (Is("extern") || Is("export")) {
                 exported = Is("export"); foreign = !exported; pos++;

@@ -5468,6 +5468,7 @@ continue;
 if (pc == 164) {
 t162 = v_id2;
 t163 = Shape(t162);
+if (t163.generic_count != 0) { TemplateAggregateSyntax(v_id2); }
 if (!(((t163).generic_count != i64(0)))) { pc = 166; } else { pc = 163; }
 continue;
 }

@@ -402,3 +402,10 @@ coercion-sanitize-test: repl-loans-sanitize-test
 module-contract-test: build/cool-compiler
 	python3 tools/test_module_contract.py
 test: module-contract-test
+
+.PHONY: template-aggregate-test template-aggregate-sanitize-test
+template-aggregate-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_template_aggregate.py
+test: template-aggregate-test
+template-aggregate-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_template_aggregate.py --frontend build/repl-loans-asan/cool-compiler

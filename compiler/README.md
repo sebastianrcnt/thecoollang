@@ -84,3 +84,7 @@ Normal specialization remains responsible for typing, ownership and borrowing.
 operand-order bias; shifts preserve the left type and independently check their
 integer count. `CanImplicitCoerce` is the sole eligibility predicate, and the
 readable `Coerce` applies the permitted AST conversion while preserving list links.
+
+`34-template-aggregate.cool` validates unspecialized nominal member grammar and
+type names without allocating a concrete layout; the bootstrap implementation
+is `language/TemplateAggregate.cool`.

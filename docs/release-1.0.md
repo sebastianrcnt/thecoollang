@@ -1202,6 +1202,24 @@ through ordinary evaluation or library use.
   remain mutable, and there is no public proxy/checksum service or cool.lock
   protocol. No 1.0 gate is closed by this local module audit.
 
+- Generic nominal declaration audit: draft 18 checks unused struct/enum member
+  syntax, duplicate names, nominal type names/privacy/arity, void field types,
+  literal array limits and nonempty enums before layout specialization. Earlier
+  frontends accepted each demonstrated invalid declaration until it was used.
+  The preflight reuses template type syntax without fake concrete arguments or
+  layout materialization; scratch duplicate-name records are recovery-owned.
+  Regression covers 34 malformed unused declarations, three imported type checks,
+  forward/concrete layout execution on five engines plus O2, and rejected REPL
+  declaration/name rollback. Updated the older unknown-type lazy-layout fixture
+  to retain dependent oversized-layout retry checks and separately exercise 128
+  declaration rejections followed by name reuse. Both frontends, compiler ASan,
+  full regression/bootstrap convergence and installed editor/distribution pass.
+  Evidence: `build/release-audit/template-aggregate-{build,focused,repl,regression,final-regression,sanitize,distribution}.log`.
+  The initial full regression failure was the obsolete delayed-error fixture;
+  the final regression is the completed passing run. IR SHA256:
+  `670a1b5804d7c9ef84f372e5ee43fd28f79195529ab4bc61645215b1b1abeecd`.
+  Dependent layouts, expression semantics and other release-wide gates remain open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

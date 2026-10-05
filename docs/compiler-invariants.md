@@ -79,6 +79,10 @@ order deterministic; they are not independently linked compiler libraries.
 | `27-repl-scratch.cool` | Input-lifetime parser/resolver allocations across nonlocal recovery | `ReplScratch.cool` |
 | `28-repl-types.cool` | Lazy-layout journal, field rollback and staged immutable text | `ReplTypes.cool` |
 | `29-editor.cool` | Native JSON diagnostics and semantic reference index | `Editor.cool` |
+| `31-template-syntax.cool` | Generic signature/name/type syntax preflight | `Parser.cool` |
+| `32-template-body.cool` | Unspecialized function body grammar and lexical scopes | `TemplateBody.cool` |
+| `33-implicit-types.cool` | Implicit eligibility, binary selection and conversion application | `Core.cool` |
+| `34-template-aggregate.cool` | Generic nominal member preflight | `TemplateAggregate.cool` |
 | `30-completion.cool` | Cursor token preparation and parser-context completion | `Completion.cool` |
 
 Much of the initial port still has explicit temporary variables and program
@@ -717,3 +721,14 @@ conversions clone the old node through `AllocateNode`, clear the clone's `next`,
 and wrap it with N_CAST. The original node's `next` remains the surrounding
 argument/initializer list link. Keep allocation tracking and source/provenance
 metadata intact: conversion must not copy a sibling into its operand subtree.
+
+## Nominal template preflight
+
+`TemplateAggregateSyntax` walks collected generic nominal member tokens using a
+stack-local Function solely as the generic-name environment for
+`TemplateTypeSyntax`. It must not bind fake concrete type arguments, attach
+fields to the descriptor, or mark its layout complete. Duplicate-name records
+are recovery-owned scratch allocations, so a rejected REPL declaration retains
+no fields or temporary names. The cursor is restored on success; nonlocal error
+recovery restores the parser and declaration transaction. Concrete Layout still
+constructs fields and validates recursion/size/storage after specialization.

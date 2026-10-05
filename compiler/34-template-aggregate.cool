@@ -1,0 +1,40 @@
+// Declaration checks do not specialize fields or materialize a layout.
+fn TemplateAggregateSyntax(type: i64) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let aggregate = Shape(type);
+        var signature: Function = Function{};
+        signature.generic_count = aggregate.generic_count;
+        for (var i: i64 = 0; i < aggregate.generic_count; i = i + 1) {
+            signature.generic_names[i] = aggregate.generic_names[i];
+        }
+        let saved = ctx.v_pos;
+        var names: *Field = null;
+        var count: i64 = 0;
+        ctx.v_pos = aggregate.begin;
+        while (ctx.v_pos < aggregate.end) {
+            if (Is(cast[*u8]("pub")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
+            let name = Ident();
+            var other = names;
+            while (other != null) {
+                if (Eq(other.name, name) != i8(0)) { Error(cast[*u8]("duplicate field")); }
+                other = other.next;
+            }
+            if (aggregate.kind == 4) {
+                if (Take(40) != i8(0)) {
+                    TemplateTypeSyntax(&raw signature, 0);
+                    Need(41, cast[*u8]("expected ')' after variant payload"));
+                }
+            } else {
+                Need(58, cast[*u8]("expected ':' after field name"));
+                if (TemplateTypeSyntax(&raw signature, 0) != 0) { Error(cast[*u8]("field cannot be void")); }
+            }
+            Need(59, cast[*u8]("expected ';' after field"));
+            let field = cast[*Field](ScratchAllocate(i64(sizeof(Field))));
+            field.name = name; field.next = names; names = field;
+            count = count + 1;
+        }
+        if (aggregate.kind == 4 && count == 0) { ErrorAt(aggregate.token, cast[*u8]("enum must contain a variant")); }
+        ctx.v_pos = saved;
+    }
+}

@@ -1,0 +1,23 @@
+// Check generic nominal declarations without constructing concrete layouts.
+U0 TemplateAggregateSyntax(I64 type) {
+    AggregateType *a=Shape(type); Function signature; Field *names=NULL,*other,*field;
+    I64 saved=pos,i,count=0; U8 *name;
+    MemSet(&signature,0,sizeof(Function));signature.generic_count=a->generic_count;
+    for(i=0;i<a->generic_count;i++)signature.generic_names[i]=a->generic_names[i];
+    pos=a->begin;
+    while(pos<a->end){
+        if(Is("pub"))pos++;
+        name=Ident();
+        for(other=names;other;other=other->next)if(Eq(other->name,name))Error("duplicate field");
+        if(a->kind==A_ENUM){
+            if(Take('(')){TemplateTypeSyntax(&signature,0);Need(')',"expected ')' after variant payload");}
+        }else{
+            Need(':',"expected ':' after field name");
+            if(TemplateTypeSyntax(&signature,0))Error("field cannot be void");
+        }
+        Need(';',"expected ';' after field");
+        field=ScratchAllocate(sizeof(Field));field->name=name;field->next=names;names=field;count++;
+    }
+    if(a->kind==A_ENUM && !count)ErrorAt(a->token,"enum must contain a variant");
+    pos=saved;
+}

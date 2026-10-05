@@ -19,10 +19,15 @@ def check(front, label, source, output, errors=()):
         assert result.stderr.count(error) == errors.count(error), (label, result.stderr)
 
 for front in fronts:
-    check(front, 'failed lazy layout retries and can be repaired',
-          'struct Bad[T]{first:T;second:Missing;}\nstruct Phantom[T]{}\n'
-          'let phantom=Phantom[Bad[i64]]{};\n' + 'Bad[i64]{}\n'*128 +
-          'struct Missing{value:i64;}\nlet good=Bad[i64]{first:7,second:Missing{value:42}};\ngood.second.value',
+    check(front, 'dependent lazy layout retries preserve valid specializations',
+          'struct Bad[T]{first:T;second:[2]T;}\nstruct Phantom[T]{}\n'
+          'let phantom=Phantom[Bad[[65536]i64]]{};\n' + 'Bad[[65536]i64]{}\n'*128 +
+          'let good=Bad[i64]{first:7,second:[2]i64{41,42}};\ngood.second[1]',
+          '42\n', ['aggregate exceeds 512 KiB implementation limit']*128)
+    check(front, 'invalid generic declaration does not reserve its name',
+          'struct Retry[T]{first:T;second:Missing;}\n'*128 +
+          'struct Missing{value:i64;}\nstruct Retry[T]{first:T;second:Missing;}\n'
+          'let good=Retry[i64]{first:7,second:Missing{value:42}};\ngood.second.value',
           '42\n', ['unsupported or unknown type']*128)
     check(front, 'completed lazy layout rolls back with newly allocated type IDs',
           'struct Holder[T]{items:[2]T;}\nstruct Phantom[T]{}\n'

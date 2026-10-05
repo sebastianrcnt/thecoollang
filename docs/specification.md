@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 17
+# Cool language specification — 1.0 draft 18
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -185,6 +185,21 @@ budget and room for 4,096 simultaneously tracked parameter/local names. It track
 block, for and match scopes so locals may shadow file import aliases. Expression
 name resolution, operand types, return coverage, moves and loans still require
 specialization; complete semantic validation of unused templates remains work.
+
+Generic nominal declarations also validate fields and variants before any
+instantiation: names must be unique, delimiters must follow the declaration
+production, field types cannot be bare builtin `void`, and enums require at
+least one variant. Field/payload type syntax resolves nominal names, privacy,
+generic arity and literal array limits using the template parameters in scope.
+As with function signatures, a parameter named `void` shadows the builtin.
+An explicit enum payload `(void)` continues to denote a payload-free variant,
+matching concrete layout parsing. This preflight does not materialize field
+layouts or certify dependent size, recursion, reference storage or lifetimes;
+concrete instantiation still runs those checks.
+
+`make template-aggregate-test` exercises forward types and concrete execution on
+five engines plus optimized binaries, rejects 34 unused malformed declarations,
+checks imported privacy/arity and verifies REPL rollback after rejection.
 
 `make declarations-test` covers 20 valid declaration/type/boundary cases and
 87 rejections, including duplicate extern/ordinary/export/unused-generic
@@ -683,6 +698,8 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 18: validate unused generic nominal member grammar, uniqueness, type
+  names/privacy/arity, void fields, literal array limits and nonempty enums.
 - Draft 17: specify binding/literal inference and implicit conversions; remove
   mixed-width operand order bias and preserve the left width for shift counts.
 - Draft 16: check unused generic body statement/expression grammar with lexical
