@@ -1287,6 +1287,25 @@ through ordinary evaluation or library use.
   This removes one generated numeric section; remaining compiler maintenance and
   mandatory release-wide gates are not closed.
 
+- Local/workspace module graph audit: main plus every addressable local root now
+  seeds outgoing requirements into MVS. Previously an empty main requirement
+  list left an imported local library's cached transitive dependency unresolved.
+  Unversioned local roots receive no fake selection/checksum; explicitly required
+  local roots retain mutable source semantics. A transitive tagged-main request
+  validates its version but cannot fetch/checksum/select or overwrite the invoking
+  checkout. Conflicting main replacements/workspace roots and two different
+  workspace directories for one identity fail explicitly; same-directory repeats
+  are deduplicated. `modules.md` records these eager-root and identity rules.
+  Replace/workspace regression fixtures execute actual imported transitive CLI
+  programs, include an unused peer raising a dependency's selected version, and
+  verify frozen/offline failure, sum preservation, tampering and main shadow
+  prevention. Final module-contract/project and installed editor/distribution
+  checks pass; the preceding full regression also covers the graph-root changes.
+  Evidence: `build/release-audit/module-roots-{focused,final-focused,final-project,distribution,final-distribution}.log`
+  and `arithmetic-refactor-regression.log`. Local source contents remain mutable;
+  fixed source identity is not a frozen-content guarantee or exact graph lock.
+  Whole-language and remaining distribution gates stay open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

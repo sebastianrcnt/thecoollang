@@ -19,15 +19,23 @@ malformed directives, nested blocks and unclosed blocks are errors. Shell-style
 quoting preserves local paths containing spaces; `//` starts a comment only
 outside quotes. Local replacement paths are relative to the manifest directory
 unless absolute. A replacement supplies source, not a version requirement.
-Its declared module identity must match when used.
+Its manifest must exist and declare the matching module identity during graph
+resolution, even when no explicit version requirement names that local root.
 
 The nearest `cool.work` found from the manifest directory upwards supplies local
 workspace modules. It accepts an optional, single `cool 1.0` and `use DIRECTORY`
 or a multiline `use (` block. Paths are relative to the workspace file. Unknown
 or unsupported language directives, malformed/nested/unclosed blocks and
 unmatched closing parentheses are errors. Workspace entries override matching
-manifest replacements, as in the existing resolver. Local workspaces/replacements
-remain mutable and are outside immutable dependency checksum verification.
+manifest replacements, as in the existing resolver. A workspace entry declaring
+the main module identity must point to the actual invoking manifest directory;
+a different directory is an explicit conflicting-main-identity error. A main-identity
+local replacement must likewise point to the invoking root. Two workspace
+entries for another module may repeat the same directory, but conflicting
+directories for that identity are rejected rather than silently selecting the last. Repeating
+the same main root does not seed its requirements twice. Local workspaces,
+replacements and the main checkout remain mutable and are outside immutable
+dependency checksum verification.
 
 ## Versions and fetching
 
@@ -47,10 +55,28 @@ currently require `host/owner/repo` and fetch over HTTPS, or SSH when
 requested module identity. This prevents cached source from being silently
 assigned a different import identity.
 
-MVS traverses declared requirements and selects the greatest required version of
-each module, including transitive requirements from every visited version.
+MVS starts with the main manifest and every addressable workspace/local
+replacement manifest as unversioned graph roots. Each root's outgoing
+requirements participate, including a local module with no explicit `require`
+in the main manifest and workspace roots not imported by the current package.
+Consequently all configured local root manifests must be present and valid, and
+their declared dependencies are resolved eagerly. An addressable root alone
+does not invent a selected version or checksum for that mutable module. When an
+actual version requirement names a local root, selection records the greatest
+required version while that root still supplies its local source.
+
+The resolver selects the greatest required version of other modules, including
+transitive requirements from every visited version. A dependency's requirement
+on a tagged version of the main module is syntax/version validated but does not
+fetch that tag, select a main-module version, demand its checksum or replace the
+invoking checkout. The main root's outgoing requirements were already seeded.
+This fixes source identity to the invoking directory; it does not promise that
+mutable main/local file contents are frozen during a build.
+
 `cool.mod` stores minimum requirements; it does not by itself pin an exact whole
-graph. Local replacement/workspace sources have separate mutable semantics.
+graph. Requirements declared in a dependency's manifest participate in MVS;
+that dependency's own replacement directives do not override the invoking main
+manifest/workspace replacement policy.
 
 ## Checksums, frozen builds and vendor format
 
@@ -99,5 +125,12 @@ HTTPS clone/archive path is exercised without a network service or subprocess
 mocking; two graph paths request different prereleases and MVS selects the higher
 one. The test checks immutable cache/offline/frozen resolution, checksum tampering,
 and actual CLI checking/interpreter execution using a copied frontend with no
-`make`. Network transport credentials, public remote availability, signed tags
+`make`. Additional replace/workspace fixtures have an empty main requirement
+list, an imported local library and an unused local peer whose requirements
+raise a shared dependency's selected version. Offline/frozen CLI output checks
+that this transitive dependency resolves and that a requirement back to a tagged
+main module cannot shadow the invoking checkout's package. Missing/tampered
+transitive cache entries and conflicting workspace main identities are rejected.
+Set `COOL_FRONTEND` to pin the frontend that the test copies into its private
+fixture. Network transport credentials, public remote availability, signed tags
 and a release-wide module/distribution gate remain outside this local regression.

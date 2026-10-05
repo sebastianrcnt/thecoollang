@@ -217,6 +217,7 @@ class Graph:
             if work.exists():
                 block = False
                 language_seen = False
+                workspace_roots = {}
                 for number, raw in enumerate(work.read_text().splitlines(), 1):
                     words = directive_words(raw, 'cool.work', number)
                     if not words:
@@ -246,6 +247,11 @@ class Graph:
                         raise ValueError(f'cool.work:{number}: expected one path')
                     root = (parent / words[0]).resolve()
                     module = Manifest.read(root)
+                    if module.module == self.manifest.module and root != self.manifest.root:
+                        raise ValueError(f'conflicting workspace main module identity: {module.module}')
+                    if module.module in workspace_roots and workspace_roots[module.module] != root:
+                        raise ValueError(f'conflicting workspace module identity: {module.module}')
+                    workspace_roots[module.module] = root
                     self.local[module.module] = str(root)
                 if block:
                     raise ValueError('cool.work: unclosed use block')
@@ -322,14 +328,28 @@ class Graph:
 
     def resolve(self):
         pending = list(self.manifest.requires.items())
-        for path in self.local:
-            if path != self.manifest.module and path not in self.manifest.requires:
-                # Workspaces/replacements are addressable without fetching, not version requirements.
-                self.roots[path] = (self.manifest.root / self.local[path]).resolve()
+        # Addressable local modules are unversioned graph roots. Their outgoing
+        # requirements participate in MVS even without a require on the root.
+        for path, location in self.local.items():
+            if path == self.manifest.module:
+                if (self.manifest.root / location).resolve() != self.manifest.root:
+                    raise ValueError(f'conflicting local main module identity: {path}')
+                continue
+            root = (self.manifest.root / location).resolve()
+            local_manifest = Manifest.read(root)
+            if local_manifest.module != path:
+                raise ValueError(f'replacement module path mismatch: {path}')
+            self.roots[path] = root
+            pending.extend(local_manifest.requires.items())
         seen = set()
         while pending:
             path, version = pending.pop()
             validate_version(path, version)
+            # The main source identity is fixed to the invoking checkout. A
+            # dependency's requirement on a tagged main version cannot fetch or
+            # replace it; its outgoing requirements were already seeded above.
+            if path == self.manifest.module:
+                continue
             if (path, version) in seen:
                 continue
             seen.add((path, version))

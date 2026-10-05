@@ -20,6 +20,79 @@ def rejects(action, text):
 def git(root,*args):
     return subprocess.run(['git','-C',root,*args],check=True,text=True,capture_output=True)
 
+def test_local_graph_roots(tmp, frontend):
+    for style in ('replace', 'workspace'):
+        base=tmp/('roots-'+style);base.mkdir()
+        app=base/'main';app.mkdir();local=base/'local';local.mkdir();peer=base/'peer';peer.mkdir()
+        main_path='example.test/seeds/main_'+style
+        local_path='example.test/seeds/local_'+style
+        peer_path='example.test/seeds/peer_'+style
+        dep_path='example.test/seeds/dep_'+style
+        manifest=Manifest(app,main_path)
+        Manifest(local,local_path,requires={dep_path:'v1.0.0'}).write()
+        Manifest(peer,peer_path,requires={dep_path:'v1.2.0'}).write()
+        (app/'common').mkdir()
+        (app/'common/common.cool').write_text('package common;pub fn value()->i64{return 30;}')
+        (local/'lib.cool').write_text('package lib;import dep "'+dep_path+'";import common "'+main_path+'/common";pub fn value()->i64{return dep.value()+common.value();}')
+        (peer/'peer.cool').write_text('package peer;pub fn unused(){}')
+        (app/'main.cool').write_text('package main;import "std/io";import lib "'+local_path+'";fn main(){io.println(lib.value());}')
+        dependencies={}
+        for version,value in [('v1.0.0',10),('v1.2.0',12)]:
+            root=Path(os.environ['COOL_CACHE'])/'mod'/(dep_path+'@'+version);root.mkdir(parents=True)
+            # A tagged requirement back to main must not replace the invoking
+            # checkout, be fetched, become selected, or demand a main checksum.
+            Manifest(root,dep_path,requires={main_path:'v1.0.0'}).write()
+            source=root/'dep.cool';source.write_text(f'package dep;pub fn value()->i64{{return {value};}}')
+            dependencies[version]=(root,source,source.read_text())
+        shadow=Path(os.environ['COOL_CACHE'])/'mod'/(main_path+'@v1.0.0');shadow.mkdir(parents=True)
+        Manifest(shadow,main_path).write();(shadow/'common').mkdir()
+        (shadow/'common/common.cool').write_text('package common;pub fn value()->i64{return 999;}')
+        if style=='replace':
+            manifest.replaces={local_path:str(local),peer_path:str(peer)}
+        else:
+            # The same main checkout can appear in use, but is seeded once.
+            (app/'cool.work').write_text('cool 1.0\nuse (\n'+repr(str(app))+'\n'+repr(str(local))+'\n'+repr(str(peer))+'\n)\n')
+        manifest.write()
+        if style=='replace':
+            manifest.replaces[main_path]=str(shadow);manifest.write()
+            rejects(lambda:Graph(Manifest.read(app),offline=True).resolve(),'conflicting local main module identity')
+            manifest.replaces[main_path]=str(app);manifest.write()
+        assert Manifest.read(app).requires=={}
+        rejects(lambda:Graph(Manifest.read(app),offline=True,frozen=True).resolve(),'frozen: missing checksum')
+        graph=Graph(Manifest.read(app),offline=True).resolve()
+        assert graph.selected=={dep_path:'v1.2.0'},graph.selected
+        assert graph.roots[main_path]==app.resolve()
+        assert graph.package(main_path+'/common')==app.resolve()/'common'
+        assert local_path not in graph.selected and peer_path not in graph.selected
+        assert set(graph.visited_roots)=={(dep_path,'v1.0.0'),(dep_path,'v1.2.0')}
+        assert set(graph.pending_sums)==set(graph.visited_roots)
+        graph.save_sums();sums=(app/'cool.sum').read_bytes()
+        Graph(Manifest.read(app),offline=True,frozen=True).resolve()
+        env={**os.environ,'COOL_FRONTEND':str(frontend)}
+        for command in (['check','--offline','--frozen','.'],['run','--backend','interp','--offline','--frozen','.']):
+            result=subprocess.run([ROOT/'tools/cool',*command],cwd=app,env=env,text=True,capture_output=True,timeout=60)
+            assert (result.returncode,result.stdout,result.stderr)==(0,'42\n' if command[0]=='run' else '',''),(style,result)
+        assert (app/'cool.sum').read_bytes()==sums
+        high,source,original=dependencies['v1.2.0']
+        source.write_text(original+'// tamper')
+        rejects(lambda:Graph(Manifest.read(app),offline=True,frozen=True).resolve(),'checksum mismatch')
+        source.write_text(original)
+        missing=high.with_name(high.name+'-removed');high.rename(missing)
+        rejects(lambda:Graph(Manifest.read(app),offline=True,frozen=True).resolve(),'offline: missing cached module')
+        missing.rename(high)
+        Graph(Manifest.read(app),offline=True,frozen=True).resolve()
+        if style=='workspace':
+            duplicate=base/'duplicate';duplicate.mkdir();Manifest(duplicate,local_path).write()
+            (app/'cool.work').write_text('use '+repr(str(local))+'\nuse '+repr(str(duplicate))+'\n')
+            rejects(lambda:Graph(Manifest.read(app),offline=True),'conflicting workspace module identity')
+            (app/'cool.work').write_text('use '+repr(str(local))+'\nuse '+repr(str(local))+'\n')
+            duplicate_graph=Graph(Manifest.read(app),offline=True,frozen=True).resolve()
+            assert duplicate_graph.roots[local_path]==local.resolve()
+            conflict=base/'conflict';conflict.mkdir();Manifest(conflict,main_path).write()
+            (app/'cool.work').write_text('use '+repr(str(conflict))+'\n')
+            rejects(lambda:Graph(Manifest.read(app),offline=True),'conflicting workspace main module identity')
+
+
 with tempfile.TemporaryDirectory(prefix='cool module contract ') as directory:
     tmp=Path(directory);app=tmp/'app';app.mkdir()
     original_env=dict(os.environ)
@@ -44,8 +117,7 @@ with tempfile.TemporaryDirectory(prefix='cool module contract ') as directory:
             manifest.replaces={'example.test/team/local':path};manifest.write()
             assert Manifest.read(app).replaces==manifest.replaces
         manifest.replaces={'example.test/team/wrong':str(local)};manifest.write()
-        wrong=Graph(Manifest.read(app),offline=True).resolve()
-        rejects(lambda:wrong.package('example.test/team/wrong'),'replacement module path mismatch')
+        rejects(lambda:Graph(Manifest.read(app),offline=True).resolve(),'replacement module path mismatch')
         manifest.replaces={};manifest.write()
         work=app/'cool.work'
         for content,error in [('cool 999\n','unsupported workspace'),('cool future extra\n','invalid'),
@@ -111,12 +183,13 @@ with tempfile.TemporaryDirectory(prefix='cool module contract ') as directory:
         cache_root=fetched.roots[module];assert tree_hash(cache_root)==fetched.sums.get((module,'v10.1.0-alpha.10'),fetched.pending_sums[module,'v10.1.0-alpha.10'])
         Graph(manifest,offline=True,frozen=True).resolve()
         # Actual CLI import from fetched tagged module, with a pinned executable.
-        frontend=tmp/'frontend';shutil.copy2(ROOT/'build/cool-compiler',frontend)
+        frontend=tmp/'frontend';shutil.copy2(Path(os.environ.get('COOL_FRONTEND',ROOT/'build/cool-compiler')),frontend)
         (app/'main.cool').write_text('package main;import "std/io";import lib "'+module+'";fn main(){io.println(lib.value());}\n')
         env={**os.environ,'COOL_FRONTEND':str(frontend)}
         for command in (['check','--offline','--frozen','.'],['run','--backend','interp','--offline','--frozen','.']):
             result=subprocess.run([ROOT/'tools/cool',*command],cwd=app,env=env,text=True,capture_output=True,timeout=60)
             assert (result.returncode,result.stdout,result.stderr)==(0,'20\n' if command[0]=='run' else '',''),result
+        test_local_graph_roots(tmp,frontend)
         before=checksum.read_bytes()
         (cache_root/'lib.cool').write_text('tampered')
         rejects(lambda:Graph(manifest,offline=True,frozen=True).resolve(),'checksum mismatch')
@@ -142,4 +215,4 @@ with tempfile.TemporaryDirectory(prefix='cool module contract ') as directory:
         rejects(lambda:Graph(manifest,offline=True,frozen=True).resolve(),'vendored module path mismatch')
     finally:
         os.environ.clear();os.environ.update(original_env)
-print('module contract: strict manifests/workspaces/checksums/vendor, major suffixes, prerelease ordering, real tagged Git fetch, offline/frozen CLI, tamper and identity rejection PASS')
+print('module contract: strict manifests/workspaces/checksums/vendor, major suffixes, prerelease ordering, real tagged Git fetch, offline/frozen CLI, addressable local/workspace graph roots, main root shadow prevention, tamper and identity rejection PASS')
