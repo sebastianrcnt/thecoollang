@@ -304,3 +304,22 @@ fn ProvenanceAddressOverlap(left:*ProvenanceNode,right:*ProvenanceNode,root:*Loc
  }
  current=first;while(current!=null){let next=current.next;Free(cast[*u8](current));current=next;}return found;
 }}
+
+// Caller proves an owner descriptor endpoint; query excludes only its payload.
+fn ProvenanceOwnerSlotOverlap(source:*ProvenanceNode,path:*ProvenanceCursor,type:i64)->bool{unsafe{
+ if(source==null){return true;}
+ let first=cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));first.node=source;first.cursor=path;
+ var current=first;var tail=first;var found=false;
+ while(current!=null && !found){
+  let node=current.node;let step=current.cursor;
+  if(node.opaque!=0 || node.root!=null){found=true;}
+  else if(step==null){
+   if(node.type!=type){found=true;}
+   else{var edge=node.edges;while(edge!=null){if(edge.kind!=4){found=true;}edge=edge.next;}}
+  }else if(node.type!=step.type){found=true;}
+  else{var edge=node.edges;while(edge!=null){if(edge.kind==step.kind && (step.kind!=1 || edge.key==step.key || AggregateKind(node.type)==4)){tail=ProvenanceQueryAppend(first,tail,edge.target,step.next,0);}edge=edge.next;}}
+  current=current.next;
+ }
+ current=first;while(current!=null){let next=current.next;Free(cast[*u8](current));current=next;}
+ return found;
+}}

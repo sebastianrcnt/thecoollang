@@ -10,10 +10,18 @@ PRELUDE='''import "std/io";
 struct Point{x:i64;y:i64;}
 struct Box{a:Point;b:Point;}
 enum Choice{None;Some(i64);}
+struct Heap{p:own[Point];q:own[Point];}
+fn consume(p:own[Point])->i64{return (*p).y;}
+fn replace(p:&mut own[Point])->i64{*p=new[Point](Point{x:3,y:4});return 5;}
 fn bump(a:&mut i64,b:&mut i64){*a=10;*b=20;}
 fn opaque(p:&mut i64)->&mut i64 borrows(p){return p;}
 '''
 POSITIVES=[
+ 'var h=Heap{p:new[Point](Point{x:1,y:2}),q:new[Point](Point{x:3,y:4})};let x=&mut (*h.p).x;(*h.p).y=7;(*h.q).x=8;*x=9;assert((*h.q).x==8);',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=7;*x=9;assert((*p).y==7);',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;let y=&mut (*p).y;*x=9;*y=7;assert(*x==9);assert(*y==7);',
+ 'var p=new[Point](Point{x:1,y:2});let x=&(*p).x;(*p).y=7;assert(*x==1);',
+ 'var b=Box{a:Point{x:1,y:2},b:Point{x:3,y:4}};var owner=new[Box](move b);let x=&mut (*owner).a.x;(*owner).a.y=8;(*owner).b.x=9;*x=7;assert((*owner).b.x==9);',
  'var p=Point{x:1,y:2};let x=&mut p.x;p.y=7;*x=9;assert(p.y==7);assert(*x==9);',
  'var p=Point{x:1,y:2};let x=&mut p.x;let y=&mut p.y;*x=9;*y=7;assert(*x==9);assert(*y==7);',
  'var p=Point{x:1,y:2};let x=&p.x;p.y=7;assert(*x==1);assert(p.y==7);',
@@ -25,11 +33,18 @@ POSITIVES=[
  'var a=[2]Point{Point{x:1,y:2},Point{x:3,y:4}};let x=&mut a[0].x;a[1].y=8;*x=9;assert(a[1].y==8);',
 ]
 NEGATIVES=[
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=consume(move p);',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=replace(&mut p);',
+ 'var h=Heap{p:new[Point](Point{x:1,y:2}),q:new[Point](Point{x:3,y:4})};let x=&mut (*h.p).x;h=Heap{p:new[Point](Point{x:5,y:6}),q:new[Point](Point{x:7,y:8})};',
+ 'var h=Heap{p:new[Point](Point{x:1,y:2}),q:new[Point](Point{x:3,y:4})};let x=&mut (*h.p).x;(*h.p).y=consume(move h.p);',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).x=3;',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;p=new[Point](Point{x:3,y:4});',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;let all=&mut *p;',
+ 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;let slot=&mut p;',
  'var p=Point{x:1,y:2};let anchor=&mut p.x;unsafe{let r=borrow_raw[&mut i64](cast[*i64](anchor),anchor);p.y=3;}',
  'var p=Point{x:1,y:2};var r=&mut p.x;r=&mut p.y;p.x=3;',
  'var p=Point{x:1,y:2};var r=&mut p.x;r=&mut p.y;p.y=3;',
  'var c=Choice.Some(1);let r=&mut c;c=Choice.None;',
- 'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=7;*x=9;assert((*p).y==7);',
  'var p=Point{x:1,y:2};let x=&mut p.x;p.x=3;',
  'var p=Point{x:1,y:2};let x=&mut p.x;let read=p.x;',
  'var p=Point{x:1,y:2};let x=&mut p.x;let y=&mut p.x;',
@@ -55,10 +70,13 @@ with tempfile.TemporaryDirectory(prefix='cool physical address ') as directory:
  for body in NEGATIVES:
   source.write_text(PRELUDE+'fn main(){'+body+'}')
   for front in fronts:
-   r=run([*front,'check',source]);assert r.returncode==2 and 'conflicts' in r.stderr,(body,r)
+   r=run([*front,'check',source]);assert r.returncode==2 and any(message in r.stderr for message in ('conflicts','owner moved while an access','moved value')),(body,r)
  repl='struct Point{x:i64;y:i64;}\nvar p=Point{x:1,y:2};\nlet x=&mut p.x;\nlet y=&mut p.y;\n*x=9;\n*y=7;\np.x=3;\n*x\n*y\n:forget x\np.x=11;\np.x\n:forget y\n:forget p\n:quit\n'
  for front in fronts:
   r=run([*front,'repl-quiet'],input=repl);assert r.returncode==0 and r.stdout=='9\n7\n11\n' and r.stderr.count('error:')==1,r
- report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':len(POSITIVES),'negative_cases':len(NEGATIVES),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual root-relative physical addresses: disjoint fields, named copies/call arguments, nested structs; conservative owned payloads, raw bridges and merged addresses; same-field/prefix/array/owner/opaque rejections and persistent REPL clone/recovery/forget.'}
+ owner_repl='struct Point{x:i64;y:i64;}\nvar p=new[Point](Point{x:1,y:2});\nlet x=&mut (*p).x;\nlet y=&mut (*p).y;\n*x=9;\n*y=7;\np=new[Point](Point{x:3,y:4});\n{*y=8;assert(false);}\n*x\n*y\n:forget x\n(*p).x=11;\n(*p).x\n:forget y\n:forget p\n:quit\n'
+ for front in fronts:
+  r=run([*front,'repl-quiet'],input=owner_repl);assert r.returncode==0 and r.stdout=='9\n8\n11\n' and r.stderr.count('error:')==2,r
+ report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':len(POSITIVES),'negative_cases':len(NEGATIVES),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual root-relative physical addresses: disjoint fields, named copies/call arguments, nested structs; owned payload field separation, conservative raw bridges and merged addresses; same-field/prefix/array/owner/opaque rejections and persistent REPL clone/recovery/forget.'}
  if args.output:args.output.write_text(json.dumps(report,indent=2)+'\n')
 print(f'physical address: {len(POSITIVES)} accepted, {len(NEGATIVES)} rejected, five engines/O2 and persistent REPL PASS'+(' on both frontends' if args.legacy else ' on production frontend'))

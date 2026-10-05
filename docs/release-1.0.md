@@ -2134,6 +2134,39 @@ through ordinary evaluation or library use.
   Evidence: `build/release-audit/physical-address-{build,focused,regression,sanitize,distribution,extra-fixtures}.log`.
   All release gates remain Open.
 
+- Direct owner payload field precision now distinguishes descriptor observation
+  while forming an address from an ordinary whole value read. Only known
+  physical geometry, matching direct root, complete cursor and owner endpoint
+  qualify. Terminal/ancestor roots, opaque/type mismatch and unknown geometry
+  remain conflicts; only endpoint OwnedPayload edges are excluded. Pending
+  address pins keep their previous whole owner and source/lifetime protection.
+  Moves, replacement and ordinary access use the existing whole-place query.
+  Both frontend implementations mirror this behavior.
+
+  Actual physical fixtures pass 14 accepted and 23 rejected programs across
+  five engines/O2 and both frontends, including nested owned fields, simultaneous
+  owned payload field borrows, same-field/owner-slot/whole-payload conflicts,
+  RHS owner movement/replacement and containing aggregate replacement. Persistent
+  REPL cases preserve loans across analysis rejection, partial runtime writes,
+  graph cloning and forget/release. Aliased owners and external payload
+  acquisition may still reject valid source; these cases remain pending.
+
+  Independent selection/address/owner-slot/authority oracles pass 1,648 cases,
+  including endpoint payload exclusions, opaque payload descendants,
+  terminal/opaque/non-payload fallback and cyclic node/cursor termination.
+  Two new seed lifecycle histories end at zero tracked graph allocations with
+  equal 64/1,024 repetition peaks: 2,208 bytes for owned field pairs and 1,392
+  for owner descriptor rejection/runtime recovery. All 15 legacy graph histories
+  pass under documented instrumentation exclusions.
+
+  Full regression and bootstrap convergence, four existing provenance sanitizer
+  targets plus physical-address sanitizer, independent oracle sanitizer and
+  external editor/distribution installation pass. Compiler IR SHA-256:
+  `93ed7f30f65bd6d67b4b31ebcffdc0cc7b1db6ac9ba6d08472a55633bd9c7b81`.
+  Evidence: `build/release-audit/owner-descriptor-{build,focused,fixtures,regression,sanitize,distribution,oracle,lifecycle}.log`.
+  Arbitrary nested borrowed storage, descriptor lifetime and indirect address
+  mapping remain required work. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

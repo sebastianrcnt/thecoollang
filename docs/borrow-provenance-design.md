@@ -189,6 +189,24 @@ payload storage and array indexes remain a union. Scratch worklists are freed.
 Only an existing physical-root conflict can be refined. Direct local struct
 fields can be disjoint, including named references and call arguments. Indirect
 access checks the whole source address set; paths through stored handles remain
-conservative. Raw bridges and opaque call returns lose precise geometry. Owned
-payload sibling access remains conservative. No arbitrary nested-storage guard
+conservative. Raw bridges and opaque call returns lose precise geometry. Direct owned
+payload sibling access uses the descriptor reads described below; indirect
+owners remain conservative. No arbitrary nested-storage guard
 is removed, and borrowed descriptor/type/field-key lifetimes still need audit.
+
+### Owner descriptor reads during address evaluation
+
+Forming an owned payload address observes the owner descriptor without reading
+its payload. An explicit internal read mode now distinguishes that observation
+from a whole value read. Only a known physical graph, direct matching root,
+complete cursor and owner endpoint qualify. Prefix/terminal roots, opaque nodes,
+type mismatches and unknown addresses retain conflict protection. At the proven
+owner endpoint, only OwnedPayload edges are excluded; other edges fall back.
+The finite node/cursor query frees its worklist, including early exits.
+
+Pending address pins use the existing acquisition and source/lifetime checks,
+with the descriptor read mode, and retain whole owner protection. Thus later
+index/RHS evaluation cannot move or replace an owner after loading its pointer.
+Moves, drops, replacements and ordinary whole value reads keep normal overlap.
+Aliased owners and borrowed external payload acquisition may remain conservative;
+this change does not infer their descriptor addresses or remove storage guards.

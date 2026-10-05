@@ -284,7 +284,10 @@ fn ReferenceAncestor(check: * ReferenceCheck, holder: * Local, via: * Local, roo
         return found;
     }
 }
-fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
+fn ReferenceAccess(check: *ReferenceCheck, place: *Node, writing: bool) {
+    ReferenceAccessMode(check, place, writing, false);
+}
+fn ReferenceAccessMode(check: * ReferenceCheck, place: * Node, writing: bool, owner_slot: bool) {
     unsafe {
         let via = BorrowRoot(place);
         let origin = ReferencePlaceSource(place);
@@ -298,7 +301,7 @@ fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
         if (writing) { ReferenceRequirePayloadWrite(check, place, via); }
         var loan = check.loans;
         while (loan != null) {
-            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root, writing) && ReferencePhysicalMayOverlap(check, loan, place, via) && !ReferenceAncestor(check, loan.holder, via, loan.root) && !(loan.holder == null && loan.expression == ReferencePlaceSource(place))) {
+            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root, writing) && ReferencePhysicalAccessOverlap(check, loan, place, via, owner_slot) && !ReferenceAncestor(check, loan.holder, via, loan.root) && !(loan.holder == null && loan.expression == ReferencePlaceSource(place))) {
                 ErrorAt(place.token, cast[ * u8]("access conflicts with a live scoped reference"));
             }
             loan = loan.next;
@@ -364,6 +367,9 @@ fn ReferenceSourceAccess(check: * ReferenceCheck, before: * ReferenceLoan, via: 
     }
 }
 fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, token: * Token, expression: * Node) {
+    ReferenceAcquireMode(check, place, exclusive, token, expression, false);
+}
+fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, token: * Token, expression: * Node, owner_slot: bool) {
     unsafe {
         let via = BorrowRoot(place);
         let nested = NestedReference(expression.type);
@@ -396,7 +402,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
             }
             return;
         }
-        ReferenceAccess(check, place, exclusive != 0);
+        ReferenceAccessMode(check, place, exclusive != 0, owner_slot);
         if (exclusive != 0 && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29)) {
             ReferenceRequirePayloadCopy(check, place, via);
         }
@@ -504,10 +510,10 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                 } else {
                     if (AggregateKind(node.a.type) == 5 && node.a.kind == 18) {
                         ReferenceAddressMode(check, node.a.a, writing);
-                        ReferenceAccess(check, node.a.a, false);
+                        ReferenceAccessMode(check, node.a.a, false, true);
                     } else {
                         if (AggregateKind(node.a.type) == 5 && node.a.kind == 3) {
-                            ReferenceAccess(check, node.a, false);
+                            ReferenceAccessMode(check, node.a, false, true);
                         } else {
                             ReferenceValue(check, node.a);
                         }
@@ -528,7 +534,7 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                         // A named reference must not move/replace that owner
                         // while a later index or assignment RHS is evaluated.
                         if (!retained) {
-                            ReferenceAcquire(check, origin, 0, node.token, origin);
+                            ReferenceAcquireMode(check, origin, 0, node.token, origin, true);
                         }
                     }
                 }

@@ -40,3 +40,15 @@ fn ReferencePhysicalMayOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,place:*
  }else{found=true;}
  ReferenceCursorFree(cursor.path);return found;
 }}
+// Reading an owner's descriptor to form a payload address does not read the
+// payload. Ancestor/slot roots still overlap; only known OwnedPayload edges at
+// the owner endpoint are excluded. Indirect and incomplete paths stay coarse.
+fn ReferencePhysicalAccessOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,place:*Node,via:*Local,owner_slot:bool)->bool{unsafe{
+ if(!owner_slot || loan.physical_provenance==null || via==null || via!=loan.root){return ReferencePhysicalMayOverlap(check,loan,place,via);}
+ var type=place.type;if(Pointer(type)!=i8(0)){type=type-100000;}
+ if(AggregateKind(type)!=5){return ReferencePhysicalMayOverlap(check,loan,place,via);}
+ var cursor=ReferencePlaceCursor(place,via,null);
+ if(cursor.complete==0){ReferenceCursorFree(cursor.path);return true;}
+ let found=ProvenanceOwnerSlotOverlap(loan.physical_provenance,cursor.path,type);
+ ReferenceCursorFree(cursor.path);return found;
+}}
