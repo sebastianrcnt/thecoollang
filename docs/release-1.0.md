@@ -24,7 +24,7 @@ implement parsing, type analysis, interpretation or code generation.
 
 | Gate | Acceptance evidence | Status |
 | --- | --- | --- |
-| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical and binary expression contracts tested; complete grammar and semantic audit pending) |
+| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/declaration/expression/statement forms drafted and tested; whole-language conformance and semantic audit pending) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
@@ -996,6 +996,22 @@ through ordinary evaluation or library use.
   Runtime-failure unwinding, complete primary grammar, package rules and other
   remaining release-wide contracts remain open; structured-exit evidence is not
   a claim that every runtime failure performs full stack cleanup.
+
+- Primary expression contract: specification draft 9 supplies the remaining
+  core primary productions: prefix/postfix forms, named/method calls, aggregate/
+  enum/array/slice construction, sizeof/len, owners, references, raw borrowing and
+  explicit casts. It records initializer completeness and trailing-comma rules,
+  name-resolution restrictions, slicing bounds, required places and unsafe
+  obligations. A combined executable grammar test verifies successful forms and
+  zero surviving owners, with 26 rejection cases covering malformed initializers,
+  calls, enum payloads, casts, indexing and raw anchors. Both frontends plus the
+  instrumented compiler pass five engines and optimized builds. The new ordinary
+  and sanitizer targets are wired into test/CI. Evidence:
+  `build/release-audit/primary-forms-{focused,sanitize}.log`.
+  Compiler/runtime sources are unchanged in this milestone. The remaining-spec
+  list now distinguishes published core productions from their release-wide
+  conformance audit and unfinished source-file/package grammar. No release gate
+  is closed by these grammar examples; remote CI has not been observed.
 
 ## Next implementation checkpoints
 

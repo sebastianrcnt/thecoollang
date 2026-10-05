@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 8
+# Cool language specification — 1.0 draft 9
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -196,9 +196,8 @@ not chained assignment. Comparison chaining is not mathematical notation:
 comparison produces bool. `true == false == false` is valid left association.
 
 The following EBNF describes the binary expression core. `primary` includes the
-prefix, literal, name, call, aggregate and postfix forms described above and in
-the semantic contract map; this production does not yet claim their complete
-grammar. Braces in the EBNF mean repetition, not source-language braces.
+prefix, literal, name, call, aggregate and postfix forms defined in
+[primary expressions](#primary-expressions-calls-and-construction). Braces in the EBNF mean repetition, not source-language braces.
 
 ```ebnf
 expression     = logical_or ;
@@ -237,6 +236,89 @@ slice bounds and a temporary method receiver. Each frontend executes all five
 engines and an optimized standalone binary. Existing reference/ownership suites
 cover the separate validity obligations around moves and live destinations.
 This does not yet specify overflow/conversion policy or cleanup timing.
+
+## Primary expressions, calls and construction
+
+The binary grammar's `primary` production is defined below. Name resolution
+selects among type names, locals, import aliases and callable names; this EBNF is
+not a context-free replacement for that resolution. `named_type`, `type_arguments`,
+`type`, `integer_token` and `floating_token` refer to the earlier productions.
+
+```ebnf
+primary        = atom, { suffix } ;
+atom           = integer_token | floating_token | string_token
+               | "true" | "false" | "null" | identifier
+               | "(", expression, ")" | prefix, primary
+               | named_call | struct_literal | array_literal | empty_slice
+               | enum_value | "sizeof", "(", type, ")"
+               | "len", "(", expression, ")"
+               | "new", "[", type, "]", "(", [ expression ], ")"
+               | "cast", "[", type, "]", "(", expression, ")"
+               | "borrow_raw", "[", type, "]", "(", expression, ",",
+                 expression, ")" ;
+prefix         = "-" | "!" | "~" | "*" | "&", [ "mut" | "raw" ] | "move" ;
+arguments      = "(", [ expression, { ",", expression } ], ")" ;
+named_call     = identifier, [ ".", identifier ], [ type_arguments ], arguments ;
+suffix         = "[", expression, "]"
+               | "[", [ expression ], ":", [ expression ], "]"
+               | ".", identifier
+               | ".", identifier, [ type_arguments ], arguments ;
+struct_literal = named_type, "{", [ field_value, { ",", field_value }, [ "," ] ], "}" ;
+field_value    = identifier, ":", expression ;
+array_literal  = "[", integer_token, "]", type, "{",
+                 [ expression, { ",", expression }, [ "," ] ], "}" ;
+empty_slice    = "[", "]", type, "{", "}" ;
+enum_value     = named_type, ".", identifier, [ "(", [ expression ], ")" ] ;
+```
+
+Calls refer to a function or builtin by name, possibly qualified by an import
+alias, or to a method via a receiver suffix. Function values and arbitrary
+expression calls such as `(function_name)(value)` are not supported. A numeric
+type name used as a one-argument call, such as `i32(value)`, performs an explicit
+numeric conversion; `cast[T](value)` provides the explicit cast spelling. Neither
+spelling makes nonnumeric conversions generally valid. Raw pointer/reference
+casts follow their unsafe restrictions. Ordinary calls, method calls and enum
+payload constructors do not allow trailing commas.
+
+A nonempty struct literal must name every field exactly once; order is arbitrary
+and expression evaluation follows written order. A nonempty fixed-array literal
+must supply exactly its declared number of elements. These two initializer forms
+permit a trailing comma. Empty braces request default zero initialization,
+subject to the type's safety/validity rules and field access checks. Slice literals
+must be empty; a nonempty slice is obtained from an existing array or slice.
+An enum is constructed by naming its variant. Payload variants require one
+expression in parentheses; unit variants permit either no parentheses or `()`.
+
+Field/index/slice/method suffixes may chain where the intermediate types permit
+it. Indexing accepts integer indices on arrays, slices or typed raw pointers;
+raw-pointer indexing requires unsafe. Slicing accepts arrays or slices, uses a
+half-open range, defaults the low bound to zero and the high bound to length,
+and has no step expression. Checked sequence indexing rejects out-of-bounds
+indices; slicing requires `0 <= low <= high <= length`. Loans and mutability
+still restrict which slices and accesses are permitted. `len` takes an array or
+slice and `sizeof` takes a type, not an expression.
+
+Dereference `*` applies to owners/references or typed raw pointers; the latter
+requires unsafe. `&place` creates a shared reference and `&mut place` an exclusive
+reference, both requiring a tracked stable place and satisfying loan checks.
+`&raw place` creates a raw address inside unsafe. `borrow_raw[R](pointer, anchor)`
+also requires unsafe: `R` must be a reference type, the pointer element must match,
+and the anchor must be a named reference with sufficient mutability. The caller
+must satisfy the raw-memory validity obligations in [references](references.md).
+This construct does not infer allocation validity from an arbitrary pointer.
+
+`new[T](value)` allocates an owner initialized from the supplied value;
+`new[T]()` requests default initialization. Borrowed values cannot be hidden in
+owned storage contrary to the current storage rules. Moving an owned binding or
+projection requires `move` where ownership transfers; a fresh owned result can
+transfer directly. Moved places are unusable until validly reinitialized. The
+full move/loan and cleanup rules remain in the ownership/reference contract.
+
+`make primary-forms-test` runs combined construction/access/conversion/ownership
+examples with zero surviving owners, plus 26 rejected grammar/type/place cases,
+on both frontends under five engines and optimized binaries. The sanitizer target
+adds the instrumented frontend. This complements the dedicated ownership,
+reference, generic, method, numeric and package suites.
 
 ## Statements, control flow and deferred calls
 
@@ -394,6 +476,8 @@ This section does not yet specify the full floating arithmetic/rounding contract
 
 ## Draft revisions
 
+- Draft 9: complete the primary-expression productions and record call,
+  construction, projection, owner/reference and explicit conversion syntax.
 - Draft 8: specify statement/control-flow/defer grammar and normal-exit ordering;
   permit projected assignments in for initializers under normal safety checks.
 - Draft 7: add declaration/type EBNF and signature rules; reject duplicate
@@ -434,9 +518,10 @@ a link is not proof that a release gate is closed.
 
 ## Work required before freezing this specification
 
-1. Complete the source-encoding/control-byte audit, then
-   publish complete EBNF for declarations, statements, types, expressions and
-   precedence, including explicit generic arguments, methods and borrow contracts.
+1. Complete the source-encoding/control-byte and source-file/package grammar
+   audit. Verify completeness and conformance mapping of the published
+   declaration, statement, type and expression productions, including generic
+   arguments, methods and borrow contracts.
 2. Define inference/coercion, integer/float operations and every runtime failure
    consistently across tree, bytecode, native JIT and optimized LLVM.
 3. State layout/alignment, copy/move/initialization, evaluation order, cleanup and
