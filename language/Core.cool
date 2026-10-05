@@ -278,7 +278,10 @@ Bool CanImplicitCoerce(Node *n,I64 type){
 U0 Coerce(Node *n, I64 type) {
     Node *child;
     if(n->type==type)return;
-    if(!CanImplicitCoerce(n,type))ErrorAt(n->token,"incompatible types; use an explicit cast for narrowing conversions");
+    if(!CanImplicitCoerce(n,type)){
+        if((Integer(n->type)||Floating(n->type))&&(Integer(type)||Floating(type)))ErrorAt(n->token,"incompatible types; narrowing conversion requires an explicit cast");
+        ErrorAt(n->token,"incompatible types; value and target types do not convert");
+    }
     if(n->type==T_NULL || (n->kind==N_INT && Integer(n->type) && Integer(type) && Fits(n->value,type))){n->type=type;return;}
     child=AllocateNode();MemCpy(child,n,sizeof(Node));child->next=NULL;
     n->kind=N_CAST;n->a=child;n->type=type;

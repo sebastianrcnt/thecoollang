@@ -3063,6 +3063,18 @@ through ordinary evaluation or library use.
   evaluation order, ownership and borrowed storage; failure promotion, broader
   slice/aggregate loans and every remaining mandatory gate stay Open.
 
+- Diagnostics: the coercion rejection no longer claims a "narrowing
+  conversion" for values whose type is not convertible at all. Numeric
+  narrowing keeps `incompatible types; narrowing conversion requires an
+  explicit cast`, while non-numeric or unrelated mismatches report
+  `incompatible types; value and target types do not convert`. Both frontends
+  emit the same categories. `tools/test_diagnostics.py` pins 13 rejection
+  categories (narrowing, non-convertible type/argument/pointer, unknown
+  variable/function, missing return, wrong argument count, use-after-move,
+  borrow conflict, duplicate function) on both frontends. This improves G4's
+  "useful source diagnostics"; the broader ergonomics and diagnostics audit
+  stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

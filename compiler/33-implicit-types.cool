@@ -60,7 +60,12 @@ fn Coerce(n: * Node, type: i64) {
             return;
         }
         if (CanImplicitCoerce(n, type) == i8(0)) {
-            ErrorAt(n.token, cast[ * u8]("incompatible types; use an explicit cast for narrowing conversions"));
+            // Distinguish a value that does not fit its numeric target from a
+            // value whose type is not convertible at all.
+            if ((Integer(n.type) != i8(0) || Floating(n.type) != i8(0)) && (Integer(type) != i8(0) || Floating(type) != i8(0))) {
+                ErrorAt(n.token, cast[ * u8]("incompatible types; narrowing conversion requires an explicit cast"));
+            }
+            ErrorAt(n.token, cast[ * u8]("incompatible types; value and target types do not convert"));
         }
         if (n.type == 13 || (n.kind == 1 && Integer(n.type) != i8(0) && Integer(type) != i8(0) && Fits(n.value, type) != i8(0))) {
             n.type = type;

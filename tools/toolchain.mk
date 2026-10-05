@@ -623,3 +623,9 @@ ownership-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/
 borrow-fuzz-test: build/cool-compiler build/language.BIN
 	python3 tools/test_borrow_fuzz.py --output build/borrow-fuzz-audit.json
 test: borrow-fuzz-test
+
+# Rejection diagnostics name the actual problem on both frontends.
+.PHONY: diagnostics-test
+diagnostics-test: build/cool-compiler build/language.BIN
+	python3 tools/test_diagnostics.py
+test: diagnostics-test
