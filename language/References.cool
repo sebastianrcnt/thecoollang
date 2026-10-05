@@ -75,9 +75,20 @@ Bool ReferenceMatches(ReferenceCheck *check,Node *place,Local *via,Local *root,B
     for(loan=check->loans;loan;loan=loan->next)if(loan->holder==via && loan->indirect==layer && loan->root==root && (!writing || loan->exclusive))return TRUE;
     return FALSE;
 }
+// Query-local visited queue follows every parent and clears marks on all exits.
 Bool ReferenceAncestor(ReferenceCheck *check,Local *holder,Local *via,Local *root){
-    Local *current=via;ReferenceLoan *loan;
-    while(current){if(current==holder)return TRUE;loan=ReferenceHolder(check,current,root);if(!loan)return FALSE;current=loan->parent;}return FALSE;
+    Local *current,*tail,*parent,*next;ReferenceLoan *loan;Bool found=FALSE;
+    if(!holder || !via)return FALSE;
+    current=tail=via;via->reference_visit=1;via->reference_next=NULL;
+    while(current){
+        if(current==holder){found=TRUE;break;}
+        for(loan=check->loans;loan;loan=loan->next)if(loan->holder==current && loan->root==root && loan->parent && !loan->parent->reference_visit){
+            parent=loan->parent;parent->reference_visit=1;parent->reference_next=NULL;tail->reference_next=parent;tail=parent;
+        }
+        current=current->reference_next;
+    }
+    current=via;while(current){next=current->reference_next;current->reference_visit=0;current->reference_next=NULL;current=next;}
+    return found;
 }
 U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing){
     Local *via=BorrowRoot(place);ReferenceLoan *loan;if(!via)return;

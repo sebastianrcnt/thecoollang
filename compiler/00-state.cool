@@ -71,6 +71,10 @@ place_region: i64;
 
 destination_mark: *Node;
 
+reference_visit: i64;
+
+reference_next: *Local;
+
 moved: i64;
 
 loop_level: i64;

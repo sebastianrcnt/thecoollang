@@ -112,7 +112,9 @@ fn ContainsReference(type: i64) -> bool {
 }
 // Stored references are copied as reborrows. Owning payloads and stored
 // references to borrowed storage still need further lifetime tracking.
-fn TrackedBorrow(type: i64) -> bool { return Borrowed(type) != i8(0); }
+fn TrackedBorrow(type: i64) -> bool {
+    return Borrowed(type) != i8(0);
+}
 fn ReferenceStorage(type: i64) -> bool {
     unsafe {
         if (IsReference(type)) {
@@ -123,7 +125,9 @@ fn ReferenceStorage(type: i64) -> bool {
         }
         Layout(type);
         let shape = Shape(type);
-        if (shape.kind == 3) { return Borrowed(shape.element) == i8(0); }
+        if (shape.kind == 3) {
+            return Borrowed(shape.element) == i8(0);
+        }
         if (shape.kind == 5) {
             return true;
         }
@@ -142,7 +146,9 @@ fn ReferenceStorage(type: i64) -> bool {
 }
 // Per-root modes are retained in loans. This maximum is only the permission
 // required to copy a typed value; it must never upgrade a shared source root.
-fn ReferenceMode(type:i64)->i64{return i64(BorrowTypeProperty(type,true));}
+fn ReferenceMode(type: i64) -> i64 {
+    return i64(BorrowTypeProperty(type, true));
+}
 fn ValidateReferenceStorage(type: i64, token: * Token) {
     unsafe {
         if (IsReference(type)) {
@@ -200,7 +206,9 @@ fn ReferenceThroughStored(place: * Node) -> bool {
         if (place == null) {
             return false;
         }
-        if (place.kind == 25 && place.op == 3) { return true; }
+        if (place.kind == 25 && place.op == 3) {
+            return true;
+        }
         if (place.kind == 30) {
             if (IsReference(place.a.type)) {
                 return place.a.kind == 18;
@@ -239,20 +247,45 @@ fn ReferenceMatches(check: * ReferenceCheck, place: * Node, via: * Local, root: 
         return false;
     }
 }
+// A holder/root can have multiple parents after unioned call results. Walk
+// every matching edge once per local, with an intrusive query-local queue.
+// Clear all marks/links before returning, including successful early exits.
 fn ReferenceAncestor(check: * ReferenceCheck, holder: * Local, via: * Local, root: * Local) -> bool {
     unsafe {
+        if (holder == null || via == null) {
+            return false;
+        }
         var current = via;
+        var tail = via;
+        via.reference_visit = 1;
+        via.reference_next = null;
+        var found = false;
         while (current != null) {
             if (current == holder) {
-                return true;
+                found = true;
+                break;
             }
-            let loan = ReferenceHolder(check, current, root);
-            if (loan == null) {
-                return false;
+            var loan = check.loans;
+            while (loan != null) {
+                if (loan.holder == current && loan.root == root && loan.parent != null && loan.parent.reference_visit == 0) {
+                    let parent = loan.parent;
+                    parent.reference_visit = 1;
+                    parent.reference_next = null;
+                    tail.reference_next = parent;
+                    tail = parent;
+                }
+                loan = loan.next;
             }
-            current = loan.parent;
+            current = current.reference_next;
         }
-        return false;
+        current = via;
+        while (current != null) {
+            let next = current.reference_next;
+            current.reference_visit = 0;
+            current.reference_next = null;
+            current = next;
+        }
+        return found;
     }
 }
 fn ReferenceAccess(check: * ReferenceCheck, place: * Node, writing: bool) {
@@ -300,7 +333,9 @@ fn ReferencePlaceSource(place: * Node) -> * Node {
         if (place == null) {
             return null;
         }
-        if (place.kind == 25 && place.op == 3) { return place.a; }
+        if (place.kind == 25 && place.op == 3) {
+            return place.a;
+        }
         if (place.kind == 30 && IsReference(place.a.type)) {
             return place.a;
         }
@@ -423,13 +458,15 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
         if (node.kind == 25) {
             if (node.op == 3) {
                 ReferenceSliceValue(check, node.a, writing);
-            } else { ReferenceAddressMode(check, node.a, writing); }
+            } else {
+                ReferenceAddressMode(check, node.a, writing);
+            }
             ReferenceValue(check, node.b);
             return;
         }
         if (node.kind == 30) {
             if (writing && IsReference(node.a.type) && Shape(node.a.type).count == 0) {
-                ErrorAt(node.token, cast[*u8]("cannot mutate or move through a shared reference"));
+                ErrorAt(node.token, cast[ * u8]("cannot mutate or move through a shared reference"));
             }
             if (IsReference(node.a.type) && node.a.kind == 3) {
                 ReferenceAccess(check, node.a, false);
@@ -438,17 +475,25 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                 // loans before a later index or assignment RHS is evaluated.
                 if (IsReference(node.a.type) && node.a.kind == 18) {
                     var mode = Shape(node.a.type).count;
-                    if (!writing) { mode = 0; }
+                    if (!writing) {
+                        mode = 0;
+                    }
                     if (BorrowRoot(node.a.a) != null) {
                         ReferenceAddressMode(check, node.a.a, false);
                         ReferenceAcquire(check, node.a.a, mode, node.a.token, node.a);
-                    } else { ReferenceProjection(check, node.a, mode); }
+                    } else {
+                        ReferenceProjection(check, node.a, mode);
+                    }
                 } else {
                     if (AggregateKind(node.a.type) == 5 && node.a.kind == 18) {
                         ReferenceAddressMode(check, node.a.a, writing);
                         ReferenceAccess(check, node.a.a, false);
                     } else {
-                        if(AggregateKind(node.a.type)==5 && node.a.kind==3){ReferenceAccess(check,node.a,false);}else{ReferenceValue(check,node.a);}
+                        if (AggregateKind(node.a.type) == 5 && node.a.kind == 3) {
+                            ReferenceAccess(check, node.a, false);
+                        } else {
+                            ReferenceValue(check, node.a);
+                        }
                     }
                 }
                 if (AggregateKind(node.a.type) == 5) {
@@ -489,17 +534,21 @@ fn ReferenceAddressIndices(check: * ReferenceCheck, node: * Node) {
         }
     }
 }
-fn ReferenceProjection(check:*ReferenceCheck, node:*Node, mode:i64) {
+fn ReferenceProjection(check: * ReferenceCheck, node: * Node, mode: i64) {
     unsafe {
         let origin = node.origin_source;
-        if (origin == null) { ErrorAt(node.token, cast[*u8]("reference projection requires an origin")); }
+        if (origin == null) {
+            ErrorAt(node.token, cast[ * u8]("reference projection requires an origin"));
+        }
         if (mode != 0 && NestedReference(origin.type) && Shape(origin.type).count == 0) {
-            ErrorAt(node.token, cast[*u8]("cannot mutate or move through a shared reference"));
+            ErrorAt(node.token, cast[ * u8]("cannot mutate or move through a shared reference"));
         }
         let before = check.loans;
         if (origin.kind == 18 && TrackedBorrow(origin.type) && BorrowRoot(origin.a) == null) {
             ReferenceProjection(check, origin, mode);
-        } else { ReferenceValue(check, origin); }
+        } else {
+            ReferenceValue(check, origin);
+        }
         var source = check.loans;
         while (source != before) {
             if (source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {
@@ -516,7 +565,9 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
             return;
         }
         // len observes descriptor storage, not its element capability.
-        if (node.kind == 27 && ReferenceLength(check, node.a)) { return; }
+        if (node.kind == 27 && ReferenceLength(check, node.a)) {
+            return;
+        }
         if (node.kind == 26) {
             if (node.op == 2) {
                 ReferenceAddressMode(check, node.a, true);
@@ -526,7 +577,9 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 ReferenceValue(check, node.a);
                 var loan = check.loans;
                 while (loan != before) {
-                    if (loan.expression == node.a) { loan.expression = node; }
+                    if (loan.expression == node.a) {
+                        loan.expression = node;
+                    }
                     loan = loan.next;
                 }
             }
@@ -584,9 +637,14 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         }
         if (node.kind == 29) {
             ReferenceAddress(check, node.a);
-            if (Owned(node.type) != i8(0)) { ReferenceAccess(check, node.a, true); }
-            if (TrackedBorrow(node.type)) { ReferenceAcquire(check, node.a, ReferenceMode(node.type), node.token, node); }
-            else { ReferenceAccess(check, node.a, true); }
+            if (Owned(node.type) != i8(0)) {
+                ReferenceAccess(check, node.a, true);
+            }
+            if (TrackedBorrow(node.type)) {
+                ReferenceAcquire(check, node.a, ReferenceMode(node.type), node.token, node);
+            } else {
+                ReferenceAccess(check, node.a, true);
+            }
             return;
         }
         if (node.kind == 22 || node.kind == 24 || node.kind == 25 || node.kind == 30) {
@@ -606,8 +664,11 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
             }
             var results: * ReferenceLoan = null;
             var arg = node.a;
-            while(arg!=null){ReferenceValue(check,arg);arg=arg.next;}
-            ReferenceCallStores(check,node,saved);
+            while (arg != null) {
+                ReferenceValue(check, arg);
+                arg = arg.next;
+            }
+            ReferenceCallStores(check, node, saved);
             var index: i64 = 0;
             arg = node.a;
             while (arg != null) {
@@ -618,7 +679,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                     var source = check.loans;
                     var found = false;
                     while (source != saved) {
-                        if (source.holder==null && source.expression == arg) {
+                        if (source.holder == null && source.expression == arg) {
                             found = true;
                             var mode = ReferenceMode(node.type) & source.exclusive;
                             var indirect: i64 = 0;
@@ -682,24 +743,36 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
 }
 // Slice replacement accumulates possible roots at the binding's original
 // lifetime marker, so branches and nested blocks cannot release them early.
-fn ReferenceAssign(check:*ReferenceCheck, target:*Local, value:*Node, stop:*ReferenceLoan) {
+fn ReferenceAssign(check: * ReferenceCheck, target: * Local, value: * Node, stop: * ReferenceLoan) {
     unsafe {
         var marker = stop;
-        while (marker != null && !(marker.root == null && marker.holder == target)) { marker = marker.next; }
-        if (marker == null) { ErrorAt(value.token, cast[*u8]("borrowed assignment requires local tracked storage")); }
+        while (marker != null && !(marker.root == null && marker.holder == target)) {
+            marker = marker.next;
+        }
+        if (marker == null) {
+            ErrorAt(value.token, cast[ * u8]("borrowed assignment requires local tracked storage"));
+        }
         var loan = check.loans;
         while (loan != stop) {
             if (loan.expression == value && loan.root != null) {
-                if (loan.root.depth > target.depth) { ErrorAt(value.token, cast[*u8]("assigned borrow may outlive local storage")); }
+                if (loan.root.depth > target.depth) {
+                    ErrorAt(value.token, cast[ * u8]("assigned borrow may outlive local storage"));
+                }
                 var parent = loan.parent;
                 if (ReferenceAncestor(check, target, parent, loan.root)) {
                     let previous = ReferenceHolder(check, target, loan.root);
-                    if (previous != null) { parent = previous.parent; } else { parent = null; }
+                    if (previous != null) {
+                        parent = previous.parent;
+                    } else {
+                        parent = null;
+                    }
                 }
                 // A persistent binding retains a set of roots/capabilities,
                 // not one record per assignment in its input history.
                 var existing = marker.next;
-                while (existing != null && !(existing.holder == target && existing.root == loan.root && existing.parent == parent && existing.exclusive == loan.exclusive && existing.indirect == loan.indirect)) { existing = existing.next; }
+                while (existing != null && !(existing.holder == target && existing.root == loan.root && existing.parent == parent && existing.exclusive == loan.exclusive && existing.indirect == loan.indirect)) {
+                    existing = existing.next;
+                }
                 if (existing == null) {
                     let retained = ReferenceNew(loan.root, parent, loan.exclusive, loan.indirect, value, marker.next);
                     retained.holder = target;
@@ -746,7 +819,9 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
         if (node.kind == 8) {
             ReferenceValue(check, node.a);
             ReferenceAccess(check, node, true);
-            if (TrackedBorrow(node.type)) { ReferenceAssign(check, node.local_ref, node.a, saved); }
+            if (TrackedBorrow(node.type)) {
+                ReferenceAssign(check, node.local_ref, node.a, saved);
+            }
         } else {
             if (node.kind == 19) {
                 // Pin the destination while evaluating the value; require write
@@ -756,7 +831,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
                 ReferenceValue(check, node.b);
                 ReferenceAccess(check, node.a, true);
                 if (TrackedBorrow(node.type)) {
-                    ReferenceStore(check,node.a,node.b,saved);
+                    ReferenceStore(check, node.a, node.b, saved);
                 }
             } else {
                 if (node.kind == 10 || node.kind == 11 || node.kind == 21) {
@@ -779,7 +854,7 @@ fn AnalyzeReferences(function: * Function) {
         var check = ReferenceCheck {
         };
         check.function = function;
-        ReferenceParameters(&raw check);
+        ReferenceParameters( & raw check);
         ReferenceStatement( & raw check, function.body);
         ReferenceRelease( & raw check, null);
     }
@@ -838,31 +913,38 @@ fn ReferencePointerCast(value: * Node, type: i64, token: * Token) -> * Node {
         return result;
     }
 }
-
 // Accessing elements must carry payload loans without copying an exclusive slice.
-fn ReferenceSliceValue(check: *ReferenceCheck, node: *Node, writing: bool) {
+fn ReferenceSliceValue(check: * ReferenceCheck, node: * Node, writing: bool) {
     unsafe {
-        if (node.kind == 3) { ReferenceAccess(check, node, false); return; }
+        if (node.kind == 3) {
+            ReferenceAccess(check, node, false);
+            return;
+        }
         if (node.kind == 18) {
             ReferenceAddressMode(check, node.a, false);
             ReferenceAccess(check, node.a, false);
-            if (BorrowRoot(node.a) != null) { ReferenceAcquire(check, node.a, BoolInt(writing), node.token, node); }
-            else { ReferenceProjection(check, node, BoolInt(writing)); }
+            if (BorrowRoot(node.a) != null) {
+                ReferenceAcquire(check, node.a, BoolInt(writing), node.token, node);
+            } else {
+                ReferenceProjection(check, node, BoolInt(writing));
+            }
             return;
         }
         ReferenceValue(check, node);
     }
 }
 // len reads physical descriptor storage, not the element capability.
-fn ReferenceLength(check: *ReferenceCheck, node: *Node) -> bool {
+fn ReferenceLength(check: * ReferenceCheck, node: * Node) -> bool {
     unsafe {
-        if (AggregateKind(node.type) != 3) { return false; }
+        if (AggregateKind(node.type) != 3) {
+            return false;
+        }
         if (node.kind == 3) {
             let via = node.local_ref;
             var loan = check.loans;
             while (loan != null) {
                 if (loan.root == via && loan.exclusive != 0 && !ReferenceAncestor(check, loan.holder, via, via)) {
-                    ErrorAt(node.token, cast[*u8]("access conflicts with a live scoped reference"));
+                    ErrorAt(node.token, cast[ * u8]("access conflicts with a live scoped reference"));
                 }
                 loan = loan.next;
             }
@@ -876,14 +958,15 @@ fn ReferenceLength(check: *ReferenceCheck, node: *Node) -> bool {
         return false;
     }
 }
-
 // Read-mode destination pins must not erase write permission of any enclosing
 // reference, including computed receivers and stored reference projections.
-fn ReferenceWriteCapability(place: *Node) {
+fn ReferenceWriteCapability(place: * Node) {
     unsafe {
-        if (place == null) { return; }
+        if (place == null) {
+            return;
+        }
         if (place.kind == 30 && IsReference(place.a.type) && Shape(place.a.type).count == 0) {
-            ErrorAt(place.token, cast[*u8]("cannot mutate or move through a shared reference"));
+            ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
         }
         if (place.kind == 18 || place.kind == 24 || place.kind == 25 || place.kind == 30) {
             ReferenceWriteCapability(place.a);

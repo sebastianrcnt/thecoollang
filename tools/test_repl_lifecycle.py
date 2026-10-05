@@ -103,6 +103,9 @@ def workload(name,count):
         prefix='struct View{r:&i64;}\n'
         setter='fn set(dst:&mut View,src:&i64) stores(dst,src){(*dst).r=src;}\n'
         return (prefix+setter*count+'var x=7;\nvar y=8;\nvar v=View{r:&x};\nset(&mut v,&y);\n*v.r\n','8\n',0)
+    if name=='shared_ancestry_diamonds':
+        prefix='fn choose(a:&i64,b:&i64)->&i64 borrows(a,b){return a;}\nvar x=7;\nlet a=&x;\nlet b=&x;\nvar q=choose(a,b);\n'
+        return (prefix+'q=choose(a,b);\n'*count+'*q\n:forget a\n:forget q\n:forget a\n:forget b\nx=8;\nx\n','7\n8\n',1)
     if name=='distinct_literals_policy':
         return ('var kept="stable";\n'+''.join(f'{{let temporary="unique {i}";assert(false);}}\n' for i in range(count))+'kept\n','stable\n',count)
     raise AssertionError(name)
@@ -124,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
     (project/'cool.mod').write_text('module example.test/lifecycle\n')
     (project/'bad/bad.cool').write_text('package bad;pub fn broken()->i64{return missing;}')
     observations=[]
-    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','distinct_literals_policy'):
+    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','distinct_literals_policy'):
         rows=[]
         for count in args.counts:
             source,output,errors=workload(name,count)
@@ -137,7 +140,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
         bounded=name!='distinct_literals_policy'
         if bounded and not args.observe:
             assert all(row['live_bytes']==rows[0]['live_bytes'] and row['live_count']==rows[0]['live_count'] for row in rows),rows
-        if name in ('reference_replacement_roots','stored_call_roots','stored_parameter_replacements') and not args.observe:
+        if name in ('reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds') and not args.observe:
             assert all(row['peak_bytes']==rows[0]['peak_bytes'] for row in rows),rows
         print(name+': '+', '.join(f'{row["submissions"]} => {row["live_bytes"]} bytes/{row["live_count"]} allocations' for row in rows))
     report=dict(artifact_sha256=digests,counts=args.counts,observations=observations,method='Copied emitted compiler IR call-site instrumentation for CAlloc, StrNew, FileRead (with size output) and Free; fresh REPL process per observation. Shim bookkeeping uses separate host malloc. Final live allocations measured at process exit after REPL cleanup, including fixed compiler tables/live declarations and policy-retained literal text. Other host-internal allocations and JIT mappings are not covered; peak bytes are diagnostic instrumentation data, not production RSS. No compiler source regeneration or shared artifact mutation.')

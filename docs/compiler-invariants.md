@@ -967,3 +967,29 @@ part of a submission may have executed. Repeated calls and compatible function
 replacements are covered by 64/1,024-submission private allocation measurements.
 This is still a two-layer root model. Arbitrary stored references to borrowed
 pointees and slices of borrowed elements need further provenance work.
+
+
+## Multi-parent scoped ancestry
+
+`ReferenceAncestor` follows every holder/parent edge whose physical root matches
+its query. A call result may contain several parents for one root; selecting the
+first `ReferenceHolder` record does not implement reachability. The walker uses
+`Local.reference_visit` and `Local.reference_next` for a query-local queue, visits
+one Local once, and clears every enqueued mark/link on both positive and negative
+returns. These fields are never persistent AST/provenance roots and must remain
+clear before another query or REPL metadata reclamation. The walk does not call
+reentrant ancestry checks or allocate memory. Cycles terminate through visited
+marks; recursive source provenance must not assume a parent chain is linear.
+
+The current adjacency lookup scans loans for each visited Local: at most V node
+visits and V*E inspections, not a linear total-compiler complexity claim.
+`tools/test_reference_ancestry.py` compiles a private production-source copy with
+visit counters and export-only graph adapters. It compares all-parent results
+with an independent Python worklist over root-filtered triples, verifies mark
+cleanup on reused graphs, reverses edge order and checks null/cyclic/depth-128
+shared graphs. Its sanitizer mode instruments generated LLVM loads/stores and
+compiles host/runtime C with ASan/UBSan. Actual language and REPL suites remain
+necessary; synthetic graph evidence does not prove nested stored acceptance.
+
+The next projection graph design is in [nested provenance](borrow-provenance-design.md).
+The current two-layer restrictions remain mandatory implementation work.

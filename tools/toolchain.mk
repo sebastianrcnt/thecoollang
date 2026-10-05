@@ -489,3 +489,10 @@ stores-test: build/cool-compiler build/language.BIN build/language-runtime.o bui
 test: stores-test
 stores-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_stores.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: reference-ancestry-test reference-ancestry-sanitize-test
+reference-ancestry-test: build/cool-compiler build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_reference_ancestry.py --output build/reference-ancestry-audit.json
+test: reference-ancestry-test
+reference-ancestry-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_reference_ancestry.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/reference-ancestry-asan-audit.json

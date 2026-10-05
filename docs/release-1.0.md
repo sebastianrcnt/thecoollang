@@ -1577,6 +1577,43 @@ through ordinary evaluation or library use.
   conformance and other mandatory checkpoints remain unfinished. All release
   gates remain Open; this is not a 1.0 declaration.
 
+- Multi-parent scoped ancestry: a holder/root can have several parents after
+  unioned call results. `ReferenceAncestor` now follows all matching parents
+  rather than one `ReferenceHolder` record. An intrusive query-local queue visits
+  each Local once, terminates on cycles and clears all visited flags/links on
+  every return, without allocations or persistent query state. Legacy and
+  production implementations remain aligned. The current scan-based adjacency
+  lookup is bounded by V node visits and V*E loan inspections per query; this is
+  not a claim about total compilation complexity.
+
+  A private production-source LLVM audit compares 52 root-filtered graph/order
+  variants and 57,716 queries with an independent Python reachability oracle.
+  Null endpoints/parents/roots, cycles, second-parent-only reachability, shared
+  diamonds through depth 128, reversed edges and repeated queries on the same
+  objects pass. Every query checks that its visited flags and queue links were
+  cleared. Native and sanitizer reports record source/IR/platform identities in
+  `build/reference-ancestry{,-asan}-audit.json`; sanitizer mode verifies generated
+  LLVM load/store instrumentation and builds host/runtime with ASan/UBSan.
+  Full regression, exact three-generation bootstrap convergence, REPL allocation
+  histories and clean external editor/distribution use pass. Source-level
+  diamonds and live exclusive ancestor/sibling conflicts were also probed on
+  native/legacy compilers; no unsafe acceptance was reproduced in those probes.
+  Permanent source regressions now execute shared diamonds, mutual replacement,
+  common exclusive ancestors and scope release on five engines/O2 for both
+  frontends and the ASan compiler; four live-loan conflicts and REPL dependency
+  release cases pass. Repeated shared ancestry diamonds also have equal final
+  allocation counts/bytes and peak bytes at 64/1,024 submissions.
+  Evidence: `build/release-audit/ancestry-{build,focused,adjacent,regression,sanitize,distribution,lifecycle,final-native,final-focused,final-lifecycle}.log`.
+  Emitted compiler IR SHA-256:
+  `5bb1047591ebbb649a7d9b795a76d5950bf04d6e3df3e0d00bfb58b9a4327942`.
+
+  This is a graph prerequisite for nested borrowed storage, not acceptance of
+  that feature. [The nested provenance design](borrow-provenance-design.md)
+  specifies typed field/element/referent/owned-payload cursors, per-root capability
+  preservation, contract substitution, recursive graphs and transaction ownership.
+  Stored borrowed pointees and borrowed slice elements remain mandatory; all
+  release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve
