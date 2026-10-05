@@ -3156,6 +3156,18 @@ through ordinary evaluation or library use.
   `e688788c51a34afd`). Four modules still contain generated dispatch sections
   (02-lexer, 06-parser, 08-llvm, 15-native); G3's complete audit stays Open.
 
+- Compiler maintenance: `compiler/06-parser.cool` no longer contains a generated
+  dispatch state machine for expression parsing. `Expr` is now a direct
+  precedence-climbing loop: parse a primary, then while the next operator's
+  precedence is at least the minimum, parse the right operand one level tighter
+  and apply the same logical/equality/numeric/pointer type checks and the
+  division-by-zero and shift-count checks. Behavior is unchanged: the expression,
+  declaration, primary-form, integer-semantics, float-arithmetic and coercion
+  suites pass, the full regression suite exits 0, and both bootstrap paths
+  converge (self-host IR SHA256 begins `6b35ac47c473db19`). Three modules still
+  contain generated dispatch sections (02-lexer, 08-llvm, 15-native) plus the
+  parser's `SpecializeFunction`/`ParseProgram`; G3's complete audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

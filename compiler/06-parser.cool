@@ -431,447 +431,70 @@ return i64(0);
 }
 
 
-fn Expr(arg_v_min: i64) -> *Node {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_min: i64 = arg_v_min;
-var v_a6: *Node = null;
-var v_n13: *Node = null;
-var v_t11: *Token = null;
-var v_p2: i64 = i64(0);
-var v_op: i64 = i64(0);
-var t0: *Token = null;
-var t1: *u8 = null;
-var t2: bool = false;
-var t3: bool = false;
-var t4: bool = false;
-var t5: bool = false;
-var t6: i64 = i64(0);
-var t7: i64 = i64(0);
-var t8: *Token = null;
-var t9: *u8 = null;
-var t10: i64 = i64(0);
-var t11: i8 = i8(0);
-var t12: bool = false;
-var t13: bool = false;
-var t14: bool = false;
-var t15: bool = false;
-var t16: *Token = null;
-var t17: *u8 = null;
-var t18: bool = false;
-var t19: *Token = null;
-var t20: *u8 = null;
-var t21: bool = false;
-var t22: bool = false;
-var t23: i64 = i64(0);
-var t24: i8 = i8(0);
-var t25: bool = false;
-var t26: bool = false;
-var t27: bool = false;
-var t28: *Token = null;
-var t29: *u8 = null;
-var t30: i64 = i64(0);
-var t31: i8 = i8(0);
-var t32: bool = false;
-var t33: bool = false;
-var t34: bool = false;
-var t35: bool = false;
-var t36: bool = false;
-var t37: bool = false;
-var t38: *Token = null;
-var t39: *u8 = null;
-var t40: i64 = i64(0);
-var t41: i8 = i8(0);
-var t42: bool = false;
-var t43: *Node = null;
-var t44: i64 = i64(0);
-var t45: *Node = null;
-var t46: i64 = i64(0);
-var t47: *Token = null;
-var t48: *u8 = null;
-var t49: *Token = null;
-var t50: *u8 = null;
-var t51: bool = false;
-var t52: bool = false;
-var t53: i64 = i64(0);
-var t54: i8 = i8(0);
-var t55: bool = false;
-var t56: i64 = i64(0);
-var t57: i8 = i8(0);
-var t58: bool = false;
-var t59: i64 = i64(0);
-var t60: *Node = null;
-var t61: i64 = i64(0);
-var t62: *Token = null;
-var t63: *Node = null;
-var t64: i64 = i64(0);
-var t65: i64 = i64(0);
-var t66: i64 = i64(0);
-var t67: *Token = null;
-var t68: *Token = null;
-var t69: i64 = i64(0);
-var t70: i64 = i64(0);
-var t71: *Node = null;
-var pc: i64 = 49;
-while (true) {
-if (pc == 1) {
-pc = 5;
-continue;
-}
-if (pc == 2) {
-return null;
-}
-if (pc == 3) {
-return v_a6;
-}
-if (pc == 4) {
-t68 = At();
-t69 = (t68).kind;
-t70 = Prec(t69);
-if ((t70 >= v_min)) { pc = 46; } else { pc = 3; }
-continue;
-}
-if (pc == 5) {
-pc = 4;
-continue;
-}
-if (pc == 6) {
-v_a6 = v_n13;
-pc = 1;
-continue;
-}
-if (pc == 7) {
-t2 = (v_op == 266);
-if (!t2) {
-t2 = (v_op == 267);
-}
-t3 = t2;
-if (t3) {
-t3 = (((v_n13).b).kind == 1);
-}
-t4 = t3;
-if (t4) {
-t5 = (((v_n13).b).value < 0);
-if (!t5) {
-t6 = ((v_n13).a).type;
-t7 = Width(t6);
-t5 = (((v_n13).b).value >= t7);
-}
-t4 = t5;
-}
-if (t4) { pc = 8; } else { pc = 6; }
-continue;
-}
-if (pc == 8) {
-t0 = v_t11;
-t1 = cast[*u8]("shift count must be below operand width");
-ErrorAt(t0, t1);
-pc = 6;
-continue;
-}
-if (pc == 9) {
-t10 = (v_a6).type;
-t11 = Floating(t10);
-t12 = !((t11 != i8(0)));
-if (t12) {
-t13 = (v_op == 47);
-if (!t13) {
-t13 = (v_op == 37);
-}
-t12 = t13;
-}
-t14 = t12;
-if (t14) {
-t14 = (((v_n13).b).kind == 1);
-}
-t15 = t14;
-if (t15) {
-t15 = !((((v_n13).b).value != i64(0)));
-}
-if (t15) { pc = 10; } else { pc = 7; }
-continue;
-}
-if (pc == 10) {
-t8 = v_t11;
-t9 = cast[*u8]("division by zero");
-ErrorAt(t8, t9);
-pc = 7;
-continue;
-}
-if (pc == 11) {
-t58 = (v_op == 263);
-if (!t58) {
-t58 = (v_op == 264);
-}
-if (t58) { pc = 13; } else { pc = 30; }
-continue;
-}
-if (pc == 12) {
-(v_n13).type = 2;
-pc = 9;
-continue;
-}
-if (pc == 13) {
-t18 = ((v_a6).type != 2);
-if (!t18) {
-t18 = (((v_n13).b).type != 2);
-}
-if (t18) { pc = 14; } else { pc = 12; }
-continue;
-}
-if (pc == 14) {
-t16 = v_t11;
-t17 = cast[*u8]("logical operators require bool operands");
-ErrorAt(t16, t17);
-pc = 12;
-continue;
-}
-if (pc == 15) {
-t42 = (v_op == 259);
-if (!t42) {
-t42 = (v_op == 260);
-}
-if (t42) { pc = 17; } else { pc = 24; }
-continue;
-}
-if (pc == 16) {
-(v_n13).type = 2;
-pc = 9;
-continue;
-}
-if (pc == 17) {
-t21 = ((v_a6).type == 0);
-if (!t21) {
-t21 = ((v_a6).type == 3);
-}
-t22 = t21;
-if (!t22) {
-t23 = (v_a6).type;
-t24 = Aggregate(t23);
-t22 = (i64(t24) != i64(0));
-}
-if (t22) { pc = 18; } else { pc = 16; }
-continue;
-}
-if (pc == 18) {
-t19 = v_t11;
-t20 = cast[*u8]("equality requires integers or bool");
-ErrorAt(t19, t20);
-pc = 16;
-continue;
-}
-if (pc == 19) {
-t25 = (v_op == 60);
-if (!t25) {
-t25 = (v_op == 62);
-}
-t26 = t25;
-if (!t26) {
-t26 = (v_op == 261);
-}
-t27 = t26;
-if (!t27) {
-t27 = (v_op == 262);
-}
-if (t27) { pc = 20; } else { pc = 9; }
-continue;
-}
-if (pc == 20) {
-(v_n13).type = 2;
-pc = 9;
-continue;
-}
-if (pc == 21) {
-(v_n13).type = (v_a6).type;
-pc = 19;
-continue;
-}
-if (pc == 22) {
-t30 = (v_a6).type;
-t31 = Floating(t30);
-t32 = (i64(t31) != i64(0));
-if (t32) {
-t33 = (v_op == 37);
-if (!t33) {
-t33 = (v_op == 38);
-}
-t34 = t33;
-if (!t34) {
-t34 = (v_op == 124);
-}
-t35 = t34;
-if (!t35) {
-t35 = (v_op == 94);
-}
-t36 = t35;
-if (!t36) {
-t36 = (v_op == 266);
-}
-t37 = t36;
-if (!t37) {
-t37 = (v_op == 267);
-}
-t32 = t37;
-}
-if (t32) { pc = 23; } else { pc = 21; }
-continue;
-}
-if (pc == 23) {
-t28 = v_t11;
-t29 = cast[*u8]("operator requires integer operands");
-ErrorAt(t28, t29);
-pc = 21;
-continue;
-}
-if (pc == 24) {
-t40 = (v_a6).type;
-t41 = Numeric(t40);
-if (!((t41 != i8(0)))) { pc = 25; } else { pc = 22; }
-continue;
-}
-if (pc == 25) {
-t38 = v_t11;
-t39 = cast[*u8]("operator requires numeric operands");
-ErrorAt(t38, t39);
-pc = 22;
-continue;
-}
-if (pc == 26) {
-if (((v_a6).type != ((v_n13).b).type)) { pc = 27; } else { pc = 15; }
-continue;
-}
-if (pc == 27) {
-CoerceBinary(v_a6,v_n13.b,v_op);
-pc = 15;
-continue;
-}
-if (pc == 30) {
-t51 = (v_op == 43);
-if (!t51) {
-t51 = (v_op == 45);
-}
-t52 = t51;
-if (t52) {
-t53 = (v_a6).type;
-t54 = Pointer(t53);
-t52 = (i64(t54) != i64(0));
-}
-t55 = t52;
-if (t55) {
-t56 = ((v_n13).b).type;
-t57 = Integer(t56);
-t55 = (i64(t57) != i64(0));
-}
-if (t55) { pc = 37; } else { pc = 26; }
-continue;
-}
-if (pc == 31) {
-pc = 1;
-continue;
-}
-if (pc == 32) {
-v_a6 = v_n13;
-pc = 31;
-continue;
-}
-if (pc == 33) {
-(v_n13).type = (v_a6).type;
-pc = 32;
-continue;
-}
-if (pc == 34) {
-(v_n13).kind = 20;
-pc = 33;
-continue;
-}
-if (pc == 35) {
-if (((v_a6).type == 100000)) { pc = 36; } else { pc = 34; }
-continue;
-}
-if (pc == 36) {
-t47 = v_t11;
-t48 = cast[*u8]("void pointer arithmetic is not defined");
-ErrorAt(t47, t48);
-pc = 34;
-continue;
-}
-if (pc == 37) {
-if (!((ctx.v_unsafe_depth != i64(0)))) { pc = 38; } else { pc = 35; }
-continue;
-}
-if (pc == 38) {
-t49 = v_t11;
-t50 = cast[*u8]("pointer arithmetic requires unsafe");
-ErrorAt(t49, t50);
-pc = 35;
-continue;
-}
-if (pc == 39) {
-t59 = (v_p2 + 1);
-t60 = Expr(t59);
-(v_n13).b = t60;
-pc = 11;
-continue;
-}
-if (pc == 40) {
-(v_n13).a = v_a6;
-pc = 39;
-continue;
-}
-if (pc == 41) {
-(v_n13).op = v_op;
-pc = 40;
-continue;
-}
-if (pc == 42) {
-t61 = 5;
-t62 = v_t11;
-t63 = NewNode(t61, t62);
-v_n13 = t63;
-pc = 41;
-continue;
-}
-if (pc == 43) {
-t64 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 42;
-continue;
-}
-if (pc == 44) {
-t65 = v_op;
-t66 = Prec(t65);
-v_p2 = t66;
-pc = 43;
-continue;
-}
-if (pc == 45) {
-v_op = (v_t11).kind;
-pc = 44;
-continue;
-}
-if (pc == 46) {
-t67 = At();
-v_t11 = t67;
-pc = 45;
-continue;
-}
-if (pc == 47) {
-pc = 4;
-continue;
-}
-if (pc == 48) {
-pc = 47;
-continue;
-}
-if (pc == 49) {
-t71 = Primary();
-v_a6 = t71;
-pc = 48;
-continue;
-}
-}
-}
-return null;
+// Precedence-climbing binary expression parser. Each operator's right operand
+// is parsed one precedence level tighter, then the pair is type-checked and,
+// for pointer arithmetic, retagged before the loop continues.
+fn Expr(min: i64) -> *Node {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var a = Primary();
+        while (Prec(At().kind) >= min) {
+            let token = At();
+            let op = token.kind;
+            let precedence = Prec(op);
+            ctx.v_pos = ctx.v_pos + 1;
+            let n = NewNode(5, token);
+            n.op = op;
+            n.a = a;
+            n.b = Expr(precedence + 1);
+            if (op == 263 || op == 264) {
+                if (a.type != 2 || n.b.type != 2) {
+                    ErrorAt(token, cast[*u8]("logical operators require bool operands"));
+                }
+                n.type = 2;
+            } else if ((op == 43 || op == 45) && Pointer(a.type) != i8(0) && Integer(n.b.type) != i8(0)) {
+                if (ctx.v_unsafe_depth == 0) {
+                    ErrorAt(token, cast[*u8]("pointer arithmetic requires unsafe"));
+                }
+                if (a.type == 100000) {
+                    ErrorAt(token, cast[*u8]("void pointer arithmetic is not defined"));
+                }
+                n.kind = 20;
+                n.type = a.type;
+                a = n;
+                continue;
+            } else {
+                if (a.type != n.b.type) {
+                    CoerceBinary(a, n.b, op);
+                }
+                if (op == 259 || op == 260) {
+                    if (a.type == 0 || a.type == 3 || Aggregate(a.type) != i8(0)) {
+                        ErrorAt(token, cast[*u8]("equality requires integers or bool"));
+                    }
+                    n.type = 2;
+                } else {
+                    if (Numeric(a.type) == i8(0)) {
+                        ErrorAt(token, cast[*u8]("operator requires numeric operands"));
+                    }
+                    if (Floating(a.type) != i8(0) && (op == 37 || op == 38 || op == 124 || op == 94 || op == 266 || op == 267)) {
+                        ErrorAt(token, cast[*u8]("operator requires integer operands"));
+                    }
+                    n.type = a.type;
+                    if (op == 60 || op == 62 || op == 261 || op == 262) {
+                        n.type = 2;
+                    }
+                }
+            }
+            if (Floating(a.type) == i8(0) && (op == 47 || op == 37) && n.b.kind == 1 && n.b.value == 0) {
+                ErrorAt(token, cast[*u8]("division by zero"));
+            }
+            if ((op == 266 || op == 267) && n.b.kind == 1 && (n.b.value < 0 || n.b.value >= Width(n.a.type))) {
+                ErrorAt(token, cast[*u8]("shift count must be below operand width"));
+            }
+            a = n;
+        }
+        return a;
+    }
 }
 
 
