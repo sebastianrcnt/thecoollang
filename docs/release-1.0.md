@@ -27,7 +27,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/declaration/expression/statement forms drafted and tested; whole-language conformance and semantic audit pending) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | **Closed** (evaluation-order, loop-ownership and move-state audits; scoped shared/exclusive references, stored loans, slices, tracked iteration and vector/map APIs; 44+35 reference/storage rejection cases, 320 nested-reference classifications and seeded ownership/borrow/aggregate/slice fuzzers — see the audit log) |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
-| G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
+| G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | **Closed** (nominal methods on struct/enum/owned/generic receivers and the safe collection methods; shared/exclusive references, slices and tracked iteration; 13 named diagnostic categories with narrowing kept distinct from non-convertible mismatches; unsupported constructs rejected explicitly — see the audit log) |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | **Closed** (owned UTF-8 `Text` and `Vector[u8]` bytes; owning `Vector`/`Map`; `fs`/`path`/`process`; JSON serialization; ownership/error/lifetime contract in `stdlib/README.md`; the two-package `examples/tally` project — see the audit log) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | **Closed** (`cool fmt`/`test`/`doc` token-preserving integration; `cool lsp` diagnostics, definitions and scoped/package/type/member/generic completion; a real Neovim client and the external-distribution editor test — see the audit log) |
@@ -3328,6 +3328,23 @@ through ordinary evaluation or library use.
   the published unsafe obligations, and the documented temporary-receiver and
   borrow-aware-replacement restrictions remain explicit ergonomics work (G4), not
   silent acceptance.
+
+- Gate closure — G4 language ergonomics: nominal methods are declared
+  `fn Type.member(self: &Type, ...)` for value, exclusive-reference and owning
+  receivers and lower to ordinary typed/borrow-checked calls; Vector/Text/Map
+  expose methods alongside their free APIs (`make methods-test` covers
+  struct/enum/owned/generic receivers, safe collection methods, five engines,
+  optimized native output and 19 rejections). The borrowing/collection API is
+  the same scoped-reference, stored-loan, slice and tracked-iteration surface
+  audited for G2. Diagnostics name the actual problem in 13 categories and keep
+  numeric narrowing distinct from non-convertible mismatches. Unsupported
+  constructs are rejected explicitly rather than accepted silently: a shared
+  reference does not auto-dereference for field access, C ABI aggregates and
+  strings, non-`C` `extern`, invalid escapes, and the temporary-receiver and
+  borrow-aware-replacement limits are all documented rejections (see
+  `docs/references.md`). Evidence is green in `build/drop-depth/reg21.log`; G4
+  is closed. Extending ergonomics further remains tracked improvement work, not
+  a silent-acceptance defect.
 
 ## Next implementation checkpoints
 
