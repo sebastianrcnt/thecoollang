@@ -88,3 +88,8 @@ readable `Coerce` applies the permitted AST conversion while preserving list lin
 `34-template-aggregate.cool` validates unspecialized nominal member grammar and
 type names without allocating a concrete layout; the bootstrap implementation
 is `language/TemplateAggregate.cool`.
+
+The numeric `Arithmetic` evaluator in `07-interpreter.cool` uses direct branches
+and descriptive variables. Its old generated dispatch is removed; integer width,
+unsigned remainder and floating carrier/NaN invariants remain documented in
+`docs/compiler-invariants.md` and covered by independent numeric oracles.

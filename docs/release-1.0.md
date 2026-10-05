@@ -1271,6 +1271,22 @@ through ordinary evaluation or library use.
   are documented without claiming all differences as dependency-check savings.
   G8 remains open for broader real projects and incremental compilation scope.
 
+- Arithmetic evaluator maintenance: replaced the production evaluator's
+  253-line generated dispatch with 58 lines of direct branches and descriptive
+  values. Width-specific division/shift validation, unsigned comparisons and the
+  seed-safe full-width remainder formula remain unchanged; floating carriers,
+  f32 normalization, NaN predicates and final integer normalization are retained.
+  The separate bootstrap evaluator provides a compact semantic counterpart.
+  Full regression/self-host/bootstrap convergence passes, as do the independent
+  integer, exact-rational floating and coercion suites with compiler ASan and
+  generated LLVM/runtime instrumentation. Installed editor/distribution checks
+  also pass. Evidence:
+  `build/release-audit/arithmetic-refactor-{build,final-build,regression,sanitize}.log`
+  and `module-roots-distribution.log`. IR SHA256:
+  `3b4e481008aaedb274b3a65bab85a11c6ba7492d2d32316ed8ad18061c271685`.
+  This removes one generated numeric section; remaining compiler maintenance and
+  mandatory release-wide gates are not closed.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

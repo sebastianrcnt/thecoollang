@@ -775,258 +775,63 @@ return i64(0);
 }
 
 
-fn Arithmetic(arg_v_n24: *Node, arg_v_a8: i64, arg_v_b4: i64) -> i64 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n24: *Node = arg_v_n24;
-var v_a8: i64 = arg_v_a8;
-var v_b4: i64 = arg_v_b4;
-var v_op2: i64 = i64(0);
-var v_result3: i64 = i64(0);
-var v_is_unsigned: i8 = i8(0);
-var v_x: f64 = f64(0);
-var v_y: f64 = f64(0);
-var v_z: f64 = f64(0);
-var t0: i64 = i64(0);
-var t1: i8 = i8(0);
-var t2: i64 = i64(0);
-var t3: i8 = i8(0);
-var t4: i64 = i64(0);
-var t5: f64 = f64(0);
-var t6: i64 = i64(0);
-var t7: f64 = f64(0);
-var t8: i64 = i64(0);
-var t9: f64 = f64(0);
-var t10: i64 = i64(0);
-var t11: i64 = i64(0);
-var t12: i64 = i64(0);
-var t13: i64 = i64(0);
-var t14: *Token = null;
-var t15: i64 = i64(0);
-var t16: bool = false;
-var t17: bool = false;
-var t18: bool = false;
-var t19: bool = false;
-var t20: bool = false;
-var t21: *Token = null;
-var t22: *u8 = null;
-var t23: bool = false;
-var t24: bool = false;
-var t25: bool = false;
-var t26: i64 = i64(0);
-var t27: i64 = i64(0);
-var t28: *Token = null;
-var t29: *u8 = null;
-var t30: i64 = i64(0);
-var t31: bool = false;
-var t32: bool = false;
-var t33: i64 = i64(0);
-var t34: i64 = i64(0);
-var t35: i64 = i64(0);
-v_op2 = (v_n24).op;
-v_result3 = 0;
-t0 = ((v_n24).a).type;
-t1 = Unsigned(t0);
-v_is_unsigned = t1;
-v_z = 0.0;
-t2 = ((v_n24).a).type;
-t3 = Floating(t2);
-if ((t3 != i8(0))) {
-// Check NaN carriers explicitly, including the bootstrap seed's unordered flags.
-if ((v_op2 == 259 || v_op2 == 260 || v_op2 == 60 || v_op2 == 62 || v_op2 == 261 || v_op2 == 262) &&
-    ((v_a8 & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000 || (v_b4 & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000)) {
-    return BoolInt(v_op2 == 260);
+fn Arithmetic(node: *Node, left: i64, right: i64) -> i64 {
+    unsafe {
+        // ASCII arithmetic tokens; 259..264 comparisons/logicals, 266/267 shifts.
+        let op = node.op;
+        let unsigned = Unsigned(node.a.type) != i8(0);
+        if (Floating(node.a.type) != i8(0)) {
+            // Carrier bits avoid the retained seed's unordered CPU flags.
+            let comparison = op == 259 || op == 260 || op == 60 || op == 62 || op == 261 || op == 262;
+            if (comparison && ((left & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000 ||
+                               (right & 0x7FFFFFFFFFFFFFFF) > 0x7FF0000000000000)) {
+                return BoolInt(op == 260);
+            }
+            let x = AsFloat(left);
+            let y = AsFloat(right);
+            var result: f64 = 0.0;
+            if (op == 43) { result = x + y; }
+            else if (op == 45) { result = x - y; }
+            else if (op == 42) { result = x * y; }
+            else if (op == 47) { result = x / y; }
+            else if (op == 259) { return BoolInt(x == y); }
+            else if (op == 260) { return BoolInt(x != y); }
+            else if (op == 60) { return BoolInt(x < y); }
+            else if (op == 62) { return BoolInt(x > y); }
+            else if (op == 261) { return BoolInt(x <= y); }
+            else if (op == 262) { return BoolInt(x >= y); }
+            return ConvertNumber(AsBits(result), 11, node.type, node.token);
+        }
+        if ((op == 47 || op == 37) && (right == 0 ||
+            (!unsigned && left == ((-0x7FFFFFFFFFFFFFFF - 1) >> (64 - Width(node.a.type))) && right == -1))) {
+            ErrorAt(node.token, cast[*u8]("invalid integer division"));
+        }
+        if ((op == 266 || op == 267) && (right < 0 || right >= Width(node.a.type))) {
+            ErrorAt(node.token, cast[*u8]("shift count outside operand width"));
+        }
+        var result: i64 = 0;
+        if (op == 43) { result = left + right; }
+        else if (op == 45) { result = left - right; }
+        else if (op == 42) { result = left * right; }
+        else if (op == 47) { if (unsigned) { result = i64(u64(left) / u64(right)); } else { result = left / right; } }
+        // Preserve full-width remainder without the legacy seed's truncation.
+        else if (op == 37) { if (unsigned) { result = i64(u64(left) - (u64(left) / u64(right)) * u64(right)); } else { result = left % right; } }
+        else if (op == 38) { result = left & right; }
+        else if (op == 124) { result = left | right; }
+        else if (op == 94) { result = left ^ right; }
+        else if (op == 266) { result = left << right; }
+        else if (op == 267) { if (unsigned) { result = i64(u64(left) >> right); } else { result = left >> right; } }
+        else if (op == 259) { result = BoolInt(left == right); }
+        else if (op == 260) { result = BoolInt(left != right); }
+        else if (op == 60) { if (unsigned) { result = BoolInt(u64(left) < u64(right)); } else { result = BoolInt(left < right); } }
+        else if (op == 62) { if (unsigned) { result = BoolInt(u64(left) > u64(right)); } else { result = BoolInt(left > right); } }
+        else if (op == 261) { if (unsigned) { result = BoolInt(u64(left) <= u64(right)); } else { result = BoolInt(left <= right); } }
+        else if (op == 262) { if (unsigned) { result = BoolInt(u64(left) >= u64(right)); } else { result = BoolInt(left >= right); } }
+        else if (op == 263) { result = BoolInt(left != 0 && right != 0); }
+        else if (op == 264) { result = BoolInt(left != 0 || right != 0); }
+        return Normalize(result, node.type);
+    }
 }
-t4 = v_a8;
-t5 = AsFloat(t4);
-v_x = t5;
-t6 = v_b4;
-t7 = AsFloat(t6);
-v_y = t7;
-t8 = v_op2;
-if (t8 == 43) { while (true) {
-v_z = (v_x + v_y);
-break; } }
-if (t8 == 45) { while (true) {
-v_z = (v_x - v_y);
-break; } }
-if (t8 == 42) { while (true) {
-v_z = (v_x * v_y);
-break; } }
-if (t8 == 47) { while (true) {
-v_z = (v_x / v_y);
-break; } }
-if (t8 == 259) { while (true) {
-return i64(BoolInt((v_x == v_y)));
-break; } }
-if (t8 == 260) { while (true) {
-return i64(BoolInt((v_x != v_y)));
-break; } }
-if (t8 == 60) { while (true) {
-return i64(BoolInt((v_x < v_y)));
-break; } }
-if (t8 == 62) { while (true) {
-return i64(BoolInt((v_x > v_y)));
-break; } }
-if (t8 == 261) { while (true) {
-return i64(BoolInt((v_x <= v_y)));
-break; } }
-if (t8 == 262) { while (true) {
-return i64(BoolInt((v_x >= v_y)));
-break; } }
-t9 = v_z;
-t10 = AsBits(t9);
-t11 = t10;
-t12 = 11;
-t13 = (v_n24).type;
-t14 = (v_n24).token;
-t15 = ConvertNumber(t11, t12, t13, t14);
-return t15;
-}
-t16 = (v_op2 == 47);
-if (!t16) {
-t16 = (v_op2 == 37);
-}
-t17 = t16;
-if (t17) {
-t18 = !((v_b4 != i64(0)));
-if (!t18) {
-t19 = !((v_is_unsigned != i8(0)));
-if (t19) {
-t19 = (v_a8 == (((-9223372036854775807) - 1) >> (64 - Width(v_n24.a.type))));
-}
-t20 = t19;
-if (t20) {
-t20 = (v_b4 == (-1));
-}
-t18 = t20;
-}
-t17 = t18;
-}
-if (t17) {
-t21 = (v_n24).token;
-t22 = cast[*u8]("invalid integer division");
-ErrorAt(t21, t22);
-}
-t23 = (v_op2 == 266);
-if (!t23) {
-t23 = (v_op2 == 267);
-}
-t24 = t23;
-if (t24) {
-t25 = (v_b4 < 0);
-if (!t25) {
-t26 = ((v_n24).a).type;
-t27 = Width(t26);
-t25 = (v_b4 >= t27);
-}
-t24 = t25;
-}
-if (t24) {
-t28 = (v_n24).token;
-t29 = cast[*u8]("shift count outside operand width");
-ErrorAt(t28, t29);
-}
-t30 = v_op2;
-if (t30 == 43) { while (true) {
-v_result3 = (v_a8 + v_b4);
-break; } }
-if (t30 == 45) { while (true) {
-v_result3 = (v_a8 - v_b4);
-break; } }
-if (t30 == 42) { while (true) {
-v_result3 = (v_a8 * v_b4);
-break; } }
-if (t30 == 47) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64((u64(v_a8) / u64(v_b4)));
-} else {
-v_result3 = (v_a8 / v_b4);
-}
-break; } }
-if (t30 == 37) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-// Match the bootstrap formula, which avoids the retained seed remainder defect.
-v_result3 = i64(u64(v_a8) - (u64(v_a8) / u64(v_b4)) * u64(v_b4));
-} else {
-v_result3 = (v_a8 % v_b4);
-}
-break; } }
-if (t30 == 38) { while (true) {
-v_result3 = (v_a8 & v_b4);
-break; } }
-if (t30 == 124) { while (true) {
-v_result3 = (v_a8 | v_b4);
-break; } }
-if (t30 == 94) { while (true) {
-v_result3 = (v_a8 ^ v_b4);
-break; } }
-if (t30 == 266) { while (true) {
-v_result3 = (v_a8 << v_b4);
-break; } }
-if (t30 == 267) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64((u64(v_a8) >> u64(v_b4)));
-} else {
-v_result3 = (v_a8 >> v_b4);
-}
-break; } }
-if (t30 == 259) { while (true) {
-v_result3 = i64(BoolInt((v_a8 == v_b4)));
-break; } }
-if (t30 == 260) { while (true) {
-v_result3 = i64(BoolInt((v_a8 != v_b4)));
-break; } }
-if (t30 == 60) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64(BoolInt((u64(v_a8) < u64(v_b4))));
-} else {
-v_result3 = i64(BoolInt((v_a8 < v_b4)));
-}
-break; } }
-if (t30 == 62) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64(BoolInt((u64(v_a8) > u64(v_b4))));
-} else {
-v_result3 = i64(BoolInt((v_a8 > v_b4)));
-}
-break; } }
-if (t30 == 261) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64(BoolInt((u64(v_a8) <= u64(v_b4))));
-} else {
-v_result3 = i64(BoolInt((v_a8 <= v_b4)));
-}
-break; } }
-if (t30 == 262) { while (true) {
-if ((v_is_unsigned != i8(0))) {
-v_result3 = i64(BoolInt((u64(v_a8) >= u64(v_b4))));
-} else {
-v_result3 = i64(BoolInt((v_a8 >= v_b4)));
-}
-break; } }
-if (t30 == 263) { while (true) {
-t31 = (v_a8 != i64(0));
-if (t31) {
-t31 = (v_b4 != i64(0));
-}
-v_result3 = i64(BoolInt(t31));
-break; } }
-if (t30 == 264) { while (true) {
-t32 = (v_a8 != i64(0));
-if (!t32) {
-t32 = (v_b4 != i64(0));
-}
-v_result3 = i64(BoolInt(t32));
-break; } }
-t33 = v_result3;
-t34 = (v_n24).type;
-t35 = Normalize(t33, t34);
-return t35;
-}
-return i64(0);
-}
-
 
 fn DropValue(arg_v_address5: i64, arg_v_type32: i64) {
 unsafe {

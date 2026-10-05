@@ -740,3 +740,12 @@ sign. Return true only for K_NE in that case, before the scalar switch. LLVM
 ordered comparisons/une already match this rule; VM and native JIT share
 Arithmetic. Do not test NaN through `x != x` in bootstrap compiler code, because
 that would rely on the defective seed operation itself.
+
+`Arithmetic` in `07-interpreter.cool` now uses direct control flow rather than
+port-generated temporaries and single-iteration dispatch loops. Preserve the
+operand's width/signedness for division and shifts, the seed-safe full-width
+unsigned remainder formula, binary64 carriers with f32 normalization, unordered
+comparison handling and final integer normalization. The bootstrap's compact
+switch implementation remains intentionally separate. Numeric refactors must
+pass independent integer/rational oracles on both frontends and all engines;
+bootstrap convergence alone cannot establish arithmetic correctness.
