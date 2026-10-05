@@ -11,6 +11,7 @@ extern ReferenceLoan *ReferenceNewFrom(ReferenceCheck *check,ReferenceLoan *sour
 extern ReferenceLoan *ReferenceNewSelected(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next,Node *place,Local *via,Node *origin,Bool payload);
 extern ReferenceLoan *ReferenceNewCall(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
 extern U0 ReferenceComputedGraph(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Node *origin,Node *expression,I64 exclusive);
+extern U0 ReferenceRequirePayloadCopy(ReferenceCheck *check,Node *place,Local *via);
 extern U0 ReferenceRequirePayloadWrite(ReferenceCheck *check,Node *place,Local *via);
 extern Bool ReferencePayloadMayAccess(ReferenceLoan *source,Node *place,Local *via);
 extern U0 ReferenceAggregateProvenance(ReferenceCheck *check,ReferenceLoan *loan,Node *aggregate,Node *item);
@@ -126,7 +127,7 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
         }
         if(!found)ErrorAt(token,"reference result requires a tracked root");return;
     }
-    ReferenceAccess(check,place,exclusive!=0);
+    ReferenceAccess(check,place,exclusive!=0);if(exclusive && (expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE))ReferenceRequirePayloadCopy(check,place,via);
     address=expression->kind==N_AGG_LITERAL && expression->op==0;
     bridge=expression->kind==N_AGG_LITERAL && expression->op==1;
     through=ReferenceThroughStored(place);physical=address && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);

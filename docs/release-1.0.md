@@ -2025,6 +2025,33 @@ through ordinary evaluation or library use.
   storage and remaining release gates still require implementation. All gates
   remain Open.
 
+- Named borrowed-value copies/moves now reject any known shared path to an
+  exclusive handle before graph selection can coarsen its capability. The finite
+  authority query follows aggregate value edges after the place cursor ends,
+  but stops at reference/slice handles. Shared handles require no exclusive copy
+  authority; mutable handles use their declared mode, including slices. Their
+  internal payloads keep lifetime protection and are not mistaken for copied
+  handles. Both physical/payload loan layers participate for named receivers.
+
+  Independent selection/overlap/write/copy-mode oracles pass 1,630 cases using
+  actual private reference/slice descriptors, with shared/exclusive alternatives,
+  cycles, missing paths and handle boundaries. Actual private production and seed
+  hooks reject both a field copy and a whole aggregate copy when their metadata
+  contains shared and exclusive alternatives. Seven legacy 64/1,024-submission
+  histories end at zero tracked graph allocations and stable peaks; alternating
+  copy rejection/recovery peaks at 2,704 bytes. These private graph allocations
+  retain the instrumentation exclusions documented above.
+
+  Full regression, production/seed bootstrap convergence, generated LLVM ASan,
+  host/runtime ASan/UBSan and external editor/distribution installation pass.
+  Compiler IR SHA-256:
+  `6ff8e3a108fcec25424e4002ccd83340bcd277c3e64b4c47c53d9c1bdd2078d7`.
+  Evidence: `build/release-audit/provenance-copy-authority-{build,focused,selection,regression,sanitize,distribution}.log`.
+  Computed receivers, opaque permission fallback, complete physical projection
+  protection and arbitrary nested borrowed storage remain required. This is
+  additional rejection coverage, not full universal authorization or completion
+  of any release gate. All gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

@@ -94,8 +94,12 @@ function analysis is registered under a heap check list for exception cleanup.
 Graph roots participate in Local reclamation. Loan queries intersect the loan's
 entry capability before following graph barriers.
 
-The existing two-layer checker still authorizes writes and protects physical
-anchors. Typed graph paths now exclude proven absent layer-one payload roots
+The existing two-layer checker still protects physical anchors and supplies
+opaque permission fallback. Universal typed payload mode queries additionally
+reject shared alternatives for named stored-referent writes and exclusive-handle
+value copies/moves. Handle copies stop at reference/slice nodes; their internal
+payload graphs retain lifetime protection without requiring exclusive copy
+authority. Computed receivers and full physical protection remain required. Typed graph paths now exclude proven absent layer-one payload roots
 from production conflict matching and reborrow acquisition. Overlap ignores
 shared/exclusive mode; terminal physical roots overlap remaining projections.
 Unknown/opaque/incomplete paths remain conservative. This first access step
@@ -106,10 +110,9 @@ structure. Opaque return bounds are per source root/capability, with recursive
 skeleton reuse preserved through owned auxiliary clone edges. These are upper
 bounds, not callee-body field correspondences. Auxiliary ownership is never
 followed for access authorization. Precise typed caller/callee substitution
-and physical protection remain required. Legacy bootstrap
-checking retains its old internal records and unchanged permission behavior;
-private metadata validation concerns production-source LLVM (also compiled by
-legacy during self-hosting). Physical prefix overlap, descriptor-lifetime audit
+and physical protection remain required. Legacy graph construction, selection, call/store upper bounds, access absence
+and these additional universal authority checks now mirror production; both
+actual frontends are exercised by private metadata/REPL regressions. Physical prefix overlap, descriptor-lifetime audit
 and arbitrary nested acceptance remain required. The initial state deduplication scans a list:
 state visits are bounded but membership search can be quadratic. The independent
 product-graph audit counts both visits and membership comparisons; no linear

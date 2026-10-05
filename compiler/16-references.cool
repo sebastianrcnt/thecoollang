@@ -391,6 +391,9 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
             return;
         }
         ReferenceAccess(check, place, exclusive != 0);
+        if (exclusive != 0 && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29)) {
+            ReferenceRequirePayloadCopy(check, place, via);
+        }
         let address = expression.kind == 23 && expression.op == 0;
         let bridge = expression.kind == 23 && expression.op == 1;
         let through = ReferenceThroughStored(place);

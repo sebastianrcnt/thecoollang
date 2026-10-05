@@ -109,7 +109,10 @@ fn WriteBarrierProbe(check:*ReferenceCheck,node:*Node){unsafe{
     var tail=ProvenanceCursor{type:inner,kind:1,key:item.key,next:null};
     var path=ProvenanceCursor{type:local.type,kind:3,key:0,next:&raw tail};
     var referent=ProvenanceCursor{type:item.target.type,kind:3,key:0,next:null};
-    let existential=ReferenceLoanQuery(loan,&raw path,loan.root,true);tail.next=&raw referent;
+    let existential=ReferenceLoanQuery(loan,&raw path,loan.root,true);
+    if(ReferencePathWriteModes(loan,&raw path,1)!=0 || ReferencePathCopyModes(loan,&raw path,1)!=3){NativeExit(94);}
+    if(ReferencePathCopyModes(loan,null,1)!=0){NativeExit(95);}
+    tail.next=&raw referent;
     if(!existential || ReferencePathWriteModes(loan,&raw path,1)!=3){NativeExit(92);}
     changed=true;break;
    }item=item.next;}
@@ -313,6 +316,10 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  r=run([native],env=env);assert (r.returncode,r.stdout,r.stderr)==(0,'42\n',''),r
  probe=tmp/'write-probe.cool';probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let write_probe=&mut pair;*(*write_probe).right=9;}')
  r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot mutate or move through a shared reference' in r.stderr,r
+ probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let write_probe=&mut pair;let q=(*write_probe).right;*q=9;}')
+ r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot copy or move an exclusive reference through a shared path' in r.stderr,r
+ probe.write_text('struct Pair{left:&mut i64;right:&mut i64;}fn main(){var a=1;var b=2;var pair=Pair{left:&mut a,right:&mut b};let write_probe=&mut pair;let q=*write_probe;}')
+ r=run([binary,'check',probe],env=env);assert r.returncode==2 and 'cannot copy or move an exclusive reference through a shared path' in r.stderr,r
  repl='struct Pair{left:&i64;right:&i64;}\nvar x=7;\nvar y=8;\nvar assigned=Pair{left:&x,right:&y};\n{assigned=Pair{left:&x,right:&y};assert(false);}\nfn broken(){var a=1;let r=&a;a=2;}\nassigned=assigned;\n*assigned.left\n*assigned.right\n:forget assigned\nx=3;\nx\n:quit\n'
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r
  assert 'AddressSanitizer' not in r.stderr and 'runtime error:' not in r.stderr,r

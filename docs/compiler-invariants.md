@@ -1232,3 +1232,35 @@ claim that ordinary source construction can create that malformed mapping. The
 legacy audit repeats rejection 64/1,024 times and verifies recovery plus zero
 tracked graph allocations at cleanup, with equal 2,704-byte peaks. This sixth
 workload shares the instrumentation exclusions documented above.
+
+
+## Universal authority for copying named borrowed values
+
+`ReferencePathAuthorityModes` shares the finite worklist between write and copy
+queries. `ReferencePathWriteModes` retains its slot-write semantics. The copy
+wrapper follows value edges once the cursor ends at an aggregate; it stops at
+reference/slice handles. Only a mutable handle's physical terminal requires
+exclusive authority, determined by `ReferenceMode`, including slices whose count
+is not a mutability bit. Shared handles contribute zero. Referent/Element children
+of a handle are lifetime payloads and are not copied handles; traversing them
+would incorrectly reject an exclusive receiver containing shared references.
+Physical terminal prefixes before cursor completion still contribute their mode.
+Opaque/incomplete/type-mismatched paths retain the existing scoped fallback.
+
+Named `ReferenceAcquire` for local values, loads and moves with a nonzero typed
+mode checks all holder/root loans in both layers before selection can coarsen
+capabilities. Any shared alternative rejects copying/moving the exclusive handle
+or aggregate. Query and cursor scratch are freed before reporting the error.
+Explicit address acquisition, raw bridges and computed receivers keep their
+existing checks; this does not finish arbitrary nested storage, all copy/move
+permission cases or physical projection protection.
+
+The independent oracle maps abstract graph labels to actual shared/mutable
+reference and slice descriptors and checks copy modes alongside selection,
+overlap and write modes in 1,630 cases. Its type table is private per probe and
+released after each query. Explicit handle cases ensure their payloads are not
+mistaken for copied handles. Actual private frontend hooks inject mixed
+capabilities and reject both field extraction and whole aggregate copies. Seven
+legacy 64/1,024-submission workloads include alternating field/aggregate copy
+rejections, recovery and final zero graph allocations. The allocation scope
+remains restricted to the documented graph-node/edge/query/copy instrumentation.

@@ -48,6 +48,24 @@ def write_modes(nodes,edges,path,start,mode,complete,known):
    _,kind,key,nxt=path[c]
    pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
  return result
+def copy_modes(nodes,edges,path,start,mode,complete,known):
+ if not complete:return 4
+ if start<0:return 0 if known else 4
+ pending=[(start,0 if path else -1,mode)];visited=set();result=0
+ while pending:
+  n,c,m=pending.pop()
+  if n<0 or (n,c,m) in visited:continue
+  visited.add((n,c,m));typ,root,cap,opaque=nodes[n]
+  if opaque or (c>=0 and typ!=path[c][0]):result|=4;continue
+  if c<0:
+   if typ in (0,1,20,30,40):
+    if typ not in (0,30) and root==0:result|=1 if m&cap else 2
+   else:pending.extend((t,-1,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0)
+  elif root==0:result|=1 if m&cap else 2
+  else:
+   _,kind,key,nxt=path[c]
+   pending.extend((t,nxt,m&barrier) for s,k,v,t,barrier in edges if s==n and t>=0 and k==kind and (kind!=1 or v==key))
+ return result
 def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  # Independent selection returns a union of original endpoint states and
  # opaque root alternatives, then queries that union with another cursor.
@@ -125,6 +143,15 @@ export "C" fn SelectJoinProbe(){unsafe{
  if(destination.provenance==null || destination.provenance.type!=20 || destination.provenance_known!=0 || ReferenceLoanQuery(&raw destination,null,&raw root,true)){NativeExit(55);}
  ProvenanceGraphFree(&raw graph);
 }}
+fn CopyProbeType(type:i64)->i64{unsafe{
+ var token=Token{};
+ if(type==0){return SequenceType(6,1,0,&raw token);}
+ if(type==1){return SequenceType(6,1,1,&raw token);}
+ if(type==20){return SequenceType(6,2,1,&raw token);}
+ if(type==30){return SequenceType(6,2,0,&raw token);}
+ if(type==40){return SequenceType(3,1,0,&raw token);}
+ return type;
+}}
 export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mode:i64,complete:i64,type:i64,known:i64,q:i64,qs:*i64,writing:i64)->i64{unsafe{
  var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
  let nodes=cast[**ProvenanceNode](CAlloc((n+1)*8));
@@ -136,7 +163,13 @@ export "C" fn SelectProbe(n:i64,e:i64,ns:*i64,es:*i64,c:i64,ps:*i64,start:i64,mo
  var source=ReferenceLoan{};source.root=&raw root;source.exclusive=mode;source.provenance_known=known;if(start>=0){source.provenance=nodes[start];}
  var path:*ProvenanceCursor=null;if(c>0){path=paths;}var extra:*ProvenanceCursor=null;if(q>0){extra=&raw paths[c];}
  var selected=ReferenceSelectGraph(&raw check,&raw source,path,complete,type);
- let result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete))+8*ReferencePathWriteModes(&raw source,path,complete);
+ var result=BoolInt(ProvenanceQueryRoot(selected.node,extra,&raw root,1,writing!=0))+2*selected.known+4*BoolInt(ReferencePathMayAccess(&raw source,path,complete))+8*ReferencePathWriteModes(&raw source,path,complete);
+ let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+ ctx.v_naggregates=0;ctx.v_aggregate_types=cast[*AggregateType](CAlloc(8*i64(sizeof(AggregateType))));
+ for(var i:i64=0;i<n;i=i+1){nodes[i].type=CopyProbeType(nodes[i].type);}
+ for(var i:i64=0;i<c;i=i+1){paths[i].type=CopyProbeType(paths[i].type);}
+ result=result+64*ReferencePathCopyModes(&raw source,path,complete);
+ Free(cast[*u8](ctx.v_aggregate_types));ctx.v_aggregate_types=null;ctx.v_naggregates=0;
  Free(cast[*u8](paths));Free(cast[*u8](nodes));ProvenanceGraphFree(&raw graph);return result;
 }}
 '''
@@ -178,6 +211,14 @@ for es in ([(0,1,100,1,1),(0,1,100,2,0)],[(0,1,100,2,0),(0,1,100,1,1)]):
  for mode in (0,1):
   case=(ns,es,[(10,1,100,1),(20,3,0,-1)],0,mode,1,20,1,[],1);cases.append(case)
   assert write_modes(ns,es,case[2],0,mode,1,1)==(3 if mode else 2)
+# Handle boundaries: shared references do not need exclusive authority, mutable
+# references/slices do; their referent/element payloads are not copied handles.
+for typ in (20,30,40):
+ for mode in (0,1):
+  ns=[(typ,0,1,0),(20,0,0,0)]
+  es=[(0,3 if typ!=40 else 2,0,1,0),(1,3,0,0,1)]
+  cases.append((ns,es,[],0,mode,1,typ,1,[],1))
+  assert copy_modes(ns,es,[],0,mode,1,1)==(0 if typ==30 else 1 if mode else 2)
 with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directory:
  tmp=Path(directory);audit=tmp/'audit.cool';audit.write_text(AUDIT);files=sorted((ROOT/'compiler').glob('*.cool'));manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(f)+'\n' for f in files)+'__main\t'+str(audit)+'\n');ir=tmp/'compiler.ll'
  frontend=args.frontend.resolve() if args.frontend else ROOT/'build/cool-compiler';env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
@@ -197,10 +238,10 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  lines=[];expected=[]
  for nodes,edges,path,start,mode,complete,typ,known,extra,write in cases:
   lines.append(' '.join(map(str,[len(nodes),len(edges),len(path),len(extra),start,mode,complete,typ,known,write,*[v for row in nodes+edges+path+extra for v in row]])))
-  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known)+8*write_modes(nodes,edges,path,start,mode,complete,known))
+  read,precise=oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write);expected.append(read+2*precise+4*overlap(nodes,edges,path,start,complete,known)+8*write_modes(nodes,edges,path,start,mode,complete,known)+64*copy_modes(nodes,edges,path,start,mode,complete,known))
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent access overlap/universal write-mode oracles; shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print(f'provenance selection/overlap: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print(f'provenance selection/overlap/authority: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
