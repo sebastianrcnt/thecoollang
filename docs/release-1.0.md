@@ -1976,6 +1976,28 @@ through ordinary evaluation or library use.
   authorization, arbitrary nested stored references, full physical projection
   overlap or descriptor lifetime completion. All release gates remain Open.
 
+- Structured call upper bounds now exclude a shared source root from declared
+  mutable-reference/slice physical terminals while retaining their Referent/
+  Element children. A shared root may still occur inside a mutable receiver's
+  shared payload; pruning the entire subtree would lose lifetime protection.
+  A distinct shared-origin recursive skeleton (cache kind 4) survives clone and
+  compaction without changing abstract parameter summaries. Opaque physical
+  call anchors and conservative lifetime loans remain independently protected.
+
+  Private actual mixed-call records verify shared x cannot supply the mutable
+  output field, while exclusive y may occur in either field; no body field
+  correspondence is inferred. Nested summary probes verify the shared root is
+  absent at the outer mutable terminal but remains in the shared child, with
+  writes unavailable. Both frontend access/REPL checks, recursive lifecycle
+  histories, 1,620 selection/overlap cases, 201,624 graph-copy queries and
+  compiler-generated LLVM ASan/host-runtime ASan/UBSan pass. Full regression,
+  production/seed convergence and external editor/distribution checks pass.
+  Compiler IR SHA-256:
+  `ff6173b27a65f46787faadceb7498b0c19cabb42053047d001b4c6557bdaec0d`.
+  Evidence: `build/release-audit/provenance-admissibility-{build,focused,regression,sanitize,distribution}.log`.
+  Universal graph write-path authorization and arbitrary nested borrowed storage
+  remain required; all release gates stay Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

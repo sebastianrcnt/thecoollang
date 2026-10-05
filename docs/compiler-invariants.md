@@ -1175,3 +1175,27 @@ tracks node/edge/query/copy allocations originating in `Provenance.cool`,
 including their frees in `LoanProvenance.cool`; five 64/1,024-submission histories
 finish at zero tracked allocations with equal peaks. Graph arenas, loans,
 other compiler metadata and JIT mappings are outside that audit's scope.
+
+
+## Admissible physical terminals in call type upper bounds
+
+A bounded call value/payload summary with source mode zero uses a separate
+shared-origin type skeleton (summary kind 4). Its declared mutable reference
+and slice nodes omit that source's physical terminal root. Their Referent/Element
+children remain: shared external roots can occur inside storage addressed by a
+mutable reference or slice. Shared reference terminals remain possible, with
+mode-zero barriers. Arrays, owners, struct fields, enum variants and recursive
+memoization retain their normal typed edges; future unknown borrowed kinds stay
+opaque. Parameter abstract graphs remain unchanged. Existing opaque physical
+call anchors and lifetime loan/Region protection remain separate and conservative.
+
+The source bound comes from the actual loan capability intersected with reachable
+root capability; unknown value mappings do not grant an exclusive source root.
+This refinement does not infer body field identity. It only excludes supplying
+an exclusive physical terminal from a shared source. Kind 4 cache identity is
+separate from the unrestricted kind 1 skeleton, and owned canonical connections
+preserve both through clone/compaction. Private mixed-call checks expect the
+shared x origin in the shared output field, while exclusive y remains a possible
+origin in both fields. A nested mutable-reference summary probe verifies x is
+absent at the outer terminal but present in its shared payload. These admissible
+upper bounds prepare universal write-path checking; that checker remains pending.

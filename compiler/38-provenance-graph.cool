@@ -7,7 +7,7 @@
 struct ProvenanceGraph { nodes: *ProvenanceNode; }
 struct ProvenanceNode {
     // Arena-local semantic summary keys survive compaction with live nodes.
-    // Kind 1=unbounded type skeleton, 2=value bound, 3=referent payload bound.
+    // Kind 1=type skeleton, 2=value bound, 3=referent bound, 4=shared-origin skeleton.
     // Owned reachability for canonical summaries; never an authorization edge.
     summary_base: *ProvenanceNode;
     summary_root: *Local;

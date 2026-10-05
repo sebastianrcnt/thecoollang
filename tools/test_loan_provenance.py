@@ -22,7 +22,7 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
    let mutableField=ParameterField(local.type,cast[*u8]("mutable"));
    var cursor=ProvenanceCursor{type:local.type,kind:1,key:cast[i64](mutableField),next:null};
    if(bounded.provenance==null || ReferenceRootMode(&raw bounded)!=0 || ReferenceLoanQuery(&raw bounded,&raw cursor,loan.root,true)){NativeExit(74);}
-   if(!ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(80);}
+   if(ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(80);}
    cursor.key=cast[i64](ParameterField(local.type,cast[*u8]("shared")));
    if(!ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(81);}
    cursor.key=cast[i64](ParameterField(local.type,cast[*u8]("count")));
@@ -32,6 +32,15 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
    var anchor=*loan;anchor.provenance=ReferenceGraphValueNode(check.graph,local.type,loan.root,0,0);
    if(!ReferencePathMayAccess(&raw anchor,&raw cursor,1)){NativeExit(84);}
    cursor.type=local.type;cursor.key=cast[i64](mutableField);
+   let outerType=SequenceType(6,local.type,1,null);
+   var outerSource=source;outerSource.provenance=bounded.provenance;
+   var outer=outerSource;outer.provenance_type=outerType;outer.provenance=ReferenceBoundedSummary(check,outerType,loan.root,0,false);
+   var childCursor=ProvenanceCursor{type:local.type,kind:1,key:cast[i64](ParameterField(local.type,cast[*u8]("shared"))),next:null};
+   var outerCursor=ProvenanceCursor{type:outerType,kind:3,key:0,next:&raw childCursor};
+   if(ReferenceLoanQuery(&raw outer,null,loan.root,false) || !ReferenceLoanQuery(&raw outer,&raw outerCursor,loan.root,false) || ReferenceLoanQuery(&raw outer,&raw outerCursor,loan.root,true)){NativeExit(89);}
+   childCursor.key=cast[i64](mutableField);
+   if(ReferenceLoanQuery(&raw outer,&raw outerCursor,loan.root,false)){NativeExit(90);}
+
 
    var arena=ProvenanceGraph{};var copied=bounded;copied.provenance=ProvenanceGraphCopy(&raw arena,bounded.provenance);
    if(copied.provenance==null || ReferenceRootMode(&raw copied)!=0 || ReferenceLoanQuery(&raw copied,&raw cursor,loan.root,true)){NativeExit(75);}
@@ -230,7 +239,7 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
   tag,stage,holder,root,field,reading,writing,valid=line.split();assert tag=='LOAN';record=(int(stage),holder,root,field,int(reading),int(writing));assert valid=='1';records.append(record)
  calls=[r for r in records if r[1]=='callmix'];assert len(calls)==4,calls
  for stage,holder,root,field,reading,writing in calls:
-  assert reading==1 and writing==int(root=='y' and field=='right'),(root,field,reading,writing)
+  assert reading==int(root=='y' or field=='left') and writing==int(root=='y' and field=='right'),(root,field,reading,writing)
  records=[r for r in records if r not in calls]
  computed=[r for r in records if r[3]=='reborrow'];assert len(computed)==7,computed
  for stage,holder,root,field,reading,known in computed:

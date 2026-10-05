@@ -5,7 +5,7 @@
 // below indicate impossible internal graph insertion, not recoverable syntax.
 // A future borrowed kind must also be included in TrackedBorrow classification.
 struct ReferenceTypeState { type: i64; node: *ProvenanceNode; next: *ReferenceTypeState; }
-fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **ReferenceTypeState) -> *ProvenanceNode {
+fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **ReferenceTypeState, shared_origin: bool) -> *ProvenanceNode {
     unsafe {
         if (!TrackedBorrow(type)) { return null; }
         var state = *states;
@@ -15,18 +15,18 @@ fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **
         state.type = type; state.node = node; state.next = *states; *states = state;
         let shape = Shape(type);
         if (shape.kind == 6 || shape.kind == 3) {
-            node.root = root;
             var mode = shape.count;
             if (shape.kind == 3) { mode = ReferenceMode(type); }
+            if (!shared_origin || mode == 0) { node.root = root; }
             node.exclusive = mode;
-            let child = ReferenceTypeNode(check, shape.element, root, states);
+            let child = ReferenceTypeNode(check, shape.element, root, states, shared_origin);
             if (child != null) {
                 var kind: i64 = 3;
                 if (shape.kind == 3) { kind = 2; }
                 if (!ProvenanceEdgeNew(node, kind, 0, child, mode)) { Error(cast[*u8]("invalid internal reference type summary")); }
             }
         } else if (shape.kind == 2 || shape.kind == 5) {
-            let child = ReferenceTypeNode(check, shape.element, root, states);
+            let child = ReferenceTypeNode(check, shape.element, root, states, shared_origin);
             var kind: i64 = 2;
             if (shape.kind == 5) { kind = 4; }
             if (child != null && !ProvenanceEdgeNew(node, kind, 0, child, 1)) { Error(cast[*u8]("invalid internal payload type summary")); }
@@ -34,7 +34,7 @@ fn ReferenceTypeNode(check: *ReferenceCheck, type: i64, root: *Local, states: **
             Layout(type);
             var field = shape.fields;
             while (field != null) {
-                let child = ReferenceTypeNode(check, field.type, root, states);
+                let child = ReferenceTypeNode(check, field.type, root, states, shared_origin);
                 if (child != null && !ProvenanceEdgeNew(node, 1, cast[i64](field), child, 1)) { Error(cast[*u8]("invalid internal field type summary")); }
                 field = field.next;
             }
@@ -53,7 +53,7 @@ fn ReferenceTypeSummary(check: *ReferenceCheck, type: i64, root: *Local) -> *Pro
             cached = cached.next;
         }
         var states: *ReferenceTypeState = null;
-        let node = ReferenceTypeNode(check, type, root, &raw states);
+        let node = ReferenceTypeNode(check, type, root, &raw states, false);
         while (states != null) { let next = states.next; Free(cast[*u8](states)); states = next; }
         if (node != null) { node.summary_root = root; node.summary_kind = 1; node.summary_mode = 1; }
         return node;
@@ -75,5 +75,22 @@ fn ReferenceParameterGraph(check: *ReferenceCheck, loan: *ReferenceLoan, type: i
         }
         loan.provenance_known = 1;
         if (loan.provenance != null) { loan.provenance_known = BoolInt(loan.provenance.opaque == 0); }
+    }
+}
+
+// A shared source cannot supply a mutable reference/slice's physical terminal.
+// Keep its children: shared roots can still occur inside the addressed payload.
+fn ReferenceSharedOriginSummary(check: *ReferenceCheck, type: i64, root: *Local) -> *ProvenanceNode {
+    unsafe {
+        var old = check.graph.nodes;
+        while (old != null) {
+            if (old.summary_kind == 4 && old.type == type && old.summary_root == root) { return old; }
+            old = old.next;
+        }
+        var states: *ReferenceTypeState = null;
+        let node = ReferenceTypeNode(check, type, root, &raw states, true);
+        while (states != null) { let next = states.next; Free(cast[*u8](states)); states = next; }
+        if (node != null) { node.summary_root = root; node.summary_kind = 4; node.summary_mode = 0; }
+        return node;
     }
 }

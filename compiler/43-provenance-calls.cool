@@ -13,7 +13,9 @@ fn ReferenceBoundedSummary(check: *ReferenceCheck, type: i64, root: *Local, mode
         }
         var value_type = type;
         if (payload) { value_type = Shape(type).element; }
-        let base = ReferenceTypeSummary(check, value_type, root);
+        var base: *ProvenanceNode = null;
+        if (mode == 0) { base = ReferenceSharedOriginSummary(check, value_type, root); }
+        else { base = ReferenceTypeSummary(check, value_type, root); }
         if (base == null) { return null; }
         var result: *ProvenanceNode = null;
         if (payload) {
