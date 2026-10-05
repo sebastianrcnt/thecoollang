@@ -259,10 +259,11 @@ pub struct Iterator[V] {
     stack: [64]* Node[V];
     depth: usize;
     count: usize;
+    current: * Node[V];
 }
 pub fn iter[V](source: & Map[V]) -> Iterator[V]borrows(source) {
     var result = Iterator[V] {
-        source: source, stack: [64]* Node[V] {}, depth: 0, count: ( * source).count
+        source: source, stack: [64]* Node[V] {}, depth: 0, count: ( * source).count, current: null
     };
     unsafe {
         var node = root_pointer[V](source);
@@ -293,7 +294,16 @@ pub fn Iterator.next[V](self: & mut Iterator[V]) -> option.Option[ & V]borrows(s
             child = pointer[V]( & raw( * child).left);
         }
         ( * self).count = ( * self).count - 1;
+        ( * self).current = node;
         return option.Option[ & V].Some(borrow_raw[ & V]( & raw( * node).value, self));
+    }
+}
+// Key of the most recently yielded value. Valid until the next next() call.
+pub fn Iterator.key[V](self: & Iterator[V]) -> & text.Text borrows(self) {
+    unsafe {
+        assert(( * self).current != null);
+        let node = ( * self).current;
+        return borrow_raw[ & text.Text]( & raw( * node).key, self);
     }
 }
 pub fn Map.iter[V](self: & Map[V]) -> Iterator[V]borrows(self) {

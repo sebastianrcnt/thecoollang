@@ -3080,11 +3080,13 @@ through ordinary evaluation or library use.
   loan, a raw left spine bounded by the AVL depth (asserted at 64) and a
   remaining count; `next` yields `Option[&V]` and the value reference borrows
   the iterator, so `next` cannot run while a result is retained and the map
-  cannot change while the iterator lives. `tools/test_map_iteration.py` checks
-  64-key sorted values against a Python model, `remaining()` countdown,
-  empty-map `None` and the mutation/retention rejections on five engines + O2 on
-  both frontends. This extends G5's borrowed collection iteration; aggregate
-  iteration and the broader G5 audit stay Open.
+  cannot change while the iterator lives, and `Iterator.key` returns the key of
+  the most recently yielded value as a borrowed `&Text`. 
+  `tools/test_map_iteration.py` checks 48-key sorted values and keys against a
+  Python model, `remaining()` countdown, empty-map `None` and the
+  mutation/retention rejections on five engines + O2 on both frontends. This
+  extends G5's borrowed collection iteration; aggregate iteration and the
+  broader G5 audit stay Open.
 
 - Aggregate-destruction fuzzing: `tools/test_aggregate_fuzz.py` builds random
   values from structs with owned fields, fixed arrays of owners and enums with
