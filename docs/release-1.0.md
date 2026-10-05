@@ -3086,6 +3086,16 @@ through ordinary evaluation or library use.
   both frontends. This extends G5's borrowed collection iteration; aggregate
   iteration and the broader G5 audit stay Open.
 
+- Aggregate-destruction fuzzing: `tools/test_aggregate_fuzz.py` builds random
+  values from structs with owned fields, fixed arrays of owners and enums with
+  owned payloads, asserts the exact live owner count while each value is alive,
+  checks modeled element reads and requires zero owners after the scope exits.
+  Five seeds at 80 values pass on five engines + release O2 on both frontends;
+  `aggregate-fuzz-sanitize-test` adds runtime ASan/UBSan and an instrumented
+  frontend. This extends G9's deterministic fuzzing from scalar owners to
+  aggregate owned payloads; slice/relocation fuzzing and every remaining
+  mandatory gate stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

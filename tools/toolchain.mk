@@ -635,3 +635,11 @@ test: diagnostics-test
 map-iteration-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_map_iteration.py --output build/map-iteration-audit.json
 test: map-iteration-test
+
+# Seeded aggregate-destruction oracle with exact live-owner counts.
+.PHONY: aggregate-fuzz-test aggregate-fuzz-sanitize-test
+aggregate-fuzz-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_aggregate_fuzz.py --output build/aggregate-fuzz-audit.json
+test: aggregate-fuzz-test
+aggregate-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_aggregate_fuzz.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/aggregate-fuzz-asan-audit.json
