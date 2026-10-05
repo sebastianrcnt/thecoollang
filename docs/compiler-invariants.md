@@ -630,3 +630,18 @@ are not filtered by filename suffix. Source selection happens before metadata
 scanning, so excluded dependency tests must not produce parse/resolution errors
 or affect the artifact input set. Selecting that dependency itself as a test root
 must include its own tests normally.
+
+## UTF-8 input and invalid-file diagnostics
+
+ValidateInput checks complete byte lengths for well-formed UTF-8 before lexing
+or manifest interpretation. It must reject isolated/truncated continuations,
+overlong encodings, surrogates and values beyond U+10FFFF without reading beyond
+the supplied length. ASCII NUL keeps its separate diagnostic. Native positions
+remain byte-based; successful multibyte sequences advance the column by their
+byte width. Validation cannot execute a valid prefix of an invalid REPL input.
+
+An invalid UTF-8 dependency can still receive an editor diagnostic. Preserve the
+original file URI and raw bytes rather than redirecting its error to an open
+buffer when decoding fails. Diagnostic position mapping uses replacement
+characters only for malformed byte input. Valid source keeps the existing UTF-16
+mapping. This recovery path must not write replacement bytes back into the file.

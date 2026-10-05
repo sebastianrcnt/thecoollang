@@ -88,4 +88,24 @@ lex_next:
     tokens[ntok].start=i;tokens[ntok].end=i;tokens[ntok].kind = 0; tokens[ntok].file = file; tokens[ntok].line = line; tokens[ntok].col = col;
 }
 
-U0 ValidateInput(U8 *source,I64 size,U8 *file){I64 i,line=1,column=1;Token token;for(i=0;i<size;i++){if(!source[i]){MemSet(&token,0,sizeof(Token));token.file=file;token.start=i;token.end=i+1;token.line=line;token.col=column;ErrorAt(&token,"embedded NUL byte in input");}if(source[i]=='\n'){line++;column=1;}else column++;}}
+U0 ValidateInput(U8 *source,I64 size,U8 *file){
+    I64 i=0,line=1,column=1,first,width,part,next,second;Bool invalid;U8 *message;Token token;
+    while(i<size){
+        first=source[i];width=1;invalid=FALSE;message="invalid UTF-8 in input";
+        if(!first){invalid=TRUE;message="embedded NUL byte in input";}
+        else if(first>=128){
+            if(first>=194 && first<=223)width=2;
+            else if(first>=224 && first<=239)width=3;
+            else if(first>=240 && first<=244)width=4;
+            else invalid=TRUE;
+            if(width>size-i)invalid=TRUE;
+            if(!invalid){
+                for(part=1;part<width;part++){next=source[i+part];if(next<128 || next>191)invalid=TRUE;}
+                second=source[i+1];
+                if((first==224 && second<160) || (first==237 && second>=160) || (first==240 && second<144) || (first==244 && second>=144))invalid=TRUE;
+            }
+        }
+        if(invalid){MemSet(&token,0,sizeof(Token));token.file=file;token.start=i;token.end=i+1;token.line=line;token.col=column;ErrorAt(&token,message);}
+        if(first==10){line++;column=1;}else column+=width;i+=width;
+    }
+}

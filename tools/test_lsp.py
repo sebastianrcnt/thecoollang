@@ -216,6 +216,23 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             client.send('textDocument/didClose',{'textDocument':{'uri':liburi}})
             client.barrier()
 
+            # Invalid bytes in a closed dependency retain that file's URI and
+            # a replacement-character range rather than blaming the open file.
+            source.write_bytes(original[source]+'// 🙂 '.encode()+b'\xff')
+            try:
+                client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':completion.version},'contentChanges':[{'text':'package main;import lib "example.test/editor/lib";fn main(){lib.answer();}'}]})
+                completion.version+=1
+                malformed=client.barrier()
+                error=malformed[liburi]['diagnostics'][0]
+                assert error['message']=='invalid UTF-8 in input',error
+                line=original[source].count(b'\n')
+                assert error['range']=={'start':{'line':line,'character':6},'end':{'line':line,'character':7}},error
+                assert malformed[uri]['diagnostics']==[],malformed
+            finally:
+                source.write_bytes(original[source])
+            client.send('textDocument/didSave',{'textDocument':{'uri':uri}})
+            assert client.barrier()[liburi]['diagnostics']==[]
+
             nul_text='package main;\nfn main(){let emoji="🙂";}\x00ignored'
             client.send('textDocument/didChange',{'textDocument':{'uri':uri,'version':completion.version},'contentChanges':[{'text':nul_text}]})
             nul_error=client.barrier()[uri]['diagnostics'][0]

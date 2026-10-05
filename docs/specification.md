@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 11
+# Cool language specification — 1.0 draft 12
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -7,6 +7,15 @@ language decisions. See [compatibility](compatibility.md) for the proposed freez
 policy and [release gates](release-1.0.md) for remaining acceptance work.
 
 ## Audited lexical core
+
+Source is well-formed UTF-8. Overlong encodings, isolated continuation bytes,
+truncated sequences, surrogate code points and values above U+10FFFF are errors
+anywhere in the input, including comments and string literals. Validation reports
+the first invalid sequence at its leading byte before tokenization or execution.
+Unicode scalar values in comments/literals are preserved without normalization.
+Identifiers remain ASCII; valid Unicode encoding does not make every scalar a
+valid token. A leading BOM is not ignored as whitespace. LF advances the source
+line; CR is whitespace outside literals and does not independently advance it.
 
 Source uses ASCII identifier characters: a letter or `_`, followed by letters,
 digits or `_`. Keywords are recognized contextually by the parser; do not infer
@@ -21,13 +30,14 @@ and REPL package manifests follow the same rule. REPL rejection happens before
 executing any prefix, and command matching cannot treat `:quit` followed by a
 NUL and extra bytes as a quit command. Native diagnostic offsets are zero-based
 byte ranges; native line and column numbers are one-based, with byte columns.
-The editor translates these ranges to UTF-16 positions. This rule does not imply
-whole-input UTF-8 validation. `make input-bytes-test` covers rejection, formatter
-file preservation, byte ranges and REPL recovery on both frontends.
+The editor translates these ranges to UTF-16 positions. `make source-utf8-test`
+checks whole-input UTF-8 validity, including byte ranges, formatter preservation
+and REPL recovery. `make input-bytes-test` covers NUL rejection, formatter file
+preservation, byte ranges and REPL recovery on both frontends.
 
 A string literal is enclosed in double quotes. Supported escapes are `\n`, `\t`,
-`\r`, `\\` and `\"`. A newline inside a string, an unknown escape, or a missing
-closing quote is a compile-time error. Runtime `string` values denote immutable
+`\r`, `\\` and `\"`. An unescaped LF inside a string, an unknown escape, or a
+missing closing quote is a compile-time error. Runtime `string` values denote immutable
 literal text; owned/validated UTF-8 text is a separate `std/text` facility. This
 lexical description does not claim Unicode identifier or normalization support.
 
@@ -599,6 +609,8 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 12: require well-formed UTF-8 across external inputs, preserve byte-based
+  native ranges, and retain invalid dependency diagnostics on their actual URI.
 - Draft 11: specify supported-target sizes, alignments, structure/array/enum
   layout and representation obligations, with an independent native ABI oracle.
 - Draft 10: specify source-file/package assembly, file-local import aliases and
@@ -645,8 +657,7 @@ a link is not proof that a release gate is closed.
 
 ## Work required before freezing this specification
 
-1. Complete the source-encoding/control-byte audit. Verify completeness and
-   conformance mapping of the published source-file/package,
+1. Verify completeness and conformance mapping of the published source-file/package,
    declaration, statement, type and expression productions, including generic
    arguments, methods and borrow contracts.
 2. Define inference/coercion, integer/float operations and every runtime failure

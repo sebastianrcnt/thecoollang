@@ -83,14 +83,20 @@ def text_index(text, position):
 
 class PositionMap:
     def __init__(self,text):
-        self.raw = text.encode('utf-8')
+        self.raw = text if isinstance(text,bytes) else text.encode('utf-8')
+        self.decode_errors = 'ignore'
+        if isinstance(text,bytes):
+            try:
+                text.decode('utf-8')
+            except UnicodeDecodeError:
+                self.decode_errors = 'replace'
         self.lines = [0]
         self.lines.extend(index+1 for index,byte in enumerate(self.raw) if byte==10)
 
     def position(self,offset):
         offset = max(0,min(int(offset),len(self.raw)))
         line = bisect_right(self.lines,offset)-1
-        prefix = self.raw[self.lines[line]:offset].decode('utf-8',errors='ignore')
+        prefix = self.raw[self.lines[line]:offset].decode('utf-8',errors=self.decode_errors)
         return {'line':line,'character':len(prefix.encode('utf-16-le'))//2}
 
 
@@ -190,8 +196,8 @@ class Server:
                         continue
                     target = originals.get(Path(record['file']),Path(record['file']))
                     try:
-                        content = self.documents[target].text if target in self.documents else target.read_bytes().decode('utf-8')
-                    except (OSError, UnicodeError):
+                        content = self.documents[target].text if target in self.documents else target.read_bytes()
+                    except OSError:
                         content = document.text
                         target = path
                     uri = self.documents[target].uri if target in self.documents else target.as_uri()

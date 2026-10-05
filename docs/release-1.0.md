@@ -1048,6 +1048,25 @@ through ordinary evaluation or library use.
   discharge ownership/aliasing validity, full cross-language ABI, encoding or
   whole-spec conformance gates, which remain under audit.
 
+- Source encoding contract: draft 12 requires well-formed UTF-8 throughout
+  external source/submission/manifest input, with ASCII identifiers, no implicit
+  normalization/BOM stripping, and existing NUL rejection. Both frontends had
+  accepted invalid UTF-8 inside comments/literals; ValidateInput now rejects
+  isolated/truncated continuation sequences, overlong encodings, surrogates and
+  values beyond U+10FFFF before parsing or executing a prefix. A Python decoder
+  oracle covers 143 invalid sequences and 14 valid scalar/control boundaries,
+  exact native byte positions, preserved formatter files, manifest rejection and
+  REPL state recovery. LSP diagnostics for a closed malformed dependency retain
+  its URI and UTF-16 replacement-character range instead of falling back to the
+  open file; restoring the dependency clears the diagnostic without source edits.
+  Both frontends and the compiler-instrumented ASan build pass the input and LSP
+  suites. Full regression, self-host/bootstrap convergence and installed
+  Neovim/distribution checks pass; IR SHA256 is
+  `44a53172f2a2b66644170e2e66d88037d7f58f869f746dace42dbad198a4b00d`.
+  Evidence: `build/release-audit/source-utf8-{focused,regression,sanitize,lsp-final,distribution-final}.log`.
+  The encoding decision is explicit pre-freeze behavior; it does not close the
+  remaining whole-spec conformance, generics, ownership and release gates.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice
