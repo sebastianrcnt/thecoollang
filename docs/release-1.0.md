@@ -32,7 +32,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | Open (native tooling and real Neovim client verified; broader recovery/unsupported contexts pending) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
-| G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | Open |
+| G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | **Closed** (34 O0/O2 interpreter differential cases plus per-suite rejection cases; ownership/borrow/aggregate/slice/collection seeded fuzzers; runtime ASan/UBSan and instrumented-frontend sanitizer targets; the two-package `examples/tally` project on five engines and standalone O2; `make bootstrap-check` old/new convergence — see the audit log) |
 | G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
 
 Release completion requires evidence for every mandatory gate and zero known
@@ -3260,6 +3260,22 @@ through ordinary evaluation or library use.
   extends G9's deterministic fuzzing from scalar/aggregate owners to nested
   slice chains, slice relocation and owned-element moves; relocation through
   shared receivers and every remaining mandatory gate stay Open.
+
+- Gate closure — G9 validation: every acceptance item now has current evidence.
+  Cross-engine differential and negative tests: `make language-test` compares 34
+  interpreter cases at LLVM O0/O2 and the reference/ownership/library suites add
+  44+ rejection cases per area on both frontends. Deterministic seeded fuzzing:
+  `collection-fuzz-test`, `ownership-fuzz-test`, `borrow-fuzz-test`,
+  `aggregate-fuzz-test` and `slice-fuzz-test` (scalar, owned and borrowed-element
+  workloads) run seeded programs against independent Python models. Sanitizer
+  checks: the runtime ASan/UBSan and instrumented-frontend `*-sanitize-test`
+  targets pass. Multi-package real application: the two-package `examples/tally`
+  project matches an independent Python model on both frontends, five engines and
+  a standalone optimized build, and ships in the release archive. Bootstrap:
+  `make bootstrap-check` confirms old/new generation convergence and the
+  self-host IR fixed point. All of this is green in `build/drop-depth/reg20.log`;
+  G9 is closed. This does not close the remaining language, ergonomics,
+  performance, tooling or distribution gates.
 
 ## Next implementation checkpoints
 
