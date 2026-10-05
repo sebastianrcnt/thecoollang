@@ -270,9 +270,7 @@ Node *Expr(I64 min) {
                 if (a->type == T_PTR) ErrorAt(t, "void pointer arithmetic is not defined");
                 n->kind = N_ADDRESS; n->type = a->type; a = n; goto expr_next;
             }
-            if (a->type != n->b->type) {
-                if (a->kind == N_INT) Coerce(a, n->b->type); else Coerce(n->b, a->type);
-            }
+            CoerceBinary(a,n->b,op);
             if (op == K_EQ || op == K_NE) {
                 if (a->type == T_VOID || a->type == T_STRING || Aggregate(a->type)) ErrorAt(t, "equality requires integers or bool");
                 n->type = T_BOOL;

@@ -257,8 +257,21 @@ Bool Fits(I64 v, I64 type) {
     if (width == 64) return TRUE;
     return -(1 << (width - 1)) <= v < (1 << (width - 1));
 }
+Bool CanImplicitCoerce(Node *n,I64 type){
+    if(n->type==type)return TRUE;
+    if(n->type==T_NULL && Pointer(type))return TRUE;
+    if(Pointer(n->type) && type==T_PTR)return TRUE;
+    if(n->type==T_F32 && type==T_F64)return TRUE;
+    if(n->kind==N_INT && Integer(n->type) && Floating(type) && !(Unsigned(n->type) && n->value<0) && -16777216<=n->value<=16777216)return TRUE;
+    if(Integer(n->type) && Integer(type)){
+        if(n->kind==N_INT && !(Unsigned(n->type) && n->value<0 && type!=T_U64) && Fits(n->value,type))return TRUE;
+        if((Unsigned(type)==Unsigned(n->type) && Width(type)>Width(n->type)) || (!Unsigned(type) && Unsigned(n->type) && Width(type)>Width(n->type)))return TRUE;
+    }
+    return FALSE;
+}
 U0 Coerce(Node *n, I64 type) {
     Node *child;
+    if(n->kind==N_INT && Integer(n->type) && Unsigned(n->type) && n->value<0 && Floating(type))ErrorAt(n->token,"incompatible types; use an explicit cast for narrowing conversions");
     if (n->type == type) return;
     if (n->type == T_NULL && Pointer(type)) { n->type = type; return; }
     if (Pointer(n->type) && type == T_PTR) { child = AllocateNode(); MemCpy(child, n, sizeof(Node)); child->next = NULL; n->kind = N_CAST; n->a = child; n->type = type; return; }
@@ -274,6 +287,16 @@ U0 Coerce(Node *n, I64 type) {
         }
     }
     ErrorAt(n->token, "incompatible types; use an explicit cast for narrowing conversions");
+}
+
+// Prefer contextual literal adoption, then choose a lossless widening direction.
+U0 CoerceBinary(Node *a,Node *b,I64 op){
+    if(op==K_SHL || op==K_SHR){if(!Integer(a->type) || !Integer(b->type))ErrorAt(b->token,"shift operands must be integers");return;}
+    if(a->type==b->type)return;
+    if(a->kind==N_INT && CanImplicitCoerce(a,b->type)){Coerce(a,b->type);return;}
+    if(b->kind==N_INT && CanImplicitCoerce(b,a->type)){Coerce(b,a->type);return;}
+    if(CanImplicitCoerce(a,b->type)){Coerce(a,b->type);return;}
+    Coerce(b,a->type);
 }
 
 extern Bool IsReference(I64 type);

@@ -1097,6 +1097,9 @@ var t66: i64 = i64(0);
 var t67: *u8 = null;
 var t68: *Token = null;
 var t69: *u8 = null;
+if (v_n5.kind == 1 && Integer(v_n5.type) != i8(0) && Unsigned(v_n5.type) != i8(0) && v_n5.value < 0 && Floating(v_type17) != i8(0)) {
+ErrorAt(v_n5.token,cast[*u8]("incompatible types; use an explicit cast for narrowing conversions"));
+}
 if (((v_n5).type == v_type17)) {
 return;
 }

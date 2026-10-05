@@ -741,20 +741,7 @@ if (((v_a6).type != ((v_n13).b).type)) { pc = 27; } else { pc = 15; }
 continue;
 }
 if (pc == 27) {
-if (((v_a6).kind == 1)) { pc = 28; } else { pc = 29; }
-continue;
-}
-if (pc == 28) {
-t43 = v_a6;
-t44 = ((v_n13).b).type;
-Coerce(t43, t44);
-pc = 15;
-continue;
-}
-if (pc == 29) {
-t45 = (v_n13).b;
-t46 = (v_a6).type;
-Coerce(t45, t46);
+CoerceBinary(v_a6,v_n13.b,v_op);
 pc = 15;
 continue;
 }

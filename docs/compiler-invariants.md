@@ -693,3 +693,19 @@ uses the signature preflight. Concrete specialization still runs the normal
 parser and every semantic/ownership/borrow pass. Keep `TemplateBody.cool` and
 `32-template-body.cool` aligned and extend the positive cross-engine fixture and
 unused rejection suite whenever grammar changes.
+
+## Binary implicit typing
+
+`CanImplicitCoerce` is a side-effect-free predicate for the conversions performed
+by `Coerce`; keep their rules aligned. `CoerceBinary` first adopts representable
+literals, then chooses a lossless conversion direction. It does not create a
+third inferred type or permit narrowing. Comparisons use the same normalized
+operands before producing bool. Shift counts remain independently typed, with
+integer checks and the left operand's original width; every backend checks the
+actual count before shifting. Numeric typing changes must preserve runtime
+canonical values and update both frontend implementations and the oracle suite.
+
+Implicit float range tests inspect the mathematical integer value. A u64 literal
+above i64 maximum has negative internal bits; it must not pass a small-signed
+range test in either `CanImplicitCoerce` or `Coerce`. Explicit numeric casts use
+the original unsigned type and retain the published rounding behavior.

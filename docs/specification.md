@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 16
+# Cool language specification — 1.0 draft 17
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -483,6 +483,57 @@ assignments. It also checks 23 rejected forms, including immutable and live-loan
 assignment destinations. Both frontends run all five engines and optimized
 binaries; the sanitizer target adds the instrumented compiler.
 
+## Inference and permitted implicit conversions
+
+An unannotated local binding takes its initializer's checked type. A nonnegative
+integer literal defaults to i64 when representable and u64 above i64's maximum;
+its unary negative form follows the signed minimum rule in the lexical contract.
+A float literal defaults to f64. Parentheses preserve the enclosed expression's
+literal status; general arithmetic expressions are not folded into literal
+nodes for implicit narrowing. For example, `let n:i8=1` works but
+`let n:i8=1+2` requires an explicit conversion. Parameter/result/field types and
+annotated bindings provide required destination types; they do not propagate
+backward into the operands of a binary expression.
+
+Permitted implicit conversions are:
+
+| Source | Destination and requirement |
+| --- | --- |
+| Same type | Identity |
+| Integer literal | Integer type that contains the value; a u64 literal above i64 maximum retains its unsigned meaning |
+| Typed integer value | A wider type of the same signedness, or a signed type strictly wider than an unsigned source |
+| Integer literal in -16,777,216..16,777,216 | f32 or f64; larger literals require an explicit conversion even when a particular value is exactly representable |
+| f32 | f64 |
+| null | A raw pointer type |
+| Typed raw pointer | `*void` erasure |
+
+Other implicit narrowing/sign changes, float-to-integer conversions and typed
+integer-to-float conversions require explicit casts. Bool/string, nominal
+aggregates, owners and references do not gain numeric conversions through these
+rules. Raw-pointer erasure does not establish a safe reference or lifetime.
+
+For arithmetic, comparisons and integer bitwise operations with different operand
+types, adopt a permitted literal conversion first. If the left literal can adopt
+the right type, it does so; otherwise try the right literal with the left type.
+If neither applies, use a permitted lossless widening direction. Reject operands
+when neither can convert to the other; there is no invented third common type.
+Thus i8/i64 addition uses i64 in either order, and f32/f64 addition uses f64 in
+either order. i32/u32 operands require an explicit conversion. A literal fitting
+an i8 operand preserves i8 arithmetic (`i8(127)+1` wraps to -128); a literal 128
+cannot narrow to i8, so that expression widens to i64 and produces 255.
+
+Shifts preserve the left integer operand's type and width. Their count may have
+any integer width or signedness; it is checked as its actual value against the
+left width, without narrowing or widening either operand. Float counts/operands
+are errors. This preserves the narrow left-width runtime checks even with an i64
+or u64 count. Raw pointer +/- integer arithmetic follows its separate unsafe
+rule and does not use numeric common-type inference.
+
+`make coercion-test` compares both operand orders over all eight integer types,
+using an independent fixed-width integer oracle, plus floating widening, literal
+adoption, pointer/null symmetry, rejection cases and separately executed invalid
+mixed-width shift counts on all five engines and optimized native builds.
+
 ## Fixed-width integer values and operations
 
 Signed integer types `i8`, `i16`, `i32`, `i64` use two's-complement values from
@@ -515,7 +566,7 @@ representable integer literals can adopt their required type, widening preserves
 signedness, and unsigned-to-signed widening is permitted when the signed type has
 strictly more bits. Other integer narrowing or sign-changing assignments require
 an explicit cast. This paragraph does not specify floating conversions or the
-complete inference algorithm for mixed-type binary expressions.
+binary inference algorithm documented above.
 
 `make integer-semantics-test` compares fixed boundary and deterministic random
 operands with Python unbounded arithmetic for all eight integer types. It covers
@@ -632,6 +683,8 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 17: specify binding/literal inference and implicit conversions; remove
+  mixed-width operand order bias and preserve the left width for shift counts.
 - Draft 16: check unused generic body statement/expression grammar with lexical
   import-alias shadowing and bounded recursion; preserve specialization semantics.
 - Draft 15: reject actual void values/elements and out-of-range array lengths in
@@ -691,8 +744,9 @@ a link is not proof that a release gate is closed.
 1. Verify completeness and conformance mapping of the published source-file/package,
    declaration, statement, type and expression productions, including generic
    arguments, methods and borrow contracts.
-2. Define inference/coercion, integer/float operations and every runtime failure
-   consistently across tree, bytecode, native JIT and optimized LLVM.
+2. Audit the inference/coercion and integer contracts against all conformance
+   cases; define remaining float operations and runtime failures consistently
+   across tree, bytecode, native JIT and optimized LLVM.
 3. State layout/alignment, copy/move/initialization, evaluation order, cleanup and
    unsafe/C obligations independently of compiler-internal representations.
 4. Consolidate package visibility, module-format/versioning and REPL replacement

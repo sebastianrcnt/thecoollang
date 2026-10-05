@@ -1154,6 +1154,26 @@ through ordinary evaluation or library use.
   are not conflated. External downloads, ordinary CLI make overhead and broader
   application workloads remain outside these samples; G8 stays open.
 
+- Implicit typing and operand-order audit: draft 17 records local/literal
+  inference, permitted scalar conversions and binary operand selection. Earlier
+  checking rejects i8+i64 and f32+f64 with the narrow value first, while accepting
+  the reverse order; `CoerceBinary` now adopts permitted literals and chooses a
+  lossless widening direction symmetrically. Shift counts stay independently
+  typed so a wide count cannot silently widen the left operand or evade its
+  width check. A separate probe found u64 literals above i64 maximum being
+  mistaken for small negative bits by the implicit float range test; both
+  frontends now reject that in assignments and both operand orders. Explicit
+  conversions remain the intentional rounding path. The oracle covers 541
+  numeric outputs over all integer pairs, floating/literal behavior and pointer
+  symmetry, 36 rejection cases, return narrowing and separately run invalid
+  mixed-width shift counts across five engines and optimized binaries. Full
+  regression, self-host/bootstrap convergence, compiler-instrumented ASan and
+  installed Neovim/distribution checks pass.
+  Evidence: `build/release-audit/coercion-{before,unsigned-before,final-build,final-focused,final-regression,final-sanitize,final-distribution}.log`.
+  IR SHA256: `f5f4bc94b8b7c5641c84bb3b3d8f23e9cb44a7684ff1cbb9dd8b6fcf77d7eaa4`.
+  This is an explicit pre-freeze numeric behavior decision; floating arithmetic,
+  whole-spec conformance, dependent templates and other release gates remain open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

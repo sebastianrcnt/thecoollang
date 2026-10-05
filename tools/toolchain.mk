@@ -390,3 +390,10 @@ template-body-test: build/cool-compiler build/language.BIN build/language-runtim
 test: template-body-test
 template-body-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_template_body.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: coercion-test coercion-sanitize-test
+coercion-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_coercion.py
+test: coercion-test
+coercion-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_coercion.py --frontend build/repl-loans-asan/cool-compiler

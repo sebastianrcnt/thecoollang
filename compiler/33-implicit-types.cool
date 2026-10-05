@@ -1,0 +1,55 @@
+// Binary operands choose the same permitted implicit type regardless of order.
+fn CanImplicitCoerce(n: * Node, type: i64) -> i8 {
+    unsafe {
+        if (n.type == type) {
+            return i8(1);
+        }
+        if (n.type == 13 && Pointer(type) != i8(0)) {
+            return i8(1);
+        }
+        if (Pointer(n.type) != i8(0) && type == 100000) {
+            return i8(1);
+        }
+        if (n.type == 12 && type == 11) {
+            return i8(1);
+        }
+        if (n.kind == 1 && Integer(n.type) != i8(0) && Floating(type) != i8(0) && !(Unsigned(n.type) != i8(0) && n.value < 0) && n.value >= -16777216 && n.value <= 16777216) {
+            return i8(1);
+        }
+        if (Integer(n.type) != i8(0) && Integer(type) != i8(0)) {
+            if (n.kind == 1 && !(Unsigned(n.type) != i8(0) && n.value < 0 && type != 10) && Fits(n.value, type) != i8(0)) {
+                return i8(1);
+            }
+            if ((Unsigned(type) == Unsigned(n.type) && Width(type) > Width(n.type)) || (Unsigned(type) == i8(0) && Unsigned(n.type) != i8(0) && Width(type) > Width(n.type))) {
+                return i8(1);
+            }
+        }
+        return i8(0);
+    }
+}
+fn CoerceBinary(a: * Node, b: * Node, op: i64) {
+    unsafe {
+        if (op == 266 || op == 267) {
+            if (Integer(a.type) == i8(0) || Integer(b.type) == i8(0)) {
+                ErrorAt(b.token, cast[ * u8]("shift operands must be integers"));
+            }
+            return;
+        }
+        if (a.type == b.type) {
+            return;
+        }
+        if (a.kind == 1 && CanImplicitCoerce(a, b.type) != i8(0)) {
+            Coerce(a, b.type);
+            return;
+        }
+        if (b.kind == 1 && CanImplicitCoerce(b, a.type) != i8(0)) {
+            Coerce(b, a.type);
+            return;
+        }
+        if (CanImplicitCoerce(a, b.type) != i8(0)) {
+            Coerce(a, b.type);
+            return;
+        }
+        Coerce(b, a.type);
+    }
+}
