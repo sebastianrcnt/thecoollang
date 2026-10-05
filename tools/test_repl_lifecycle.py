@@ -66,6 +66,12 @@ def workload(name,count):
             return (prefix+'{s[0]=&b;assert(false); }\n'*count+'*s[0]\nb=11;\n:forget s\n:forget refs\nb=13;\nb\n','9\n13\n',count+1)
         if name=='slice_call_summaries':
             return ('fn identity(s:[]&i64)->[]&i64 borrows(s){return s;}\n'+prefix+'s=identity(s);\n'*count+'*s[0]\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',0)
+        if name in ('slice_projection_revalidation','slice_projection_revalidation_rollback'):
+            declaration='fn first(a:[]&i64,b:[]&i64)->[]&i64 borrows(a,b){return a;}\n'
+            contract='a,b' if name=='slice_projection_revalidation' else 'a'
+            declaration+='fn use(a:[]&i64,b:[]&i64)->[]&i64 borrows('+contract+'){return first(a,b);}\n'
+            updates=''.join('fn first(a:[]&i64,b:[]&i64)->[]&i64 borrows(a,b){return '+('b' if name.endswith('rollback') or i%2==0 else 'a')+';}\n' for i in range(count))
+            return (declaration+prefix+'var others=[1]&i64{&b};\nvar t=others[:];\n'+updates+'*use(s,t)[0]\n:forget t\n:forget others\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',count if name.endswith('rollback') else 0)
         if name=='slice_selected_values':
             return (prefix+'var q=&a;\n'+'q=s[0];\n'*count+'*q\n:forget q\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',0)
         if name=='slice_compile_recovery':
@@ -184,7 +190,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
     (project/'bad/bad.cool').write_text('package bad;pub fn broken()->i64{return missing;}')
     observations=[]
     workloads=('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','generic_parent_success','generic_parent_runtime_failure','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','kept_partial_store_graphs','kept_opaque_store_graphs','typed_parameter_replacements','computed_reborrow_graphs','opaque_return_graphs','nested_return_graphs','recursive_return_graphs','disjoint_payload_access','rejected_loan_analysis','distinct_literals_policy')
-    if args.borrowed_slices:workloads=('slice_partial_stores','slice_call_summaries','slice_selected_values','slice_compile_recovery')
+    if args.borrowed_slices:workloads=('slice_partial_stores','slice_call_summaries','slice_selected_values','slice_compile_recovery','slice_projection_revalidation','slice_projection_revalidation_rollback')
     for name in workloads:
         rows=[]
         for count in args.counts:

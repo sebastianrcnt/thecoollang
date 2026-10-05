@@ -16,6 +16,7 @@ struct ReferenceLoan {
     next: * ReferenceLoan;
 }
 struct ReferenceCheck {
+    synthetic_roots: *Local;
     pending_owner: *Node;
     graph: *ProvenanceGraph;
     next: *ReferenceCheck;

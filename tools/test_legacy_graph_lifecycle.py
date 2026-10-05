@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='cool legacy graph lifecycle ') as direc
  marker='check->loans=loan;return;}'
  assert text.count(marker)==1
  text=text.replace(marker,'check->loans=loan;AuditWriteBarrier(check,node);return;}')
- header='class ReferenceCheck { Node *pending_owner; ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };'
+ header='class ReferenceCheck { Local *synthetic_roots; Node *pending_owner; ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };'
  assert text.count(header)==1
  call_end='        }return;\n    }\n    if(node->kind==N_AGG_LITERAL || node->kind==N_NEW){'
  assert text.count(call_end)==1;text=text.replace(call_end,'        }AuditWriteBarrier(check,node);return;\n    }\n    if(node->kind==N_AGG_LITERAL || node->kind==N_NEW){')

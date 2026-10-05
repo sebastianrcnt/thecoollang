@@ -74,3 +74,20 @@ fn ReplCommitFunctions() {
         }
     }
 }
+
+// Existing values retain their actual historical origins. Future calls through
+// retained bodies must remain valid under the newly installed projections.
+fn ReplRevalidateBorrowProjections(){unsafe{
+    let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    if(ctx.v_allow_redefinition==i8(0) || ctx.v_repl_snapshot==null){return;}
+    var changed=false;
+    for(var i:i64=1;i<ctx.v_repl_saved_nfun;i=i+1){
+        let old=&raw ctx.v_repl_snapshot[i];let current=&raw ctx.v_functions[i];
+        if(old.body!=current.body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current)){changed=true;}
+    }
+    if(!changed){return;}
+    for(var i:i64=1;i<ctx.v_repl_saved_nfun;i=i+1){
+        let current=&raw ctx.v_functions[i];
+        if(current.body!=null && current.body==ctx.v_repl_snapshot[i].body && current.generic_count==0){AnalyzeReferences(current);}
+    }
+}}

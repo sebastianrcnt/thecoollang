@@ -1406,11 +1406,13 @@ An actual parameter Local denotes its callee value slot; it never has
 `reference_external` set. ReferenceParameters allocates a distinct synthetic
 Local for each reference parameter's caller storage, with that flag set and
 parameter place-region bits. Borrowed aggregate/owner payload summaries also
-use separate external synthetic roots. These are function-owned analysis
-metadata, not runtime slots. All reference-result loans must have an external
+use separate external synthetic roots. These are check-owned analysis
+metadata, not runtime slots; they never enter retained function local registries. All reference-result loans must have an external
 root, depth zero, nonzero parameter origins and origins contained in the
-function's borrows contract. Missing roots reject. Aggregate, slice and owned
-borrowed result forms retain their Region return checks.
+function's borrows contract. Missing roots reject. Aggregate and owned
+borrowed result forms retain their Region return checks. Slice returns with
+nonzero regions also require authorized external roots; root-free slices keep
+their separate return policy.
 
 This distinction is required for this invalid program:
 
@@ -1718,10 +1720,23 @@ actual CALL and a valid function-table slot before indexing the table. A private
 setter fixture exposed the missing guard under ASan, despite ordinary tests
 passing. Stored receiver summaries keep the original conservative path.
 
-REPL replacement checks the prior established projection against the new body
-range before publishing it. A different argument or opaque body cannot replace
-an established precise projection; otherwise older callers could retain only
-the old subset of origins. Same-source literal reslicing/renaming and alias chains are compatible.
-Function token compaction already updates begin/end ranges; failed declarations
-restore the prior snapshot. Arbitrary body summaries and dependent caller
-revalidation remain required implementation work.
+REPL replacement compares the snapshot's established projection with the final
+installed body after ParseProgram checks all new declarations. A changed source
+or transition to opaque triggers AnalyzeReferences for every retained concrete
+body whose AST matches its snapshot. New bodies were already checked. Function
+signatures remain stable; static regions still conservatively describe declared
+contracts. Existing values retain historical loans. Analysis failure propagates
+through the normal transaction rollback before execution or publication.
+
+Synthetic parameter roots belong to ReferenceCheck.synthetic_roots, allocated
+without AllocateLocal and never linked to function.all_locals or its allocation
+registry. ReferenceCheckFree releases loans, graph and then roots; abort uses the
+same disposal path. Reanalysis therefore leaves AST local lists and function
+allocation registries unchanged, regardless of ctx.current_fun. This avoids
+re-seeding old synthetic physical roots and assigning their ownership to an
+unrelated current function. Check-owned roots must not escape into persistent
+session loans or AST fields. Calls in session analysis use actual caller roots.
+
+The current audit rechecks all retained concrete bodies on a changed established
+projection; ordinary scalar updates and same-origin replacement skip it. General
+body summaries and dependency-directed invalidation remain required work.

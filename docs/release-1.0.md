@@ -2623,6 +2623,51 @@ through ordinary evaluation or library use.
   The four allocation workloads retain equal final/peak tracked allocations
   at histories 64 and 1024. All mandatory release gates remain Open.
 
+- Transactional REPL projection revalidation (specification draft 29): changed
+  established slice projections no longer unconditionally require a new session.
+  After new bodies pass checking, the parser compares snapshot/final projections
+  and rechecks every unchanged retained concrete body against the new callees.
+  Safe caller contracts and same-submission caller rewrites are accepted;
+  invalid lifetime contracts reject and roll back every replacement. Instantiated
+  generic callers participate. Retained bodies with injected ownership/defer
+  cleanup are also valid reanalysis inputs. Existing values retain historical
+  provenance and continue to prevent forgetting borrowed backing bindings.
+
+  Review exposed an implementation prerequisite: ReferenceParameters previously
+  appended synthetic roots to function locals via AllocateLocal. Reanalysis
+  could reseed those roots and register allocations under an unrelated current
+  function. Roots now belong to ReferenceCheck and are freed after its loans and
+  graph on success or abort. Function AST/local allocation lists are untouched.
+  The legacy graph lifecycle instrument's exact structure marker was updated
+  for the new field, retaining its graph allocation and barrier checks.
+
+  Permanent readiness/sanitizer: 194 classifications, 80 positive programs,
+  480 five-engine/O2 executions (80 tree runs under ASan), 36 persistent REPL
+  scenarios, zero gaps and 12 allocation observations PASS. Multiple producer
+  replacements followed by a later retained caller failure restore all prior
+  behavior. Revalidation success and rollback workloads at 64/1024 histories
+  have equal final/peak tracked allocation bytes; success ends at 32,164,649
+  bytes/139 allocations and rollback at 32,164,643/136. The previous identity
+  workload retains 288 fewer bytes/two fewer Local allocations (32,159,097/61).
+  These include fixed compiler/live declaration resources, not host RSS or JIT
+  mappings. Unmodified public production/seed frontends also pass 24 projection
+  REPL scenarios in `build/release-audit/repl-projection-revalidation-public.json`.
+
+  Full regression, bootstrap convergence, legacy graph lifecycle and external
+  distribution passed on the current compiler in
+  `build/release-audit/repl-projection-revalidation-complete.log`; that combined
+  command exited 2 for the new cleanup fixture's invalid `defer { ... }` syntax.
+  The fixture now uses supported `defer expression;`; no compiler change or
+  exclusion was needed. Corrected permanent readiness/slice sanitizer plus
+  graph/copy/loan/selection/access/physical/descriptor/stores/public slice
+  sanitizer targets all exit 0 in
+  `build/release-audit/repl-projection-revalidation-verified.log`.
+  Production stage-2 IR SHA256:
+  `ed0f3411e79a8a633f051fac25cef734633769c6d258d8418815899363b659b2`.
+  Both final private reports' compiler/legacy source hashes match the sources.
+  General body summaries, dependency-directed revalidation and the remaining
+  production nested-storage acceptance stay mandatory; all gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

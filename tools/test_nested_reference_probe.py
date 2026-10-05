@@ -459,13 +459,13 @@ SLICE_REPL_CASES.extend([
   'first(a[:],b[:])[0]\n'
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
   'first(a[:],b[:])[0]\n:quit\n',
-  '7\n7\n', {'borrow projection change requires a new session':1}),
+  '7\n9\n', {}),
  ('projection_opaque_replacement',
   'fn identity(s:[]i64)->[]i64 borrows(s){return s;}\n'
   'var a=[2]i64{7,9};\nidentity(a[:])[0]\n'
   'fn identity(s:[]i64)->[]i64 borrows(s){assert(true);let copy=s;return copy;}\n'
   'identity(a[:])[0]\n:quit\n',
-  '7\n7\n', {'borrow projection change requires a new session':1}),
+  '7\n7\n', {}),
  ('projection_reslice_replacement',
   'fn identity(s:[]i64)->[]i64 borrows(s){return s;}\n'
   'var a=[2]i64{7,9};\nidentity(a[:])[0]\n'
@@ -481,14 +481,14 @@ SLICE_REPL_CASES.extend([
   'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
   'use(a[:],b[:])[0]\n:quit\n',
-  '7\n7\n', {'borrow projection change requires a new session':1}),
+  '7\n7\n', {'returned borrow may outlive local storage':1}),
  ('projection_existing_caller_opaque_replacement',
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
   'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
   'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){assert(true);let copy=a;return copy;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
   'use(a[:],b[:])[0]\n:quit\n',
-  '7\n7\n', {'borrow projection change requires a new session':1}),
+  '7\n7\n', {'returned borrow may outlive local storage':1}),
 ])
 
 
@@ -504,7 +504,47 @@ SLICE_REPL_CASES.extend([
   'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
   'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
   'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let unused=a;let copy=b;return copy;}\n'
-  'use(a[:],b[:])[0]\n:quit\n', '7\n7\n', {'borrow projection change requires a new session':1}),
+  'use(a[:],b[:])[0]\n:quit\n', '7\n7\n', {'returned borrow may outlive local storage':1}),
+])
+
+SLICE_REPL_CASES.extend([
+ ('projection_revalidate_safe_caller_and_live_result',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nvar past=use(a[:],b[:]);\npast[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
+  'past[0]\n:forget a\n:forget past\nuse(a[:],b[:])[0]\n:forget a\n:quit\n',
+  '7\n7\n9\n', {'live dependent loans':1}),
+ ('projection_revalidate_updated_caller_batch',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;} fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return a;}\n'
+  'use(a[:],b[:])[0]\nfirst(a[:],b[:])[0]\n:quit\n', '7\n7\n9\n', {}),
+])
+
+SLICE_REPL_CASES.extend([
+ ('projection_revalidate_multiple_replacements_rollback',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn second(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn valid(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return first(a,b);}\n'
+  'fn restricted(a:[]i64,b:[]i64)->[]i64 borrows(a){return second(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nvalid(a[:],b[:])[0]\nrestricted(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;} fn second(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
+  'valid(a[:],b[:])[0]\nrestricted(a[:],b[:])[0]\nfirst(a[:],b[:])[0]\n:quit\n',
+  '7\n7\n7\n7\n7\n', {'returned borrow may outlive local storage':1}),
+ ('projection_revalidate_instantiated_generic_caller',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use[T](a:[]T,b:[]T)->[]T borrows(a){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse[i64](a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
+  'use[i64](a[:],b[:])[0]\n:quit\n', '7\n7\n', {'returned borrow may outlive local storage':1}),
+ ('projection_revalidate_retained_owner_cleanup',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn work(x:&i64)->i64{let owned=new[i64](*x);defer assert(*owned==7);return *owned;}\n'
+  'var x=7;\nwork(&x)\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
+  'work(&x)\n:quit\n', '7\n7\n', {}),
 ])
 
 def main():

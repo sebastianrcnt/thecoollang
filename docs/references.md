@@ -903,10 +903,15 @@ array as part of the result. Descriptor addresses and whole intermediate slices
 still require that array's lifetime. Other function bodies use conservative
 return summaries.
 
-A live session cannot replace such a function with a body returning a different
-parameter or a body whose projection cannot yet be proven. It reports `borrow
-projection change requires a new session`, preserving the prior function and
-callers. Reslicing the same parameter with literal bounds and renaming that
-parameter, or following the same source through aliases, remain compatible.
-General body summaries and caller revalidation
-are still required work; see specification drafts 27–28.
+A live session can change the proven source when retained callers remain safe.
+After all new bodies pass checking, the compiler checks retained concrete bodies
+against the changed projection. A lifetime or permission failure rejects the
+whole submission and preserves the old bodies. Affected callers can be replaced
+in the same submission with compatible signatures and valid new bodies.
+
+Existing returned values keep their actual earlier origins and continue to
+protect their backing bindings. Producer replacement does not retroactively
+change them. Rechecking uses analysis-owned parameter anchors, so repeated
+successful or rejected replacements do not add synthetic locals to functions.
+General body summaries and dependency-directed revalidation remain required work;
+see specification draft 29.

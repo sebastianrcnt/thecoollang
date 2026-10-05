@@ -3965,6 +3965,7 @@ pc = 6;
 continue;
 }
 if (pc == 3) {
+ReplRevalidateBorrowProjections();
 return;
 }
 if (pc == 4) {
@@ -4244,12 +4245,7 @@ continue;
 }
 if (pc == 53) {
 (v_f9).end = ctx.v_pos;
-if (v_old != null) {
-    let projection = ReferenceSliceProjection(v_old);
-    if (projection >= 0 && ReferenceSliceProjection(v_f9) != projection) {
-        ErrorAt(v_f9.token, cast[*u8]("borrow projection change requires a new session"));
-    }
-}
+
 pc = 1;
 continue;
 }

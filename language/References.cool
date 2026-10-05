@@ -2,7 +2,7 @@ extern I64 ReferenceSliceProjection(Function *f);
 extern U0 ReferenceWriteCapability(Node *place);
 // Scoped lexical loans. Keep semantics aligned with compiler/16-references.cool.
 class ReferenceLoan { ProvenanceNode *physical_provenance,*provenance; I64 provenance_type,provenance_known; Local *root, *holder, *parent; I64 exclusive, indirect; Node *owner_pin,*expression; ReferenceLoan *next; };
-class ReferenceCheck { Node *pending_owner; ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };
+class ReferenceCheck { Local *synthetic_roots; Node *pending_owner; ReferenceLoan *loans; Function *function; ProvenanceGraph *graph; ReferenceCheck *next; };
 ReferenceCheck *reference_checks;
 extern U0 ReferenceChecksAbort();
 extern U0 ReferenceCheckFree(ReferenceCheck *check);

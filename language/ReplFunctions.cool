@@ -18,3 +18,5 @@ U0 ReplRollbackFunctions() {
     for(i=1;i<nfun;i++){retained=&empty;if(i<repl_saved_nfun)retained=&repl_snapshot[i];FreeFunctionChanges(&functions[i],retained);}
 }
 U0 ReplCommitFunctions() {I64 i;for(i=1;i<repl_saved_nfun;i++)FreeFunctionChanges(&repl_snapshot[i],&functions[i]);}
+
+U0 ReplRevalidateBorrowProjections(){I64 i;Bool changed=FALSE;Function *old,*current;if(!allow_redefinition || !repl_snapshot)return;for(i=1;i<repl_saved_nfun;i++){old=&repl_snapshot[i];current=&functions[i];if(old->body!=current->body && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(current))changed=TRUE;}if(!changed)return;for(i=1;i<repl_saved_nfun;i++){current=&functions[i];if(current->body && current->body==repl_snapshot[i].body && !current->generic_count)AnalyzeReferences(current);}}

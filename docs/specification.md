@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 28
+# Cool language specification — 1.0 draft 29
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1008,3 +1008,28 @@ and other unrecognized body forms retain conservative summaries. Live REPL
 replacement accepts an alias chain with the same proven source and rejects a
 changed or unproven source under the draft 27 compatibility rule. General body
 summaries and dependent caller revalidation remain required work.
+
+
+## Draft 29: transactional projection replacement
+
+The draft 27 requirement for a new session on a changed established slice
+projection is superseded. After checking every new declaration body, a live
+session detects changed proven parameter origins (including a transition to an
+opaque summary) and checks all retained concrete function bodies against the
+new projections. A caller whose lifetime/permission contract no longer holds
+rejects the entire submission with its ordinary borrow diagnostic. The previous
+functions and callers survive unchanged. Replacing affected callers in the
+same submission is supported when their signatures stay compatible and their
+new bodies pass checking.
+
+Already-created session values retain the provenance of their actual historical
+storage. Replacing a producer does not rewrite those loans or release protected
+bindings. Future calls are checked against the new body. Parameter storage
+anchors are owned by one analysis and are released on successful checking or
+aborted transactions; checking retained bodies does not append synthetic locals
+to their AST or function allocation registries.
+
+This implementation checks every retained concrete body when an established
+projection changes. Dependency-directed invalidation and broader body summaries
+remain required compiler/performance work. Arbitrary nested storage restrictions
+and all remaining release gates still apply.

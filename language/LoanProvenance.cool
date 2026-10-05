@@ -1,3 +1,4 @@
+Local *ReferenceSyntheticRoot(ReferenceCheck *check){Local *local=CAlloc(sizeof(Local));local->all_next=check->synthetic_roots;check->synthetic_roots=local;return local;}
 // Straight-line aliases preserve the original slice parameter projection.
 I64 ReferenceSliceProjection(Function *f){
  I64 begin=f->begin,end=f->end,count=0,position,selected,origin,duplicate;
@@ -30,7 +31,7 @@ I64 ReferenceSliceProjection(Function *f){
 extern U0 ReferenceSliceElementGraph(ReferenceCheck *check,ReferenceLoan *target,ReferenceLoan *source,Node *expression,Node *place,Local *via);
 // Manual bootstrap counterpart of production typed loan metadata.
 U0 ReferenceGraphFree(ProvenanceGraph *graph){if(graph){ProvenanceGraphFree(graph);Free(graph);}}
-U0 ReferenceCheckFree(ReferenceCheck *check){ReferenceRelease(check,NULL);ReferenceGraphFree(check->graph);Free(check);}
+U0 ReferenceCheckFree(ReferenceCheck *check){Local *local,*next;ReferenceRelease(check,NULL);ReferenceGraphFree(check->graph);for(local=check->synthetic_roots;local;local=next){next=local->all_next;Free(local);}Free(check);}
 U0 ReferenceChecksAbort(){ReferenceCheck *check;while(reference_checks){check=reference_checks;reference_checks=check->next;ReferenceCheckFree(check);}}
 ProvenanceNode *ReferenceGraphValueNode(ProvenanceGraph *graph,I64 type,Local *root,I64 mode,I64 opaque){ProvenanceNode *n=graph->nodes;while(n){if(n->opaque==opaque && n->type==type && n->root==root && n->exclusive==mode && !n->edges)return n;n=n->next;}n=ProvenanceNodeNew(graph,type,root,mode);n->opaque=opaque;return n;}
 ProvenanceNode *ReferenceGraphLeaf(ProvenanceGraph *graph,I64 type,Local *root,I64 mode){I64 kind=AggregateKind(type),opaque=0;if(kind==A_STRUCT || kind==A_ARRAY || kind==A_ENUM || kind==A_OWNER || (kind==6 && Borrowed(Shape(type)->element)))opaque=1;return ReferenceGraphValueNode(graph,type,root,mode,opaque);}

@@ -277,22 +277,18 @@ fn ReferenceParameters(check: * ReferenceCheck) {
             if (local.depth == 0 && TrackedBorrow(local.type)) {
                 var payload = local;
                 if (!IsReference(local.type) || NestedReference(local.type)) {
-                    payload = AllocateLocal();
+                    payload = ReferenceSyntheticRoot(check);
                     payload.region = local.region;
                     payload.place_region = local.place_region;
                     payload.reference_external = 1;
-                    payload.all_next = check.function.all_locals;
-                    check.function.all_locals = payload;
                 }
                 var physical = local;
                 if (IsReference(local.type) || ReferenceBorrowedSlice(local.type)) {
-                    physical = AllocateLocal();
+                    physical = ReferenceSyntheticRoot(check);
                     physical.type = local.type;
                     physical.region = local.region;
                     physical.place_region = local.place_region;
                     physical.reference_external = 1;
-                    physical.all_next = check.function.all_locals;
-                    check.function.all_locals = physical;
                     // Stores install into caller storage, with its own marker.
                     check.loans = ReferenceNew(check, null, null, 0, 0, null, check.loans);
                     check.loans.holder = physical;

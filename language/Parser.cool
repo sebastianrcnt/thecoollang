@@ -1,3 +1,4 @@
+extern U0 ReplRevalidateBorrowProjections();
 extern I64 ReferenceSliceProjection(Function *f);
 extern Bool ContainsReference(I64 type);
 I64 TypeName(U8 *s) {
@@ -596,7 +597,6 @@ U0 ParseProgram() {
                 if (Take('{')) braces++; else if (Take('}')) braces--; else pos++;
             }
             f->end = pos;
-            if(old && ReferenceSliceProjection(old)>=0 && ReferenceSliceProjection(old)!=ReferenceSliceProjection(f))ErrorAt(f->token,"borrow projection change requires a new session");
 declaration_next:;
         }
     }
@@ -608,4 +608,5 @@ declaration_next:;
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
 parsed_next:;
     }
+    ReplRevalidateBorrowProjections();
 }
