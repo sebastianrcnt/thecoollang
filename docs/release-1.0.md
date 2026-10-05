@@ -2530,6 +2530,60 @@ through ordinary evaluation or library use.
   not complete foreign/raw, recursive alias or whole-language safety audits.
   Production nested-storage guards and all release gates remain Open.
 
+- Nested slice value selection and stable simple call projections (specification
+  draft 27): private generic recursion, enum payload, depth-three descriptor and
+  alias fixtures exposed intermediate backing roots incorrectly retained by
+  direct value selection. Selection now distinguishes slice value copies from
+  storage/address selection. Precise intermediate terminals can be absent from
+  an element value; its payload edges remain, with unchanged capability limits.
+  Cursor endpoints, address selection, opaque/mismatched/incomplete paths and
+  physical/authority checks remain conservative. Proven-absent selected roots
+  do not recreate fallback loans or become computed result origins.
+  A same-root intermediate/endpoint graph probe checks both shared/exclusive
+  edge insertion orders, entry modes, absence and conservative fallbacks;
+  the existing 1,648 independent selection/overlap/authority oracle also PASS
+  with ASan/UBSan. Metadata selection does not itself authorize permissions.
+
+  A bounded whole-body recognizer proves same-typed slice parameter returns,
+  including literal/omitted reslicing bounds, without stores effects. These
+  calls preserve actual argument value graphs rather than distributing every
+  contracted root into every output slot. Unused overdeclared sources remain
+  protected as arguments but do not enter the proven result. Forward and
+  instantiated generic helper cases execute correctly. Other bodies keep
+  conservative summaries. Established projections cannot become another source
+  or opaque during live REPL replacement; same-source reslicing/renaming remains
+  compatible. Existing-caller and multi-declaration rollback scenarios verify
+  rejection preserves prior behavior. General body summaries and dependent
+  caller revalidation remain required unfinished work.
+
+  ASan found a new internal mistake: stored receiver effects reuse
+  `ReferenceNewCall` with non-call destinations and slot -1. Projection lookup
+  now requires a CALL and a valid function-table slot; receiver effects keep
+  their old summary path. The failing setter was not excluded. Corrected private
+  slice sanitizer: 164 classifications/70 tree runs, 22 persistent scenarios
+  and eight allocation observations PASS. Permanent readiness has the same
+  classifications/positives and 420 executions. Expanded combined depth/store/
+  slice audit: 252 classifications/102 positives and 612 executions across both
+  frontends/five engines plus O2, no gaps. Graph/copy/loan/selection/access/
+  physical-address/descriptor/stores and public slice-descriptor sanitizer
+  targets PASS. The four existing allocation workloads retain equal final and
+  peak tracked bytes/counts at 64/1024 histories.
+
+  Full `make -j4 test bootstrap-check editor-distribution-test` PASS on the
+  corrected compiler, including external distribution and identical bootstrap/
+  stage2/stage3 IR/native binaries. The later forward/generic fixtures and
+  same-root graph probe pass their expanded permanent readiness/sanitizer/O2
+  targets. Stage-2 IR SHA256:
+  `6d5614be275227f0c3ea938b20f2151b33cc038b7f4056d3fa7f6d2ad2061ad0`.
+  Evidence: `build/release-audit/slice-projection-final-{regression,sanitize}.log`,
+  `build/release-audit/slice-projection-expanded-{validation,combined}.log`,
+  `build/release-audit/slice-projection-expanded-combined.json`,
+  `build/release-audit/slice-value-purpose-oracle.{json,log}` and
+  `build/nested-reference-slice-{readiness,asan}-audit.json`.
+  Counterexamples: `slice-aggregate-baseline.{json,log}`,
+  `slice-value-selection-trial.{json,log}` and `slice-projection-sanitize.log`.
+  Production nested-storage guards and all release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

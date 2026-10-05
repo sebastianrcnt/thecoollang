@@ -293,6 +293,58 @@ SLICE_CASES.extend([
 ])
 STORE_DIAGNOSTICS.update({name:'outlive' for name in ('plain_slice_local_backing_return','plain_slice_empty_local_backing_return','plain_slice_zero_length_local_return','nested_slice_stores_return_missing_source')})
 
+
+SLICE_CASES.extend([
+    ('generic_recursive_slice_read', 'accept', 'struct Node[T]{kids:[]Node[T];value:T;}fn main(){var none=[0]Node[i64]{};var leaf=Node[i64]{kids:none[:],value:7};var kids=[1]Node[i64]{leaf};var root=Node[i64]{kids:kids[:],value:9};assert(root.kids[0].value==7);}'),
+    ('generic_recursive_reference_initializer', 'reject', 'struct Node[T]{kids:[]Node[T];value:T;}fn main(){let node=new[Node[&i64]]();}'),
+    ('enum_slice_external_descriptor_return', 'accept', 'enum View{None;Some([]i64);}fn get(x:[]i64)->[]i64 borrows(x){var views=[1]View{View.Some(x)};var s=views[:];match(s[0]){View.None=>{return []i64{};}View.Some(v)=>{return v;}}}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('enum_slice_local_descriptor_return', 'reject', 'enum View{None;Some([]i64);}fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};var views=[1]View{View.Some(a[:])};var s=views[:];match(s[0]){View.None=>{return []i64{};}View.Some(v)=>{return v;}}}fn main(){}'),
+    ('depth3_slice_external_descriptor_return', 'accept', 'fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};var s=layers[:];return s[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('depth3_slice_local_descriptor_return', 'reject', 'fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};var rows=[1][]i64{a[:]};var layers=[1][][]i64{rows[:]};var s=layers[:];return s[0][0];}fn main(){}'),
+    ('nested_slice_shared_mutable_copy', 'reject', 'fn bad(s:&[][]i64){let inner=(*s)[0];inner[0]=9;}fn main(){}'),
+    ('nested_slice_live_inner_alias', 'reject', 'fn main(){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];let inner=s[0];s[0][0]=9;assert(inner[0]==9);}'),
+    ('nested_slice_released_inner_alias', 'accept', 'fn main(){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];{let inner=s[0];inner[0]=8;}s[0][0]=9;assert(s[0][0]==9);}'),
+])
+STORE_DIAGNOSTICS.update({
+    'generic_recursive_reference_initializer':'reference storage requires an explicit initializer',
+    'enum_slice_local_descriptor_return':'outlive',
+    'depth3_slice_local_descriptor_return':'outlive',
+    'nested_slice_live_inner_alias':'conflicts',
+    'nested_slice_shared_mutable_copy':'cannot mutate or move through a shared reference',
+})
+
+
+SLICE_CASES.extend([
+    ('depth3_slice_local_descriptor_address_return','reject','fn bad(x:[]i64)->&[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};var s=layers[:];return &s[0][0];}fn main(){}'),
+    ('depth3_slice_intermediate_descriptor_return','reject','fn bad(x:[]i64)->[][]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};var s=layers[:];return s[0];}fn main(){}'),
+    ('depth3_slice_computed_descriptor_return','accept','fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity(layers[:])[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+])
+STORE_DIAGNOSTICS.update({name:'outlive' for name in ('depth3_slice_local_descriptor_address_return','depth3_slice_intermediate_descriptor_return')})
+
+
+SLICE_CASES.extend([
+    ('depth3_slice_computed_local_address_return','reject','fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn bad(x:[]i64)->&[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return &identity(layers[:])[0][0];}fn main(){}'),
+    ('depth3_slice_computed_local_payload_return','reject','fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};var rows=[1][]i64{a[:]};var layers=[1][][]i64{rows[:]};return identity(layers[:])[0][0];}fn main(){}'),
+    ('depth3_slice_computed_intermediate_return','reject','fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn bad(x:[]i64)->[][]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity(layers[:])[0];}fn main(){}'),
+    ('depth3_slice_resliced_call_descriptor_return','accept','fn tail(s:[][][]i64)->[][][]i64 borrows(s){return s[0:];}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return tail(layers[:])[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('slice_exact_overdeclared_source_return','accept','fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}fn get(x:[]i64)->[]i64 borrows(x){var local=[1]i64{9};return first(x,local[:]);}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+])
+STORE_DIAGNOSTICS.update({name:'outlive' for name in ('depth3_slice_computed_local_address_return','depth3_slice_computed_local_payload_return','depth3_slice_computed_intermediate_return')})
+
+
+STORE_DIAGNOSTICS['depth3_slice_computed_local_address_return']='conflicts'
+SLICE_CASES.extend([
+    ('depth3_slice_bound_local_address_return','reject','fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn bad(x:[]i64)->&[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};var tmp=identity(layers[:]);return &tmp[0][0];}fn main(){}'),
+    ('slice_identity_external_descriptor_address','accept','fn identity(s:[][]i64)->[][]i64 borrows(s){return s;}fn get(x:[][]i64)->&[]i64 borrows(x){var tmp=identity(x);return &tmp[0];}fn main(){var a=[1]i64{7};var rows=[1][]i64{a[:]};let r=get(rows[:]);assert((*r)[0]==7);}'),
+])
+STORE_DIAGNOSTICS['depth3_slice_bound_local_address_return']='outlive'
+
+
+SLICE_CASES.extend([
+    ('depth3_slice_forward_projection_return','accept','fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity(layers[:])[0][0];}fn identity(s:[][][]i64)->[][][]i64 borrows(s){return s;}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('depth3_slice_generic_projection_return','accept','fn identity[T](s:[]T)->[]T borrows(s){return s;}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var layers=[1][][]i64{rows[:]};return identity[[][]i64](layers[:])[0][0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+])
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -369,6 +421,45 @@ SLICE_REPL_CASES = [('backing_forget',
   '7\n7\n7\n7\n9\n',
   {'live dependent loans': 1})]
 
+
+SLICE_REPL_CASES.extend([
+ ('projection_source_replacement',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'var a=[2]i64{7,8};\nvar b=[2]i64{9,10};\n'
+  'first(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;}\n'
+  'first(a[:],b[:])[0]\n:quit\n',
+  '7\n7\n', {'borrow projection change requires a new session':1}),
+ ('projection_opaque_replacement',
+  'fn identity(s:[]i64)->[]i64 borrows(s){return s;}\n'
+  'var a=[2]i64{7,9};\nidentity(a[:])[0]\n'
+  'fn identity(s:[]i64)->[]i64 borrows(s){let copy=s;return copy;}\n'
+  'identity(a[:])[0]\n:quit\n',
+  '7\n7\n', {'borrow projection change requires a new session':1}),
+ ('projection_reslice_replacement',
+  'fn identity(s:[]i64)->[]i64 borrows(s){return s;}\n'
+  'var a=[2]i64{7,9};\nidentity(a[:])[0]\n'
+  'fn identity(view:[]i64)->[]i64 borrows(view){return view[1:];}\n'
+  'identity(a[:])[0]\n:quit\n',
+  '7\n9\n', {}),
+])
+
+SLICE_REPL_CASES.extend([
+ ('projection_existing_caller_source_replacement',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return b;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
+  'use(a[:],b[:])[0]\n:quit\n',
+  '7\n7\n', {'borrow projection change requires a new session':1}),
+ ('projection_existing_caller_opaque_replacement',
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){return a;}\n'
+  'fn use(a:[]i64,b:[]i64)->[]i64 borrows(a){return first(a,b);}\n'
+  'var a=[1]i64{7};\nvar b=[1]i64{9};\nuse(a[:],b[:])[0]\n'
+  'fn first(a:[]i64,b:[]i64)->[]i64 borrows(a,b){let copy=a;return copy;} fn trigger(a:[]i64,b:[]i64)->[]i64 borrows(a){return use(a,b);}\n'
+  'use(a[:],b[:])[0]\n:quit\n',
+  '7\n7\n', {'borrow projection change requires a new session':1}),
+])
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

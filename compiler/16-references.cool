@@ -401,7 +401,9 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
                     if (check.pending_owner != null) {
                         check.loans = ReferenceNewFrom(check, loan, loan.parent, exclusive & loan.exclusive, loan.indirect, expression, check.loans);
                     } else {
-                        ReferenceComputedGraph(check, loan, place, origin, expression, exclusive);
+                        if (!ReferenceComputedGraph(check, loan, place, origin, expression, exclusive)) {
+                            found = true; loan = loan.next; continue;
+                        }
                         loan.exclusive = exclusive & loan.exclusive;
                         // A scalar projection may retain extra shared roots. Keep
                         // them conservatively rather than losing the anchor.
@@ -714,6 +716,8 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
             if (TrackedBorrow(node.type)) {
                 let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
                 contract = ctx.v_functions[node.slot].borrow_contract;
+                let projection = ReferenceSliceProjection(&raw ctx.v_functions[node.slot]);
+                if (projection >= 0) { contract = 1 << projection; }
                 if (contract == 0 && IsReference(node.type)) {
                     ErrorAt(node.token, cast[ * u8]("reference return requires at least one borrows source"));
                 }

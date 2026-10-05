@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 26
+# Cool language specification — 1.0 draft 27
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -956,3 +956,38 @@ edges are merged. Compilation rejection rolls back staged loans; REPL runtime
 failure retains candidate roots because a store may already have executed.
 Multi-layer stored borrowed pointees and borrowed slice elements remain required
 work. All 1.0 release gates remain open.
+
+
+## Draft 27: slice return roots and stable simple projections
+
+A slice return with nonzero borrow provenance requires every retained backing
+root to be caller storage authorized by the function's `borrows` contract.
+Selecting an inner slice value does not return the physical storage of an
+intermediate descriptor array. Taking the descriptor's address or returning
+that intermediate slice still requires its backing lifetime. Other borrowed
+aggregate returns retain the conservative region rule. Region-zero empty slice
+values may be returned; a zero-length view of a local array is not root-free.
+Direct assignments, branches, aliases and checked stores accumulate installed
+backing roots even when the binding originally held an empty literal.
+
+A checked function whose entire body returns one equal-typed slice parameter,
+optionally resliced with omitted or nonnegative integer-literal bounds, preserves
+that parameter's borrowed element graph in the caller. It must have no `stores`
+effects, be nonforeign, and name that parameter in `borrows`. Additional declared
+return sources do not become actual result origins for this proven simple
+projection. Argument loans still protect all arguments during evaluation.
+Calls with other bodies retain conservative contract summaries; an equal input
+and output type alone does not prove a value-preserving projection.
+
+In a live REPL, changing an established simple projection to another parameter
+or an unproven body requires a new session. The diagnostic is `borrow projection
+change requires a new session`. This prevents callers checked against the old
+projection from becoming unsafe after body replacement. Parameter renaming and
+literal reslicing of the same source remain compatible. Failed replacements
+roll back without changing the prior body or its callers. This is an explicit
+current limitation: general body summaries and dependent caller revalidation
+remain unfinished incremental-compilation work.
+
+Arbitrary nested borrowed storage and borrowed slice elements remain guarded in
+production. Private readiness tests audit deeper cases without enabling those
+features. This draft does not complete any 1.0 release gate.

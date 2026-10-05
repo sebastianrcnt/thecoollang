@@ -1682,3 +1682,40 @@ still returns a root-free empty slice. Both ordinary frontends and the
 instrumented compiler run these cases; generated code also runs under
 ASan/UBSan. Foreign/raw and arbitrary recursive alias paths remain separate
 audit work.
+
+## Slice value selection and stable call projections
+
+`ReferenceSelectGraphMode` distinguishes a slice value copy from storage/address
+selection. Only copied slice-valued LOCAL/LOAD/MOVE results use the value mode.
+A precise intermediate borrowed-slice terminal does not become the origin of
+a subsequently selected element value. Its payload edges still participate with
+the existing capability intersections. Cursor endpoints, opaque/mismatched
+nodes and incomplete paths preserve the established conservative behavior.
+Physical overlap and authority queries are unchanged. Known-empty selected
+value graphs omit that result root; processing them must not trigger fallback
+root creation. Computed selections leave old temporaries protecting evaluation
+but do not retag proven-absent roots as the result.
+
+`ReferenceSliceProjection` recognizes an entire tokenized body returning an
+equal-typed slice argument, optionally with literal/omitted bounds. It excludes
+foreign declarations, uninstantiated templates and checked stores effects.
+The bounded recognizer checks identifier kinds and the final semicolon/brace;
+extra statements/expressions remain opaque. Forward headers have complete
+body token ranges before checking callers. Recognized calls preserve source
+value graphs/capability limits, but discard physical geometry as before.
+Unused overdeclared sources do not enter the result; their argument loans still
+protect evaluation.
+
+`ReferenceNewCall` is also reused for stored receiver effects whose destination
+is not a CALL and may have slot -1. Projection lookup must therefore require an
+actual CALL and a valid function-table slot before indexing the table. A private
+setter fixture exposed the missing guard under ASan, despite ordinary tests
+passing. Stored receiver summaries keep the original conservative path.
+
+REPL replacement checks the prior established projection against the new body
+range before publishing it. A different argument or opaque body cannot replace
+an established precise projection; otherwise older callers could retain only
+the old subset of origins. Same-source literal reslicing/renaming is compatible.
+Function token compaction already updates begin/end ranges; failed declarations
+restore the prior snapshot. Arbitrary body summaries and dependent caller
+revalidation remain required implementation work.

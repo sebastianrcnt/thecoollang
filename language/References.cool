@@ -1,3 +1,4 @@
+extern I64 ReferenceSliceProjection(Function *f);
 extern U0 ReferenceWriteCapability(Node *place);
 // Scoped lexical loans. Keep semantics aligned with compiler/16-references.cool.
 class ReferenceLoan { ProvenanceNode *physical_provenance,*provenance; I64 provenance_type,provenance_known; Local *root, *holder, *parent; I64 exclusive, indirect; Node *owner_pin,*expression; ReferenceLoan *next; };
@@ -10,7 +11,7 @@ extern U0 ReferenceProvenanceJoin(ReferenceCheck *check,ReferenceLoan *loan,Refe
 extern ReferenceLoan *ReferenceNewFrom(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
 extern ReferenceLoan *ReferenceNewSelected(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next,Node *place,Local *via,Node *origin,Bool payload);
 extern ReferenceLoan *ReferenceNewCall(ReferenceCheck *check,ReferenceLoan *source,Local *parent,I64 exclusive,I64 indirect,Node *expression,ReferenceLoan *next);
-extern U0 ReferenceComputedGraph(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Node *origin,Node *expression,I64 exclusive);
+extern Bool ReferenceComputedGraph(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Node *origin,Node *expression,I64 exclusive);
 extern U0 ReferenceRequireComputedAuthority(ReferenceCheck *check,Node *place,Node *origin,Bool copying);
 extern U0 ReferenceRequirePayloadCopy(ReferenceCheck *check,Node *place,Local *via);
 extern U0 ReferenceRequirePayloadWrite(ReferenceCheck *check,Node *place,Local *via);
@@ -131,8 +132,8 @@ U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *t
     if(!via || (origin && origin->kind!=N_LOCAL)){
         if(exclusive)ReferenceRequireComputedAuthority(check,place,origin,expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE);
         for(source=check->loans;source;source=source->next)if(origin && !source->owner_pin && source->expression==origin && !source->holder && (!(expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) || !ReferenceLayered(origin->type) || ReferenceLayered(expression->type) || source->indirect)){
-            if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");if(check->pending_owner)check->loans=ReferenceNewFrom(check,source,source->parent,exclusive & source->exclusive,source->indirect,expression,check->loans);else{ReferenceComputedGraph(check,source,place,origin,expression,exclusive);source->exclusive=exclusive & source->exclusive;
-            if(!ReferenceLayered(expression->type))source->indirect=0;source->expression=expression;}found=TRUE;
+            if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");if(check->pending_owner)check->loans=ReferenceNewFrom(check,source,source->parent,exclusive & source->exclusive,source->indirect,expression,check->loans);else{if(ReferenceComputedGraph(check,source,place,origin,expression,exclusive)){source->exclusive=exclusive & source->exclusive;
+            if(!ReferenceLayered(expression->type))source->indirect=0;source->expression=expression;}}found=TRUE;
         }
         if(!found)ErrorAt(token,"reference result requires a tracked root");return;
     }
@@ -204,7 +205,7 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     if(node->kind==N_LOCAL_ADDRESS || node->kind==N_FIELD_ADDRESS || node->kind==N_INDEX_ADDRESS || node->kind==N_OWN_ADDRESS){ReferenceAddressMode(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);ReferenceAccess(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);return;}
     if(node->kind==N_CALL){
         saved=check->loans;contract=0;results=NULL;
-        if(TrackedBorrow(node->type)){contract=functions[node->slot].borrow_contract;if(!contract && IsReference(node->type))ErrorAt(node->token,"reference return requires at least one borrows source");}
+        if(TrackedBorrow(node->type)){contract=functions[node->slot].borrow_contract;{I64 projection=ReferenceSliceProjection(&functions[node->slot]);if(projection>=0)contract=1<<projection;}if(!contract && IsReference(node->type))ErrorAt(node->token,"reference return requires at least one borrows source");}
         for(arg=node->a;arg;arg=arg->next)ReferenceValue(check,arg);
         ReferenceCallStores(check,node,saved);index=0;
         for(arg=node->a;arg;arg=arg->next){

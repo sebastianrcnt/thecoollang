@@ -1,3 +1,29 @@
+// A stable, syntactically checked slice projection: one parameter value,
+// optionally resliced with literal bounds. No effects or other statements.
+// This preserves all element alternatives, not individual index identities.
+fn ReferenceSliceProjection(function: *Function) -> i64 { unsafe {
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    if (function.foreign != 0 || function.generic_count != 0 || function.store_destinations != 0 || AggregateKind(function.result) != 3) { return -1; }
+    let begin = function.begin; let end = function.end;
+    if (begin < 0 || end > ctx.v_ntok || end - begin < 5 || end - begin > 11) { return -1; }
+    let tokens = ctx.v_tokens;
+    if (tokens[begin].kind != 123 || tokens[begin+1].kind != 256 || tokens[begin+2].kind != 256 || Eq(tokens[begin+1].text, cast[*u8]("return")) == i8(0) || tokens[end-2].kind != 59 || tokens[end-1].kind != 125) { return -1; }
+    var argument:i64 = 0;
+    while (argument < function.argc && Eq(function.arg_names[argument], tokens[begin+2].text) == i8(0)) { argument = argument + 1; }
+    if (argument == function.argc || function.arg_types[argument] != function.result || (function.borrow_contract & (1 << argument)) == 0) { return -1; }
+    var position = begin + 3;
+    if (tokens[position].kind == 91) {
+        position = position + 1;
+        if (tokens[position].kind == 257) { position = position + 1; }
+        if (tokens[position].kind != 58) { return -1; }
+        position = position + 1;
+        if (tokens[position].kind == 257) { position = position + 1; }
+        if (tokens[position].kind != 93) { return -1; }
+        position = position + 1;
+    }
+    if (position != end-2) { return -1; }
+    return argument;
+}}
 // Opaque contracts specify possible origins, not field correspondences. Each
 // source root may occur in every borrowed output slot permitted by its type.
 // Root/capability keys live on graph nodes so clone/compaction preserves reuse
@@ -59,7 +85,11 @@ fn ReferenceNewCall(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Loc
     unsafe {
         var scoped = *source;
         scoped.exclusive = scoped.exclusive & exclusive;
-        var value = ReferenceCallGraph(check, &raw scoped, expression.type, indirect);
+        var value = scoped;
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (expression.kind == 4 && expression.slot >= 0 && expression.slot < ctx.v_nfun && ReferenceSliceProjection(&raw ctx.v_functions[expression.slot]) >= 0 && scoped.provenance_type == expression.type) {
+            value.physical_provenance = null;
+        } else { value = ReferenceCallGraph(check, &raw scoped, expression.type, indirect); }
         var old = next;
         while (old != null && old.expression == expression && old.holder == null && old.owner_pin == check.pending_owner) {
             if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {

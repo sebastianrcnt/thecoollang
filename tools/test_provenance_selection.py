@@ -136,6 +136,42 @@ def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  reading=int(any(query(nodes,edges,extra,n,m,write) for n,m in states) or (not extra and any(not write or m for m in fallback)))
  return reading,int(precise)
 AUDIT='''
+export "C" fn SliceValueProbe(){unsafe{
+ let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+ let prior=ctx.v_aggregate_types;let prior_count=ctx.v_naggregates;
+ ctx.v_naggregates=0;ctx.v_aggregate_types=cast[*AggregateType](CAlloc(8*i64(sizeof(AggregateType))));
+ var token=Token{};let inner=SequenceType(3,1,0,&raw token);let outer=SequenceType(3,inner,0,&raw token);
+ for(var mode:i64=0;mode<2;mode=mode+1){for(var reverse:i64=0;reverse<2;reverse=reverse+1){
+  var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
+  let leaf=ProvenanceNodeNew(&raw graph,inner,&raw root,1);
+  let parent=ProvenanceNodeNew(&raw graph,outer,&raw root,1);
+  var source=ReferenceLoan{};source.root=&raw root;source.exclusive=mode;source.provenance_known=1;source.provenance=parent;
+  var path=ProvenanceCursor{type:outer,kind:2,key:0,next:null};
+  var absent=ReferenceSelectGraphMode(&raw check,&raw source,&raw path,1,inner,true);
+  if(absent.node!=null || absent.known!=1){NativeExit(82);}
+  var address=ReferenceSelectGraph(&raw check,&raw source,&raw path,1,inner);
+  if(address.node==null || address.known!=0 || !ProvenanceQueryRoot(address.node,null,&raw root,1,false)){NativeExit(83);}
+  // Shared/exclusive edge alternatives and both insertion orders. The final
+  // endpoint has the same root as intermediate backing; it must remain.
+  ProvenanceEdgeNew(parent,2,0,leaf,reverse);ProvenanceEdgeNew(parent,2,0,leaf,1-reverse);
+  var selected=ReferenceSelectGraphMode(&raw check,&raw source,&raw path,1,inner,true);
+  if(selected.node==null || selected.known!=1 || !ProvenanceQueryRoot(selected.node,null,&raw root,1,false) || BoolInt(ProvenanceQueryRoot(selected.node,null,&raw root,1,true))!=mode){NativeExit(84);}
+  // Existential selection metadata is not permission authorization: universal
+  // source authority still sees every barrier, and physical overlap is intact.
+  var authority:i64=2;if(mode!=0){authority=3;}
+  if(ReferencePathCopyModes(&raw source,&raw path,1)!=authority || !ReferencePathMayAccess(&raw source,&raw path,1)){NativeExit(85);}
+  var whole=ReferenceSelectGraphMode(&raw check,&raw source,null,1,outer,true);
+  if(whole.node==null || whole.known!=1 || !ProvenanceQueryRoot(whole.node,null,&raw root,1,false)){NativeExit(86);}
+  parent.opaque=1;var unknown=ReferenceSelectGraphMode(&raw check,&raw source,&raw path,1,inner,true);
+  if(unknown.node==null || unknown.known!=0){NativeExit(87);}parent.opaque=0;
+  var incomplete=ReferenceSelectGraphMode(&raw check,&raw source,&raw path,0,inner,true);
+  if(incomplete.node==null || incomplete.known!=0){NativeExit(88);}
+  path.type=inner;var mismatch=ReferenceSelectGraphMode(&raw check,&raw source,&raw path,1,inner,true);
+  if(mismatch.node==null || mismatch.known!=0){NativeExit(89);}
+  ProvenanceGraphFree(&raw graph);
+ }}
+ Free(cast[*u8](ctx.v_aggregate_types));ctx.v_aggregate_types=prior;ctx.v_naggregates=prior_count;
+}}
 export "C" fn StoreGraphProbe(){unsafe{
  var graph=ProvenanceGraph{};var external=Local{};var holder=Local{};holder.type=10;
  var check=ReferenceCheck{};check.graph=&raw graph;
@@ -250,10 +286,10 @@ DRIVER=r'''
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-extern void SelectJoinProbe(void);extern void StoreGraphProbe(void);extern void PhysicalProjectProbe(void);
+extern void SelectJoinProbe(void);extern void StoreGraphProbe(void);extern void PhysicalProjectProbe(void);extern void SliceValueProbe(void);
 extern int64_t SelectProbe(int64_t,int64_t,int64_t*,int64_t*,int64_t,int64_t*,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t*,int64_t);
 static int64_t get(void){int64_t v;if(scanf("%"SCNd64,&v)!=1)abort();return v;}
-int main(void){SelectJoinProbe();StoreGraphProbe();PhysicalProjectProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
+int main(void){SelectJoinProbe();StoreGraphProbe();PhysicalProjectProbe();SliceValueProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
  int64_t *ns=calloc(n*4+1,8),*es=calloc(e*5+1,8),*ps=calloc(c*4+1,8),*qs=calloc(q*4+1,8);
  for(int64_t i=0;i<n*4;i++)ns[i]=get();for(int64_t i=0;i<e*5;i++)es[i]=get();for(int64_t i=0;i<c*4;i++)ps[i]=get();for(int64_t i=0;i<q*4;i++)qs[i]=get();
  printf("%"PRId64"\n",SelectProbe(n,e,ns,es,c,ps,start,mode,complete,type,known,q,qs,writing));free(ns);free(es);free(ps);free(qs);
@@ -362,6 +398,6 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent owner descriptor slot and physical address pair-product overlap and access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Physical projection clone invariants: all union endpoints, same-arena source preservation, recursive edges, equal source/target endpoint types, identity, all-or-unknown alternatives, cyclic/unsupported suffix rejection. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent owner descriptor slot and physical address pair-product overlap and access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Physical projection clone invariants: all union endpoints, same-arena source preservation, recursive edges, equal source/target endpoint types, identity, all-or-unknown alternatives, cyclic/unsupported suffix rejection. Slice value-copy purpose probes: same intermediate/endpoint root, shared/exclusive edge alternatives in both insertion orders, known absence, whole endpoints, address/opaque/incomplete/mismatch preservation, unchanged universal source authority and physical overlap. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
  print(f'provenance selection/overlap/authority: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
