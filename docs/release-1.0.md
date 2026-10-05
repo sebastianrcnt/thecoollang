@@ -3052,6 +3052,17 @@ through ordinary evaluation or library use.
   coverage for evaluation order and ownership; borrowed-storage fuzzing and
   every remaining mandatory gate stay Open.
 
+- Scoped-loan fuzzing: `tools/test_borrow_fuzz.py` generates seeded sequences of
+  shared and exclusive loans over two locals, writes through the root or an
+  exclusive binding, reads through live loans and opens/closes nested scopes.
+  An independent model of live loans decides which operations are legal; the
+  valid program must run and print the modeled values on five engines and both
+  frontends, and one deliberately conflicting operation must be rejected with a
+  scoped-reference diagnostic. Seven seeds at 120 steps pass. Together with
+  `tools/test_ownership_fuzz.py` this supplies G9's deterministic fuzzing for
+  evaluation order, ownership and borrowed storage; failure promotion, broader
+  slice/aggregate loans and every remaining mandatory gate stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
@@ -3065,10 +3076,8 @@ through ordinary evaluation or library use.
   and the separate unsafe raw-pointer obligations.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
   packages, persistent loans and runtime-error recovery.
-- Add adversarial/deterministic fuzz cases for borrowed storage and slice
-  loans (evaluation-order and ownership fuzzing now exist in
-  `tools/test_ownership_fuzz.py`). Promote every discovered failure to a
-  permanent regression.
+- Extend the ownership/borrow fuzzers to slices, aggregates and repeated
+  relocation, and promote every discovered failure to a permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying
   remaining port-generated compiler sections. Both frontend implementations
   must remain semantically aligned and bootstrap must continue to converge.

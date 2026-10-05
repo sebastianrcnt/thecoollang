@@ -617,3 +617,9 @@ ownership-fuzz-test: build/cool-compiler build/language.BIN build/language-runti
 test: ownership-fuzz-test
 ownership-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_ownership_fuzz.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/ownership-fuzz-asan-audit.json
+
+# Seeded scoped-loan oracle: modeled valid programs run, conflicts reject.
+.PHONY: borrow-fuzz-test
+borrow-fuzz-test: build/cool-compiler build/language.BIN
+	python3 tools/test_borrow_fuzz.py --output build/borrow-fuzz-audit.json
+test: borrow-fuzz-test
