@@ -1341,6 +1341,21 @@ through ordinary evaluation or library use.
   suite passes and `build/repl-lifecycle-audit.json` pins measured artifacts.
   G6 remains open for host/JIT accounting and complete resource acceptance.
 
+- Borrowed-type maintenance: replaced 161 lines of port-generated provenance
+  and storage-boundary dispatch in production `03-types.cool` with 42 lines of
+  direct branches and named layout/field values. Value-level borrowing and
+  owning/slice allocation boundaries retain the compact bootstrap semantics;
+  storage restrictions were not loosened. `compiler-invariants.md` explains why
+  owner contents are not recursively treated as value-level borrow roots and why
+  extending owned borrowed storage requires separate lifetime analysis. Full
+  regression, native/legacy bootstrap convergence, instrumented compiler and
+  generated LLVM/runtime descriptor/reference checks, REPL allocation accounting
+  and installed editor/distribution verification pass. Evidence:
+  `build/release-audit/borrow-predicates-{build,regression,sanitize,distribution}.log`.
+  Current compiler IR SHA256:
+  `82ca7a0dd7ee1b507a61c4d41e8a8d2bd9be1aa1fb5b400893e94c60eeecf47c`.
+  Remaining generated compiler sections and the complete G3 audit stay open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and lifetime-aware slice

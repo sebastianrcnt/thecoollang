@@ -869,169 +869,50 @@ return i64(0);
 }
 
 
-fn Borrowed(arg_v_type22: i64) -> i8 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_type22: i64 = arg_v_type22;
-var v_f2: *Field = null;
-var t0: i64 = i64(0);
-var t1: i8 = i8(0);
-var t2: i64 = i64(0);
-var t3: i64 = i64(0);
-var t4: *AggregateType = null;
-var t5: i64 = i64(0);
-var t6: *AggregateType = null;
-var t7: i64 = i64(0);
-var t8: *AggregateType = null;
-var t9: i64 = i64(0);
-var t10: i8 = i8(0);
-var t11: i64 = i64(0);
-var t12: *AggregateType = null;
-var t13: i64 = i64(0);
-var t14: i8 = i8(0);
-t0 = v_type22;
-t1 = Aggregate(t0);
-if (!((t1 != i8(0)))) {
-return i8(0);
-}
-t2 = v_type22;
-Layout(t2);
-t3 = v_type22;
-t4 = Shape(t3);
-if (((t4).kind == 3 || (t4).kind == 6)) {
-return i8(1);
-}
-t5 = v_type22;
-t6 = Shape(t5);
-if (((t6).kind == 2)) {
-t7 = v_type22;
-t8 = Shape(t7);
-t9 = (t8).element;
-t10 = Borrowed(t9);
-return t10;
-}
-t11 = v_type22;
-t12 = Shape(t11);
-v_f2 = (t12).fields;
-while (true) {
-if (!((v_f2 != null))) { break; }
-t13 = (v_f2).type;
-t14 = Borrowed(t13);
-if ((t14 != i8(0))) {
-return i8(1);
-}
-v_f2 = (v_f2).next;
-}
-return i8(0);
-}
-return i8(0);
+// Borrowed values retain external roots; owning handles do not expose the
+// ownership allocation's contents as part of their value-level provenance.
+fn Borrowed(type: i64) -> i8 {
+    unsafe {
+        if (Aggregate(type) == i8(0)) { return i8(0); }
+        Layout(type);
+        let shape = Shape(type);
+        if (shape.kind == 3 || shape.kind == 6) { return i8(1); }
+        if (shape.kind == 2) { return Borrowed(shape.element); }
+        var field = shape.fields;
+        while (field != null) {
+            if (Borrowed(field.type) != i8(0)) { return i8(1); }
+            field = field.next;
+        }
+        return i8(0);
+    }
 }
 
-
-fn ValidateBorrowedElements(arg_v_type23: i64) {
-unsafe {
-ValidateReferenceStorage(arg_v_type23,At());
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_type23: i64 = arg_v_type23;
-var v_field: *Field = null;
-var t0: i64 = i64(0);
-var t1: i8 = i8(0);
-var t2: i64 = i64(0);
-var t3: i64 = i64(0);
-var t4: *AggregateType = null;
-var t5: i64 = i64(0);
-var t6: *AggregateType = null;
-var t7: i64 = i64(0);
-var t8: i8 = i8(0);
-var t9: i64 = i64(0);
-var t10: *AggregateType = null;
-var t11: *Token = null;
-var t12: *u8 = null;
-var t13: i64 = i64(0);
-var t14: *AggregateType = null;
-var t15: i64 = i64(0);
-var t16: *AggregateType = null;
-var t17: i64 = i64(0);
-var t18: i8 = i8(0);
-var t19: i64 = i64(0);
-var t20: *AggregateType = null;
-var t21: *Token = null;
-var t22: *u8 = null;
-var t23: i64 = i64(0);
-var t24: *AggregateType = null;
-var t25: i64 = i64(0);
-var t26: i8 = i8(0);
-var t27: i64 = i64(0);
-var t28: *AggregateType = null;
-var t29: *Token = null;
-var t30: *u8 = null;
-var t31: i64 = i64(0);
-var t32: *AggregateType = null;
-var t33: i64 = i64(0);
-var t34: *AggregateType = null;
-var t35: i64 = i64(0);
-var t36: i64 = i64(0);
-var t37: *AggregateType = null;
-var t38: i64 = i64(0);
-t0 = v_type23;
-t1 = Aggregate(t0);
-if (!((t1 != i8(0)))) {
-return;
-}
-t2 = v_type23;
-Layout(t2);
-t3 = v_type23;
-t4 = Shape(t3);
-if (((t4).kind == 5)) {
-t5 = v_type23;
-t6 = Shape(t5);
-t7 = (t6).element;
-t8 = Borrowed(t7);
-if ((t8 != i8(0))) {
-t9 = v_type23;
-t10 = Shape(t9);
-t11 = (t10).token;
-t12 = cast[*u8]("owned storage cannot contain borrowed references");
-ErrorAt(t11, t12);
-}
-} else {
-t13 = v_type23;
-t14 = Shape(t13);
-if (((t14).kind == 3)) {
-t23 = v_type23;
-t24 = Shape(t23);
-t25 = (t24).element;
-t26 = Borrowed(t25);
-if ((t26 != i8(0))) {
-t27 = v_type23;
-t28 = Shape(t27);
-t29 = (t28).token;
-t30 = cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists");
-ErrorAt(t29, t30);
-}
-} else {
-t31 = v_type23;
-t32 = Shape(t31);
-if (((t32).kind == 2)) {
-t33 = v_type23;
-t34 = Shape(t33);
-t35 = (t34).element;
-ValidateBorrowedElements(t35);
-} else {
-t36 = v_type23;
-t37 = Shape(t36);
-v_field = (t37).fields;
-while (true) {
-if (!((v_field != null))) { break; }
-t38 = (v_field).type;
-ValidateBorrowedElements(t38);
-v_field = (v_field).next;
-}
-}
-}
-}
-}
-return;
+// Validate the storage boundaries separately from the value-level predicate.
+// Keep this aligned with language/Types.cool until the seed can be retired.
+fn ValidateBorrowedElements(type: i64) {
+    unsafe {
+        ValidateReferenceStorage(type, At());
+        if (Aggregate(type) == i8(0)) { return; }
+        Layout(type);
+        let shape = Shape(type);
+        if (shape.kind == 5) {
+            if (Borrowed(shape.element) != i8(0)) {
+                ErrorAt(shape.token, cast[*u8]("owned storage cannot contain borrowed references"));
+            }
+        } else if (shape.kind == 3) {
+            if (Borrowed(shape.element) != i8(0)) {
+                ErrorAt(shape.token, cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));
+            }
+        } else if (shape.kind == 2) {
+            ValidateBorrowedElements(shape.element);
+        } else {
+            var field = shape.fields;
+            while (field != null) {
+                ValidateBorrowedElements(field.type);
+                field = field.next;
+            }
+        }
+    }
 }
 
 

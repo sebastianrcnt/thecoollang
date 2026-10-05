@@ -763,8 +763,25 @@ physical anchors conservatively.
 A store pins its destination with read-mode address evaluation before evaluating
 the RHS, then requires write access after the RHS. `ReferenceWriteCapability`
 checks every enclosing reference in the destination projection before read-mode
-pins are established, including computed shared receivers and stored references. This allows ordinary scalar
-read/modify/write without weakening owner-address liveness or live child-loan
+pins are established, including computed shared receivers and stored references.
+This allows ordinary scalar read/modify/write without weakening owner-address liveness or live child-loan
 conflicts. Do not discard pending address pins before evaluating RHS/index calls.
 Borrowed-storage writes through a reference are rejected until replacement
 provenance can be attached to the actual destination lifetime across calls.
+
+## Value provenance and borrowed storage boundaries
+
+`Borrowed(type)` classifies value-level provenance: slices and references retain
+external roots, arrays inherit their element provenance, and nominal aggregates
+inherit their fields. An owning handle itself has no borrowed value provenance;
+its allocation contents are a separate storage boundary. Keep `Layout` before
+reading field lists, including lazy nominal and generic layouts.
+
+`ValidateBorrowedElements` first enforces reference-storage restrictions, then
+checks owning allocations and slice elements for borrowed payloads and recursively
+validates arrays/nominal fields. The predicate and storage validator have distinct
+roles; simply recursing through owners in `Borrowed` changes return/move semantics
+and can introduce cycles through recursive owning layouts. Extending owned
+borrowed storage requires destination lifetimes and escape analysis, not only
+relaxing this validator. The production implementations use direct control flow
+and remain semantically aligned with the compact bootstrap `Types.cool` helpers.
