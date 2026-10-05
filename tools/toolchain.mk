@@ -582,7 +582,7 @@ test: nested-reference-store-readiness-test
 # This private guard-bypass audit does not enable the production feature.
 .PHONY: nested-reference-slice-readiness-test nested-reference-slice-sanitize-test
 nested-reference-slice-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
-	python3 tools/test_nested_reference_probe.py --legacy --slices --all-engines --assert-expectations --output build/nested-reference-slice-readiness-audit.json
+	python3 tools/test_nested_reference_probe.py --legacy --slices --repl --all-engines --assert-expectations --output build/nested-reference-slice-readiness-audit.json
 test: nested-reference-slice-readiness-test
 nested-reference-slice-sanitize-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
-	python3 tools/test_nested_reference_probe.py --legacy --slices --sanitize --assert-expectations --output build/nested-reference-slice-asan-audit.json
+	python3 tools/test_nested_reference_probe.py --legacy --slices --repl --sanitize --assert-expectations --output build/nested-reference-slice-asan-audit.json

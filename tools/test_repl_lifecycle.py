@@ -15,7 +15,10 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--counts',type=int,nargs='+',default=[64,1024])
 parser.add_argument('--output',type=Path)
 parser.add_argument('--observe',action='store_true',help='Collect lifecycle deltas without asserting bounded retention')
+parser.add_argument('--compiler-ir',type=Path,help='Use an explicitly supplied private compiler IR snapshot')
+parser.add_argument('--borrowed-slices',action='store_true',help='Run borrowed slice lifecycle workloads on a private guard-bypass compiler')
 args=parser.parse_args()
+if args.borrowed_slices and not args.compiler_ir:parser.error('--borrowed-slices requires --compiler-ir')
 if len(args.counts)<2 or min(args.counts)<1:parser.error('provide at least two positive counts')
 SHIM=r'''
 #include <stdint.h>
@@ -57,6 +60,17 @@ __attribute__((destructor)) static void finish(void){
 '''
 
 def workload(name,count):
+    if name.startswith('slice_'):
+        prefix='var hole=[1024]i64{};\nvar a=7;\nvar b=9;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget hole\n'
+        if name=='slice_partial_stores':
+            return (prefix+'{s[0]=&b;assert(false); }\n'*count+'*s[0]\nb=11;\n:forget s\n:forget refs\nb=13;\nb\n','9\n13\n',count+1)
+        if name=='slice_call_summaries':
+            return ('fn identity(s:[]&i64)->[]&i64 borrows(s){return s;}\n'+prefix+'s=identity(s);\n'*count+'*s[0]\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',0)
+        if name=='slice_selected_values':
+            return (prefix+'var q=&a;\n'+'q=s[0];\n'*count+'*q\n:forget q\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',0)
+        if name=='slice_compile_recovery':
+            return (prefix+'{var short=11;s[0]=&short;}\n'*count+'*s[0]\n:forget s\n:forget refs\na=8;\na\n','7\n8\n',count)
+        raise AssertionError(name)
     if name=='rejected_literals':
         return ('var kept="stable";\n'+''.join(f'fn rejected{i}()->string{{let text="unique {i}";return missing;}}\n' for i in range(count))+'kept\n', 'stable\n',count)
     if name=='rejected_types':
@@ -152,9 +166,11 @@ def workload(name,count):
 
 with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
     tmp=Path(directory);names=['compiler-stage2.ll','compiler-host.o','language-runtime.o']
-    digests={name:hashlib.sha256((ROOT/'build'/name).read_bytes()).hexdigest() for name in names}
-    for name in names:shutil.copy2(ROOT/'build'/name,tmp/name)
-    if any(hashlib.sha256((ROOT/'build'/name).read_bytes()).hexdigest()!=digests[name] or hashlib.sha256((tmp/name).read_bytes()).hexdigest()!=digests[name] for name in names):
+    artifacts={name:ROOT/'build'/name for name in names}
+    if args.compiler_ir:artifacts['compiler-stage2.ll']=args.compiler_ir.resolve()
+    digests={name:hashlib.sha256(artifacts[name].read_bytes()).hexdigest() for name in names}
+    for name in names:shutil.copy2(artifacts[name],tmp/name)
+    if any(hashlib.sha256(artifacts[name].read_bytes()).hexdigest()!=digests[name] or hashlib.sha256((tmp/name).read_bytes()).hexdigest()!=digests[name] for name in names):
         raise RuntimeError('Shared artifacts changed during diagnostic snapshot; retry after build completes')
     ir=(tmp/'compiler-stage2.ll').read_text()
     for original,replacement in [('CAlloc','ReplTrackedAlloc'),('StrNew','ReplTrackedStrNew'),('Free','ReplTrackedFree'),('FileRead','ReplTrackedFileRead')]:
@@ -162,12 +178,14 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
         ir=ir.replace('@'+original+'(', '@'+replacement+'(')
     (tmp/'tracked.ll').write_text(ir);(tmp/'tracker.c').write_text(SHIM)
     frontend=tmp/'tracked-compiler'
-    subprocess.run(['clang','-Wno-override-module','-O2',tmp/'tracked.ll',tmp/'tracker.c',tmp/'compiler-host.o',tmp/'language-runtime.o','-lffi','-o',frontend],check=True,capture_output=True)
+    subprocess.run(['clang','-Wno-override-module','-O2',*(['-fsanitize=address,undefined'] if 'sanitize_address' in ir else []),tmp/'tracked.ll',tmp/'tracker.c',tmp/'compiler-host.o',tmp/'language-runtime.o','-lffi','-o',frontend],check=True,capture_output=True)
     project=tmp/'project';(project/'bad').mkdir(parents=True)
     (project/'cool.mod').write_text('module example.test/lifecycle\n')
     (project/'bad/bad.cool').write_text('package bad;pub fn broken()->i64{return missing;}')
     observations=[]
-    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','generic_parent_success','generic_parent_runtime_failure','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','kept_partial_store_graphs','kept_opaque_store_graphs','typed_parameter_replacements','computed_reborrow_graphs','opaque_return_graphs','nested_return_graphs','recursive_return_graphs','disjoint_payload_access','rejected_loan_analysis','distinct_literals_policy'):
+    workloads=('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','generic_parent_success','generic_parent_runtime_failure','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','kept_partial_store_graphs','kept_opaque_store_graphs','typed_parameter_replacements','computed_reborrow_graphs','opaque_return_graphs','nested_return_graphs','recursive_return_graphs','disjoint_payload_access','rejected_loan_analysis','distinct_literals_policy')
+    if args.borrowed_slices:workloads=('slice_partial_stores','slice_call_summaries','slice_selected_values','slice_compile_recovery')
+    for name in workloads:
         rows=[]
         for count in args.counts:
             source,output,errors=workload(name,count)
@@ -180,9 +198,9 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
         bounded=name!='distinct_literals_policy'
         if bounded and not args.observe:
             assert all(row['live_bytes']==rows[0]['live_bytes'] and row['live_count']==rows[0]['live_count'] for row in rows),rows
-        if name in ('generic_parent_success','generic_parent_runtime_failure','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','kept_partial_store_graphs','kept_opaque_store_graphs','typed_parameter_replacements','computed_reborrow_graphs','opaque_return_graphs','nested_return_graphs','recursive_return_graphs','disjoint_payload_access','rejected_loan_analysis') and not args.observe:
+        if (args.borrowed_slices or name in ('generic_parent_success','generic_parent_runtime_failure','reference_replacement_roots','stored_call_roots','stored_parameter_replacements','shared_ancestry_diamonds','kept_field_graphs','kept_selected_graphs','kept_partial_store_graphs','kept_opaque_store_graphs','typed_parameter_replacements','computed_reborrow_graphs','opaque_return_graphs','nested_return_graphs','recursive_return_graphs','disjoint_payload_access','rejected_loan_analysis')) and not args.observe:
             assert all(row['peak_bytes']==rows[0]['peak_bytes'] for row in rows),rows
         print(name+': '+', '.join(f'{row["submissions"]} => {row["live_bytes"]} bytes/{row["live_count"]} allocations' for row in rows))
-    report=dict(artifact_sha256=digests,counts=args.counts,observations=observations,method='Copied emitted compiler IR call-site instrumentation for CAlloc, StrNew, FileRead (with size output) and Free; fresh REPL process per observation. Shim bookkeeping uses separate host malloc. Final live allocations measured at process exit after REPL cleanup, including fixed compiler tables/live declarations and policy-retained literal text. Other host-internal allocations and JIT mappings are not covered; peak bytes are diagnostic instrumentation data, not production RSS. No compiler source regeneration or shared artifact mutation.')
+    report=dict(private_ir=bool(args.compiler_ir),borrowed_slices=args.borrowed_slices,artifact_sha256=digests,counts=args.counts,observations=observations,method='Copied emitted compiler IR call-site instrumentation for CAlloc, StrNew, FileRead (with size output) and Free; fresh REPL process per observation. Shim bookkeeping uses separate host malloc. Final live allocations measured at process exit after REPL cleanup, including fixed compiler tables/live declarations and policy-retained literal text. Other host-internal allocations and JIT mappings are not covered; peak bytes are diagnostic instrumentation data, not production RSS. No compiler source regeneration or shared artifact mutation.')
     if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
 print('REPL lifecycle allocation instrumentation '+('observations complete' if args.observe else 'PASS'))

@@ -2437,6 +2437,24 @@ through ordinary evaluation or library use.
   Arbitrary nested/recursive/alias slice storage and persistent REPL lifetimes
   still require audit before enabling the feature. All release gates remain Open.
 
+- Persistent borrowed slices: added six guard-bypass REPL scenarios on both
+  frontends, covering backing forget/mutation, source release, compile/runtime
+  recovery and warm identity calls followed by body replacement. Four allocation
+  workloads exercise 64/1024 repetitions with reused session storage. For each
+  workload, final tracked bytes/count and peak tracked bytes are equal at both
+  history lengths. Partial stores, selected values and compile recovery finish
+  at 32,154,167 tracked bytes / 18 allocations; identity declarations finish at
+  32,159,385 / 63. These totals include fixed compiler tables/live declarations
+  and establish bounded history retention; host internals, JIT mappings and RSS
+  are not measured.
+  The ordinary production allocation suite also passes with its default IR.
+  Evidence: `build/release-audit/slice-repl-{lifecycle,validation,final-validation}.log`,
+  `build/release-audit/slice-repl-lifecycle.json`,
+  `build/nested-reference-slice-{readiness,asan}-audit.json` and
+  `build/repl-lifecycle-audit.json`.
+  Permanent private slice readiness and sanitizer targets include REPL and
+  allocation checks. Production guards remain; all release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

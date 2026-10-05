@@ -245,6 +245,82 @@ for contract in (False, True):
     SLICE_CASES.append((name,'accept' if contract else 'reject',header+body+main))
     if not contract:STORE_DIAGNOSTICS[name]='matching stores'
 
+SLICE_REPL_CASES = [('backing_forget',
+  'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
+  '',
+  {'live dependent loans': 1}),
+ ('backing_mutation',
+  'var a=7;\nvar b=9;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\nrefs[0]=&b;\n:quit\n',
+  '',
+  {'conflicts': 1}),
+ ('stored_source_release',
+  'var a=7;\n'
+  'var b=9;\n'
+  'var refs=[1]&i64{&a};\n'
+  'var s=refs[:];\n'
+  's[0]=&b;\n'
+  'b=11;\n'
+  '*s[0]\n'
+  ':forget s\n'
+  ':forget refs\n'
+  'b=13;\n'
+  'b\n'
+  ':quit\n',
+  '9\n13\n',
+  {'conflicts': 1}),
+ ('stored_source_runtime_recovery',
+  'var a=7;\n'
+  'var b=9;\n'
+  'var refs=[1]&i64{&a};\n'
+  'var s=refs[:];\n'
+  '{s[0]=&b;assert(false);}\n'
+  '*s[0]\n'
+  'b=11;\n'
+  ':forget s\n'
+  ':forget refs\n'
+  'b=13;\n'
+  'b\n'
+  ':quit\n',
+  '9\n13\n',
+  {'assertion failed': 1, 'conflicts': 1}),
+ ('stored_source_compile_recovery',
+  'var a=7;\n'
+  'var b=9;\n'
+  'var refs=[1]&i64{&a};\n'
+  'var s=refs[:];\n'
+  's[0]=&b;\n'
+  '{var c=13;s[0]=&c;}\n'
+  '*s[0]\n'
+  'b=11;\n'
+  ':forget s\n'
+  ':forget refs\n'
+  'b=13;\n'
+  'b\n'
+  ':quit\n',
+  '9\n13\n',
+  {'assigned borrow may outlive local storage': 1, 'conflicts': 1}),
+ ('identity_replacement',
+  'fn identity(s:[]&i64)->[]&i64 borrows(s){return s;}\n'
+  'var a=7;\n'
+  'var b=9;\n'
+  'var refs=[2]&i64{&a,&b};\n'
+  'var s=identity(refs[:]);\n'
+  's=identity(s);\n'
+  '*s[0]\n'
+  's=identity(s);\n'
+  '*s[0]\n'
+  's=identity(s);\n'
+  '*s[0]\n'
+  's=identity(s);\n'
+  '*s[0]\n'
+  'fn identity(s:[]&i64)->[]&i64 borrows(s){return s[1:];}\n'
+  's=identity(s);\n'
+  '*s[0]\n'
+  ':forget refs\n'
+  ':quit\n',
+  '7\n7\n7\n7\n9\n',
+  {'live dependent loans': 1})]
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -258,7 +334,9 @@ def main():
     parser.add_argument('--all-engines', action='store_true', help='Run accepted positives on tree/VM/JIT/LLVM/LLVM-JIT and release AOT')
     parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases')
     parser.add_argument('--slices', action='store_true', help='Include borrowed slice element, lifetime, capability and stores cases')
+    parser.add_argument('--repl', action='store_true', help='Audit persistent borrowed slice roots, forgetting and compile/runtime recovery')
     args = parser.parse_args()
+    if args.repl and not args.slices: parser.error('--repl requires --slices')
     if args.slices: CASES.extend(SLICE_CASES)
     if args.deep: CASES.extend(DEEP_CASES)
     if args.stores: CASES.extend(STORE_CASES)
@@ -356,12 +434,28 @@ def main():
                             assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(front_name,name,engine,result)
                 # Accepted negative cases are intentionally never executed.
                 observations.append(row);print(front_name,name,expected,observed)
+        repl_observations=[]
+        if args.repl:
+            for front_name,front in fronts:
+                for name,source,expected,errors in SLICE_REPL_CASES:
+                    result=run([*front,'repl-quiet'],input=source)
+                    matches=(result.returncode==0 and result.stdout==expected and result.stderr.count('error:')==sum(errors.values()) and all(result.stderr.count(message)==count for message,count in errors.items()))
+                    repl_observations.append(dict(frontend=front_name,name=name,source=source,expected_stdout=expected,expected_errors=errors,exit=result.returncode,stdout=result.stdout,stderr=result.stderr,matches_expectation=matches))
+                    print(front_name,'repl',name,'PASS' if matches else 'FAIL')
+        repl_lifecycle=None
+        if args.repl:
+            lifecycle=tmp/'slice-lifecycle.json'
+            result=run(['python3',ROOT/'tools/test_repl_lifecycle.py','--compiler-ir',ir,'--borrowed-slices','--output',lifecycle])
+            assert result.returncode==0,result
+            repl_lifecycle=json.loads(lifecycle.read_text())
+            print(result.stdout,end='')
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; ReferenceStorage bypassed; --slices additionally removes only the slice-element type/parser restrictions. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,repl=args.repl,repl_observations=repl_observations,repl_lifecycle=repl_lifecycle,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; ReferenceStorage bypassed; --slices additionally removes only the slice-element type/parser restrictions. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:
             failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]
             assert not failures,failures
+            assert all(row['matches_expectation'] for row in repl_observations),repl_observations
     return 0
 
 

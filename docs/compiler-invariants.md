@@ -1599,3 +1599,32 @@ annotates every private production frontend function, verifies generated ASan
 load/store instrumentation, and executes the corpus with halt-on-error enabled.
 This is readiness evidence, not complete arbitrary nested slice/alias/recursive
 storage coverage or production feature enablement.
+
+## Persistent borrowed slice readiness
+
+The private slice audit's `--repl` mode keeps backing and element loans alive
+across submissions. It checks rejection of backing-array forget/mutation,
+retention and release of newly stored sources, compile-error rollback,
+runtime-error partial execution, and warm slice-identity calls followed by
+same-signature body replacement. Existing slice roots must survive replacement;
+subsequent calls must use the replaced body. Both production and seed frontend
+sessions run the same six scenarios.
+
+The allocation lifecycle audit accepts an explicit private emitted IR snapshot
+and four borrowed-slice workloads. Private mode requires that explicit snapshot
+so production guards cannot be silently bypassed by the ordinary audit. Each
+workload runs at 64/1024 repetitions: partial stores/assertion failures, whole
+slice call summaries, selected element values, and rejected short-source stores.
+A forgotten 1024-element scratch array exercises reusable session storage.
+Final CAlloc/StrNew/FileRead-owned bytes/count and maximum tracked bytes must be
+identical between history lengths. The existing production workloads and their
+retention policies still run with the original default compiler snapshot.
+
+Call-site instrumentation and host bookkeeping are separate from semantic
+compiler implementation. Fixed compiler tables/live declaration allocations
+remain in the measured baseline; these results prove bounded retention for the
+workloads, not zero process allocations, RSS, or reclamation of JIT mappings.
+The sanitizer slice target also runs persistent scenarios and the allocation
+workloads on private frontend IR with verified ASan load/store instrumentation.
+The production borrowed-slice guards remain until the broader nested/recursive,
+module and alias audit is complete.
