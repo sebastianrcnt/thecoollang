@@ -26,7 +26,7 @@ implement parsing, type analysis, interpretation or code generation.
 | --- | --- | --- |
 | G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/declaration/expression/statement forms drafted and tested; whole-language conformance and semantic audit pending) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
-| G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | Open (self-hosting already verified) |
+| G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | Open (text, vector, ordered map and JSON validated) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
@@ -3225,6 +3225,23 @@ through ordinary evaluation or library use.
   parser's `ParseProgram` is the last generated dispatch section; G3's complete
   audit stays Open.
 
+- Compiler maintenance: `compiler/06-parser.cool` no longer contains a generated
+  dispatch state machine. `ParseProgram` is now a direct declaration loop:
+  `package`/`import` handling, `pub`/`struct`/`enum`/`extern`/`export`/`fn`
+  declarations, duplicate/signature/C-ABI checks, body brace scanning, and the
+  later per-function signature/body analysis pass use ordinary loops and
+  conditionals instead of numbered states. This is the last generated dispatch
+  section in the compiler; `grep -c 'pc == ' compiler/*.cool language/*.cool`
+  now returns zero. Behavior is unchanged: the language, LLVM AOT, ownership,
+  reference, library, REPL and editor suites pass, the full `make -k -j4 test
+  lsp-test bootstrap-check editor-distribution-test` run plus the
+  borrowed-vector/nested-reference/stores/drop-depth/ownership-fuzz/
+  aggregate-fuzz sanitizer targets exits 0 (`build/drop-depth/reg17.log`), and
+  both bootstrap paths converge (self-host IR SHA256
+  `044f3118497a69ea67f5b29d1e1cf134887ca6995d0e3b01e3f7627f5bb8c23e`). G3 is
+  closed: the source is modular and descriptive, the invariants are documented,
+  and the deterministic bootstrap needs no source-translation tool.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
@@ -3240,9 +3257,9 @@ through ordinary evaluation or library use.
   packages, persistent loans and runtime-error recovery.
 - Extend the ownership/borrow fuzzers to slices, aggregates and repeated
   relocation, and promote every discovered failure to a permanent regression.
-- Maintain the documented AST/slot/ownership invariants while simplifying
-  remaining port-generated compiler sections. Both frontend implementations
-  must remain semantically aligned and bootstrap must continue to converge.
+- Maintain the documented AST/slot/ownership invariants as the compiler
+  evolves. Both frontend implementations must remain semantically aligned and
+  bootstrap must continue to converge.
 - Extend tracked collection iteration and borrowed-element APIs, including
   remaining temporary receiver restrictions. Preserve ownership/lifetime checks
   while extending ordinary collection use.

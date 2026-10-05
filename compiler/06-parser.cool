@@ -3068,1336 +3068,223 @@ return;
 fn ParseProgram() {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_f9: *Function = null;
-var v_old: *Function = null;
+var f: *Function = null;
+var old: *Function = null;
 var previous = Function{};
-var v_name17: *u8 = null;
-var v_alias1: *u8 = null;
-var v_path2: *u8 = null;
-var v_braces: i64 = i64(0);
-var v_i11: i64 = i64(0);
-var v_j4: i64 = i64(0);
-var v_k4: i64 = i64(0);
-var v_id2: i64 = i64(0);
-var v_parsed: [4096]i64 = [4096]i64{};
-var v_count10: i64 = i64(0);
-var v_public2: i8 = i8(0);
-var v_foreign: i8 = i8(0);
-var v_exported: i8 = i8(0);
-var v_t15: *Token = null;
-var v_parameter1: *Local = null;
-var t0: i64 = i64(0);
-var t1: *Token = null;
-var t2: *u8 = null;
-var t3: bool = false;
-var t4: *Node = null;
-var t5: i8 = i8(0);
-var t6: *Function = null;
-var t7: *Function = null;
-var t8: *Node = null;
-var t9: i64 = i64(0);
-var t10: i64 = i64(0);
-var t11: i8 = i8(0);
-var t12: *u8 = null;
-var t13: i64 = i64(0);
-var t14: i8 = i8(0);
-var t15: *Local = null;
-var t16: bool = false;
-var t17: i64 = i64(0);
-var t18: *u8 = null;
-var t19: *u8 = null;
-var t20: i64 = i64(0);
-var t21: i64 = i64(0);
-var t22: *u8 = null;
-var t23: i64 = i64(0);
-var t24: *u8 = null;
-var t25: i64 = i64(0);
-var t26: *Token = null;
-var t27: *u8 = null;
-var t28: *Token = null;
-var t29: *u8 = null;
-var t30: *Token = null;
-var t31: i64 = i64(0);
-var t32: *Token = null;
-var t33: i64 = i64(0);
-var t34: i64 = i64(0);
-var t35: i64 = i64(0);
-var t36: i64 = i64(0);
-var t37: i8 = i8(0);
-var t38: i64 = i64(0);
-var t39: i8 = i8(0);
-var t40: *u8 = null;
-var t41: *Token = null;
-var t42: i64 = i64(0);
-var t43: *u8 = null;
-var t44: i64 = i64(0);
-var t45: *u8 = null;
-var t46: i64 = i64(0);
-var t47: *u8 = null;
-var t48: *u8 = null;
-var t49: i64 = i64(0);
-var t50: *u8 = null;
-var t51: i64 = i64(0);
-var t52: i8 = i8(0);
-var t53: *u8 = null;
-var t54: i64 = i64(0);
-var t55: i8 = i8(0);
-var t56: i64 = i64(0);
-var t57: i64 = i64(0);
-var t58: *u8 = null;
-var t59: *u8 = null;
-var t60: bool = false;
-var t61: *u8 = null;
-var t62: bool = false;
-var t63: bool = false;
-var t64: bool = false;
-var t65: bool = false;
-var t66: *u8 = null;
-var t67: *u8 = null;
-var t68: i8 = i8(0);
-var t69: *u8 = null;
-var t70: *u8 = null;
-var t71: *u8 = null;
-var t72: i8 = i8(0);
-var t73: bool = false;
-var t74: *u8 = null;
-var t75: i64 = i64(0);
-var t76: bool = false;
-var t77: bool = false;
-var t78: bool = false;
-var t79: bool = false;
-var t80: bool = false;
-var t81: bool = false;
-var t82: bool = false;
-var t83: bool = false;
-var t84: *u8 = null;
-var t85: i64 = i64(0);
-var t86: bool = false;
-var t87: bool = false;
-var t88: bool = false;
-var t89: bool = false;
-var t90: bool = false;
-var t91: bool = false;
-var t92: i64 = i64(0);
-var t93: *Token = null;
-var t94: *u8 = null;
-var t95: *Token = null;
-var t96: *u8 = null;
-var t97: bool = false;
-var t98: bool = false;
-var t99: i64 = i64(0);
-var t100: *Token = null;
-var t101: bool = false;
-var t102: *Token = null;
-var t103: *u8 = null;
-var t104: bool = false;
-var t105: *Function = null;
-var t106: **u8 = null;
-var t107: i64 = i64(0);
-var t108: *u8 = null;
-var t109: bool = false;
-var t110: bool = false;
-var t111: *Token = null;
-var t112: *Token = null;
-var t113: *Token = null;
-var t114: i64 = i64(0);
-var t115: *u8 = null;
-var t116: *u8 = null;
-var t117: i64 = i64(0);
-var t118: *u8 = null;
-var t119: i64 = i64(0);
-var t120: *u8 = null;
-var t121: i64 = i64(0);
-var t122: *u8 = null;
-var t123: *u8 = null;
-var t124: i64 = i64(0);
-var t125: *u8 = null;
-var t126: *Token = null;
-var t127: *u8 = null;
-var t128: *u8 = null;
-var t129: i64 = i64(0);
-var t130: *u8 = null;
-var t131: *Token = null;
-var t132: *u8 = null;
-var t133: *u8 = null;
-var t134: i64 = i64(0);
-var t135: *u8 = null;
-var t136: i64 = i64(0);
-var t137: *u8 = null;
-var t138: *u8 = null;
-var t139: i8 = i8(0);
-var t140: i64 = i64(0);
-var t141: *u8 = null;
-var t142: *Token = null;
-var t143: bool = false;
-var t144: *Token = null;
-var t145: *u8 = null;
-var t146: *u8 = null;
-var t147: i8 = i8(0);
-var t148: i64 = i64(0);
-var t149: *u8 = null;
-var t150: i8 = i8(0);
-var t151: *u8 = null;
-var t152: i8 = i8(0);
-var t153: bool = false;
-var t154: *u8 = null;
-var t155: i8 = i8(0);
-var t156: i64 = i64(0);
-var t157: i8 = i8(0);
-var t158: i64 = i64(0);
-var t159: *AggregateType = null;
-var t160: i64 = i64(0);
-var t161: i64 = i64(0);
-var t162: i64 = i64(0);
-var t163: *AggregateType = null;
-var t164: *Token = null;
-var t165: *u8 = null;
-var t166: *u8 = null;
-var t167: i64 = i64(0);
-var t168: *u8 = null;
-var t169: i64 = i64(0);
-var t170: *u8 = null;
-var t171: i8 = i8(0);
-var t172: bool = false;
-var t173: *u8 = null;
-var t174: i8 = i8(0);
-var t175: i64 = i64(0);
-var t176: *u8 = null;
-var t177: i8 = i8(0);
-var t178: *u8 = null;
-var t179: i8 = i8(0);
-var t180: *u8 = null;
-var t181: i8 = i8(0);
-var t182: *Token = null;
-var t183: i64 = i64(0);
-var t184: *u8 = null;
-var pc: i64 = 181;
-while (true) {
-if (pc == 1) {
-pc = 52;
-continue;
-}
-if (pc == 2) {
-pc = 6;
-continue;
-}
-if (pc == 3) {
-ReplRevalidateBorrowProjections();
-return;
-}
-if (pc == 4) {
-if ((v_i11 < v_count10)) { pc = 25; } else { pc = 3; }
-continue;
-}
-if (pc == 5) {
-t0 = v_i11;
-v_i11 = v_i11 + i64(1);
-pc = 4;
-continue;
-}
-if (pc == 6) {
-pc = 5;
-continue;
-}
-if (pc == 7) {
-t3 = ((v_f9).result != 0);
-if (t3) {
-t4 = (v_f9).body;
-t5 = Returns(t4);
-t3 = !((t5 != i8(0)));
-}
-if (t3) { pc = 8; } else { pc = 2; }
-continue;
-}
-if (pc == 8) {
-t1 = (v_f9).token;
-t2 = cast[*u8]("not every path returns a value");
-ErrorAt(t1, t2);
-pc = 2;
-continue;
-}
-if (pc == 9) {
-t6 = v_f9;
-InjectDrops(t6);
-pc = 7;
-continue;
-}
-if (pc == 10) {
-t7 = v_f9;
-AnalyzeBorrows(t7);
-AnalyzeReferences(t7);
-pc = 9;
-continue;
-}
-if (pc == 11) {
-t8 = Block();
-(v_f9).body = t8;
-pc = 10;
-continue;
-}
-if (pc == 12) {
-if ((v_j4 < (v_f9).argc)) { pc = 16; } else { pc = 11; }
-continue;
-}
-if (pc == 13) {
-t9 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 12;
-continue;
-}
-if (pc == 14) {
-t10 = (v_parameter1).type;
-t11 = Borrowed(t10);
-if ((t11 != i8(0))) { pc = 15; } else { pc = 13; }
-continue;
-}
-if (pc == 15) {
-(v_parameter1).region = (1 << v_j4);
-(v_parameter1).place_region = (v_parameter1).region;
-pc = 13;
-continue;
-}
-if (pc == 16) {
-t12 = (&raw ((v_f9).arg_names)[0])[v_j4];
-t13 = (&raw ((v_f9).arg_types)[0])[v_j4];
-t14 = i8(0);
-t15 = AddLocal(t12, t13, t14);
-v_parameter1 = t15;
-pc = 14;
-continue;
-}
-if (pc == 17) {
-v_j4 = 0;
-pc = 12;
-continue;
-}
-if (pc == 18) {
-ctx.v_unsafe_depth = 0;
-pc = 17;
-continue;
-}
-if (pc == 19) {
-ctx.v_depth = 0;
-pc = 18;
-continue;
-}
-if (pc == 20) {
-ctx.v_locals = null;
-pc = 19;
-continue;
-}
-if (pc == 21) {
-ctx.v_pos = (v_f9).begin;
-pc = 20;
-continue;
-}
-if (pc == 22) {
-if (v_f9.foreign == 0 && v_f9.generic_count != 0) { ctx.v_pos = v_f9.begin; TemplateBodyCheck(v_f9); }
-t16 = ((v_f9).foreign != i64(0));
-if (!t16) {
-t16 = ((v_f9).generic_count != i64(0));
-}
-if (t16) { pc = 23; } else { pc = 21; }
-continue;
-}
-if (pc == 23) {
-pc = 2;
-continue;
-}
-if (pc == 24) {
-v_f9 = &raw ((ctx.v_functions)[ctx.v_current_fun]);
-pc = 22;
-continue;
-}
-if (pc == 25) {
-ctx.v_current_fun = (&raw (v_parsed)[0])[v_i11];
-pc = 24;
-continue;
-}
-if (pc == 26) {
-CompletionOrder(&raw v_parsed[0], v_count10);
-v_i11 = 0;
-pc = 4;
-continue;
-}
-if (pc == 27) {
-t182 = At();
-if (((t182).kind != i64(0))) { pc = 28; } else { pc = 26; }
-continue;
-}
-if (pc == 28) {
-t180 = cast[*u8]("package");
-t181 = Is(t180);
-if ((t181 != i8(0))) { pc = 31; } else { pc = 32; }
-continue;
-}
-if (pc == 29) {
-t17 = 59;
-t18 = cast[*u8]("expected ';' after package");
-Need(t17, t18);
-pc = 27;
-continue;
-}
-if (pc == 30) {
-t19 = Ident();
-pc = 29;
-continue;
-}
-if (pc == 31) {
-t20 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 30;
-continue;
-}
-if (pc == 32) {
-t178 = cast[*u8]("import");
-t179 = Is(t178);
-if ((t179 != i8(0))) { pc = 51; } else { pc = 173; }
-continue;
-}
-if (pc == 33) {
-t21 = 59;
-t22 = cast[*u8]("expected ';' after import");
-Need(t21, t22);
-pc = 27;
-continue;
-}
-if (pc == 34) {
-t23 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 33;
-continue;
-}
-if (pc == 35) {
-if (!((*(v_alias1) != u8(0)))) { pc = 36; } else { pc = 34; }
-continue;
-}
-if (pc == 36) {
-t24 = cast[*u8]("empty import name");
-Error(t24);
-pc = 34;
-continue;
-}
-if (pc == 37) {
-if (!((v_alias1 != null))) { pc = 43; } else { pc = 35; }
-continue;
-}
-if (pc == 38) {
-if (((v_path2)[v_j4] != u8(0))) { pc = 40; } else { pc = 35; }
-continue;
-}
-if (pc == 39) {
-t25 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 38;
-continue;
-}
-if (pc == 40) {
-if ((i64((v_path2)[v_j4]) == 47)) { pc = 41; } else { pc = 39; }
-continue;
-}
-if (pc == 41) {
-v_alias1 = ((v_path2 + v_j4) + 1);
-pc = 39;
-continue;
-}
-if (pc == 42) {
-v_j4 = 0;
-pc = 38;
-continue;
-}
-if (pc == 43) {
-v_alias1 = v_path2;
-pc = 42;
-continue;
-}
-if (pc == 44) {
-t26 = At();
-v_path2 = (t26).text;
-pc = 37;
-continue;
-}
-if (pc == 45) {
-t28 = At();
-if (((t28).kind != 258)) { pc = 46; } else { pc = 44; }
-continue;
-}
-if (pc == 46) {
-t27 = cast[*u8]("expected import path string");
-Error(t27);
-pc = 44;
-continue;
-}
-if (pc == 47) {
-t30 = At();
-if (((t30).kind == 256)) { pc = 48; } else { pc = 45; }
-continue;
-}
-if (pc == 48) {
-t29 = Ident();
-v_alias1 = t29;
-pc = 45;
-continue;
-}
-if (pc == 49) {
-v_alias1 = null;
-pc = 47;
-continue;
-}
-if (pc == 50) {
-t31 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 49;
-continue;
-}
-if (pc == 51) {
-t32 = At();
-v_t15 = t32;
-pc = 50;
-continue;
-}
-if (pc == 52) {
-pc = 27;
-continue;
-}
-if (pc == 53) {
-(v_f9).end = ctx.v_pos;
-
-pc = 1;
-continue;
-}
-if (pc == 54) {
-if ((v_braces != i64(0))) { pc = 60; } else { pc = 53; }
-continue;
-}
-if (pc == 55) {
-t38 = 123;
-t39 = Take(t38);
-if ((t39 != i8(0))) { pc = 56; } else { pc = 57; }
-continue;
-}
-if (pc == 56) {
-t33 = v_braces;
-v_braces = v_braces + i64(1);
-pc = 54;
-continue;
-}
-if (pc == 57) {
-t36 = 125;
-t37 = Take(t36);
-if ((t37 != i8(0))) { pc = 58; } else { pc = 59; }
-continue;
-}
-if (pc == 58) {
-t34 = v_braces;
-v_braces = v_braces - i64(1);
-pc = 54;
-continue;
-}
-if (pc == 59) {
-t35 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 54;
-continue;
-}
-if (pc == 60) {
-t41 = At();
-if (!(((t41).kind != i64(0)))) { pc = 61; } else { pc = 55; }
-continue;
-}
-if (pc == 61) {
-t40 = cast[*u8]("unterminated function body");
-Error(t40);
-pc = 55;
-continue;
-}
-if (pc == 62) {
-v_braces = 1;
-pc = 54;
-continue;
-}
-if (pc == 63) {
-t42 = 123;
-t43 = cast[*u8]("expected function body");
-Need(t42, t43);
-pc = 62;
-continue;
-}
-if (pc == 64) {
-(v_f9).begin = ctx.v_pos;
-pc = 63;
-continue;
-}
-if (pc == 65) {
-t91 = (i64(v_foreign) != i64(0));
-if (!t91) {
-t91 = (i64(v_exported) != i64(0));
-}
-if (t91) { pc = 97; } else { pc = 64; }
-continue;
-}
-if (pc == 66) {
-if ((v_foreign != i8(0))) { pc = 69; } else { pc = 64; }
-continue;
-}
-if (pc == 67) {
-pc = 1;
-continue;
-}
-if (pc == 68) {
-(v_f9).body = null;
-pc = 67;
-continue;
-}
-if (pc == 69) {
-t44 = 59;
-t45 = cast[*u8]("expected ';' after extern declaration");
-Need(t44, t45);
-pc = 68;
-continue;
-}
-if (pc == 70) {
-if ((v_j4 < (v_f9).argc)) { pc = 72; } else { pc = 66; }
-continue;
-}
-if (pc == 71) {
-t46 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 70;
-continue;
-}
-if (pc == 72) {
-if (((&raw ((v_f9).arg_types)[0])[v_j4] == 3)) { pc = 73; } else { pc = 71; }
-continue;
-}
-if (pc == 73) {
-t47 = cast[*u8]("C ABI strings must use an explicit pointer");
-Error(t47);
-pc = 71;
-continue;
-}
-if (pc == 74) {
-v_j4 = 0;
-pc = 70;
-continue;
-}
-if (pc == 75) {
-if (((v_f9).result == 3)) { pc = 76; } else { pc = 74; }
-continue;
-}
-if (pc == 76) {
-t48 = cast[*u8]("C ABI strings must use an explicit pointer");
-Error(t48);
-pc = 74;
-continue;
-}
-if (pc == 77) {
-if ((v_j4 < (v_f9).argc)) { pc = 79; } else { pc = 75; }
-continue;
-}
-if (pc == 78) {
-t49 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 77;
-continue;
-}
-if (pc == 79) {
-t51 = (&raw ((v_f9).arg_types)[0])[v_j4];
-t52 = Aggregate(t51);
-if ((t52 != i8(0))) { pc = 80; } else { pc = 78; }
-continue;
-}
-if (pc == 80) {
-t50 = cast[*u8]("C ABI aggregate values are not supported; use a pointer");
-Error(t50);
-pc = 78;
-continue;
-}
-if (pc == 81) {
-v_j4 = 0;
-pc = 77;
-continue;
-}
-if (pc == 82) {
-t54 = (v_f9).result;
-t55 = Aggregate(t54);
-if ((t55 != i8(0))) { pc = 83; } else { pc = 81; }
-continue;
-}
-if (pc == 83) {
-t53 = cast[*u8]("C ABI aggregate values are not supported; use a pointer");
-Error(t53);
-pc = 81;
-continue;
-}
-if (pc == 84) {
-if ((v_k4 < ctx.v_nfun)) { pc = 86; } else { pc = 82; }
-continue;
-}
-if (pc == 85) {
-t56 = v_k4;
-v_k4 = v_k4 + i64(1);
-pc = 84;
-continue;
-}
-if (pc == 86) {
-t63 = (v_k4 != v_id2);
-if (t63) {
-t64 = (((ctx.v_functions)[v_k4]).foreign != i64(0));
-if (!t64) {
-t64 = (((ctx.v_functions)[v_k4]).exported != i64(0));
-}
-t63 = t64;
-}
-t65 = t63;
-if (t65) {
-t66 = ((ctx.v_functions)[v_k4]).name;
-t67 = v_name17;
-t68 = Eq(t66, t67);
-t65 = (i64(t68) != i64(0));
-}
-if (t65) { pc = 94; } else { pc = 85; }
-continue;
-}
-if (pc == 87) {
-if ((v_j4 < (v_f9).argc)) { pc = 89; } else { pc = 85; }
-continue;
-}
-if (pc == 88) {
-t57 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 87;
-continue;
-}
-if (pc == 89) {
-if (((&raw (((ctx.v_functions)[v_k4]).arg_types)[0])[v_j4] != (&raw ((v_f9).arg_types)[0])[v_j4])) { pc = 90; } else { pc = 88; }
-continue;
-}
-if (pc == 90) {
-t58 = cast[*u8]("conflicting C function signature");
-Error(t58);
-pc = 88;
-continue;
-}
-if (pc == 91) {
-v_j4 = 0;
-pc = 87;
-continue;
-}
-if (pc == 92) {
-t60 = (((ctx.v_functions)[v_k4]).argc != (v_f9).argc);
-if (!t60) {
-t60 = (((ctx.v_functions)[v_k4]).result != (v_f9).result);
-}
-if (t60) { pc = 93; } else { pc = 91; }
-continue;
-}
-if (pc == 93) {
-t59 = cast[*u8]("conflicting C function signature");
-Error(t59);
-pc = 91;
-continue;
-}
-if (pc == 94) {
-t62 = (i64(v_exported) != i64(0));
-if (!t62) {
-t62 = (((ctx.v_functions)[v_k4]).exported != i64(0));
-}
-if (t62) { pc = 95; } else { pc = 92; }
-continue;
-}
-if (pc == 95) {
-t61 = cast[*u8]("duplicate exported C symbol");
-Error(t61);
-pc = 92;
-continue;
-}
-if (pc == 96) {
-v_k4 = 0;
-pc = 84;
-continue;
-}
-if (pc == 97) {
-t70 = v_name17;
-t71 = cast[*u8]("main");
-t72 = Eq(t70, t71);
-t73 = (i64(t72) != i64(0));
-if (!t73) {
-t74 = v_name17;
-t75 = StrLen(t74);
-t76 = (t75 >= 7);
-if (t76) {
-t76 = (i64((v_name17)[0]) == 95);
-}
-t77 = t76;
-if (t77) {
-t77 = (i64((v_name17)[1]) == 95);
-}
-t78 = t77;
-if (t78) {
-t78 = (i64((v_name17)[2]) == 99);
-}
-t79 = t78;
-if (t79) {
-t79 = (i64((v_name17)[3]) == 111);
-}
-t80 = t79;
-if (t80) {
-t80 = (i64((v_name17)[4]) == 111);
-}
-t81 = t80;
-if (t81) {
-t81 = (i64((v_name17)[5]) == 108);
-}
-t82 = t81;
-if (t82) {
-t82 = (i64((v_name17)[6]) == 95);
-}
-t73 = t82;
-}
-t83 = t73;
-if (!t83) {
-t84 = v_name17;
-t85 = StrLen(t84);
-t86 = (t85 >= 5);
-if (t86) {
-t86 = (i64((v_name17)[0]) == 99);
-}
-t87 = t86;
-if (t87) {
-t87 = (i64((v_name17)[1]) == 111);
-}
-t88 = t87;
-if (t88) {
-t88 = (i64((v_name17)[2]) == 111);
-}
-t89 = t88;
-if (t89) {
-t89 = (i64((v_name17)[3]) == 108);
-}
-t90 = t89;
-if (t90) {
-t90 = (i64((v_name17)[4]) == 95);
-}
-t83 = t90;
-}
-if (t83) { pc = 98; } else { pc = 96; }
-continue;
-}
-if (pc == 98) {
-t69 = cast[*u8]("reserved C runtime symbol");
-Error(t69);
-pc = 96;
-continue;
-}
-if (pc == 99) {
-if ((v_old != null)) { pc = 105; } else { pc = 65; }
-continue;
-}
-if (pc == 100) {
-if ((v_j4 < (v_f9).argc)) { pc = 102; } else { pc = 65; }
-continue;
-}
-if (pc == 101) {
-t92 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 100;
-continue;
-}
-if (pc == 102) {
-if (((&raw ((v_old).arg_types)[0])[v_j4] != (&raw ((v_f9).arg_types)[0])[v_j4])) { pc = 103; } else { pc = 101; }
-continue;
-}
-if (pc == 103) {
-t93 = (v_f9).token;
-t94 = cast[*u8]("signature change requires a new session");
-ErrorAt(t93, t94);
-pc = 101;
-continue;
-}
-if (pc == 104) {
-v_j4 = 0;
-pc = 100;
-continue;
-}
-if (pc == 105) {
-if(!StoreSignatureSame(v_old,v_f9)){ErrorAt(v_f9.token,cast[*u8]("signature change requires a new session"));}
-if (v_old.foreign != v_f9.foreign || v_old.exported != v_f9.exported) { ErrorAt(v_f9.token, cast[*u8]("C ABI change requires a new session")); }
-t97 = ((v_old).argc != (v_f9).argc);
-if (!t97) {
-t97 = ((v_old).result != (v_f9).result);
-}
-t98 = t97;
-if (!t98) {
-t98 = ((v_old).borrow_contract != (v_f9).borrow_contract);
-}
-if (t98) { pc = 106; } else { pc = 104; }
-continue;
-}
-if (pc == 106) {
-t95 = (v_f9).token;
-t96 = cast[*u8]("signature change requires a new session");
-ErrorAt(t95, t96);
-pc = 104;
-continue;
-}
-if (pc == 107) {
-if (((v_f9).generic_count != i64(0))) { pc = 110; } else { pc = 112; }
-continue;
-}
-if (pc == 108) {
-TemplateSignatureSyntax(v_f9);
-pc = 99;
-continue;
-}
-if (pc == 110) {
-t104 = (i64(v_foreign) != i64(0));
-if (!t104) {
-t104 = (i64(v_exported) != i64(0));
-}
-if (t104) { pc = 111; } else { pc = 108; }
-continue;
-}
-if (pc == 111) {
-t103 = cast[*u8]("C ABI functions cannot be generic");
-Error(t103);
-pc = 108;
-continue;
-}
-if (pc == 112) {
-t105 = v_f9;
-FunctionSignature(t105);
-pc = 99;
-continue;
-}
-if (pc == 113) {
-(v_f9).signature = ctx.v_pos;
-pc = 107;
-continue;
-}
-if (pc == 114) {
-t106 = &raw ((v_f9).generic_names)[0];
-t107 = GenericNames(t106);
-(v_f9).generic_count = t107;
-ValidateMethodTemplate(v_f9);
-pc = 113;
-continue;
-}
-if (pc == 115) {
-t109 = (v_old != null);
-if (t109) {
-t110 = ((v_old).generic_count != i64(0));
-if (!t110) {
-t111 = At();
-t110 = ((t111).kind == 91);
-}
-t109 = t110;
-}
-if (t109) { pc = 116; } else { pc = 114; }
-continue;
-}
-if (pc == 116) {
-t108 = cast[*u8]("generic redefinition requires a new session");
-Error(t108);
-pc = 114;
-continue;
-}
-if (pc == 117) {
-t112 = At();
-(v_f9).token = t112;
-pc = 115;
-continue;
-}
-if (pc == 118) {
-(v_f9).public = i64(v_public2);
-pc = 117;
-continue;
-}
-if (pc == 119) {
-t113 = At();
-(v_f9).package = (t113).package;
-pc = 118;
-continue;
-}
-if (pc == 120) {
-(v_f9).name = v_name17;
-pc = 119;
-continue;
-}
-if (pc == 121) {
-(v_f9).exported = i64(v_exported);
-pc = 120;
-continue;
-}
-if (pc == 122) {
-(v_f9).foreign = i64(v_foreign);
-pc = 121;
-continue;
-}
-if (pc == 123) {
-(v_f9).result = 0;
-(v_f9).argc = (v_f9).result;
-(v_f9).calls = (v_f9).argc;
-(v_f9).slots = (v_f9).calls;
-(v_f9).registers = (v_f9).slots;
-(v_f9).code_capacity = (v_f9).registers;
-(v_f9).code_count = (v_f9).code_capacity;
-pc = 122;
-continue;
-}
-if (pc == 124) {
-(v_f9).machine = null;
-pc = 123;
-continue;
-}
-if (pc == 125) {
-(v_f9).bytecode = null;
-(v_f9).byte_allocations = null;
-pc = 124;
-continue;
-}
-if (pc == 126) {
-(v_f9).all_locals = null;
-pc = 125;
-continue;
-}
-if (pc == 127) {
-(v_f9).drops = null;
-v_f9.allocated_locals = null;
-v_f9.nodes = null;
-v_f9.body = null;
-v_f9.machine_size = 0;
-pc = 126;
-continue;
-}
-if (pc == 128) {
-v_f9 = &raw ((ctx.v_functions)[v_id2]);
-pc = 127;
-continue;
-}
-if (pc == 129) {
-t114 = v_count10;
-v_count10 = v_count10 + i64(1);
-(&raw (v_parsed)[0])[t114] = v_id2;
-pc = 128;
-continue;
-}
-if (pc == 130) {
-if ((v_id2 >= 0)) { pc = 138; } else { pc = 141; }
-continue;
-}
-if (pc == 131) {
-t115 = cast[*u8](v_old);
-t116 = cast[*u8](&raw ((ctx.v_functions)[v_id2]));
-t117 = i64(sizeof(Function));
-t118 = MemCpy(t115, t116, t117);
-pc = 129;
-continue;
-}
-if (pc == 132) {
-v_old = &raw previous;
-pc = 131;
-continue;
-}
-if (pc == 133) {
-if ((v_j4 < v_count10)) { pc = 135; } else { pc = 132; }
-continue;
-}
-if (pc == 134) {
-t121 = v_j4;
-v_j4 = v_j4 + i64(1);
-pc = 133;
-continue;
-}
-if (pc == 135) {
-if (((&raw (v_parsed)[0])[v_j4] == v_id2)) { pc = 136; } else { pc = 134; }
-continue;
-}
-if (pc == 136) {
-t122 = cast[*u8]("duplicate declaration in submission");
-Error(t122);
-pc = 134;
-continue;
-}
-if (pc == 137) {
-v_j4 = 0;
-pc = 133;
-continue;
-}
-if (pc == 138) {
-if (ctx.v_allow_redefinition != i8(0) && v_id2 == 0) { Error(cast[*u8]("internal session function cannot be redefined")); }
-if (!((ctx.v_allow_redefinition != i8(0)))) { pc = 139; } else { pc = 137; }
-continue;
-}
-if (pc == 139) {
-t123 = cast[*u8]("duplicate function declaration");
-Error(t123);
-pc = 137;
-continue;
-}
-if (pc == 140) {
-t124 = ctx.v_nfun;
-ctx.v_nfun = ctx.v_nfun + i64(1);
-v_id2 = t124;
-pc = 129;
-continue;
-}
-if (pc == 141) {
-if ((ctx.v_nfun >= 4096)) { pc = 142; } else { pc = 140; }
-continue;
-}
-if (pc == 142) {
-t125 = cast[*u8]("function limit exceeded");
-Error(t125);
-pc = 140;
-continue;
-}
-if (pc == 143) {
-v_old = null;
-pc = 130;
-continue;
-}
-if (pc == 144) {
-t126 = At();
-t127 = (t126).package;
-t128 = v_name17;
-t129 = FindFunIn(t127, t128);
-v_id2 = t129;
-pc = 143;
-continue;
-}
-if (pc == 145) {
-t131 = At();
-t132 = (t131).package;
-t133 = v_name17;
-t134 = FindType(t132, t133);
-if ((t134 >= 0)) { pc = 146; } else { pc = 144; }
-continue;
-}
-if (pc == 146) {
-t130 = cast[*u8]("function name conflicts with a type");
-Error(t130);
-pc = 144;
-continue;
-}
-if (pc == 147) {
-t135 = MethodDeclarationName();
-v_name17 = t135;
-pc = 145;
-continue;
-}
-if (pc == 148) {
-t136 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 147;
-continue;
-}
-if (pc == 149) {
-t138 = cast[*u8]("fn");
-t139 = Is(t138);
-if (!((t139 != i8(0)))) { pc = 150; } else { pc = 148; }
-continue;
-}
-if (pc == 150) {
-t137 = cast[*u8]("expected fn, package or import declaration");
-Error(t137);
-pc = 148;
-continue;
-}
-if (pc == 151) {
-t151 = cast[*u8]("extern");
-t152 = Is(t151);
-t153 = (i64(t152) != i64(0));
-if (!t153) {
-t154 = cast[*u8]("export");
-t155 = Is(t154);
-t153 = (i64(t155) != i64(0));
-}
-if (t153) { pc = 157; } else { pc = 149; }
-continue;
-}
-if (pc == 152) {
-t140 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 149;
-continue;
-}
-if (pc == 153) {
-t142 = At();
-t143 = ((t142).kind != 258);
-if (!t143) {
-t144 = At();
-t145 = (t144).text;
-t146 = cast[*u8]("C");
-t147 = Eq(t145, t146);
-t143 = !((t147 != i8(0)));
-}
-if (t143) { pc = 154; } else { pc = 152; }
-continue;
-}
-if (pc == 154) {
-t141 = cast[*u8]("only extern C is supported");
-Error(t141);
-pc = 152;
-continue;
-}
-if (pc == 155) {
-t148 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 153;
-continue;
-}
-if (pc == 156) {
-v_foreign = i8(BoolInt(!((v_exported != i8(0)))));
-pc = 155;
-continue;
-}
-if (pc == 157) {
-t149 = cast[*u8]("export");
-t150 = Is(t149);
-v_exported = t150;
-pc = 156;
-continue;
-}
-if (pc == 158) {
-v_exported = i8(0);
-pc = 151;
-continue;
-}
-if (pc == 159) {
-v_foreign = i8(0);
-pc = 158;
-continue;
-}
-if (pc == 160) {
-t170 = cast[*u8]("struct");
-t171 = Is(t170);
-t172 = (i64(t171) != i64(0));
-if (!t172) {
-t173 = cast[*u8]("enum");
-t174 = Is(t173);
-t172 = (i64(t174) != i64(0));
-}
-if (t172) { pc = 169; } else { pc = 159; }
-continue;
-}
-if (pc == 161) {
-pc = 1;
-continue;
-}
-if (pc == 162) {
-t156 = 59;
-t157 = Take(t156);
-pc = 161;
-continue;
-}
-if (pc == 163) {
-t158 = v_id2;
-t159 = Shape(t158);
-ctx.v_pos = ((t159).end + 1);
-pc = 162;
-continue;
-}
-if (pc == 164) {
-t162 = v_id2;
-t163 = Shape(t162);
-if (t163.generic_count != 0) { TemplateAggregateSyntax(v_id2); }
-if (!(((t163).generic_count != i64(0)))) { pc = 166; } else { pc = 163; }
-continue;
-}
-if (pc == 165) {
-t160 = v_id2;
-ValidateBorrowedElements(t160);
-pc = 163;
-continue;
-}
-if (pc == 166) {
-t161 = v_id2;
-Layout(t161);
-pc = 165;
-continue;
-}
-if (pc == 167) {
-t164 = At();
-t165 = (t164).package;
-t166 = v_name17;
-t167 = FindType(t165, t166);
-v_id2 = t167;
-pc = 164;
-continue;
-}
-if (pc == 168) {
-t168 = Ident();
-v_name17 = t168;
-pc = 167;
-continue;
-}
-if (pc == 169) {
-t169 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 168;
-continue;
-}
-if (pc == 170) {
-t176 = cast[*u8]("pub");
-t177 = Is(t176);
-if ((t177 != i8(0))) { pc = 172; } else { pc = 160; }
-continue;
-}
-if (pc == 171) {
-t175 = ctx.v_pos;
-ctx.v_pos = ctx.v_pos + i64(1);
-pc = 160;
-continue;
-}
-if (pc == 172) {
-v_public2 = i8(1);
-pc = 171;
-continue;
-}
-if (pc == 173) {
-v_public2 = i8(0);
-pc = 170;
-continue;
-}
-if (pc == 174) {
+var name: *u8 = null;
+var alias: *u8 = null;
+var path: *u8 = null;
+var braces: i64 = 0;
+var i: i64 = 0;
+var j: i64 = 0;
+var k: i64 = 0;
+var id: i64 = 0;
+var parsed: [4096]i64 = [4096]i64{};
+var count: i64 = 0;
+var is_public: i8 = i8(0);
+var foreign: i8 = i8(0);
+var exported: i8 = i8(0);
+var t: *Token = null;
+var parameter: *Local = null;
+if (ctx.v_functions == null) { ctx.v_functions = cast[*Function](CAlloc(i64(u64(4096) * sizeof(Function)))); }
 CollectTypes();
-pc = 27;
-continue;
+while ((At()).kind != i64(0)) {
+    if (Is(cast[*u8]("package")) != i8(0)) {
+        ctx.v_pos = ctx.v_pos + 1;
+        Ident();
+        Need(59, cast[*u8]("expected ';' after package"));
+    } else if (Is(cast[*u8]("import")) != i8(0)) {
+        t = At();
+        ctx.v_pos = ctx.v_pos + 1;
+        alias = null;
+        if ((At()).kind == 256) { alias = Ident(); }
+        if ((At()).kind != 258) { Error(cast[*u8]("expected import path string")); }
+        path = (At()).text;
+        if (alias == null) {
+            alias = path;
+            j = 0;
+            while ((path)[j] != u8(0)) {
+                if (i64((path)[j]) == 47) { alias = ((path + j) + 1); }
+                j = j + 1;
+            }
+        }
+        if (!(*(alias) != u8(0))) { Error(cast[*u8]("empty import name")); }
+        ctx.v_pos = ctx.v_pos + 1;
+        Need(59, cast[*u8]("expected ';' after import"));
+    } else {
+        is_public = i8(0);
+        if (Is(cast[*u8]("pub")) != i8(0)) { is_public = i8(1); ctx.v_pos = ctx.v_pos + 1; }
+        if (Is(cast[*u8]("struct")) != i8(0) || Is(cast[*u8]("enum")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            name = Ident();
+            id = FindType((At()).package, name);
+            if ((Shape(id)).generic_count != 0) { TemplateAggregateSyntax(id); } else { Layout(id); ValidateBorrowedElements(id); }
+            ctx.v_pos = ((Shape(id)).end + 1);
+            Take(59);
+        } else {
+            foreign = i8(0);
+            exported = i8(0);
+            if (Is(cast[*u8]("extern")) != i8(0) || Is(cast[*u8]("export")) != i8(0)) {
+                exported = Is(cast[*u8]("export"));
+                foreign = i8(BoolInt(!((exported != i8(0)))));
+                ctx.v_pos = ctx.v_pos + 1;
+                if ((At()).kind != 258 || !(Eq((At()).text, cast[*u8]("C")) != i8(0))) { Error(cast[*u8]("only extern C is supported")); }
+                ctx.v_pos = ctx.v_pos + 1;
+            }
+            if (!(Is(cast[*u8]("fn")) != i8(0))) { Error(cast[*u8]("expected fn, package or import declaration")); }
+            ctx.v_pos = ctx.v_pos + 1;
+            name = MethodDeclarationName();
+            if (FindType((At()).package, name) >= 0) { Error(cast[*u8]("function name conflicts with a type")); }
+            id = FindFunIn((At()).package, name);
+            old = null;
+            if (id >= 0) {
+                if (ctx.v_allow_redefinition != i8(0) && id == 0) { Error(cast[*u8]("internal session function cannot be redefined")); }
+                if (!(ctx.v_allow_redefinition != i8(0))) { Error(cast[*u8]("duplicate function declaration")); }
+                j = 0;
+                while (j < count) {
+                    if ((&raw (parsed)[0])[j] == id) { Error(cast[*u8]("duplicate declaration in submission")); }
+                    j = j + 1;
+                }
+                old = &raw previous;
+                MemCpy(cast[*u8](old), cast[*u8](&raw ((ctx.v_functions)[id])), i64(sizeof(Function)));
+            } else {
+                if (ctx.v_nfun >= 4096) { Error(cast[*u8]("function limit exceeded")); }
+                id = ctx.v_nfun;
+                ctx.v_nfun = ctx.v_nfun + 1;
+            }
+            (&raw (parsed)[0])[count] = id;
+            count = count + 1;
+            f = &raw ((ctx.v_functions)[id]);
+            (f).drops = null;
+            (f).allocated_locals = null;
+            (f).nodes = null;
+            (f).body = null;
+            (f).machine_size = 0;
+            (f).all_locals = null;
+            (f).bytecode = null;
+            (f).byte_allocations = null;
+            (f).machine = null;
+            (f).result = 0;
+            (f).argc = (f).result;
+            (f).calls = (f).argc;
+            (f).slots = (f).calls;
+            (f).registers = (f).slots;
+            (f).code_capacity = (f).registers;
+            (f).code_count = (f).code_capacity;
+            (f).foreign = i64(foreign);
+            (f).exported = i64(exported);
+            (f).name = name;
+            (f).package = (At()).package;
+            (f).public = i64(is_public);
+            (f).token = At();
+            if (old != null && ((old).generic_count != 0 || (At()).kind == 91)) { Error(cast[*u8]("generic redefinition requires a new session")); }
+            (f).generic_count = GenericNames(&raw ((f).generic_names)[0]);
+            ValidateMethodTemplate(f);
+            (f).signature = ctx.v_pos;
+            if ((f).generic_count != 0) {
+                if (i64(foreign) != 0 || i64(exported) != 0) { Error(cast[*u8]("C ABI functions cannot be generic")); }
+                TemplateSignatureSyntax(f);
+            } else {
+                FunctionSignature(f);
+            }
+            if (old != null) {
+                if (!StoreSignatureSame(old, f)) { ErrorAt((f).token, cast[*u8]("signature change requires a new session")); }
+                if ((old).foreign != (f).foreign || (old).exported != (f).exported) { ErrorAt((f).token, cast[*u8]("C ABI change requires a new session")); }
+                if ((old).argc != (f).argc || (old).result != (f).result || (old).borrow_contract != (f).borrow_contract) { ErrorAt((f).token, cast[*u8]("signature change requires a new session")); }
+                j = 0;
+                while (j < (f).argc) {
+                    if ((&raw ((old).arg_types)[0])[j] != (&raw ((f).arg_types)[0])[j]) { ErrorAt((f).token, cast[*u8]("signature change requires a new session")); }
+                    j = j + 1;
+                }
+            }
+            if (i64(foreign) != 0 || i64(exported) != 0) {
+                if (Eq(name, cast[*u8]("main")) != i8(0) || (StrLen(name) >= 7 && i64((name)[0]) == 95 && i64((name)[1]) == 95 && i64((name)[2]) == 99 && i64((name)[3]) == 111 && i64((name)[4]) == 111 && i64((name)[5]) == 108 && i64((name)[6]) == 95) || (StrLen(name) >= 5 && i64((name)[0]) == 99 && i64((name)[1]) == 111 && i64((name)[2]) == 111 && i64((name)[3]) == 108 && i64((name)[4]) == 95)) { Error(cast[*u8]("reserved C runtime symbol")); }
+                k = 0;
+                while (k < ctx.v_nfun) {
+                    if (k != id && (((ctx.v_functions)[k]).foreign != 0 || ((ctx.v_functions)[k]).exported != 0) && Eq(((ctx.v_functions)[k]).name, name) != i8(0)) {
+                        if (exported != i8(0) || ((ctx.v_functions)[k]).exported != 0) { Error(cast[*u8]("duplicate exported C symbol")); }
+                        if (((ctx.v_functions)[k]).argc != (f).argc || ((ctx.v_functions)[k]).result != (f).result) { Error(cast[*u8]("conflicting C function signature")); }
+                        j = 0;
+                        while (j < (f).argc) {
+                            if ((&raw (((ctx.v_functions)[k]).arg_types)[0])[j] != (&raw ((f).arg_types)[0])[j]) { Error(cast[*u8]("conflicting C function signature")); }
+                            j = j + 1;
+                        }
+                    }
+                    k = k + 1;
+                }
+                if (Aggregate((f).result) != i8(0)) { Error(cast[*u8]("C ABI aggregate values are not supported; use a pointer")); }
+                j = 0;
+                while (j < (f).argc) {
+                    if (Aggregate((&raw ((f).arg_types)[0])[j]) != i8(0)) { Error(cast[*u8]("C ABI aggregate values are not supported; use a pointer")); }
+                    j = j + 1;
+                }
+                if ((f).result == 3) { Error(cast[*u8]("C ABI strings must use an explicit pointer")); }
+                j = 0;
+                while (j < (f).argc) {
+                    if ((&raw ((f).arg_types)[0])[j] == 3) { Error(cast[*u8]("C ABI strings must use an explicit pointer")); }
+                    j = j + 1;
+                }
+                if (foreign != i8(0)) {
+                    Need(59, cast[*u8]("expected ';' after extern declaration"));
+                    (f).body = null;
+                } else {
+                    (f).begin = ctx.v_pos;
+                    Need(123, cast[*u8]("expected function body"));
+                    braces = 1;
+                    while (braces != 0) {
+                        if ((At()).kind == i64(0)) { Error(cast[*u8]("unterminated function body")); }
+                        if (Take(123) != i8(0)) { braces = braces + 1; }
+                        else if (Take(125) != i8(0)) { braces = braces - 1; }
+                        else { ctx.v_pos = ctx.v_pos + 1; }
+                    }
+                    (f).end = ctx.v_pos;
+                }
+            } else {
+                (f).begin = ctx.v_pos;
+                Need(123, cast[*u8]("expected function body"));
+                braces = 1;
+                while (braces != 0) {
+                    if ((At()).kind == i64(0)) { Error(cast[*u8]("unterminated function body")); }
+                    if (Take(123) != i8(0)) { braces = braces + 1; }
+                    else if (Take(125) != i8(0)) { braces = braces - 1; }
+                    else { ctx.v_pos = ctx.v_pos + 1; }
+                }
+                (f).end = ctx.v_pos;
+            }
+        }
+    }
 }
-if (pc == 175) {
-if (!((ctx.v_functions != null))) { pc = 176; } else { pc = 174; }
-continue;
+CompletionOrder(&raw parsed[0], count);
+i = 0;
+while (i < count) {
+    ctx.v_current_fun = (&raw (parsed)[0])[i];
+    f = &raw ((ctx.v_functions)[ctx.v_current_fun]);
+    if ((f).foreign == 0 && (f).generic_count != 0) { ctx.v_pos = (f).begin; TemplateBodyCheck(f); }
+    if ((f).foreign != 0 || (f).generic_count != 0) {
+        i = i + 1;
+        continue;
+    }
+    ctx.v_pos = (f).begin;
+    ctx.v_locals = null;
+    ctx.v_depth = 0;
+    ctx.v_unsafe_depth = 0;
+    j = 0;
+    while (j < (f).argc) {
+        parameter = AddLocal((&raw ((f).arg_names)[0])[j], (&raw ((f).arg_types)[0])[j], i8(0));
+        if (Borrowed((parameter).type) != i8(0)) {
+            (parameter).region = (1 << j);
+            (parameter).place_region = (parameter).region;
+        }
+        j = j + 1;
+    }
+    (f).body = Block();
+    AnalyzeBorrows(f);
+    AnalyzeReferences(f);
+    InjectDrops(f);
+    if ((f).result != 0 && !(Returns((f).body) != i8(0))) { ErrorAt((f).token, cast[*u8]("not every path returns a value")); }
+    i = i + 1;
 }
-if (pc == 176) {
-t183 = i64((u64(4096) * sizeof(Function)));
-t184 = CAlloc(t183);
-ctx.v_functions = cast[*Function](t184);
-pc = 174;
-continue;
-}
-if (pc == 177) {
-pc = 175;
-continue;
-}
-if (pc == 178) {
-pc = 177;
-continue;
-}
-if (pc == 179) {
-v_count10 = 0;
-pc = 178;
-continue;
-}
-if (pc == 180) {
-pc = 179;
-continue;
-}
-if (pc == 181) {
-pc = 180;
-continue;
-}
-}
+ReplRevalidateBorrowProjections();
 }
 return;
 }
