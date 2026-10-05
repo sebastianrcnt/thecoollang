@@ -503,3 +503,11 @@ place-projections-test: build/cool-compiler build/language.BIN build/compiler-ho
 test: place-projections-test
 place-projections-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_place_projections.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/place-projections-asan-audit.json
+
+.PHONY: provenance-graph-test provenance-graph-sanitize-test
+provenance-graph-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_provenance_graph.py --output build/provenance-graph-audit.json
+	python3 tools/test_provenance_graph.py --legacy --output build/provenance-graph-legacy-audit.json
+test: provenance-graph-test
+provenance-graph-sanitize-test: repl-loans-sanitize-test build/compiler-host.o build/language-runtime.o
+	python3 tools/test_provenance_graph.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/provenance-graph-asan-audit.json

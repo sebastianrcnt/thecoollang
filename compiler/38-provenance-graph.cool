@@ -1,0 +1,146 @@
+// A graph owns its nodes and edges. Cursors are query inputs, never retained.
+// Descriptor identities are opaque keys: the graph does not own type layouts.
+// Edges may only target nodes owned by this graph; cross-arena substitution
+// requires copying into the destination arena before linking.
+// Installing persistent graphs must pin their descriptors under transaction
+// ownership before the current two-layer checker can use this representation.
+struct ProvenanceGraph { nodes: *ProvenanceNode; }
+struct ProvenanceNode {
+    graph: *ProvenanceGraph;
+    type: i64;
+    root: *Local;
+    // Terminal root capability; intermediate barriers belong to edges.
+    exclusive: i64;
+    edges: *ProvenanceEdge;
+    next: *ProvenanceNode;
+}
+struct ProvenanceEdge {
+    kind: i64;
+    key: i64;
+    exclusive: i64;
+    target: *ProvenanceNode;
+    next: *ProvenanceEdge;
+}
+struct ProvenanceCursor {
+    type: i64;
+    kind: i64;
+    key: i64;
+    next: *ProvenanceCursor;
+}
+struct ProvenanceQueryState {
+    node: *ProvenanceNode;
+    cursor: *ProvenanceCursor;
+    exclusive: i64;
+    next: *ProvenanceQueryState;
+}
+fn ProvenanceNodeNew(graph: *ProvenanceGraph, type: i64, root: *Local, exclusive: i64) -> *ProvenanceNode {
+    unsafe {
+        let node = cast[*ProvenanceNode](CAlloc(i64(sizeof(ProvenanceNode))));
+        node.graph = graph;
+        node.type = type;
+        node.root = root;
+        node.exclusive = BoolInt(exclusive != 0);
+        node.next = graph.nodes;
+        graph.nodes = node;
+        return node;
+    }
+}
+fn ProvenanceEdgeNew(node: *ProvenanceNode, kind: i64, key: i64, target: *ProvenanceNode, exclusive: i64) -> bool {
+    unsafe {
+        if (node == null || kind < 1 || kind > 4) { return false; }
+        if (target != null && target.graph != node.graph) { return false; }
+        // Merging identical edges preserves both actual capabilities when the
+        // same declaration receives shared and exclusive source paths.
+        let mode = BoolInt(exclusive != 0);
+        var edge = node.edges;
+        while (edge != null) {
+            if (edge.kind == kind && edge.key == key && edge.target == target && edge.exclusive == mode) { return true; }
+            edge = edge.next;
+        }
+        let fresh = cast[*ProvenanceEdge](CAlloc(i64(sizeof(ProvenanceEdge))));
+        fresh.kind = kind;
+        fresh.key = key;
+        fresh.target = target;
+        fresh.exclusive = mode;
+        fresh.next = node.edges;
+        node.edges = fresh;
+        return true;
+    }
+}
+fn ProvenanceGraphFree(graph: *ProvenanceGraph) {
+    unsafe {
+        var node = graph.nodes;
+        graph.nodes = null;
+        while (node != null) {
+            let next = node.next;
+            var edge = node.edges;
+            while (edge != null) {
+                let following = edge.next;
+                Free(cast[*u8](edge));
+                edge = following;
+            }
+            Free(cast[*u8](node));
+            node = next;
+        }
+    }
+}
+fn ProvenanceQueryAppend(head: *ProvenanceQueryState, tail: *ProvenanceQueryState, node: *ProvenanceNode, cursor: *ProvenanceCursor, exclusive: i64) -> *ProvenanceQueryState {
+    unsafe {
+        if (node == null) { return tail; }
+        var state = head;
+        while (state != null) {
+            if (state.node == node && state.cursor == cursor && state.exclusive == exclusive) { return tail; }
+            state = state.next;
+        }
+        let fresh = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        fresh.node = node;
+        fresh.cursor = cursor;
+        fresh.exclusive = exclusive;
+        tail.next = fresh;
+        return fresh;
+    }
+}
+// Select a root at a value-relative cursor. This is payload selection, not
+// physical prefix-overlap: moving an ancestor needs a separate protection query.
+// Each (node,cursor,actual mode) state is processed once; type-only visited sets
+// would lose recursive projections or a second path with different permission.
+fn ProvenanceQueryRoot(start: *ProvenanceNode, cursor: *ProvenanceCursor, root: *Local, exclusive: i64, writing: bool) -> bool {
+    unsafe {
+        if (start == null || root == null) { return false; }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = start;
+        first.cursor = cursor;
+        first.exclusive = BoolInt(exclusive != 0);
+        var tail = first;
+        var current = first;
+        var found = false;
+        while (current != null) {
+            let node = current.node;
+            let path = current.cursor;
+            if (path == null) {
+                if (node.root == root && (!writing || (current.exclusive & node.exclusive) != 0)) {
+                    found = true;
+                    break;
+                }
+            } else if (path.type == node.type) {
+                var edge = node.edges;
+                while (edge != null) {
+                    // Elements select a conservative union. Only declaration
+                    // projections use keys; byte offsets never identify fields.
+                    if (edge.kind == path.kind && (path.kind != 1 || edge.key == path.key)) {
+                        tail = ProvenanceQueryAppend(first, tail, edge.target, path.next, current.exclusive & edge.exclusive);
+                    }
+                    edge = edge.next;
+                }
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) {
+            let next = current.next;
+            Free(cast[*u8](current));
+            current = next;
+        }
+        return found;
+    }
+}

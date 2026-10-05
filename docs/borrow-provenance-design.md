@@ -56,6 +56,32 @@ Type-only visited sets are insufficient when one type appears with different
 capabilities or provenance. Borrow-free ownership/layout traversal remains a
 separate operation.
 
+## Implemented graph query foundation
+
+`compiler/38-provenance-graph.cool` now implements an owned node/edge arena and
+typed value-relative payload selection. Each node has a terminal physical root
+and its actual capability; intermediate shared barriers belong to edges. Field
+selection compares declaration keys and concrete source types, element selection
+unions possible elements, and referent/owned-payload edges retain their kinds.
+Capabilities intersect along edges and at the selected root. Distinct shared and
+exclusive source edges remain distinct; another path cannot upgrade a shared
+path. Edge insertion rejects cross-arena targets and invalid edge kinds. Callers
+must check its boolean result and copy substitutions into the destination arena.
+
+Queries retain no AST/layout pointers or cursor ownership, mutate no graph
+marks, and free every query state even after early success. Visits are keyed by
+(node,cursor,actual mode), so both recursive graph edges and cyclic query cursors
+terminate. Arena destruction visits owned allocation lists rather than target
+edges, safely handling cycles/shared targets and repeated destruction.
+
+This module is not yet installed in `ReferenceLoan`. Payload selection is not
+physical prefix overlap, and graph ownership does not pin type/field descriptors.
+Persistent transaction ownership, call substitution, stored receiver updates and
+nested acceptance remain required. The initial state deduplication scans a list:
+state visits are bounded but membership search can be quadratic. The independent
+product-graph audit counts both visits and membership comparisons; no linear
+compiler performance claim follows from its state bound.
+
 ## Operations
 
 Address acquisition creates physical protection for the selected place and

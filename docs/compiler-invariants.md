@@ -1023,3 +1023,26 @@ compatible function replacement and failed lazy-layout construction followed
 by valid field access. Native/legacy execution across five engines and O2,
 private LLVM load/store ASan and host/runtime ASan/UBSan are complementary
 evidence; metadata validity alone does not prove loan permission correctness.
+
+
+## Owned typed payload graphs
+
+`ProvenanceGraph` owns every allocated node and its outgoing edges. Nodes record
+arena identity; edge insertion returns false for cross-arena targets, null sources
+and unsupported projection kinds. Successful duplicate insertion preserves both
+shared and exclusive variants while coalescing identical edges. Callers must
+check insertion results. Root Locals, type IDs and field keys are borrowed
+metadata, not arena-owned descriptors; persistent installation still requires
+transaction and descriptor ownership before scoped loans use these graphs.
+
+`ProvenanceQueryRoot` selects payload roots rather than physical ancestor overlap.
+Node permission applies at the terminal root; edge permission supplies intermediate
+barriers. State identity includes node, cursor and actual mode. Scratch allocations
+are query-owned and completely freed on success or failure, with no persistent
+marks. Destruction follows arena-owned lists and never recursively frees targets.
+
+The private LLVM audit compares a separate Python product-graph model and checks
+allocation balance after every query and arena destruction, including repeated
+destruction. Instrumented state visits and membership comparisons distinguish
+bounded traversal from the initial linear-list deduplication cost. These checks
+do not prove scoped loan substitution or arbitrary nested borrowing.

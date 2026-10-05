@@ -1642,6 +1642,37 @@ through ordinary evaluation or library use.
   ownership, arbitrary nested stored borrowed pointees and borrowed slice
   elements remain required implementation work. All release gates remain Open.
 
+- Typed payload graph query foundation: `compiler/38-provenance-graph.cool`
+  implements arena-owned nodes/edges, declaration/type-aware fields, conservative
+  element unions, referent/owned-payload edges and actual root capability
+  selection. Edge barriers intersect permissions; shared/exclusive versions of
+  one edge remain distinct. Insertion rejects invalid kinds, null sources and
+  cross-arena targets. Substitution must copy nodes into the destination arena
+  and check insertion results. Destruction follows owned allocation lists, so
+  cycles/shared targets do not cause recursive or duplicate freeing.
+
+  An independent Python product-graph model agrees with private production LLVM
+  on 34 graph/order variants and 201,624 queries. Coverage includes declaration
+  keys, wrong concrete source types, element unions, mixed permissions, nulls,
+  graph/cursor cycles, duplicate edges and depth-64 shared paths. Query allocation
+  balance returns to its starting value after every positive/negative result;
+  graph destruction returns arena balance to zero and repeated destruction is
+  safe. Production and legacy frontends agree; compiler/generated LLVM ASan
+  plus host/runtime ASan/UBSan pass. Full regression, exact three-generation
+  bootstrap convergence and clean external editor/distribution installation pass. Reports record source/platform/object/private-IR identities in
+  `build/provenance-graph{,-legacy,-asan}-audit.json`. Evidence:
+  `build/release-audit/provenance-graph-{final-build,final-focused,final-regression,final-sanitize,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `e86adf52b410e0d31abf5cb65115e7f20d6c61aa52618fc6d748915e520daf23`.
+  Maximum measured state visits are
+  129 and state-list membership comparisons 16,698; the initial linear-list
+  deduplication can be quadratic and this is not a compiler speed claim.
+
+  This is payload selection, not physical ancestor overlap. The graph is not
+  yet installed in `ReferenceLoan`; descriptor pinning, transaction ownership,
+  contract substitution, live stored-receiver updates and arbitrary nested
+  borrowed-storage acceptance remain mandatory. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve
