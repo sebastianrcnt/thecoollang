@@ -32,6 +32,11 @@ valid += [
  'fn f[T](x:Later[T]){}struct Later[T]{value:T;}fn main(){}',
  'fn f[i64](x:i64)->i64{return x;}fn main(){f[u8](u8(1));}',
 ]
+valid += [
+ 'fn f[T](x:*void)->void{}fn main(){}',
+ 'fn f[void](x:void)->void{return x;}fn main(){f[i64](1);}',
+ 'fn f[T](a:[0]T,b:[65536]u8,c:own[*void],d:&*void){}fn main(){}',
+]
 duplicates=[
  'extern "C" fn f(x:i64,x:i64);fn main(){}',
  'extern "C" fn f(x:i64,x:f64);fn main(){}',
@@ -88,6 +93,20 @@ invalid += [
  'fn f[T](x:missing.Type){}fn main(){}',
 ]
 invalid += [('struct G[A]{}' if '(x:G' in program else '')+program+'fn main(){}' for program in template_invalid]
+invalid += [
+ 'fn f[T](x:void){}fn main(){}',
+ 'fn f[T](x:[65537]T){}fn main(){}',
+ 'fn f[T](x:[18446744073709551615]T){}fn main(){}',
+ 'fn f[T](x:[9223372036854775808]T){}fn main(){}',
+ 'fn f[T](x:own[void]){}fn main(){}',
+ 'fn f[T](x:&void){}fn main(){}',
+ 'fn f[T](x:&mut void){}fn main(){}',
+ 'fn f[T](x:[]void){}fn main(){}',
+ 'fn f[T](x:[0]void){}fn main(){}',
+ 'fn f[T](x:*own[void]){}fn main(){}',
+ 'struct G[A]{}fn f[T](x:G[void]){}fn main(){}',
+ 'fn f[T]()->[]void{}fn main(){}',
+]
 env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
 with tempfile.TemporaryDirectory(prefix='cool declarations ') as temporary:
  source=Path(temporary)/'main.cool'

@@ -439,6 +439,7 @@ Bool Returns(Node *n) {
 I64 TemplateNamedArity(Function *f) {
     Token *token=At(); U8 *name=Ident(), *package=token->package; I64 i,type;
     for(i=0;i<f->generic_count;i++)if(Eq(name,f->generic_names[i]))return 0;
+    if(TypeName(name)==T_VOID)return -1;
     if(TypeName(name)>=0)return 0;
     if(FindType(package,name)<0 && Take('.')){package=ResolveAlias(token,name);name=Ident();}
     type=FindType(package,name);
@@ -449,22 +450,23 @@ I64 TemplateNamedArity(Function *f) {
 }
 // Validate template signature grammar without inventing concrete type arguments.
 // Nominal names and arity do not require concrete layouts or type bindings.
-U0 TemplateTypeSyntax(Function *f, I64 nesting) {
-    I64 count = 0, expected;
+I64 TemplateTypeSyntax(Function *f, I64 nesting) {
+    I64 count = 0, expected, length; Bool is_void;
     if (nesting > 256) Error("template type syntax nesting limit exceeded");
-    if (Take('&')) { if (Is("mut")) pos++; TemplateTypeSyntax(f,nesting+1); return; }
-    if (Take('*')) { TemplateTypeSyntax(f,nesting+1); return; }
-    if (Is("own")) { pos++; Need('[', "expected '[' after own"); TemplateTypeSyntax(f,nesting+1); Need(']', "expected ']' after owned type"); return; }
+    if (Take('&')) { if (Is("mut")) pos++; if(TemplateTypeSyntax(f,nesting+1))Error("invalid element type"); return 0; }
+    if (Take('*')) { TemplateTypeSyntax(f,nesting+1); return 0; }
+    if (Is("own")) { pos++; Need('[', "expected '[' after own"); if(TemplateTypeSyntax(f,nesting+1))Error("invalid element type"); Need(']', "expected ']' after owned type"); return 0; }
     if (Take('[')) {
-        if (!Take(']')) { Need(K_INT, "array length must be an integer literal"); Need(']', "expected ']'"); }
-        TemplateTypeSyntax(f,nesting+1); return;
+        if (!Take(']')) { length=At()->val; Need(K_INT, "array length must be an integer literal"); if(length<0 || length>65536)Error("array length outside 0..65536"); Need(']', "expected ']'"); }
+        if(TemplateTypeSyntax(f,nesting+1))Error("invalid element type"); return 0;
     }
-    expected = TemplateNamedArity(f);
+    expected = TemplateNamedArity(f); is_void=expected<0; if(is_void)expected=0;
     if (Take('[')) {
-        do { if (count == 8) Error("generic argument limit exceeded"); TemplateTypeSyntax(f,nesting+1); count++; } while (Take(','));
+        do { if (count == 8) Error("generic argument limit exceeded"); if(TemplateTypeSyntax(f,nesting+1))Error("generic argument cannot be void"); count++; } while (Take(','));
         Need(']', "expected ']' after type arguments");
     }
     if (count != expected) Error("wrong generic argument count");
+    return is_void;
 }
 U0 TemplateSignatureSyntax(Function *f) {
     U8 *names[32], *name; I64 count = 0, i;
@@ -474,7 +476,7 @@ U0 TemplateSignatureSyntax(Function *f) {
             if (count == 32) Error("function argument limit exceeded");
             name = Ident();
             for (i = 0; i < count; i++) if (Eq(names[i], name)) Error("duplicate parameter name");
-            names[count++] = name; Need(':', "expected ':' after parameter"); TemplateTypeSyntax(f,0);
+            names[count++] = name; Need(':', "expected ':' after parameter"); if(TemplateTypeSyntax(f,0))Error("parameter cannot be void");
         } while (Take(','));
         Need(')', "expected ')'");
     }

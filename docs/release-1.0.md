@@ -1103,6 +1103,22 @@ through ordinary evaluation or library use.
   alongside concrete layout/borrow semantics and unused generic bodies; this
   change does not close G1/G4 or the other mandatory release gates.
 
+- Template signature value/element validity: draft 15 extends preflight to
+  reject builtin void parameters, void sequence/reference elements, void generic
+  arguments and literal array lengths outside 0..65,536, even when unused. A
+  syntax-result flag distinguishes bare builtin void from raw pointers and type
+  parameters (including a parameter named void), preserving existing substitution
+  behavior without allocating layouts. Boundary regressions include zero and
+  65,536-element arrays, unsigned lengths above signed-i64 range, nested invalid
+  elements, legal void results/raw pointers and a called shadowing template.
+  Twenty valid declarations, 87 rejections, four bundle cases and REPL recovery
+  pass on both frontends and the ASan compiler. Full regression, self-host/bootstrap
+  convergence and installed distribution/Neovim checks pass. Evidence:
+  `build/release-audit/template-types-{build,focused,regression,sanitize,distribution}.log`.
+  IR SHA256: `75ccae88a89675684d6021fd10ee62188b8bb84d9b7db5f6812acec19dafa91b`.
+  Unused body syntax and dependent layout/ownership/borrow semantics remain open;
+  this change resolves the previous void/array probes, not the remaining gates.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

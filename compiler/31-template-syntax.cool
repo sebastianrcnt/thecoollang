@@ -1,38 +1,42 @@
 // Template signature grammar is checked even when no specialization is used.
 // Resolve nominal names and arity without constructing concrete layouts.
-fn TemplateTypeSyntax(function: *Function, nesting: i64) {
+fn TemplateTypeSyntax(function: *Function, nesting: i64) -> i64 {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         if (nesting > 256) { Error(cast[*u8]("template type syntax nesting limit exceeded")); }
         if (Take(38) != i8(0)) {
             if (Is(cast[*u8]("mut")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
-            TemplateTypeSyntax(function, nesting + 1); return;
+            if (TemplateTypeSyntax(function, nesting + 1) != 0) { Error(cast[*u8]("invalid element type")); } return 0;
         }
-        if (Take(42) != i8(0)) { TemplateTypeSyntax(function, nesting + 1); return; }
+        if (Take(42) != i8(0)) { TemplateTypeSyntax(function, nesting + 1); return 0; }
         if (Is(cast[*u8]("own")) != i8(0)) {
             ctx.v_pos = ctx.v_pos + 1;
             Need(91, cast[*u8]("expected '[' after own"));
-            TemplateTypeSyntax(function, nesting + 1);
-            Need(93, cast[*u8]("expected ']' after owned type")); return;
+            if (TemplateTypeSyntax(function, nesting + 1) != 0) { Error(cast[*u8]("invalid element type")); }
+            Need(93, cast[*u8]("expected ']' after owned type")); return 0;
         }
         if (Take(91) != i8(0)) {
             if (Take(93) == i8(0)) {
+                let length = At().val;
                 Need(257, cast[*u8]("array length must be an integer literal"));
+                if (length < 0 || length > 65536) { Error(cast[*u8]("array length outside 0..65536")); }
                 Need(93, cast[*u8]("expected ']'"));
             }
-            TemplateTypeSyntax(function, nesting + 1); return;
+            if (TemplateTypeSyntax(function, nesting + 1) != 0) { Error(cast[*u8]("invalid element type")); } return 0;
         }
-        let expected = TemplateNamedArity(function);
+        var expected = TemplateNamedArity(function);
+        let is_void = expected < 0; if (is_void) { expected = 0; }
         var count: i64 = 0;
         if (Take(91) != i8(0)) {
             while (true) {
                 if (count == 8) { Error(cast[*u8]("generic argument limit exceeded")); }
-                TemplateTypeSyntax(function, nesting + 1); count = count + 1;
+                if (TemplateTypeSyntax(function, nesting + 1) != 0) { Error(cast[*u8]("generic argument cannot be void")); } count = count + 1;
                 if (Take(44) == i8(0)) { break; }
             }
             Need(93, cast[*u8]("expected ']' after type arguments"));
         }
         if (count != expected) { Error(cast[*u8]("wrong generic argument count")); }
+        return BoolInt(is_void);
     }
 }
 fn TemplateSignatureSyntax(function: *Function) {
@@ -49,7 +53,8 @@ fn TemplateSignatureSyntax(function: *Function) {
                     if (Eq(names[i], name) != i8(0)) { Error(cast[*u8]("duplicate parameter name")); }
                 }
                 names[count] = name; count = count + 1;
-                Need(58, cast[*u8]("expected ':' after parameter")); TemplateTypeSyntax(function, 0);
+                Need(58, cast[*u8]("expected ':' after parameter"));
+                if (TemplateTypeSyntax(function, 0) != 0) { Error(cast[*u8]("parameter cannot be void")); }
                 if (Take(44) == i8(0)) { break; }
             }
             Need(41, cast[*u8]("expected ')'"));
@@ -81,6 +86,7 @@ fn TemplateNamedArity(function: *Function) -> i64 {
         for (var i: i64 = 0; i < function.generic_count; i = i + 1) {
             if (Eq(name, function.generic_names[i]) != i8(0)) { return 0; }
         }
+        if (TypeName(name) == 0) { return -1; }
         if (TypeName(name) >= 0) { return 0; }
         if (FindType(package, name) < 0 && Take(46) != i8(0)) {
             package = ResolveAlias(token, name); name = Ident();

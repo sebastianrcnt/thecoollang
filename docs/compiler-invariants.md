@@ -663,3 +663,12 @@ rules as `ParseType`. `CollectTypes` has already gathered forward nominal names
 and imports. It records nominal editor references, but does not instantiate a
 type or compute a layout. Borrowed type semantics and generic bodies are not
 certified by the preflight.
+
+`TemplateNamedArity` returns -1 only for the actual builtin `void`, after checking
+parameter names; ordinary zero-argument types and a parameter named `void` return
+zero. `TemplateTypeSyntax` normalizes that sentinel for arity checking and returns
+one only for a bare builtin void type. Raw pointer construction consumes the
+flag and returns zero; references/owners/arrays/slices and generic argument lists
+reject it. The signature rejects it in value parameter position, while permitting
+a void result. Literal array counts are checked before constructing any layout,
+including unsigned literals whose token bits appear negative as signed i64.
