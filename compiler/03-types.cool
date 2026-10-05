@@ -654,179 +654,43 @@ return i64(0);
 }
 
 
-fn InstantiateType(arg_v_template_type: i64) -> i64 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_template_type: i64 = arg_v_template_type;
-var v_args: [8]i64 = [8]i64{};
-var v_count5: i64 = i64(0);
-var v_i6: i64 = i64(0);
-var v_j1: i64 = i64(0);
-var v_type20: i64 = i64(0);
-var v_base1: *AggregateType = null;
-var v_a4: *AggregateType = null;
-var t0: i64 = i64(0);
-var t1: *u8 = null;
-var t2: *u8 = null;
-var t3: i64 = i64(0);
-var t4: *u8 = null;
-var t5: i64 = i64(0);
-var t6: *AggregateType = null;
-var t7: i64 = i64(0);
-var t8: *Token = null;
-var t9: i64 = i64(0);
-var t10: i64 = i64(0);
-var t11: i64 = i64(0);
-var t12: *u8 = null;
-var t13: *i64 = null;
-var t14: i64 = i64(0);
-var t15: i64 = i64(0);
-var t16: *AggregateType = null;
-var pc: i64 = 28;
-while (true) {
-if (pc == 1) {
-pc = 16;
-continue;
-}
-if (pc == 2) {
-return i64(0);
-}
-if (pc == 3) {
-return v_type20;
-}
-if (pc == 4) {
-if ((v_j1 < v_count5)) { pc = 6; } else { pc = 3; }
-continue;
-}
-if (pc == 5) {
-t0 = v_j1;
-v_j1 = v_j1 + i64(1);
-pc = 4;
-continue;
-}
-if (pc == 6) {
-(&raw ((v_a4).generic_args)[0])[v_j1] = (&raw (v_args)[0])[v_j1];
-pc = 5;
-continue;
-}
-if (pc == 7) {
-v_j1 = 0;
-pc = 4;
-continue;
-}
-if (pc == 8) {
-(v_a4).generic_count = 0;
-pc = 7;
-continue;
-}
-if (pc == 9) {
-(v_a4).origin = v_template_type;
-pc = 8;
-continue;
-}
-if (pc == 10) {
-t1 = cast[*u8](v_a4);
-t2 = cast[*u8](v_base1);
-t3 = i64(sizeof(AggregateType));
-t4 = MemCpy(t1, t2, t3);
-pc = 9;
-continue;
-}
-if (pc == 11) {
-t5 = v_type20;
-t6 = Shape(t5);
-v_a4 = t6;
-pc = 10;
-continue;
-}
-if (pc == 12) {
-t7 = (v_base1).kind;
-t8 = (v_base1).token;
-t9 = NewType(t7, t8);
-v_type20 = t9;
-pc = 11;
-continue;
-}
-if (pc == 13) {
-if ((v_i6 < ctx.v_naggregates)) { pc = 15; } else { pc = 12; }
-continue;
-}
-if (pc == 14) {
-t10 = v_i6;
-v_i6 = v_i6 + i64(1);
-pc = 13;
-continue;
-}
-if (pc == 15) {
-if ((((ctx.v_aggregate_types)[v_i6]).origin == v_template_type)) { pc = 22; } else { pc = 14; }
-continue;
-}
-if (pc == 16) {
-pc = 14;
-continue;
-}
-if (pc == 17) {
-return (1000 + v_i6);
-}
-if (pc == 18) {
-if ((v_j1 < v_count5)) { pc = 20; } else { pc = 17; }
-continue;
-}
-if (pc == 19) {
-t11 = v_j1;
-v_j1 = v_j1 + i64(1);
-pc = 18;
-continue;
-}
-if (pc == 20) {
-if (((&raw (((ctx.v_aggregate_types)[v_i6]).generic_args)[0])[v_j1] != (&raw (v_args)[0])[v_j1])) { pc = 21; } else { pc = 19; }
-continue;
-}
-if (pc == 21) {
-pc = 1;
-continue;
-}
-if (pc == 22) {
-v_j1 = 0;
-pc = 18;
-continue;
-}
-if (pc == 23) {
-v_i6 = 0;
-pc = 13;
-continue;
-}
-if (pc == 24) {
-if ((v_count5 != (v_base1).generic_count)) { pc = 25; } else { pc = 23; }
-continue;
-}
-if (pc == 25) {
-t12 = cast[*u8]("wrong generic argument count");
-Error(t12);
-pc = 23;
-continue;
-}
-if (pc == 26) {
-t13 = &raw (v_args)[0];
-t14 = TypeArguments(t13);
-v_count5 = t14;
-pc = 24;
-continue;
-}
-if (pc == 27) {
-t15 = v_template_type;
-t16 = Shape(t15);
-v_base1 = t16;
-pc = 26;
-continue;
-}
-if (pc == 28) {
-pc = 27;
-continue;
-}
-}
-}
-return i64(0);
+// Find or create the concrete specialization of a generic aggregate for the
+// type arguments at the current position. Reusing an existing instantiation
+// keeps Shape(type) identity stable across references.
+fn InstantiateType(template_type: i64) -> i64 {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var args: [8]i64 = [8]i64{};
+        let base = Shape(template_type);
+        let count = TypeArguments( & raw args[0]);
+        if (count != base.generic_count) {
+            Error(cast[*u8]("wrong generic argument count"));
+        }
+        var i: i64 = 0;
+        while (i < ctx.v_naggregates) {
+            if ((ctx.v_aggregate_types)[i].origin == template_type) {
+                var j: i64 = 0;
+                while (j < count && (ctx.v_aggregate_types)[i].generic_args[j] == args[j]) {
+                    j = j + 1;
+                }
+                if (j == count) {
+                    return 1000 + i;
+                }
+            }
+            i = i + 1;
+        }
+        let type = NewType(base.kind, base.token);
+        let a = Shape(type);
+        MemCpy(cast[*u8](a), cast[*u8](base), i64(sizeof(AggregateType)));
+        a.origin = template_type;
+        a.generic_count = 0;
+        var j: i64 = 0;
+        while (j < count) {
+            a.generic_args[j] = args[j];
+            j = j + 1;
+        }
+        return type;
+    }
 }
 
 

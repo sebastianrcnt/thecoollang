@@ -3136,6 +3136,16 @@ through ordinary evaluation or library use.
   that state them. This is a G1 accuracy fix; the inference/coercion audit and the
   other specification-freeze tasks stay Open.
 
+- Compiler maintenance: `compiler/03-types.cool` no longer contains a generated
+  dispatch state machine. `InstantiateType` was rewritten as a direct loop that
+  finds an existing specialization by origin and type arguments, or copies the
+  template layout into a `NewType` and records the arguments. Behavior is
+  unchanged: the generic, aggregate, template-body and template-aggregate suites
+  pass on both frontends and five engines, and both bootstrap paths converge
+  (self-host IR SHA256 begins `b4691c49e2b90c7e`). Five modules still contain
+  generated dispatch sections (02-lexer, 06-parser, 08-llvm, 13-repl, 15-native);
+  G3's complete audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
