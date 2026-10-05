@@ -94,8 +94,13 @@ function analysis is registered under a heap check list for exception cleanup.
 Graph roots participate in Local reclamation. Loan queries intersect the loan's
 entry capability before following graph barriers.
 
-The existing two-layer checker remains authoritative; typed graph paths are not
-yet used to authorize access. Field loads and partial stores now select/update
+The existing two-layer checker still authorizes writes and protects physical
+anchors. Typed graph paths now exclude proven absent layer-one payload roots
+from production conflict matching and reborrow acquisition. Overlap ignores
+shared/exclusive mode; terminal physical roots overlap remaining projections.
+Unknown/opaque/incomplete paths remain conservative. This first access step
+does not remove nested storage restrictions; legacy acceptance integration
+remains in progress. Field loads and partial stores now select/update
 metadata; parameter and opaque return summaries describe declared possible
 structure. Opaque return bounds are per source root/capability, with recursive
 skeleton reuse preserved through owned auxiliary clone edges. These are upper

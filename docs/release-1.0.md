@@ -1901,6 +1901,44 @@ through ordinary evaluation or library use.
   Authoritative graph substitution/physical protection and arbitrary nested
   borrowed storage remain unfinished; all release gates remain Open.
 
+- Production typed payload overlap now participates in actual conflict checks
+  and reborrow acquisition. Exact absent layer-one roots can be excluded;
+  layer-zero anchors, direct root protection and raw bridges retain existing
+  coarse checks. Overlap ignores capability: a shared path still accesses its
+  root. Physical terminal roots overlap remaining child projections, and
+  unknown/opaque/mismatched/incomplete paths remain conservative. This enables
+  independent access to distinct roots in known nested receiver fields while
+  preserving same-root, array union and opaque return conflicts. Write
+  authorization and arbitrary nested storage remain unfinished.
+
+  Four explicit programs and 24 deterministic field/root/initializer
+  permutations pass on production across five engines/O2, with 31 rejection
+  cases and persistent REPL recovery. Private helper checks include cyclic
+  cursors/recursive graphs, physical prefixes, shared overlap, absence and
+  fallback. Eliminating proven absent payload loans changes audited records
+  to 12 selection, 16 store and seven computed records; exact surviving root
+  sets are asserted. Existing 34 field, 22 parameter and four call records
+  pass. Generated LLVM ASan/host-runtime ASan/UBSan pass. A repeated disjoint
+  payload access history has equal final tracked bytes/counts (32,154,838/52)
+  and peak bytes (32,168,353) at 64/1,024 submissions. Final reports are after
+  REPL cleanup; peaks cover session use. Production self-hosting converges,
+  with compiler IR SHA-256:
+  `d387dc147076df57a16d30beae9fd46576b35f3a77ae1969aafb0a57c2c55f36`.
+
+  The full regression suite also passes against these frozen compiler/seed
+  artifacts (`make -o build/cool-compiler -o build/language.BIN -j4 test`);
+  this avoids rebuilding while legacy source integration is in progress.
+  Evidence: `build/release-audit/provenance-access-regression-snapshot.log`.
+  Final regression/bootstrap checks must be repeated after legacy integration.
+
+  Legacy arena/query/clone foundations compile, but matching access acceptance
+  and full legacy metadata/lifecycle integration are still in progress. Current
+  production access evidence does not certify legacy parity or finish G2/G9.
+  Reports: `build/provenance-access{,-asan}-audit.json`,
+  `build/loan-provenance{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/provenance-access-{build,cases,cases-sanitize,focused,helper-sanitize,sanitize,contracts,ancestry,lifecycle,selfhost,legacy-build}.log`.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

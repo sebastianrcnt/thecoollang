@@ -22,6 +22,17 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
    let mutableField=ParameterField(local.type,cast[*u8]("mutable"));
    var cursor=ProvenanceCursor{type:local.type,kind:1,key:cast[i64](mutableField),next:null};
    if(bounded.provenance==null || ReferenceRootMode(&raw bounded)!=0 || ReferenceLoanQuery(&raw bounded,&raw cursor,loan.root,true)){NativeExit(74);}
+   if(!ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(80);}
+   cursor.key=cast[i64](ParameterField(local.type,cast[*u8]("shared")));
+   if(!ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(81);}
+   cursor.key=cast[i64](ParameterField(local.type,cast[*u8]("count")));
+   if(ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(82);}
+   cursor.type=local.type+1;
+   if(!ReferencePathMayAccess(&raw bounded,&raw cursor,1)){NativeExit(83);}
+   var anchor=*loan;anchor.provenance=ReferenceGraphValueNode(check.graph,local.type,loan.root,0,0);
+   if(!ReferencePathMayAccess(&raw anchor,&raw cursor,1)){NativeExit(84);}
+   cursor.type=local.type;cursor.key=cast[i64](mutableField);
+
    var arena=ProvenanceGraph{};var copied=bounded;copied.provenance=ProvenanceGraphCopy(&raw arena,bounded.provenance);
    if(copied.provenance==null || ReferenceRootMode(&raw copied)!=0 || ReferenceLoanQuery(&raw copied,&raw cursor,loan.root,true)){NativeExit(75);}
    var copyCheck=ReferenceCheck{};copyCheck.graph=&raw arena;let before=arena.nodes;
@@ -30,6 +41,7 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
    source.provenance=null;source.provenance_known=1;
    let absent=ReferenceCallGraph(check,&raw source,local.type,0);
    if(absent.provenance!=null || absent.provenance_known!=1){NativeExit(77);}
+   var missing=absent;if(ReferencePathMayAccess(&raw missing,&raw cursor,1) || !ReferencePathMayAccess(&raw missing,&raw cursor,0)){NativeExit(85);}
    source.provenance_known=0;var unknown=ReferenceCallGraph(check,&raw source,local.type,0);
    if(unknown.provenance==null || !ReferenceLoanQuery(&raw unknown,&raw cursor,loan.root,true)){NativeExit(78);}
    var sharedAgain=ReferenceCallGraph(&raw copyCheck,&raw bounded,local.type,0);
@@ -55,6 +67,11 @@ fn ParameterAudit(check:*ReferenceCheck,local:*Local){unsafe{
    }path[8].key=cast[i64](value);
    let reading=BoolInt(ReferenceLoanQuery(loan,path,loan.root,false));let writing=BoolInt(ReferenceLoanQuery(loan,path,loan.root,true));
    if(reading!=BoolInt(ProvenanceQueryRoot(cloned,path,loan.root,loan.exclusive,false)) || writing!=BoolInt(ProvenanceQueryRoot(cloned,path,loan.root,loan.exclusive,true))){NativeExit(71);}
+   if(!ReferencePathMayAccess(loan,path,1)){NativeExit(86);}
+   var copiedLoan=*loan;copiedLoan.provenance=cloned;
+   if(!ReferencePathMayAccess(&raw copiedLoan,path,1)){NativeExit(87);}
+   path[2].next=path;
+   if(ReferencePathMayAccess(loan,path,1) || ReferencePathMayAccess(&raw copiedLoan,path,1)){NativeExit(88);}
    LoanRecord(200+loan.indirect,local.name,cast[*u8]("parameter"),cast[*u8]("deep"),reading,writing,BoolInt(valid));Free(cast[*u8](path));
   }else{
    var type=local.type;var prefix=ProvenanceCursor{};var indirect=false;
@@ -215,11 +232,12 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  for stage,holder,root,field,reading,writing in calls:
   assert reading==1 and writing==int(root=='y' and field=='right'),(root,field,reading,writing)
  records=[r for r in records if r not in calls]
- computed=[r for r in records if r[3]=='reborrow'];assert len(computed)==8,computed
+ computed=[r for r in records if r[3]=='reborrow'];assert len(computed)==7,computed
  for stage,holder,root,field,reading,known in computed:
   assert root in ('x','y','container'),(holder,root)
   expected=int(root=='container' or (root=='x' and holder!='computed_scalar'))
   assert (reading,known)==(expected,int(root!='container')),(holder,root,reading,known)
+ assert [(r[2],r[4]) for r in computed if r[1]=='from_computed']==[('x',1)],computed
  records=[r for r in records if r not in computed]
  parameters=[r for r in records if r[2]=='parameter'];assert len(parameters)==22,parameters
  for stage,holder,root,field,reading,writing in parameters:
@@ -237,7 +255,9 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
   else:assert (reading,known)==(1,1),(stage,holder,root,reading,known)
  assert sum(r[1]=='picked' and r[2]=='x' for r in selection)==4,selection
  assert any(r[1]=='picked_copy' and r[2]=='x' for r in selection),selection
- stores=[r for r in records if r[3]=='store'];assert len(stores)==18,stores
+ stores=[r for r in records if r[3]=='store'];assert len(stores)==16,stores
+ assert {r[2] for r in stores if r[1]=='after_left'}=={'x','z'},stores
+ assert {r[2] for r in stores if r[1]=='after_right'}=={'y','z'},stores
  for stage,holder,root,field,reading,known in stores:
   assert stage==7 and root in ('x','y','z'),(stage,holder,root)
   expected=int(root in ('x','z'))

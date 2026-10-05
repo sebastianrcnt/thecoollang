@@ -234,7 +234,7 @@ fn ReferenceMatches(check: * ReferenceCheck, place: * Node, via: * Local, root: 
         }
         var loan = check.loans;
         while (loan != null) {
-            if (loan.holder == via && loan.indirect == layer && loan.root == root && (!writing || loan.exclusive != 0)) {
+            if (loan.holder == via && loan.indirect == layer && loan.root == root && (!writing || loan.exclusive != 0) && ReferencePayloadMayAccess(loan, place, via)) {
                 return true;
             }
             loan = loan.next;
@@ -407,7 +407,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
         }
         var source = before;
         while (source != null) {
-            if (source.root != null && source.holder == via && (preserve || bridge || source.indirect == layer)) {
+            if (source.root != null && source.holder == via && (preserve || bridge || source.indirect == layer) && (bridge || ReferencePayloadMayAccess(source, place, via))) {
                 if (physical) {
                     if (nested) {
                         ReferenceSourceAccess(check, before, via, source.root, exclusive & source.exclusive, token, origin);

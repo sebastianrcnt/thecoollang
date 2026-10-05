@@ -1134,3 +1134,33 @@ histories retain observed aggregates across opaque calls, nested mutable receive
 and recursive owning return values; final and peak tracked bytes remain equal at
 64 and 1,024 submissions. These tests cover metadata/lifecycle, not arbitrary
 nested stored references or graph-based authorization.
+
+
+## Typed payload overlap during access and acquisition
+
+`ReferencePathMayAccess` answers whether an access may touch a loan's payload
+root, independently of shared/exclusive capability. It traverses finite
+(node,cursor) states and frees all query scratch, including early exits. A
+terminal physical root overlaps every remaining projection below it. When the
+cursor ends at an aggregate value, all descendant payload roots are possible.
+Exact missing edges prove absence; opaque nodes, type mismatches and incomplete
+cursors retain conservative overlap. Known NULL payloads prove absence only
+with a complete cursor. Auxiliary summary ownership is never traversed.
+
+`ReferencePayloadMayAccess` preserves all layer-zero and direct-root coarse
+checks. Only layer-one payload candidates can be excluded. `ReferenceMatches`
+uses this predicate for conflict matching; `ReferenceAcquire` excludes those
+same proven absent candidates before checking/reborrowing sources. Raw borrow
+bridges keep all contracted roots. Shared barriers, ancestry, return/store
+lifetimes and physical protection remain independently authoritative. This does
+not implement graph-based write authorization or remove nested storage limits.
+
+The production access suite includes four explicit disjoint/nested/shared path
+examples, 24 deterministic field/root/initializer permutations and 31 rejection
+cases. Array elements and opaque call fields remain conservative unions. Direct
+root mutation and parent storage replacement stay blocked. Private helper probes
+cover shared mode-zero overlap, borrow-free field absence, physical prefixes,
+unknown/incomplete paths and recursive graphs with cyclic cursors before/after
+clone. Persistent REPL recovery and bounded repeated accesses are checked.
+Legacy acceptance parity is still being integrated; the new access suite's
+`--legacy` mode must pass before this behavior is certified on both frontends.

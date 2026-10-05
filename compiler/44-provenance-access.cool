@@ -1,0 +1,49 @@
+// Root overlap is independent of capability. A shared path still accesses its
+// root and must conflict with an unrelated exclusive loan. This query may prove
+// payload absence; it never grants writes or weakens physical root protection.
+fn ReferencePathMayAccess(source: *ReferenceLoan, path: *ProvenanceCursor, complete: i64) -> bool {
+    unsafe {
+        if (complete == 0) { return true; }
+        if (source.provenance == null) { return source.provenance_known == 0; }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = source.provenance; first.cursor = path;
+        var tail = first;
+        var current = first;
+        var found = false;
+        while (current != null && !found) {
+            let node = current.node;
+            let cursor = current.cursor;
+            // A terminal protects addressed storage and every child place, even
+            // when the cursor still has fields/elements/referents to traverse.
+            if (node.root == source.root && node.root != null) { found = true; }
+            else if (node.opaque != 0 || (cursor != null && node.type != cursor.type)) { found = true; }
+            else {
+                var edge = node.edges;
+                while (edge != null) {
+                    if (cursor == null) {
+                        tail = ProvenanceQueryAppend(first, tail, edge.target, null, 0);
+                    } else if (edge.kind == cursor.kind && (cursor.kind != 1 || edge.key == cursor.key)) {
+                        tail = ProvenanceQueryAppend(first, tail, edge.target, cursor.next, 0);
+                    }
+                    edge = edge.next;
+                }
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+        return found;
+    }
+}
+fn ReferencePayloadMayAccess(source: *ReferenceLoan, place: *Node, via: *Local) -> bool {
+    unsafe {
+        // Layer zero can be a physical address rather than value provenance.
+        // Keep its established coarse overlap rules until typed places replace
+        // the physical checker. Direct-root checks are likewise authoritative.
+        if (source.indirect == 0 || source.root == via) { return true; }
+        var cursor = ReferencePlaceCursor(place, via, null);
+        let found = ReferencePathMayAccess(source, cursor.path, cursor.complete);
+        ReferenceCursorFree(cursor.path);
+        return found;
+    }
+}

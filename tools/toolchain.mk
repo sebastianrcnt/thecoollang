@@ -533,3 +533,10 @@ provenance-selection-test: build/cool-compiler build/compiler-host.o build/langu
 test: provenance-selection-test
 provenance-selection-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_provenance_selection.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/provenance-selection-asan-audit.json
+
+.PHONY: provenance-access-test provenance-access-sanitize-test
+provenance-access-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_provenance_access.py --output build/provenance-access-audit.json
+test: provenance-access-test
+provenance-access-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_provenance_access.py --frontend build/repl-loans-asan/cool-compiler --output build/provenance-access-asan-audit.json
