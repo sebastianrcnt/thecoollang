@@ -7,6 +7,8 @@ p=argparse.ArgumentParser();p.add_argument('--frontend',type=Path);p.add_argumen
 prelude='''import "std/io";import "std/mem";
 struct View{data:[]i64;tag:i64;}
 struct Mixed{data:[]i64;label:&i64;}
+struct Holder{slice:&[]i64;}
+fn nested_descriptor(s:&[][]i64){}
 fn empty()->[]i64 borrows(){return []i64{};}
 fn install(dst:&mut []i64,src:[]i64) stores(dst,src){*dst=src;}
 fn from_empty(x:[]i64)->[]i64 borrows(x){var s=empty();install(&mut s,x);return s;}
@@ -35,6 +37,7 @@ program=prelude+'''fn main(){
  {let s=from_empty_alias(a[:]);assert(s[1]==45);}
  {let s=from_empty_branch(a[:],true);assert(s[2]==46);}
  {let s=from_empty_branch(a[:],false);assert(len(s)==0);}
+ {var s=a[:];let r=&s;let rr=&r;assert(len(**rr)==3);let h=Holder{slice:r};assert((*h.slice)[0]==44);}
  assert(mem.owner_count()==0);io.println(42);
 }
 '''
@@ -53,15 +56,12 @@ invalid=[
  'let r=choose(&s,&t,true);t[0]=9;', 'let r=choose(&s,&t,true);s[0]=9;',
  'let r=choose(&s,&t,true);let e=&mut (*r)[0];',
  'var h=View{data:b[:],tag:0};let r=&mut h;{var z=[1]i64{3};(*r).data=z[:];}',
- 'let r=&s;let rr=&r;',
 ]
 whole=[
  'fn bad()->&[]i64 borrows(){var a=[1]i64{1};var s=a[:];return &s;}fn main(){}',
  'fn bad(s:[]i64)->&[]i64 borrows(s){return &s;}fn main(){}',
  'fn bad(s:&[]i64)->[]i64 borrows(s){return *s;}fn main(){}',
  'fn bad(s:&mut []i64,a:[]i64){*s=a;}fn main(){}',
- 'fn bad(s:&[][]i64){}fn main(){}',
- 'struct Holder{slice:&[]i64;}fn main(){}',
  'fn main(){var a=[1]own[i64]{new[i64](1)};var s=a[:];let r=&s;let old=move (*r)[0];}',
  'fn main(){var a=[1]own[i64]{new[i64](1)};var s=a[:];let r=&s;*(*r)[0]=9;}',
  'fn main(){var p=new[[2]i64]([2]i64{1,2});var s=(*p)[:];let r=&s;let gone=move p;}',

@@ -122,9 +122,6 @@ fn Primary() -> * Node {
                     if (kind == 0) {
                         ErrorAt(token, cast[ * u8]("slicing requires an array or slice"));
                     }
-                    if (Borrowed(element) != i8(0)) {
-                        ErrorAt(token, cast[ * u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));
-                    }
                     if (kind == 2 && mutable == 0) {
                         ErrorAt(token, cast[ * u8]("mutable slice requires a var array"));
                     }
@@ -182,7 +179,6 @@ fn EnumLiteral(type: i64, token: * Token) -> * Node {
     unsafe {
         Layout(type);
         ValidateBorrowedElements(type);
-        ValidateReferenceStorage(type, At());
         Need(46, cast[ * u8]("enum construction requires a variant"));
         CompletionMembers(type, true);
         let variant = FindField(type, Ident(), token);

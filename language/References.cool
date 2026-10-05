@@ -34,7 +34,6 @@ Node *ReferenceExpression(Token *token) {
 Node *ReferenceForPlace(Node *place,I64 exclusive,Token *token){
     Node *address=NULL,*result;
     if(exclusive && !place->mutable) ErrorAt(token,"exclusive borrow requires a mutable place");
-    if(Borrowed(place->type) && !ReferenceStorage(place->type)) ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");
     if(place->kind==N_LOCAL){address=NewNode(N_LOCAL_ADDRESS,token);address->slot=place->slot;address->local_ref=place->local_ref;address->type=T_PTR+place->type;}
     else {if(place->kind!=N_LOAD)ErrorAt(token,"reference operand must be a stable place");address=place->a;}
     if(!BorrowRoot(address) && !ReferencePlaceSource(address))ErrorAt(token,"reference requires a tracked local or parameter root");
@@ -47,23 +46,12 @@ Node *ReferenceLoad(Node *value,Token *token){
     load->a=address;load->origin_source=value;load->type=Shape(value->type)->element;load->mutable=Shape(value->type)->count;
     if(Aggregate(load->type))load->storage=Storage(load->type);return load;
 }
-Bool ContainsReferenceWalk(I64 type,U8 *visited){I64 index;AggregateType *shape;Field *field;if(IsReference(type))return TRUE;if(!Aggregate(type))return FALSE;index=type-T_AGG;if(index>=4096)Error("internal type graph index outside type limit");if(visited[index])return FALSE;Layout(type);visited[index]=1;shape=Shape(type);if(shape->kind==A_ARRAY || shape->kind==A_SLICE)return ContainsReferenceWalk(shape->element,visited);if(shape->kind==A_OWNER)return FALSE;for(field=shape->fields;field;field=field->next)if(ContainsReferenceWalk(field->type,visited))return TRUE;return FALSE;}
+Bool ContainsReferenceWalk(I64 type,U8 *visited){I64 index;AggregateType *shape;Field *field;if(IsReference(type))return TRUE;if(!Aggregate(type))return FALSE;index=type-T_AGG;if(index>=4096)Error("internal type graph index outside type limit");if(visited[index])return FALSE;Layout(type);visited[index]=1;shape=Shape(type);if(shape->kind==A_ARRAY && !shape->count)return FALSE;if(shape->kind==A_ARRAY || shape->kind==A_SLICE)return ContainsReferenceWalk(shape->element,visited);if(shape->kind==A_OWNER)return FALSE;for(field=shape->fields;field;field=field->next)if(ContainsReferenceWalk(field->type,visited))return TRUE;return FALSE;}
 Bool ContainsReference(I64 type){U8 visited[4096];MemSet(visited,0,sizeof(visited));return ContainsReferenceWalk(type,visited);}
 Bool TrackedBorrow(I64 type){return Borrowed(type)!=0;}
-Bool ReferenceStorage(I64 type){
-    AggregateType *shape;Field *field;
-    if(IsReference(type))return !Borrowed(Shape(type)->element);
-    if(!Aggregate(type))return TRUE;Layout(type);shape=Shape(type);
-    if(shape->kind==A_SLICE)return !Borrowed(shape->element);if(shape->kind==A_OWNER)return TRUE;
-    if(shape->kind==A_ARRAY)return ReferenceStorage(shape->element);
-    for(field=shape->fields;field;field=field->next)if(!ReferenceStorage(field->type))return FALSE;
-    return TRUE;
-}
+
 I64 ReferenceMode(I64 type){return BorrowTypeProperty(type,TRUE);}
-U0 ValidateReferenceStorage(I64 type,Token *token){
-    if(IsReference(type)){if(Borrowed(Shape(type)->element) && !ReferenceStorage(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
-    else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references require single-layer aggregate storage");
-}
+
 U0 ReferenceMatchBinding(Node *binding){
     Local *local;if(!TrackedBorrow(binding->type))return;
     local=AllocateLocal();local->type=binding->type;local->slot=binding->slot;local->depth=depth;
@@ -142,7 +130,7 @@ U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *t
     bridge=expression->kind==N_AGG_LITERAL && expression->op==1;
     through=ReferenceThroughStored(place);slicing=expression->kind==N_SLICE && expression->op==A_ARRAY && ReferenceBorrowedSlice(expression->type);physical=(address || slicing) && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);
     if(NestedReference(via->type) && (through || expression->kind==N_LOAD || expression->kind==N_MOVE))layer=1;
-    if(!IsReference(via->type) && !bridge)layer=ReferenceAcquisitionLayer(place,via,expression,layer);preserve=(nested || ReferenceBorrowedSlice(expression->type)) && TrackedBorrow(via->type) && !physical && !bridge;before=check->loans;
+    if(!IsReference(via->type) && !bridge)layer=ReferenceAcquisitionLayer(place,via,expression,layer);preserve=(nested || ReferenceBorrowedSlice(expression->type) || ((expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) && TrackedBorrow(expression->type) && !IsReference(expression->type) && !layer)) && TrackedBorrow(via->type) && !physical && !bridge;before=check->loans;
     if(physical){check->loans=ReferenceNew(check,via,via,exclusive,0,expression,check->loans);ReferencePhysicalCapture(check,place,via,expression);found=TRUE;}
     for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || (physical && (nested || slicing)) || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
 
@@ -250,7 +238,7 @@ Node *RawReferenceExpression(){
     Token *token=At();I64 type;Node *pointer,*anchor,*result;pos++;
     if(!unsafe_depth)ErrorAt(token,"borrow_raw requires unsafe");
     Need('[',"expected '[' after borrow_raw");type=ParseType();Need(']',"expected ']'");
-    if(!IsReference(type))ErrorAt(token,"borrow_raw requires a reference result type");ValidateReferenceStorage(type,token);
+    if(!IsReference(type))ErrorAt(token,"borrow_raw requires a reference result type");
     Need('(',"expected '('");pointer=Expr(1);Need(',',"expected anchor argument");anchor=Expr(1);Need(')',"expected ')'");
     if(pointer->type!=T_PTR+Shape(type)->element)ErrorAt(token,"borrow_raw pointer element type mismatch");
     if(anchor->kind!=N_LOCAL || !IsReference(anchor->type))ErrorAt(token,"borrow_raw anchor must be a named reference");

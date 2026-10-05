@@ -74,14 +74,15 @@ This is a development foundation, not completion of the 1.0 borrowing gate.
 
 - Shared and exclusive references can be stored in structs, arrays and enums,
   including aggregates that also contain slices and owning fields. Owning
-  payloads retain their own external loans. A stored reference's pointee must not itself contain borrowed storage.
-  Stored references to borrowed pointees still need nested lifetime tracking. Reassignment of reference
-  bindings/fields and general nested stored lifetimes need further tracking.
+  payloads retain their own external loans. Stored pointees may themselves contain
+  borrowed storage; typed provenance preserves the physical storage and payload
+  roots separately. Replacement retains possible roots under lifetime checks.
 - Function-body slices use the same lexical provenance as references. A slice
   exclusively borrows its elements; element references reborrow it, and disjoint
   lexical scopes can reuse the source. Direct references to slice descriptors
-  are supported; stored references to descriptors and slice elements containing
-  borrowed storage remain unsupported.
+  are supported, including stored descriptor references and slice elements
+  containing borrowed storage. Shared paths cannot acquire exclusive payload
+  permissions.
 - REPL submissions retain reference and slice loans across inputs under the
   same checking rules as functions. Top-level bindings stay live until
   `:forget name` or session exit. See the persistent-loan and recovery rules
@@ -232,8 +233,8 @@ external parameter storage. Shared or exclusive borrows such as `&PairView` and 
 source roots as shared loans while separately borrowing the container's storage.
 An exclusive container receiver can update ordinary fields and replace reference
 fields under lifetime checks, but cannot mutate through a contained shared reference.
-Stored `&mut T` uses the reborrow rules below. General nested stored lifetimes
-and borrowed slice elements remain required work for the full stored-reference gate.
+Stored `&mut T` uses the reborrow rules below, including nested borrowed pointees
+and borrowed slice elements. Whole-language safety auditing remains required.
 
 `make stored-references-test` checks nested structs/arrays/enums, generic
 copies, methods, computed projections, match evaluation, empty results, owner
@@ -721,7 +722,7 @@ an exclusive descriptor reference; moving their backing owner remains rejected.
 Replacing a slice or slice-containing field through an exclusive reference uses
 the original destination lifetime. Cross-call replacement requires a matching
 `stores` contract described below. Stored `&[]T` fields, references to borrowed
-references and borrowed slice elements still require further implementation.
+references and borrowed slice elements preserve typed physical/payload origins.
 
 `make slice-descriptors-test` verifies both frontends, five engines and O2,
 31 negative programs, 30 independent permission-model queries and persistent
@@ -776,7 +777,8 @@ holders; moving a value does not remove its lexical or persistent root record.
 This supports nested ordinary aggregates and generic layouts, shared/exclusive
 fields, arrays, named/anonymous enum matches and aggregates combining slices and
 owners. Borrowed owning heaps are supported as described below; stored references
-to borrowed pointees and borrowed slice elements remain incomplete. `make mixed-owned-references-test` checks both
+to borrowed pointees and borrowed slice elements use the same typed provenance
+rules. `make mixed-owned-references-test` checks both
 frontends, five engines and O2, zero leaked owners, checked empty-owner faults,
 17 rejected programs, 14 independent permission queries and persistent REPL
 roots. `make mixed-owned-references-sanitize-test` adds an ASan compiler and
@@ -811,8 +813,9 @@ lifetime marker. Earlier possible roots remain pinned conservatively until that
 binding ends. A borrow from a shorter block cannot be installed into a longer
 lived heap. Reference-field assignment is supported; cross-call borrowed storage
 replacement through a receiver requires a matching `stores` contract. Heap storage containing a
-reference to an already-borrowed pointee is also still rejected; arbitrary nested
-stored lifetimes require further work.
+reference to an already-borrowed pointee is supported with the same
+physical/payload lifetime and authority checks. Moving a borrowed owner or
+aggregate transports its external payload roots as well as its physical origins.
 
 `make heap-borrows-test` exercises both frontends, five engines and O2, recursive
 and generic owners, consumed exclusive getters, nested moves and enum cleanup, a 64-link chain with exactly 65 live owners and
@@ -853,8 +856,8 @@ Identical retained root/parent/mode/layer records are merged, so repeating the
 same replacement does not retain one loan record per input. A failed RHS leaves the old reference value when the store was not executed.
 REPL checking failures discard staged loans; runtime failures retain candidate
 roots conservatively because earlier stores in the input may have executed.
-Multi-layer stored borrowed pointees and borrowed slice elements still require
-further lifetime work.
+Multi-layer stored borrowed pointees and borrowed slice elements retain the same
+conservative union after replacement and runtime failure.
 
 
 ## Borrowed replacement through functions
@@ -921,3 +924,30 @@ Early returns require every continuing path to return. Unsupported statements
 and exhausted inference limits keep the conservative summary. Origin-set
 expansion and narrowing participate in the same REPL revalidation.
 General body summaries remain required work; see specification draft 31.
+
+
+## Nested borrowed storage
+
+Nested reference pointees, reference-containing slice elements, recursive slice
+layouts and borrowed owning heaps use typed provenance graphs. Copying an
+external payload is distinct from taking an address into its enclosing storage.
+Returning a copied external reference/inner slice can be valid when an address
+of the local descriptor remains invalid. Every possible source root must satisfy
+the return/store contract. Shared paths intersect payload permissions and never
+upgrade an exclusive handle to allow mutation. Incomplete or opaque paths retain
+conservative origins, which may reject programs lacking a provable lifetime.
+
+Both branch and loop replacement retain old/new receiver identities. Cross-call
+stores require all destination/source relations, including retargeted receivers.
+Unsafe raw pointers retain their existing caller obligations; a valid
+`borrow_raw` anchor still limits lifetime and authority after nested selection.
+Scoped references cannot be manufactured through zero initialization. A fixed
+array of length zero contains no reference slots, so `[0]&T{}` and an owner of
+that array may be empty-initialized; unrelated reference fields still require
+explicit initialization.
+
+The nested lifetime/depth/store/slice regression targets compile byte-identical
+production and seed source copies, without removing feature guards. They verify
+positive execution, required negative diagnostics, persistent REPL rollback and
+tracked allocation histories; sanitizer targets instrument the production
+frontend. This coverage does not close the whole 1.0 safety gate.

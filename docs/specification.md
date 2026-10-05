@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 31
+# Cool language specification — 1.0 draft 32
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1072,3 +1072,28 @@ capabilities. Any change of the nonempty returned-origin set participates in
 transactional dependency-directed REPL revalidation, including expansion and
 narrowing. Existing returned values retain historical provenance. General body
 inference and production nested-storage acceptance remain unfinished.
+
+
+## Draft 32: nested borrowed storage
+
+Prior draft restrictions on stored references to borrowed pointees, owned
+nested reference payloads and slice elements containing borrowed storage are
+superseded. The production language permits these forms with typed provenance
+and physical/payload lifetime checking. Recursive slice type queries terminate
+through query-local visitation. Shared selection preserves capability barriers;
+unknown or incomplete paths remain conservative. A copied external value may
+outlive its local enclosing descriptor when its roots satisfy the return
+contract; an address into that descriptor may not. Branch/loop replacements and
+retargeted nested receivers retain every possible root and require applicable
+`stores` relations. REPL success/compile rollback/runtime failure keep the same
+historical-root rules. Raw operations keep the published unsafe obligations.
+
+Zero-length fixed arrays contain no scoped reference slots. They, including
+owners and aggregate fields of such arrays, may be empty-initialized. Nonempty
+reference arrays and other scoped-reference fields still require explicit
+initialization. This rule changes reference-presence queries for zero arrays,
+not their declared element types or ordinary borrow-mode queries.
+
+This draft establishes production availability; broader adversarial audits,
+tracked collection iteration and every outstanding release requirement remain
+mandatory. It does not declare the safety gate or the 1.0 release complete.

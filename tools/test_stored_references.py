@@ -70,17 +70,19 @@ NEGATIVE += [
  ('fn main(){var x=1;var y=2;var a=array(&x,&y);{var z=3;a[0]=&z;}}','outlive'),
  ('fn main(){var x=1;var y=2;let v=pair(&x,&y);*v.left=3;}','immutable'),
  ('fn main(){var x=1;var y=2;let v=pair(&x,&y);let r=&mut *v.left;}','mutable place'),
- ('struct Bad{r:&mut &i64;}fn main(){}','aggregate storage'),
- ('struct Bad{r:&i64;bytes:&[]u8;}fn main(){}','aggregate storage'),
- ('struct Bad{r:&i64;p:own[&View];}fn main(){}','owned storage'),
- ('fn main(){var x=1;let v=pair(&x,&x);let p=new[&View](&v);}','owned storage'),
  ('fn main(){var x=1;let v=pair(&x,&x);let r=&v;x=2;}','conflicts'),
- ('fn main(){var x=1;var a=[2]&i64{&x,&x};let s=a[:];}','slice elements'),
  ('fn main(){var x=1;var y=2;let arr=array(&x,&y);let r=arr[index(&mut x)];}','conflicts'),
 ]
 def run(command,**kwargs):
  return subprocess.run([str(x) for x in command],cwd=ROOT,text=True,capture_output=True,timeout=120,**kwargs)
 parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--sanitize',action='store_true');args=parser.parse_args()
+SUPPORTED_NESTED = [
+ 'struct Bad{r:&mut &i64;}fn main(){}',
+ 'struct Bad{r:&i64;bytes:&[]u8;}fn main(){}',
+ 'struct Bad{r:&i64;p:own[&View];}fn main(){}',
+ 'fn main(){var x=1;let v=pair(&x,&x);let p=new[&View](&v);}',
+ 'fn main(){var x=1;var a=[2]&i64{&x,&x};let s=a[:];}',
+]
 with tempfile.TemporaryDirectory(prefix='cool-stored-refs-') as tmp:
  source=Path(tmp)/'main.cool';source.write_text(POSITIVE)
  for front in FRONTS:
@@ -126,3 +128,12 @@ with tempfile.TemporaryDirectory(prefix='cool-stored-refs-') as tmp:
   p=run([ROOT/'tools/cool','run','--backend',engine,source]);assert (p.returncode,p.stdout,p.stderr)==(0,'70\n',''),(engine,p)
  print('stored shared references: imported std/option generic payloads and returned fallback loans, five engines PASS')
 print(f'stored shared references: structures/arrays/enums/generics, copies, projections, contracts, owner lifetime; five engines/O2 and {len(NEGATIVE)} rejections on both frontends PASS')
+
+with tempfile.TemporaryDirectory(prefix='cool-enabled-nested-') as enabled_tmp:
+ enabled_source=Path(enabled_tmp)/'main.cool'
+ for code in SUPPORTED_NESTED:
+  enabled_source.write_text(PRELUDE+code if 'PRELUDE' in globals() else code)
+  for front in FRONTS:
+   result=run([*front,'check',enabled_source]);assert result.returncode==0,(code,result)
+   result=run([*front,'run',enabled_source]);assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(code,result)
+print(f'nested storage: {len(SUPPORTED_NESTED)} former restrictions accepted and executed on both frontends PASS')

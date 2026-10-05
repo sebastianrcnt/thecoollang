@@ -98,9 +98,6 @@ WHOLE_NEGATIVE=[
  ('fn bad(p:&i64)->& &i64 borrows(p){return &p;}fn main(){}', 'outlive'),
  ('struct Pair{r:&i64;}fn bad(p:Pair)->& &i64 borrows(p){return &p.r;}fn main(){}', 'outlive'),
  ('struct Wrapper{r:&i64;value:i64;}fn bad(p:own[Wrapper])->&i64 borrows(p){return &(*p).value;}fn main(){}', 'outlive'),
- ('struct S{r:&mut &i64;}fn main(){}', 'aggregate storage'),
- ('fn f(x:&[][]i64){}fn main(){}', 'nested borrowed'),
- ('fn main(){var x=1;let r=&x;let p=new[& &i64](&r);}', 'owned storage'),
 ]
 PRELUDE='fn consume(p:own[i64])->i64{return 0;}fn observe(p:&i64,n:i64){}fn hold(p:&mut i64,n:i64){}fn set(x:&mut i64){*x=1;}fn both(x:&mut i64,y:&mut i64){}fn identity(x:&mut i64)->&mut i64 borrows(x){return x;} '
 
@@ -109,6 +106,11 @@ def run(args,**kwargs):
  return subprocess.run([str(x) for x in args],cwd=ROOT,capture_output=True,text=True,timeout=90,**kwargs)
 
 
+SUPPORTED_NESTED = [
+ 'struct S{r:&mut &i64;}fn main(){}',
+ 'fn f(x:&[][]i64){}fn main(){}',
+ 'fn main(){var x=1;let r=&x;let p=new[& &i64](&r);}',
+]
 with tempfile.TemporaryDirectory(prefix='cool-references-') as tmp:
  path=Path(tmp)/'main.cool';path.write_text(POSITIVE)
  for front in FRONTS:
@@ -128,3 +130,12 @@ with tempfile.TemporaryDirectory(prefix='cool-references-') as tmp:
  result=run([ROOT/'tools/cool','repl'],input='var x=1;\nlet r=&mut x;\nx=2;\n*r\n:forget r\nx=2;\nx\n:quit\n')
  assert result.returncode==0 and result.stdout=='1\n2\n' and result.stderr.count('conflicts')==1,result
 print(f'references: shared/exclusive/reborrow/return/defer on five engines + O2; {len(NEGATIVE)+len(WHOLE_NEGATIVE)} rejection cases on both frontends; formatter and REPL rollback PASS')
+
+with tempfile.TemporaryDirectory(prefix='cool-enabled-nested-') as enabled_tmp:
+ enabled_source=Path(enabled_tmp)/'main.cool'
+ for code in SUPPORTED_NESTED:
+  enabled_source.write_text(PRELUDE+code if 'PRELUDE' in globals() else code)
+  for front in FRONTS:
+   result=run([*front,'check',enabled_source]);assert result.returncode==0,(code,result)
+   result=run([*front,'run',enabled_source]);assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(code,result)
+print(f'nested storage: {len(SUPPORTED_NESTED)} former restrictions accepted and executed on both frontends PASS')

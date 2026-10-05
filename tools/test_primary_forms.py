@@ -59,9 +59,22 @@ with tempfile.TemporaryDirectory(prefix='cool primary forms ') as temporary:
  if args.frontend:fronts.append(args.frontend.resolve())
  for frontend in fronts:
   env={**os.environ,'COOL_FRONTEND':str(frontend),'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
-  for code in recursive_types:
+  for index,code in enumerate(recursive_types):
    source.write_text(code);r=run([frontend,'check',source],env)
-   assert r.returncode==2 and any(message in r.stderr for message in ('slice elements cannot contain borrowed slices','stored references require single-layer aggregate storage','reference storage requires an explicit initializer')),(code,r)
+   assert r.returncode==(0 if index==0 else 2),(code,r)
+   if index:assert 'reference storage requires an explicit initializer' in r.stderr,(code,r)
+  # Empty reference arrays may initialize, but cannot manufacture an element.
+  for setup,value in [('let empty=[0]&i64{};','empty[0]'),
+                      ('let empty=[0]&mut i64{};','empty[0]'),
+                      ('let empty=new[[0]&mut i64]();','(*empty)[0]')]:
+   source.write_text('fn main(){'+setup+'let value='+value+';}')
+   r=run([frontend,'check',source],env);assert r.returncode==0,r
+   for engine in ('tree','interp','jit','llvm','llvm-jit','O2'):
+    if engine=='O2':
+     r=run([ROOT/'tools/cool','build','--release',source,'-o',binary],env);assert r.returncode==0,r
+     r=run([binary],env)
+    else:r=run([ROOT/'tools/cool','run','--backend',engine,source],env)
+    assert r.returncode==2 and 'index out of bounds' in r.stderr,(frontend,engine,r)
   source.write_text(program)
   for engine in ('tree','interp','jit','llvm','llvm-jit','O2'):
    if engine=='O2':

@@ -2743,11 +2743,77 @@ through ordinary evaluation or library use.
   General body inference, broader production nested storage and all mandatory
   release gates remain unfinished/Open.
 
+
+- Production nested borrowed storage (specification draft 32): removed the
+  blanket ReferenceStorage/ValidateReferenceStorage and borrowed slice-element
+  restrictions from both frontends. Typed provenance, physical/payload roots,
+  source permissions, lifetime/store contracts, raw anchor validation and
+  owner-address pins remain authoritative. The nested regression tool now
+  compiles byte-identical source copies without bypassing feature checks.
+  Normal mode asserts copy identity; the unsafe-root countermodel remains an
+  explicit experimental option rather than alternate production semantics.
+
+  New loop receiver-retargeting cases require contracts for both possible
+  destinations. Recursive slices preserve shared/exclusive payload authority.
+  Valid raw anchors retain nested lifetime/capability checks. An owned recursive
+  REPL payload replacement followed by assertion failure preserves the changed
+  value and old/new protected roots; forgetting its owner releases both and
+  leaves zero owners. A zero-length fixed array has no reference slots and can
+  initialize empty, including in structs/owners. Other actual reference fields
+  still require explicit initialization. Empty array element access traps with
+  the normal bounds diagnostic across engines and both/instrumented frontends.
+
+  Enabling the feature exposed an actual value-transport defect: moving
+  `own[&Mixed]` into another aggregate omitted its layer-one external payload
+  loans, despite retaining a field graph. Layer-zero owner/aggregate value
+  copies now transport all payload layers. Reference-valued and deeper-layer
+  selections retain existing filtering, preventing descriptor/backing roots
+  from contaminating scalar reference and inner-slice results. Physical/raw
+  paths remain distinct. Regression cases validate external payload returns
+  after relocation, local descriptor/owned payload address rejection and shared
+  permission barriers. Existing disjoint-field/layer models also pass.
+
+  Permanent production slice readiness/sanitizer: 262 classifications and
+  112 positive programs, 672 five-engine/O2 executions (112 tree ASan runs),
+  44 persistent scenarios, zero gaps and 12 allocation observations PASS.
+  Combined depth/store/slice audit: 350 classifications, 144 positives and
+  864 executions; combined production-frontend ASan/UBSan audit runs the same
+  classifications/144 tree positives and all 44 persistent scenarios PASS.
+  Final source hashes match compiler/legacy files in both combined/permanent
+  reports. REPL replacement success/failure workloads retain equal tracked
+  final/peak allocations at histories 64 and 1024; this is not an RSS claim.
+  Former support-limit rejection fixtures are promoted to positive checks or
+  executable cases with assertions in the reference/heap/slice/mixed suites.
+  Local storage escapes retain their precise lifetime errors. The late-DAG
+  initializer test now distinguishes a real reference field from an empty
+  nullable owner field; both semantics have permanent coverage.
+
+  `make -k -j4 test bootstrap-check editor-distribution-test
+  nested-reference-slice-sanitize-test heap-borrows-sanitize-test
+  slice-descriptors-sanitize-test mixed-owned-references-sanitize-test
+  primary-forms-sanitize-test` exits 0 in
+  `build/release-audit/nested-production-all-regression.log`. Graph/copy/loan/
+  selection/access/physical/descriptor/stores/dependency sanitizer targets exit
+  0 in `build/release-audit/nested-production-verified-sanitize.log`.
+  Combined evidence: `nested-production-verified-combined{,-asan}.{json,log}`.
+  Earlier `nested-production-*-validation.log` and trial combined reports record
+  initializer/obsolete-restriction expectations and the transport defect;
+  they are not passing acceptance evidence. Bootstrap/stage2/stage3 converge.
+  Production stage-2 IR SHA256:
+  `baf859d61d182711ad55d00d65479e7cf249ca59b53bc3c8d68c5177d8c28872`.
+  `examples/nested-views.cool` demonstrates a shared matrix view, descriptor
+  reference returns and backing reuse after scope exit; five engines/O2 and
+  seed tree produce 21 (`nested-views-example.json`, seven executions).
+  Production availability is established for the audited cases. Broader safety
+  fuzzing, relocation/alias combinations, collection APIs and every remaining
+  mandatory release gate stay Open.
+
 ## Next implementation checkpoints
 
-- Complete nested stored references and borrowed slice elements; preserve
-  checked heap/slice replacement contracts, keep unsafe raw pointers separate and
-  add rejection regressions before removing restrictions.
+- Expand adversarial/model coverage for production nested references and
+  borrowed slice elements, including repeated relocation through fields, arrays,
+  enums and shared receivers. Preserve checked heap/slice replacement contracts
+  and the separate unsafe raw-pointer obligations.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
   packages, persistent loans and runtime-error recovery.
 - Add adversarial/deterministic fuzz cases for evaluation order, ownership and
@@ -2755,6 +2821,6 @@ through ordinary evaluation or library use.
 - Maintain the documented AST/slot/ownership invariants while simplifying
   remaining port-generated compiler sections. Both frontend implementations
   must remain semantically aligned and bootstrap must continue to converge.
-- Complete stored loans and tracked iteration, including the remaining
-  temporary receiver restrictions. Preserve existing ownership checks while
-  extending ordinary collection use.
+- Extend tracked collection iteration and borrowed-element APIs, including
+  remaining temporary receiver restrictions. Preserve ownership/lifetime checks
+  while extending ordinary collection use.

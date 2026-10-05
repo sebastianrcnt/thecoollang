@@ -897,9 +897,8 @@ fn ValidateBorrowedGraph(type:i64,visited:*u8){unsafe{
  let index=type-1000;
  if(index>=4096){Error(cast[*u8]("internal type graph index outside type limit"));}
  if(visited[index]!=u8(0)){return;}
- Layout(type);visited[index]=u8(1);ValidateReferenceStorage(type,At());let shape=Shape(type);
- if(shape.kind==3){if(Borrowed(shape.element)!=i8(0)){ErrorAt(shape.token,cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));}return;}
- if(shape.kind==5 && !ReferenceStorage(shape.element)){ErrorAt(shape.token,cast[*u8]("owned storage cannot contain nested borrowed references"));}
+ Layout(type);visited[index]=u8(1);let shape=Shape(type);
+ if(shape.kind==3){return;}
  if(shape.kind==2 || shape.kind==5){ValidateBorrowedGraph(shape.element,visited);return;}
  var field=shape.fields;
  while(field!=null){ValidateBorrowedGraph(field.type,visited);field=field.next;}

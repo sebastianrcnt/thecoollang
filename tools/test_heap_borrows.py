@@ -28,6 +28,8 @@ fn recursive(p:own[Recursive])->own[Recursive] borrows(p){return move p;}
 '''
 program=prelude+'''fn tests(){
  var x=7;var y=8;
+ {let p=make(&x);let q=new[&View](&*p);assert(*(**q).r==7);}
+ {var a=[1]own[View]{make(&x)};let s=a[:];assert(*(*s[0]).r==7);}
  {let p=make(&x);let q=same(move p);assert(*(*q).r==7);let r=get(move q);assert(*r==7);}x=9;
  {var p=make(&x);{let r=&p;assert(*receiver_get(r)==9);let h=heap_get(r);assert(*(*h).r==9);}let q=take(&mut p);assert(*(*q).r==9);}
  {let p=new[Mut](Mut{r:&mut x});let r=mut_get(move p);*r=10;}assert(x==10);
@@ -57,7 +59,6 @@ invalid=[
  'fn main(){var x=1;let p=new[own[View]](make(&x));let r=&**p;let q=move p;}',
  'fn main(){var x=1;let p=new[Mut](Mut{r:&mut x});x=2;}',
  'fn main(){var x=1;let p=new[Mut](Mut{r:&mut x});let r=mut_get(move p);x=2;}',
- 'fn main(){var x=1;let p=make(&x);let q=new[&View](&*p);}',
  'fn main(){let p=new[View]();}',
  'fn main(){let p=new[&i64]();}',
  'fn main(){var x=1;var y=2;var p=make(&x);{var z=3;(*p).r=&z;}}',
@@ -66,7 +67,6 @@ invalid=[
  'fn main(){var x=1;var p=make(&x);let r=&p;let q=take(&mut p);}',
  'fn main(){var x=1;var p=make(&x);let r=heap_get(&p);let q=move p;}',
  'fn main(){var x=1;let p=make(&x);let q=same(move p);x=2;}',
- 'fn main(){var x=1;var a=[1]own[View]{make(&x)};let s=a[:];}',
  'fn main(){var x=1;let p=new[&mut i64](&mut x);let r=&*p;let q=move p;}',
 ]
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)

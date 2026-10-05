@@ -1766,3 +1766,38 @@ retain the real AST and restore ownership before analysis. The rejection case
 executes the old producer/caller after rollback. A chain with 256 unrelated
 functions checks exactly three retained bodies; this measures analysis count,
 not elapsed-time speedup.
+
+
+## Production nested borrowed storage (draft 32)
+
+The preceding private readiness checkpoints describe their historical guarded
+state. Production no longer uses ReferenceStorage/ValidateReferenceStorage or
+slice-element type restrictions. The existing typed loan graph, physical roots,
+capability intersection, root authorization, stores metadata, owner pins and
+transactional lifetime checking apply to nested storage. Do not reintroduce a
+blanket single-layer check as a substitute for correcting a failing lifetime or
+permission rule. ContainsReferenceWalk treats a length-zero fixed array as
+having no reference slots, while checking every other reachable field. Owning
+payload construction and ordinary borrowed-mode queries retain their separate
+semantics.
+
+The nested-reference tool compiles byte-identical copies of both real frontend
+sources; without the explicit unsafe-root countermodel it asserts source copy
+identity before compilation. It removes no feature checks. ASan instruments
+production frontend LLVM. Generated program ASan/UBSan coverage remains supplied
+by the complementary reference/heap/slice/store suites. Classifications alone
+are not a general memory-safety proof. Whole-language safety work remains open.
+
+
+Borrowed owner/aggregate LOCAL/LOAD/MOVE copies at acquisition layer zero must
+transport all their payload loan layers. Selecting only layer-zero loans can
+lose a nested reference's external roots when moving `own[&Mixed]` into another
+aggregate. The copied graph alone cannot restore a loan that was omitted.
+Reference-valued copies and acquisitions already at a deeper layer retain their
+existing filtering, separating descriptor/backing storage from the selected
+payload. Physical address and raw bridge paths retain their distinct rules;
+owner pins are temporary address obligations, never value-level provenance.
+The nested-owner regression verifies external payload return after relocation,
+rejection of local descriptor/owned payload addresses and shared capability
+barriers. Complementary field-disjoint permission and nested slice return tests
+must continue to pass alongside this transport rule.

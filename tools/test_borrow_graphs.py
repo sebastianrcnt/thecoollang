@@ -152,10 +152,15 @@ entry:
         if label.startswith('diamond'):assert any(mode==2 and type in mapping and mapping[type]==len(nodes)-1 for type,mode,_,_ in rows),(label,rows)
         assert seen=={(i,mode) for i in range(len(nodes)) for mode in (0,1)},(label,seen)
         queries+=len(seen);graphs+=1
-    # A late invalid storage branch cannot be skipped after a shared safe DAG.
-    file.write_text('struct A{v:i64;}struct B{a:own[A];b:own[A];}struct Bad{a:own[B];b:own[B];r:own[& &i64];}fn main(){let p=new[Bad]();}')
+    # A late actual reference field cannot be skipped after a shared safe DAG.
+    file.write_text('struct A{v:i64;}struct B{a:own[A];b:own[A];}struct Bad{a:own[B];b:own[B];r:& &i64;}fn main(){let p=new[Bad]();}')
     for front in fronts:
-        result=run([front,'check',file]);assert result.returncode==2 and 'nested borrowed references' in result.stderr,(front,result)
+        result=run([front,'check',file]);assert result.returncode==2 and 'reference storage requires an explicit initializer' in result.stderr,(front,result)
+    # An owning field may be null without constructing its reference payload.
+    file.write_text('import "std/mem";struct A{v:i64;}struct B{a:own[A];b:own[A];}struct Empty{a:own[B];b:own[B];r:own[& &i64];}fn main(){{let p=new[Empty]();assert(mem.owner_count()==1);}assert(mem.owner_count()==0);}')
+    for front in fronts:
+        result=run([front,'check',file]);assert result.returncode==0,(front,result)
+        result=run([front,'run',file]);assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(front,result)
     # Lazy concrete layouts and rollback reuse must not see stale visited bits.
     for front in fronts:
         for element,borrowed in (('i64',False),('&i64',True),('&mut i64',True),('[]i64',True)):

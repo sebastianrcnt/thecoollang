@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Private nested-root experiments; known counterexamples are not release acceptance."""
+"""Nested borrowed-storage lifetime, authority and cross-engine regressions."""
 import argparse
 import hashlib
 import json
@@ -426,6 +426,49 @@ STORE_DIAGNOSTICS.update({'slice_branch_nested_hidden_continuation':'outlive','s
 SLICE_CASES.append(('slice_branch_scope_escape','reject','fn pick(a:[]i64,b:[]i64,flag:bool)->[]i64 borrows(a,b){if(flag){let copy=a;}return copy;}fn main(){}'))
 STORE_DIAGNOSTICS['slice_branch_scope_escape']='unknown variable'
 
+
+# Iteration must retain both receiver identities for cross-call stored effects.
+for omitted in ('old','new','none'):
+    contracts=(' stores(p,src)' if omitted!='old' else '')+(' stores(other,src)' if omitted!='new' else '')
+    program=('struct L0{r:&i64;}struct L1{next:&mut L0;}'
+      'fn change(p:&mut L1,other:&mut L0,src:&i64,yes:bool) stores(p,other)'+contracts+
+      '{var again=yes;while(again){(*p).next=other;again=false;}let alias=(*p).next;(*alias).r=src;}')
+    main='fn main(){var a=7;var b=9;var c=11;'
+    for yes in ('true','false'):
+        main+='{var first=L0{r:&a};var second=L0{r:&b};var outer=L1{next:&mut first};change(&mut outer,&mut second,&c,'+yes+');assert(*(*outer.next).r==11);}'
+    main+='}'
+    case='nested_loop_store_'+omitted
+    SLICE_CASES.append((case,'accept' if omitted=='none' else 'reject',program+(main if omitted=='none' else 'fn main(){}')))
+    if omitted!='none':STORE_DIAGNOSTICS[case]='matching stores'
+SLICE_CASES.extend([
+ ('recursive_exclusive_slice_payload','accept','struct Node{kids:[]Node;r:&mut i64;}fn get(p:&mut Node)->&mut i64 borrows(p){return (*p).kids[0].r;}fn main(){var a=7;var b=9;var none=[0]Node{};var leaf=Node{kids:none[:],r:&mut a};var kids=[1]Node{leaf};var root=Node{kids:kids[:],r:&mut b};{let r=get(&mut root);*r=11;}assert(*root.kids[0].r==11);}'),
+ ('recursive_shared_slice_payload','reject','struct Node{kids:[]Node;r:&mut i64;}fn bad(p:&Node){let r=(*p).kids[0].r;*r=11;}fn main(){}'),
+ ('nested_raw_shared_read','accept','struct View{r:&i64;}fn main(){var a=7;let view=View{r:&a};let anchor=&view;unsafe{let copy=borrow_raw[&View](cast[*View](anchor),anchor);assert(*(*copy).r==7);}}'),
+ ('nested_raw_shared_payload_mutation','reject','struct View{r:&mut i64;}fn bad(view:&View){unsafe{let copy=borrow_raw[&View](cast[*View](view),view);let r=(*copy).r;*r=9;}}fn main(){}'),
+ ('nested_raw_local_payload_escape','reject','struct View{r:&i64;}fn bad(x:&i64)->&i64 borrows(x){var local=7;let view=View{r:&local};let anchor=&view;unsafe{let copy=borrow_raw[&View](cast[*View](anchor),anchor);return (*copy).r;}}fn main(){}'),
+])
+STORE_DIAGNOSTICS.update({'recursive_shared_slice_payload':'cannot mutate or move through a shared reference','nested_raw_shared_payload_mutation':'cannot mutate or move through a shared reference','nested_raw_local_payload_escape':'outlive'})
+
+
+SLICE_CASES.extend([
+ ('zero_reference_array_initializer','accept','import "std/mem";struct Wrap{empty:[0]&i64;value:i64;}fn main(){let empty=[0]&i64{};assert(len(empty)==0);let wrapper=Wrap{};assert(wrapper.value==0);{let owner=new[[0]&mut i64]();assert(len(*owner)==0);}assert(mem.owner_count()==0);}'),
+ ('nonzero_reference_array_initializer','reject','fn main(){let bad=[1]&i64{};}'),
+ ('zero_array_other_reference_initializer','reject','struct Wrap{empty:[0]&i64;r:&i64;}fn main(){let bad=Wrap{};}'),
+])
+STORE_DIAGNOSTICS.update({'nonzero_reference_array_initializer':'explicit initializer','zero_array_other_reference_initializer':'explicit initializer'})
+
+
+# Moving a borrowed owner must transport payload loans as well as physical ones.
+owned_nested='struct Mixed{r:&i64;p:own[i64];}struct Nested{p:own[&Mixed];}'
+setup='let view=Mixed{r:x,p:new[i64](9)};let owner=new[&Mixed](&view);let nested=Nested{p:move owner};'
+SLICE_CASES.extend([
+ ('nested_owner_move_external_return','accept',owned_nested+'fn get(x:&i64)->&i64 borrows(x){'+setup+'return (**nested.p).r;}fn main(){var a=7;let r=get(&a);assert(*r==7);}'),
+ ('nested_owner_move_slot_return','reject',owned_nested+'fn bad(x:&i64)->& &Mixed borrows(x){'+setup+'return &*nested.p;}fn main(){}'),
+ ('nested_owner_move_heap_address_return','reject',owned_nested+'fn bad(x:&i64)->&i64 borrows(x){'+setup+'return &*(**nested.p).p;}fn main(){}'),
+ ('nested_owner_move_shared_payload_mutation','reject','struct Mixed{r:&mut i64;}struct Nested{p:own[&Mixed];}fn bad(x:&mut i64){let view=Mixed{r:x};let owner=new[&Mixed](&view);let nested=Nested{p:move owner};let r=(**nested.p).r;*r=9;}fn main(){}'),
+])
+STORE_DIAGNOSTICS.update({'nested_owner_move_slot_return':'outlive','nested_owner_move_heap_address_return':'outlive','nested_owner_move_shared_payload_mutation':'cannot mutate or move through a shared reference'})
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -622,6 +665,8 @@ SLICE_REPL_CASES.extend([
   'use(a[:],b[:],true)[0]\n:quit\n','7\n9\n',{}),
 ])
 
+SLICE_REPL_CASES.append(('nested_owned_recursive_runtime_recovery','import "std/mem";\nstruct View{r:&i64;}\nstruct Node{kids:[]Node;payload:own[View];}\nfn set(dst:&mut Node,src:&i64) stores(dst,src){(*(*dst).payload).r=src;}\nvar a=7;\nvar b=9;\nvar none=[0]Node{};\nvar root=new[Node](Node{kids:none[:],payload:new[View](View{r:&a})});\n{set(&mut *root,&b);assert(false);}\n*(*(*root).payload).r\na=8;\nb=10;\n:forget root\na=8;\nb=10;\na\nb\nmem.owner_count()\n:forget none\n:quit\n','9\n8\n10\n0\n',{'assertion failed':1,'access conflicts with a live scoped reference':2}))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frontend', type=Path, default=ROOT / 'build/cool-compiler')
@@ -656,20 +701,12 @@ def main():
         for original in artifacts:
             copy=tmp/original.name;shutil.copy2(original,copy);copies.append(copy)
         assert all(digest(copy)==artifact_hashes[str(original)] for original,copy in zip(artifacts,copies))
-        target=private/'16-references.cool';text=target.read_text()
-        start,end=function_span(text,'ReferenceStorage')
-        text=text[:start]+'fn ReferenceStorage(type:i64)->bool{return true;}'+text[end:]
         if args.unsafe_root_predicate:
+            target=private/'16-references.cool';text=target.read_text()
             assert text.count('root.reference_external == 0')==1
-            text=text.replace('root.reference_external == 0','(root.type != 0 && !IsReference(root.type))')
-        target.write_text(text)
-        if args.slices:
-            types=private/'03-types.cool';text=types.read_text()
-            guard='if(Borrowed(shape.element)!=i8(0)){ErrorAt(shape.token,cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));}'
-            assert text.count(guard)==1;types.write_text(text.replace(guard,''))
-            parser=private/'37-parser-projections.cool';text=parser.read_text()
-            guard='                    if (Borrowed(element) != i8(0)) {\n                        ErrorAt(token, cast[ * u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));\n                    }\n'
-            assert text.count(guard)==1;parser.write_text(text.replace(guard,''))
+            target.write_text(text.replace('root.reference_external == 0','(root.type != 0 && !IsReference(root.type))'))
+        else:
+            assert all((private/p.name).read_bytes()==p.read_bytes() for p in sources)
         manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(p)+'\n' for p in sorted(private.glob('*.cool'))))
         ir=tmp/'compiler.ll';r=run([copies[0],'llvm-bundle',manifest,ir]);assert r.returncode==0,r
         frontend_flags=[]
@@ -685,19 +722,12 @@ def main():
         if args.legacy:
             seed=tmp/'language';seed.mkdir()
             for original in legacy_sources:shutil.copy2(original,seed/original.name)
-            refs=seed/'References.cool';text=refs.read_text();start,end=function_span(text,'ReferenceStorage','Bool ')
-            text=text[:start]+'Bool ReferenceStorage(I64 type){return TRUE;}'+text[end:]
             if args.unsafe_root_predicate:
+                refs=seed/'References.cool';text=refs.read_text()
                 assert text.count('!root->reference_external')==1
-                text=text.replace('!root->reference_external','(root->type && !IsReference(root->type))')
-            refs.write_text(text)
-            if args.slices:
-                types=seed/'Types.cool';text=types.read_text()
-                guard='if(Borrowed(shape->element))ErrorAt(shape->token,"slice elements cannot contain borrowed slices until lifetime analysis exists");'
-                assert text.count(guard)==1;types.write_text(text.replace(guard,''))
-                parser=seed/'Parser.cool';text=parser.read_text()
-                guard='                if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");\n'
-                assert text.count(guard)==1;parser.write_text(text.replace(guard,''))
+                refs.write_text(text.replace('!root->reference_external','(root->type && !IsReference(root->type))'))
+            else:
+                assert all((seed/p.name).read_bytes()==p.read_bytes() for p in legacy_sources)
             binary=tmp/'frontend.BIN';r=run([ROOT/'build/coolc',seed/'Native.cool',binary]);assert r.returncode==0,r
             fronts.append(('seed',[ROOT/'build/coolc','--run',binary]))
         control_source=next(source for name,_,source in CASES if name=='reference_parameter_slot_return')
@@ -750,7 +780,7 @@ def main():
             repl_lifecycle=json.loads(lifecycle.read_text())
             print(result.stdout,end='')
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,repl=args.repl,repl_observations=repl_observations,repl_lifecycle=repl_lifecycle,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; ReferenceStorage bypassed; --slices additionally removes only the slice-element type/parser restrictions. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,repl=args.repl,repl_observations=repl_observations,repl_lifecycle=repl_lifecycle,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Byte-identical copies of production/seed frontend sources, without feature bypasses. Optional explicit countermodel changes external-root authorization. Positive programs execute on tree and optional five engines/O2; accepted negatives never execute. Source hash stability, parameter-slot lifetime rejection, persistent REPL and allocation histories are verified. Sanitizer instruments the production frontend; generated program runtime sanitizer coverage is supplied by complementary suites.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:
             failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]

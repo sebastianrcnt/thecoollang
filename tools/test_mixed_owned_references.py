@@ -9,6 +9,7 @@ struct Mixed{r:&i64;p:own[i64];}
 struct Exclusive{r:&mut i64;p:own[i64];}
 struct View{r:&i64;data:[]i64;p:own[i64];}
 struct Wrap{value:Mixed;}
+struct Nested{r:&i64;p:own[&Mixed];}
 struct Box[T]{value:T;}
 fn generic[T](value:T)->T borrows(value){return move value;}
 enum Choice{None;Some(Mixed);Owned(own[i64]);}
@@ -24,6 +25,7 @@ fn choice(value:Choice)->Choice borrows(value){return move value;}
 '''
 program=prelude+'''fn tests(){
  var x=7;var y=8;
+ {let v=Mixed{r:&x,p:new[i64](7)};let p=new[&Mixed](&v);assert(*(**p).r==7);assert(*(**p).p==7);let nested=Nested{r:&y,p:move p};assert(*(**nested.p).r==7);}
  {let a=Mixed{r:&x,p:new[i64](9)};let b=identity(move a);assert(*b.r==7);assert(*b.p==9);{let r=&b;assert(*label(r)==7);assert(*payload(r)==9);}}
  {var a=Mixed{r:&x,p:new[i64](10)};let receiver=&mut a;{let b=take(receiver);assert(*b.r==7);assert(*b.p==10);}assert(*(*receiver).r==7);}
  {let a=Exclusive{r:&mut x,p:new[i64](11)};let b=exclusive(move a);*b.r=17;assert(*b.p==11);}assert(x==17);
@@ -58,8 +60,6 @@ invalid=[
  'fn main(){var x=1;var v=Exclusive{r:&mut x,p:new[i64](7)};let r=&mut v;let gone=move *r;*(*r).r=2;}',
  'fn main(){var x=1;var v=Mixed{r:&x,p:new[i64](7)};let r=&mut v;let gone=take(r);x=2;}',
  'fn main(){var x=1;var v=Mixed{r:&x,p:new[i64](7)};let r=&mut v;let p=&*(*r).p;let gone=take(r);}',
- 'fn main(){var x=1;let v=Mixed{r:&x,p:new[i64](7)};let p=new[&Mixed](&v);}',
- 'struct Bad{r:&i64;p:own[&Mixed];}fn main(){}',
  'fn main(){var x=1;var a=[2]Mixed{Mixed{r:&x,p:new[i64](7)},Mixed{r:&x,p:new[i64](8)}};let r=&a;let gone=move a;}',
 ]
 def run(command,env,input=None):return subprocess.run(list(map(str,command)),cwd=ROOT,env=env,input=input,capture_output=True,text=True,timeout=180)

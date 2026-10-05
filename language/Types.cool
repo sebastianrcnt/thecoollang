@@ -1,4 +1,3 @@
-extern Bool ReferenceStorage(I64 type);
 // Aggregate layouts and structural array/slice types. Pointer depth uses T_PTR.
 I64 FindType(U8 *package, U8 *name) {
     I64 i; for (i = 0; i < naggregates; i++) if ((aggregate_types[i].kind == A_STRUCT || aggregate_types[i].kind == A_ENUM) && !aggregate_types[i].origin && Eq(aggregate_types[i].package, package) && Eq(aggregate_types[i].name, name)) return T_AGG + i;
@@ -101,9 +100,8 @@ U0 ValidateBorrowedGraph(I64 type,U8 *visited){
  AggregateType *shape;Field *field;I64 index;
  if(!Aggregate(type))return;
  index=type-T_AGG;if(index>=MAX_TYPES)Error("internal type graph index outside type limit");if(visited[index])return;
- Layout(type);visited[index]=1;ValidateReferenceStorage(type,At());shape=Shape(type);
- if(shape->kind==A_SLICE){if(Borrowed(shape->element))ErrorAt(shape->token,"slice elements cannot contain borrowed slices until lifetime analysis exists");return;}
- if(shape->kind==A_OWNER && !ReferenceStorage(shape->element))ErrorAt(shape->token,"owned storage cannot contain nested borrowed references");
+ Layout(type);visited[index]=1;shape=Shape(type);
+ if(shape->kind==A_SLICE)return;
  if(shape->kind==A_ARRAY || shape->kind==A_OWNER){ValidateBorrowedGraph(shape->element,visited);return;}
  for(field=shape->fields;field;field=field->next)ValidateBorrowedGraph(field->type,visited);
 }

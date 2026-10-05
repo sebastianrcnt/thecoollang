@@ -52,9 +52,6 @@ fn ReferenceForPlace(place: * Node, exclusive: i64, token: * Token) -> * Node {
         if (exclusive != 0 && place.mutable == 0) {
             ErrorAt(token, cast[ * u8]("exclusive borrow requires a mutable place"));
         }
-        if (Borrowed(place.type) != i8(0) && !ReferenceStorage(place.type)) {
-            ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
-        }
         var address: * Node = null;
         if (place.kind == 3) {
             address = NewNode(22, token);
@@ -104,6 +101,7 @@ fn ContainsReferenceWalk(type:i64,visited:*u8)->bool { unsafe {
     if (visited[index]!=u8(0)) { return false; }
     Layout(type); visited[index]=u8(1);
     let shape=Shape(type);
+    if (shape.kind==2 && shape.count==0) { return false; }
     if (shape.kind==2 || shape.kind==3) { return ContainsReferenceWalk(shape.element,visited); }
     if (shape.kind==5) { return false; }
     var field=shape.fields;
@@ -117,58 +115,17 @@ fn ContainsReference(type:i64)->bool { unsafe {
     var visited=[4096]u8{};
     return ContainsReferenceWalk(type,cast[*u8](&raw visited));
 }}
-// Stored references are copied as reborrows. Owning payloads and stored
-// references to borrowed storage still need further lifetime tracking.
+// Stored references and nested payloads are copied as checked reborrows.
 fn TrackedBorrow(type: i64) -> bool {
     return Borrowed(type) != i8(0);
 }
-fn ReferenceStorage(type: i64) -> bool {
-    unsafe {
-        if (IsReference(type)) {
-            return Borrowed(Shape(type).element) == i8(0);
-        }
-        if (Aggregate(type) == i8(0)) {
-            return true;
-        }
-        Layout(type);
-        let shape = Shape(type);
-        if (shape.kind == 3) {
-            return Borrowed(shape.element) == i8(0);
-        }
-        if (shape.kind == 5) {
-            return true;
-        }
-        if (shape.kind == 2) {
-            return ReferenceStorage(shape.element);
-        }
-        var field = shape.fields;
-        while (field != null) {
-            if (!ReferenceStorage(field.type)) {
-                return false;
-            }
-            field = field.next;
-        }
-        return true;
-    }
-}
+
 // Per-root modes are retained in loans. This maximum is only the permission
 // required to copy a typed value; it must never upgrade a shared source root.
 fn ReferenceMode(type: i64) -> i64 {
     return i64(BorrowTypeProperty(type, true));
 }
-fn ValidateReferenceStorage(type: i64, token: * Token) {
-    unsafe {
-        if (IsReference(type)) {
-            if (Borrowed(Shape(type).element) != i8(0) && !ReferenceStorage(Shape(type).element)) {
-                ErrorAt(token, cast[ * u8]("nested borrowed storage is not yet supported by scoped references"));
-            }
-        } else {
-            if (ContainsReference(type) && !ReferenceStorage(type)) {
-                ErrorAt(token, cast[ * u8]("stored references require single-layer aggregate storage"));
-            }
-        }
-    }
-}
+
 // Match evaluates its scrutinee once into anonymous storage. Give borrowed
 // payloads a real loan holder, without exposing a name in the lexical scope.
 fn ReferenceMatchBinding(binding: * Node) {
@@ -436,7 +393,10 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
             layer = 1;
         }
         if (!IsReference(via.type) && !bridge) { layer = ReferenceAcquisitionLayer(place, via, expression, layer); }
-        let preserve = (nested || ReferenceBorrowedSlice(expression.type)) && TrackedBorrow(via.type) && !physical && !bridge;
+        // Copy/move a borrowed owning or aggregate value with all payload
+        // layers intact. Layer zero alone is not its complete value provenance.
+        let value_copy = (expression.kind == 3 || expression.kind == 18 || expression.kind == 29) && TrackedBorrow(expression.type) && !IsReference(expression.type) && layer == 0;
+        let preserve = (nested || ReferenceBorrowedSlice(expression.type) || value_copy) && TrackedBorrow(via.type) && !physical && !bridge;
         let before = check.loans;
         var found = false;
         if (physical) {
@@ -940,7 +900,6 @@ fn RawReferenceExpression() -> * Node {
         if (!IsReference(type)) {
             ErrorAt(token, cast[ * u8]("borrow_raw requires a reference result type"));
         }
-        ValidateReferenceStorage(type, token);
         Need(40, cast[ * u8]("expected '('"));
         let pointer = Expr(1);
         Need(44, cast[ * u8]("expected anchor argument"));

@@ -241,7 +241,6 @@ Node *Primary() {
             if (kind) element = Shape(n->type)->element; else element = n->type-T_PTR;
             if (Take(':')) {
                 if (!kind) ErrorAt(t, "slicing requires an array or slice");
-                if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");
                 if (kind == A_ARRAY && !mutable) ErrorAt(t, "mutable slice requires a var array");
                 high = NULL; if (At()->kind != ']') { high = Expr(1); if (!Integer(high->type)) ErrorAt(t, "slice bound must be an integer"); }
                 Need(']', "expected ']'"); address = NewNode(N_SLICE, t); address->a = n; if (kind == A_ARRAY) address->a = AggregateAddress(n);

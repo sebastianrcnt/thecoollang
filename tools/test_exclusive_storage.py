@@ -75,10 +75,12 @@ WHOLE=[
  ('fn bad(a:&i64,b:&mut i64)->Mixed borrows(a){return create(a,b);}fn main(){}','outlive'),
  ('fn main(){let v=[2]&mut i64{};}','explicit initializer'),
  ('fn main(){var x=1;let a=[2]&mut i64{&mut x,&mut x};}','conflicts'),
- ('fn main(){var a=1;var b=2;let v=create(&a,&mut b);let h=new[&Mixed](&v);}','owned storage'),
  ('fn main(){var a=1;let o=optional(&mut a);let c=o;match(o){Maybe.None=>{}Maybe.Some(r)=>{*r=2;}}}','conflicts'),
 ]
 def run(command):return subprocess.run([str(x) for x in command],cwd=ROOT,text=True,capture_output=True,timeout=120)
+SUPPORTED_NESTED = [
+ 'fn main(){var a=1;var b=2;let v=create(&a,&mut b);let h=new[&Mixed](&v);}',
+]
 with tempfile.TemporaryDirectory(prefix='cool-exclusive-storage-') as tmp:
  source=Path(tmp)/'main.cool';source.write_text(POSITIVE)
  for front in FRONTS:
@@ -111,3 +113,12 @@ with tempfile.TemporaryDirectory(prefix='cool-exclusive-storage-') as tmp:
      queries+=1
  print(f'exclusive storage: {queries} independent per-root read/write permission queries on both frontends PASS')
 print(f'exclusive storage: mixed/generic/array/enum references, parent suspension/resumption, shared receivers and owning pointees; five engines/O2; {len(NEGATIVE)+len(WHOLE)} rejections on both frontends PASS')
+
+with tempfile.TemporaryDirectory(prefix='cool-enabled-nested-') as enabled_tmp:
+ enabled_source=Path(enabled_tmp)/'main.cool'
+ for code in SUPPORTED_NESTED:
+  enabled_source.write_text(PRELUDE+code if 'PRELUDE' in globals() else code)
+  for front in FRONTS:
+   result=run([*front,'check',enabled_source]);assert result.returncode==0,(code,result)
+   result=run([*front,'run',enabled_source]);assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(code,result)
+print(f'nested storage: {len(SUPPORTED_NESTED)} former restrictions accepted and executed on both frontends PASS')

@@ -52,11 +52,13 @@ NEGATIVE += [
  ('fn bad(v:View)->&View borrows(v){return &v;}fn main(){}','outlive'),
  ('fn bad(a:&i64,b:&i64)->&i64 borrows(a,b){let v=create(a,b);return v.get();}fn main(){}','outlive'),
  ('fn bad(v:&View)->&mut View borrows(v){return &mut *v;}fn main(){}','mutable place'),
- ('fn bad(v:&[][]i64){}fn main(){}','nested borrowed'),
- ('fn main(){var a=[2]i64{1,2};var s=a[:];let p=&s;let q=&p;}','nested borrowed'),
- ('fn bad(p:&mut &mut &mut i64){}fn main(){}','nested borrowed'),
 ]
 def run(args):return subprocess.run([str(x) for x in args],cwd=ROOT,text=True,capture_output=True,timeout=120)
+SUPPORTED_NESTED = [
+ 'fn bad(v:&[][]i64){}fn main(){}',
+ 'fn main(){var a=[2]i64{1,2};var s=a[:];let p=&s;let q=&p;}',
+ 'fn bad(p:&mut &mut &mut i64){}fn main(){}',
+]
 with tempfile.TemporaryDirectory(prefix='cool-nested-refs-') as tmp:
  source=Path(tmp)/'main.cool';source.write_text(POSITIVE)
  for front in FRONTS:
@@ -70,3 +72,12 @@ with tempfile.TemporaryDirectory(prefix='cool-nested-refs-') as tmp:
   for front in FRONTS:
    p=run([*front,'check',source]);assert p.returncode==2 and error in p.stderr,(body,error,p)
 print(f'nested shared storage: receiver mutation, reborrows, arrays, owners and scope release; five engines/O2 and {len(NEGATIVE)} rejections on both frontends PASS')
+
+with tempfile.TemporaryDirectory(prefix='cool-enabled-nested-') as enabled_tmp:
+ enabled_source=Path(enabled_tmp)/'main.cool'
+ for code in SUPPORTED_NESTED:
+  enabled_source.write_text(PRELUDE+code if 'PRELUDE' in globals() else code)
+  for front in FRONTS:
+   result=run([*front,'check',enabled_source]);assert result.returncode==0,(code,result)
+   result=run([*front,'run',enabled_source]);assert (result.returncode,result.stdout,result.stderr)==(0,'',''),(code,result)
+print(f'nested storage: {len(SUPPORTED_NESTED)} former restrictions accepted and executed on both frontends PASS')

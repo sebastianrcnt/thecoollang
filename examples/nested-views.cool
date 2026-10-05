@@ -1,0 +1,34 @@
+import "std/io";
+
+// A shared matrix view protects both its descriptors and their backing rows.
+fn sum(rows: &[][]i64) -> i64 {
+    var total = 0;
+    for (var i: usize = 0; i < len(*rows); i = i + 1) {
+        let row = &(*rows)[i];
+        for (var j: usize = 0; j < len(*row); j = j + 1) {
+            total = total + (*row)[j];
+        }
+    }
+    return total;
+}
+
+fn first_row(rows: &[][]i64) -> &[]i64 borrows(rows) {
+    return &(*rows)[0];
+}
+
+fn main() {
+    var first = [3]i64{1, 2, 3};
+    var second = [3]i64{4, 5, 6};
+    var total = 0;
+    {
+        var descriptors = [2][]i64{first[:], second[:]};
+        let matrix = descriptors[:];
+        let shared = &matrix;
+        total = sum(shared);
+        assert((*first_row(shared))[2] == 3);
+    }
+    // Ending the views' scope releases both backing rows for reuse.
+    first[0] = 7;
+    assert(total == 21 && first[0] == 7);
+    io.println(total);
+}
