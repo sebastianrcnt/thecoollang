@@ -1046,3 +1046,25 @@ allocation balance after every query and arena destruction, including repeated
 destruction. Instrumented state visits and membership comparisons distinguish
 bounded traversal from the initial linear-list deduplication cost. These checks
 do not prove scoped loan substitution or arbitrary nested borrowing.
+
+
+## Graph copy ownership and rollback
+
+`ProvenanceGraphCopyRoots` uses a single source-node identity map across every
+root of one copy operation. Copies register target nodes before traversing edges,
+so cycles and sharing survive. Source node type IDs alone never identify copies.
+The source/output buffers must not overlap; duplicate and null roots are preserved.
+Copies within one arena create fresh nodes without following its allocation list.
+
+Insertion failure restores the saved destination allocation-list head, frees
+only new nodes/edges and every scratch mapping, and clears output roots. Existing
+destination nodes and source graphs remain unchanged. Negative/overflowing counts and overlapping or null buffers
+return false before mutation. The single-root wrapper diagnoses a failed copy
+after cleanup. Borrowed Local/type/field metadata is not cloned or pinned by this
+operation; REPL staging still needs descriptor and loan lifetime integration.
+
+The copied-graph oracle destroys its original arena before root selection, checks
+exact node/edge counts after two joint copies, duplicate/null roots and failed
+copy rollback, and measures graph allocation balance at each query/destruction.
+Neither copy nor query has a linear performance claim: source mapping currently
+uses list lookup.

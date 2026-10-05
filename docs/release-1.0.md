@@ -1673,6 +1673,35 @@ through ordinary evaluation or library use.
   contract substitution, live stored-receiver updates and arbitrary nested
   borrowed-storage acceptance remain mandatory. All release gates remain Open.
 
+- Provenance arena copy and rollback: `ProvenanceGraphCopyRoots` copies a
+  complete root batch through one source-node identity map. Shared nodes, cycles
+  and duplicate/null roots survive cross-arena and same-arena copying. Copies
+  own every new node/edge and borrow Local/type/declaration identities. Failed
+  insertion frees scratch mappings and newly allocated destination nodes/edges,
+  restores the previous arena head and clears outputs. Invalid counts or null/
+  overlapping buffers are rejected before mutation. The single-root wrapper
+  diagnoses failure only after cleanup.
+
+  The independent graph audit performs two joint copies, destroys the original
+  arena and compares 201,624 payload queries across 34 graph/order variants per
+  frontend. Exact copied node/edge counts verify preservation of sharing; checks
+  include duplicate/null roots, partial buffer overlap, malformed edge insertion
+  rollback and allocation balance after every query/destruction. Production,
+  legacy and sanitizer frontends pass, with generated LLVM ASan loads/stores and
+  host/runtime ASan/UBSan. Full regression, self-hosted IR/native convergence and
+  external editor/distribution installation pass. Reports:
+  `build/provenance-copy{,-legacy,-asan}-audit.json`. Evidence:
+  `build/release-audit/provenance-copy-{final-build,final-focused,regression,final-sanitize,selfhost,final-distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `c97110dff7e6ff30e9ac8049ff5c7c2f4ce97f417b565ac71634943fb099b6c1`.
+
+  This provides arena transfer required for REPL staging; it has not yet
+  replaced the existing shallow loan transaction or connected field graphs to
+  scoped loans. Descriptor pinning, physical protection, contract substitution
+  and arbitrary nested borrowed-storage acceptance remain required. Source-map
+  lookup is currently linear and no whole-compiler speed claim is made. All
+  release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

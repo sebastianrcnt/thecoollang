@@ -74,6 +74,16 @@ marks, and free every query state even after early success. Visits are keyed by
 terminate. Arena destruction visits owned allocation lists rather than target
 edges, safely handling cycles/shared targets and repeated destruction.
 
+`ProvenanceGraphCopyRoots` copies all supplied reachable roots with one
+source-node identity map, preserving cycles, shared targets and duplicate/null
+roots. Input and output buffers must not overlap. Single-root copying is a
+wrapper over this batch operation. Cross-arena and same-arena copying both
+create independent nodes. Failed edge insertion frees the scratch map, removes
+only newly allocated destination nodes/edges, restores the previous arena head
+and clears output roots. Local/type/declaration metadata remains borrowed.
+Independent tests destroy the source arena before querying copied graphs,
+compare copied node/edge counts and check malformed-copy rollback.
+
 This module is not yet installed in `ReferenceLoan`. Payload selection is not
 physical prefix overlap, and graph ownership does not pin type/field descriptors.
 Persistent transaction ownership, call substitution, stored receiver updates and

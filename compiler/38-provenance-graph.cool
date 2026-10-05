@@ -144,3 +144,112 @@ fn ProvenanceQueryRoot(start: *ProvenanceNode, cursor: *ProvenanceCursor, root: 
         return found;
     }
 }
+
+// Copy reachable nodes into a destination arena before linking a substituted
+// value. Sharing and cycles survive through source-node identity, not type IDs.
+// Root Locals and declaration/type identities remain borrowed metadata.
+struct ProvenanceCopyState {
+    source: *ProvenanceNode;
+    target: *ProvenanceNode;
+    next: *ProvenanceCopyState;
+}
+fn ProvenanceCopyFind(head: *ProvenanceCopyState, source: *ProvenanceNode) -> *ProvenanceCopyState {
+    unsafe {
+        var state = head;
+        while (state != null) {
+            if (state.source == source) { return state; }
+            state = state.next;
+        }
+        return null;
+    }
+}
+fn ProvenanceCopyNew(graph: *ProvenanceGraph, source: *ProvenanceNode) -> *ProvenanceCopyState {
+    unsafe {
+        let state = cast[*ProvenanceCopyState](CAlloc(i64(sizeof(ProvenanceCopyState))));
+        state.source = source;
+        state.target = ProvenanceNodeNew(graph, source.type, source.root, source.exclusive);
+        return state;
+    }
+}
+// One map spans every supplied root, preserving sharing between loans.
+// Failed insertion rolls back only allocations made by this copy operation.
+fn ProvenanceGraphCopyRoots(graph: *ProvenanceGraph, sources: **ProvenanceNode, targets: **ProvenanceNode, count: i64) -> bool {
+    unsafe {
+        if (count < 0 || count > 1152921504606846975) { return false; }
+        if (count > 0) {
+            if (sources == null || targets == null) { return false; }
+            let input = cast[i64](sources);
+            let output = cast[i64](targets);
+            let span = count * 8;
+            if ((input <= output && output - input < span) || (output < input && input - output < span)) { return false; }
+        }
+        let before = graph.nodes;
+        var first: *ProvenanceCopyState = null;
+        var tail: *ProvenanceCopyState = null;
+        for (var index: i64 = 0; index < count; index = index + 1) {
+            targets[index] = null;
+            if (sources[index] != null) {
+                var mapped = ProvenanceCopyFind(first, sources[index]);
+                if (mapped == null) {
+                    mapped = ProvenanceCopyNew(graph, sources[index]);
+                    if (tail == null) { first = mapped; } else { tail.next = mapped; }
+                    tail = mapped;
+                }
+                targets[index] = mapped.target;
+            }
+        }
+        var current = first;
+        var valid = true;
+        while (current != null && valid) {
+            var edge = current.source.edges;
+            while (edge != null && valid) {
+                var target: *ProvenanceNode = null;
+                if (edge.target != null) {
+                    var mapped = ProvenanceCopyFind(first, edge.target);
+                    if (mapped == null) {
+                        mapped = ProvenanceCopyNew(graph, edge.target);
+                        tail.next = mapped;
+                        tail = mapped;
+                    }
+                    target = mapped.target;
+                }
+                valid = ProvenanceEdgeNew(current.target, edge.kind, edge.key, target, edge.exclusive);
+                edge = edge.next;
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) {
+            let next = current.next;
+            Free(cast[*u8](current));
+            current = next;
+        }
+        if (!valid) {
+            var node = graph.nodes;
+            graph.nodes = before;
+            while (node != before) {
+                let next = node.next;
+                var edge = node.edges;
+                while (edge != null) {
+                    let following = edge.next;
+                    Free(cast[*u8](edge));
+                    edge = following;
+                }
+                Free(cast[*u8](node));
+                node = next;
+            }
+            for (var index: i64 = 0; index < count; index = index + 1) { targets[index] = null; }
+        }
+        return valid;
+    }
+}
+fn ProvenanceGraphCopy(graph: *ProvenanceGraph, source: *ProvenanceNode) -> *ProvenanceNode {
+    unsafe {
+        var input = source;
+        var output: *ProvenanceNode = null;
+        if (!ProvenanceGraphCopyRoots(graph, &raw input, &raw output, 1)) {
+            Error(cast[*u8]("invalid internal provenance graph copy"));
+        }
+        return output;
+    }
+}
