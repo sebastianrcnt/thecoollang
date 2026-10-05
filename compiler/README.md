@@ -70,6 +70,7 @@ fingerprints, aliases, definitions and the lexical namespace participate in
 REPL rollback. Loaded package bodies cannot silently change under live callers.
 
 `31-template-syntax.cool` validates generic function signature grammar before
-specialization. It consumes type syntax without inventing concrete bindings or
-mutating type layouts; the normal signature parser still performs concrete
+specialization. It resolves nominal names, visibility and generic arity without
+inventing concrete bindings or mutating type layouts; the normal signature
+parser still performs concrete
 semantic checks after explicit type arguments are supplied.

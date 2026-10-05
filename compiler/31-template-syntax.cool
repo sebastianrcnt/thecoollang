@@ -1,18 +1,18 @@
 // Template signature grammar is checked even when no specialization is used.
-// Concrete name resolution, layout and ownership remain specialization checks.
-fn TemplateTypeSyntax(nesting: i64) {
+// Resolve nominal names and arity without constructing concrete layouts.
+fn TemplateTypeSyntax(function: *Function, nesting: i64) {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         if (nesting > 256) { Error(cast[*u8]("template type syntax nesting limit exceeded")); }
         if (Take(38) != i8(0)) {
             if (Is(cast[*u8]("mut")) != i8(0)) { ctx.v_pos = ctx.v_pos + 1; }
-            TemplateTypeSyntax(nesting + 1); return;
+            TemplateTypeSyntax(function, nesting + 1); return;
         }
-        if (Take(42) != i8(0)) { TemplateTypeSyntax(nesting + 1); return; }
+        if (Take(42) != i8(0)) { TemplateTypeSyntax(function, nesting + 1); return; }
         if (Is(cast[*u8]("own")) != i8(0)) {
             ctx.v_pos = ctx.v_pos + 1;
             Need(91, cast[*u8]("expected '[' after own"));
-            TemplateTypeSyntax(nesting + 1);
+            TemplateTypeSyntax(function, nesting + 1);
             Need(93, cast[*u8]("expected ']' after owned type")); return;
         }
         if (Take(91) != i8(0)) {
@@ -20,21 +20,22 @@ fn TemplateTypeSyntax(nesting: i64) {
                 Need(257, cast[*u8]("array length must be an integer literal"));
                 Need(93, cast[*u8]("expected ']'"));
             }
-            TemplateTypeSyntax(nesting + 1); return;
+            TemplateTypeSyntax(function, nesting + 1); return;
         }
-        Ident(); if (Take(46) != i8(0)) { Ident(); }
+        let expected = TemplateNamedArity(function);
+        var count: i64 = 0;
         if (Take(91) != i8(0)) {
-            var count: i64 = 0;
             while (true) {
                 if (count == 8) { Error(cast[*u8]("generic argument limit exceeded")); }
-                TemplateTypeSyntax(nesting + 1); count = count + 1;
+                TemplateTypeSyntax(function, nesting + 1); count = count + 1;
                 if (Take(44) == i8(0)) { break; }
             }
             Need(93, cast[*u8]("expected ']' after type arguments"));
         }
+        if (count != expected) { Error(cast[*u8]("wrong generic argument count")); }
     }
 }
-fn TemplateSignatureSyntax() {
+fn TemplateSignatureSyntax(function: *Function) {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
         var names: [32]*u8 = [32]*u8{};
@@ -48,12 +49,12 @@ fn TemplateSignatureSyntax() {
                     if (Eq(names[i], name) != i8(0)) { Error(cast[*u8]("duplicate parameter name")); }
                 }
                 names[count] = name; count = count + 1;
-                Need(58, cast[*u8]("expected ':' after parameter")); TemplateTypeSyntax(0);
+                Need(58, cast[*u8]("expected ':' after parameter")); TemplateTypeSyntax(function, 0);
                 if (Take(44) == i8(0)) { break; }
             }
             Need(41, cast[*u8]("expected ')'"));
         }
-        if (Take(265) != i8(0)) { TemplateTypeSyntax(0); }
+        if (Take(265) != i8(0)) { TemplateTypeSyntax(function, 0); }
         if (Is(cast[*u8]("borrows")) != i8(0)) {
             ctx.v_pos = ctx.v_pos + 1;
             Need(40, cast[*u8]("expected '(' after borrows"));
@@ -71,5 +72,25 @@ fn TemplateSignatureSyntax() {
             }
         }
         if (At().kind != 123) { Error(cast[*u8]("expected function body after signature")); }
+    }
+}
+
+fn TemplateNamedArity(function: *Function) -> i64 {
+    unsafe {
+        let token = At(); var name = Ident(); var package = token.package;
+        for (var i: i64 = 0; i < function.generic_count; i = i + 1) {
+            if (Eq(name, function.generic_names[i]) != i8(0)) { return 0; }
+        }
+        if (TypeName(name) >= 0) { return 0; }
+        if (FindType(package, name) < 0 && Take(46) != i8(0)) {
+            package = ResolveAlias(token, name); name = Ident();
+        }
+        let type = FindType(package, name);
+        if (type < 0) { ErrorAt(token, cast[*u8]("unsupported or unknown type")); }
+        if (Eq(package, token.package) == i8(0) && Shape(type).public == i8(0)) {
+            ErrorAt(token, cast[*u8]("type is private to its package"));
+        }
+        EditorTypeReference(name, type);
+        return Shape(type).generic_count;
     }
 }

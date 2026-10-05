@@ -1085,6 +1085,24 @@ through ordinary evaluation or library use.
   This preflight does not discharge concrete type resolution, unused template
   body/layout validation or the remaining G1/G4 requirements.
 
+- Non-dependent template signature types: draft 14 extends declaration-time
+  checking to unknown nominal names, imported type visibility and exact nominal
+  type argument counts. Type parameters take precedence over builtin spellings,
+  consistent with specialization; forward nominal declarations remain available.
+  Both frontend implementations reuse collected names/imports and record editor
+  references without allocating instantiated types or forcing layouts. The
+  declaration suite now covers 17 valid cases and 75 rejections, plus four
+  bundled-package visibility/arity cases and transactional REPL recovery. Both
+  normal frontends and the ASan compiler pass. Full regression, self-host/bootstrap
+  convergence and installed distribution/Neovim checks pass. Evidence:
+  `build/release-audit/template-names-{build,focused,final,regression,sanitize,distribution}.log`.
+  IR SHA256: `1d7ca81f519e371f86f2bcab37c016b04cf525b04a92f3cde550dcb4be38cfda`.
+  Further probes still accept unused templates with void parameters/elements,
+  oversized arrays and malformed body expressions (recorded in
+  `build/release-audit/template-names-remaining.log`). These are follow-up defects,
+  alongside concrete layout/borrow semantics and unused generic bodies; this
+  change does not close G1/G4 or the other mandatory release gates.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

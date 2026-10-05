@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 13
+# Cool language specification — 1.0 draft 14
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -168,15 +168,19 @@ Current checked implementation limits include eight generic parameters/arguments
 512 KiB. These are resource limits, not permission to accept malformed syntax.
 Generic function signature syntax, unique parameter names, parameter/type-argument
 counts and names in borrow contracts are checked when declared, including unused
-templates. Template signature type syntax is limited to 256 nested type operators
-or argument lists. Concrete type resolution, layout, borrowed-result contracts
+templates. Signature type names resolve to a type parameter, builtin or declared
+nominal type; qualified names respect per-file imports and public visibility.
+Nominal type argument counts are checked without constructing concrete layouts.
+Type names declared later in the package are available. Template signature type syntax is limited to 256 nested type operators
+or argument lists. Concrete type substitution, layout, borrowed-result contracts
 and body semantics are still checked on instantiation. Complete validation of
 unused templates remains release work.
 
-`make declarations-test` covers 15 valid declaration/type/boundary cases and
-64 rejections, including duplicate extern/ordinary/export/unused-generic
+`make declarations-test` covers 17 valid declaration/type/boundary cases and
+75 rejections, including duplicate extern/ordinary/export/unused-generic
 parameters, duplicate nominal members, malformed template signatures, invalid C
-signatures, method owners, borrow contracts and implementation limits. REPL
+signatures, method owners, borrow contracts and implementation limits. Four
+additional bundle cases check qualified type visibility and argument counts. REPL
 recovery also verifies that a rejected template does not reserve its name or
 change existing values, on both frontends.
 The wider package/method/reference suites cover visibility and lifetime behavior.

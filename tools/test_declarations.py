@@ -28,6 +28,10 @@ valid += [
  'fn f[T](x:&T)->&T borrows(x){return x;}fn main(){let n=1;let r=f[i64](&n);}',
  'fn f[T]('+','.join(f'p{i}:T' for i in range(32))+'){}fn main(){}',
 ]
+valid += [
+ 'fn f[T](x:Later[T]){}struct Later[T]{value:T;}fn main(){}',
+ 'fn f[i64](x:i64)->i64{return x;}fn main(){f[u8](u8(1));}',
+]
 duplicates=[
  'extern "C" fn f(x:i64,x:i64);fn main(){}',
  'extern "C" fn f(x:i64,x:f64);fn main(){}',
@@ -70,7 +74,20 @@ template_invalid=[
  'fn f[T](x:G['+','.join('T' for _ in range(9))+']){}',
  'fn f[T](x:'+'*'*258+'T){}',
 ]
-invalid += [program+'fn main(){}' for program in template_invalid]
+invalid += [
+ 'fn f[T](x:Missing){}fn main(){}',
+ 'fn f[T]()->Missing{}fn main(){}',
+ 'fn f[T](x:own[Missing]){}fn main(){}',
+ 'fn f[T](x:T[i64]){}fn main(){}',
+ 'fn f[T](x:i64[T]){}fn main(){}',
+ 'struct G[A,B]{}fn f[T](x:G[T]){}fn main(){}',
+ 'struct G[A]{}fn f[T](x:G[T,T]){}fn main(){}',
+ 'struct G[A]{}fn f[T](x:G){}fn main(){}',
+ 'struct G{}fn f[T](x:G[T]){}fn main(){}',
+ 'struct G[A]{}fn f[T](x:G[Missing]){}fn main(){}',
+ 'fn f[T](x:missing.Type){}fn main(){}',
+]
+invalid += [('struct G[A]{}' if '(x:G' in program else '')+program+'fn main(){}' for program in template_invalid]
 env={**os.environ,'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
 with tempfile.TemporaryDirectory(prefix='cool declarations ') as temporary:
  source=Path(temporary)/'main.cool'
@@ -82,6 +99,13 @@ with tempfile.TemporaryDirectory(prefix='cool declarations ') as temporary:
    source.write_text(program);r=subprocess.run([*frontend,'check',source],capture_output=True,text=True,env=env,timeout=30)
    assert r.returncode==2,(frontend,program,r)
    if program in duplicates:assert 'duplicate parameter name' in r.stderr,r
+  library=Path(temporary)/'library.cool';manifest=Path(temporary)/'sources.list'
+  library.write_text('package library;pub struct Public[T]{pub value:T;}struct Private{}')
+  manifest.write_text('__main\t'+str(source)+'\nlib\t'+str(library)+'\n')
+  for spelling,expected in [('lib.Public[T]',0),('lib.Private',2),('lib.Public[T,T]',2),('lib.Absent',2)]:
+   source.write_text('package main;import "lib";fn unused[T](x:'+spelling+'){}fn main(){}')
+   r=subprocess.run([*frontend,'check-bundle',manifest],capture_output=True,text=True,env=env,timeout=30)
+   assert r.returncode==expected,(frontend,spelling,r)
   recovery='var kept=7;\nfn retry[T](x:T,x:T){}\nfn retry[T](x:T)->T{return move x;}\nretry[i64](kept)\n:quit\n'
   r=subprocess.run([*frontend,'repl-quiet'],input=recovery,capture_output=True,text=True,env=env,timeout=30)
   assert r.returncode==0 and r.stdout=='7\n' and r.stderr.count('error:')==1 and 'duplicate parameter name' in r.stderr,r

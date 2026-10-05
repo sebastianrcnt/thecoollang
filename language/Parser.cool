@@ -436,25 +436,37 @@ Bool Returns(Node *n) {
     if (n->kind == N_BLOCK) { n = n->a; while (n) { if (Returns(n)) return TRUE; n = n->next; } }
     return FALSE;
 }
+I64 TemplateNamedArity(Function *f) {
+    Token *token=At(); U8 *name=Ident(), *package=token->package; I64 i,type;
+    for(i=0;i<f->generic_count;i++)if(Eq(name,f->generic_names[i]))return 0;
+    if(TypeName(name)>=0)return 0;
+    if(FindType(package,name)<0 && Take('.')){package=ResolveAlias(token,name);name=Ident();}
+    type=FindType(package,name);
+    if(type<0)ErrorAt(token,"unsupported or unknown type");
+    if(!Eq(package,token->package) && !Shape(type)->public)ErrorAt(token,"type is private to its package");
+    EditorTypeReference(name,type);
+    return Shape(type)->generic_count;
+}
 // Validate template signature grammar without inventing concrete type arguments.
-// Resolution, layout and ownership checks still run during specialization.
-U0 TemplateTypeSyntax(I64 nesting) {
-    I64 count = 0;
+// Nominal names and arity do not require concrete layouts or type bindings.
+U0 TemplateTypeSyntax(Function *f, I64 nesting) {
+    I64 count = 0, expected;
     if (nesting > 256) Error("template type syntax nesting limit exceeded");
-    if (Take('&')) { if (Is("mut")) pos++; TemplateTypeSyntax(nesting+1); return; }
-    if (Take('*')) { TemplateTypeSyntax(nesting+1); return; }
-    if (Is("own")) { pos++; Need('[', "expected '[' after own"); TemplateTypeSyntax(nesting+1); Need(']', "expected ']' after owned type"); return; }
+    if (Take('&')) { if (Is("mut")) pos++; TemplateTypeSyntax(f,nesting+1); return; }
+    if (Take('*')) { TemplateTypeSyntax(f,nesting+1); return; }
+    if (Is("own")) { pos++; Need('[', "expected '[' after own"); TemplateTypeSyntax(f,nesting+1); Need(']', "expected ']' after owned type"); return; }
     if (Take('[')) {
         if (!Take(']')) { Need(K_INT, "array length must be an integer literal"); Need(']', "expected ']'"); }
-        TemplateTypeSyntax(nesting+1); return;
+        TemplateTypeSyntax(f,nesting+1); return;
     }
-    Ident(); if (Take('.')) Ident();
+    expected = TemplateNamedArity(f);
     if (Take('[')) {
-        do { if (count == 8) Error("generic argument limit exceeded"); TemplateTypeSyntax(nesting+1); count++; } while (Take(','));
+        do { if (count == 8) Error("generic argument limit exceeded"); TemplateTypeSyntax(f,nesting+1); count++; } while (Take(','));
         Need(']', "expected ']' after type arguments");
     }
+    if (count != expected) Error("wrong generic argument count");
 }
-U0 TemplateSignatureSyntax() {
+U0 TemplateSignatureSyntax(Function *f) {
     U8 *names[32], *name; I64 count = 0, i;
     Need('(', "expected '(' after function name");
     if (!Take(')')) {
@@ -462,11 +474,11 @@ U0 TemplateSignatureSyntax() {
             if (count == 32) Error("function argument limit exceeded");
             name = Ident();
             for (i = 0; i < count; i++) if (Eq(names[i], name)) Error("duplicate parameter name");
-            names[count++] = name; Need(':', "expected ':' after parameter"); TemplateTypeSyntax(0);
+            names[count++] = name; Need(':', "expected ':' after parameter"); TemplateTypeSyntax(f,0);
         } while (Take(','));
         Need(')', "expected ')'");
     }
-    if (Take(K_ARROW)) TemplateTypeSyntax(0);
+    if (Take(K_ARROW)) TemplateTypeSyntax(f,0);
     if (Is("borrows")) {
         pos++; Need('(', "expected '(' after borrows");
         if (!Take(')')) {
@@ -551,7 +563,7 @@ U0 ParseProgram() {
             f->foreign = foreign; f->exported = exported; f->name = name; f->package = At()->package; f->public = public; f->token = At();
             if (old && (old->generic_count || At()->kind == '[')) Error("generic redefinition requires a new session");
             f->generic_count = GenericNames(f->generic_names); ValidateMethodTemplate(f); f->signature = pos;
-            if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); TemplateSignatureSyntax(); }
+            if (f->generic_count) { if (foreign || exported) Error("C ABI functions cannot be generic"); TemplateSignatureSyntax(f); }
             else FunctionSignature(f);
             if (old) {
                 if(old->foreign!=f->foreign || old->exported!=f->exported)ErrorAt(f->token,"C ABI change requires a new session");

@@ -5125,7 +5125,7 @@ if (((v_f9).generic_count != i64(0))) { pc = 110; } else { pc = 112; }
 continue;
 }
 if (pc == 108) {
-TemplateSignatureSyntax();
+TemplateSignatureSyntax(v_f9);
 pc = 99;
 continue;
 }

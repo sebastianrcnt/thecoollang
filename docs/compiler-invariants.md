@@ -657,5 +657,9 @@ The cursor stops immediately before the required opening body brace. It must
 not populate `Function.argc` or concrete argument types: specialization starts
 with a cleared `Function` and runs the full `FunctionSignature` parser after
 binding real type arguments. Keep both syntax implementations and the concrete
-parser aligned when changing type grammar. Name resolution, borrowed type
-semantics and generic bodies are not certified by the preflight.
+parser aligned when changing type grammar. `TemplateNamedArity` resolves type
+parameters before builtins, then nominal types, using the same alias/privacy
+rules as `ParseType`. `CollectTypes` has already gathered forward nominal names
+and imports. It records nominal editor references, but does not instantiate a
+type or compute a layout. Borrowed type semantics and generic bodies are not
+certified by the preflight.
