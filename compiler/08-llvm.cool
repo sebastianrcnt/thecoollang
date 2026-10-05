@@ -2504,740 +2504,133 @@ return;
 }
 
 
-fn EmitLLVM(arg_v_output: *u8) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_output: *u8 = arg_v_output;
-var v_i20: i64 = i64(0);
-var v_j8: i64 = i64(0);
-var v_k5: i64 = i64(0);
-var v_parameter2: i64 = i64(0);
-var v_offset2: i64 = i64(0);
-var v_main: i64 = i64(0);
-var v_f17: *Function = null;
-var v_all: *Text = null;
-var t0: *u8 = null;
-var t1: *u8 = null;
-var t2: *u8 = null;
-var t3: i64 = i64(0);
-var t4: i64 = i64(0);
-var t5: *Text = null;
-var t6: *u8 = null;
-var t7: *Text = null;
-var t8: *u8 = null;
-var t9: *Text = null;
-var t10: *u8 = null;
-var t11: i64 = i64(0);
-var t12: *u8 = null;
-var t13: i64 = i64(0);
-var t14: *Function = null;
-var t15: i64 = i64(0);
-var t16: *u8 = null;
-var t17: *u8 = null;
-var t18: *Function = null;
-var t19: *Node = null;
-var t20: i64 = i64(0);
-var t21: i64 = i64(0);
-var t22: i64 = i64(0);
-var t23: i64 = i64(0);
-var t24: i64 = i64(0);
-var t25: i64 = i64(0);
-var t26: i64 = i64(0);
-var t27: i64 = i64(0);
-var t28: *u8 = null;
-var t29: i64 = i64(0);
-var t30: *u8 = null;
-var t31: i64 = i64(0);
-var t32: *u8 = null;
-var t33: i64 = i64(0);
-var t34: i64 = i64(0);
-var t35: i64 = i64(0);
-var t36: i64 = i64(0);
-var t37: i8 = i8(0);
-var t38: *u8 = null;
-var t39: i64 = i64(0);
-var t40: *u8 = null;
-var t41: i64 = i64(0);
-var t42: *u8 = null;
-var t43: i64 = i64(0);
-var t44: bool = false;
-var t45: *u8 = null;
-var t46: i64 = i64(0);
-var t47: *u8 = null;
-var t48: i64 = i64(0);
-var t49: *u8 = null;
-var t50: i64 = i64(0);
-var t51: *u8 = null;
-var t52: i64 = i64(0);
-var t53: *u8 = null;
-var t54: *u8 = null;
-var t55: i64 = i64(0);
-var t56: *u8 = null;
-var t57: *u8 = null;
-var t58: i64 = i64(0);
-var t59: i64 = i64(0);
-var t60: *u8 = null;
-var t61: *u8 = null;
-var t62: bool = false;
-var t63: i64 = i64(0);
-var t64: i8 = i8(0);
-var t65: *u8 = null;
-var t66: i64 = i64(0);
-var t67: i8 = i8(0);
-var t68: *u8 = null;
-var t69: i64 = i64(0);
-var t70: *u8 = null;
-var t71: i64 = i64(0);
-var t72: *Function = null;
-var t73: i64 = i64(0);
-var t74: bool = false;
-var t75: *u8 = null;
-var t76: *u8 = null;
-var t77: i8 = i8(0);
-var t78: *u8 = null;
-var t79: *u8 = null;
-var t80: *u8 = null;
-var t81: *u8 = null;
-var t82: *u8 = null;
-var t83: *u8 = null;
-var t84: *u8 = null;
-var t85: *Text = null;
-var t86: *Text = null;
-var t87: *Token = null;
-var t88: *u8 = null;
-var t89: bool = false;
-var t90: bool = false;
-var t91: bool = false;
-var t92: bool = false;
-var t93: *u8 = null;
-var t94: *u8 = null;
-var t95: i64 = i64(0);
-var pc: i64 = 107;
-while (true) {
-if (pc == 1) {
-pc = 82;
-continue;
-}
-if (pc == 2) {
-pc = 15;
-continue;
-}
-if (pc == 3) {
-return;
-}
-if (pc == 4) {
-t1 = v_output;
-t2 = (v_all).data;
-t3 = (v_all).len;
-t4 = FileWrite(t1, t2, t3);
-if (!((t4 != i64(0)))) { pc = 5; } else { pc = 3; }
-continue;
-}
-if (pc == 5) {
-t0 = cast[*u8]("failed to write LLVM IR");
-Error(t0);
-pc = 3;
-continue;
-}
-if (pc == 6) {
-t5 = v_all;
-t6 = (ctx.v_ir).data;
-Append(t5, t6);
-pc = 4;
-continue;
-}
-if (pc == 7) {
-if (((ctx.v_globals).len != i64(0))) { pc = 8; } else { pc = 6; }
-continue;
-}
-if (pc == 8) {
-t7 = v_all;
-t8 = (ctx.v_globals).data;
-Append(t7, t8);
-pc = 6;
-continue;
-}
-if (pc == 9) {
-t9 = TextNew();
-v_all = t9;
-pc = 7;
-continue;
-}
-if (pc == 10) {
-t10 = cast[*u8]("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n");
-IR(t10);
-pc = 9;
-continue;
-}
-if (pc == 11) {
-t11 = v_main;
-RI(t11);
-pc = 10;
-continue;
-}
-if (pc == 12) {
-t12 = cast[*u8]("define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @cool_args_init(i32 %argc, ptr %argv)\n  %exit = call i64 @__cool_fn");
-IR(t12);
-pc = 11;
-continue;
-}
-if (pc == 13) {
-if ((v_i20 < ctx.v_nfun)) { pc = 77; } else { pc = 12; }
-continue;
-}
-if (pc == 14) {
-t13 = v_i20;
-v_i20 = v_i20 + i64(1);
-pc = 13;
-continue;
-}
-if (pc == 15) {
-pc = 14;
-continue;
-}
-if (pc == 16) {
-if (((v_f17).exported != i64(0))) { pc = 17; } else { pc = 2; }
-continue;
-}
-if (pc == 17) {
-t14 = v_f17;
-t15 = v_i20;
-ExportWrapper(t14, t15);
-pc = 2;
-continue;
-}
-if (pc == 18) {
-t16 = cast[*u8]("}\n");
-IR(t16);
-pc = 16;
-continue;
-}
-if (pc == 19) {
-if (!((ctx.v_terminated != i8(0)))) { pc = 20; } else { pc = 18; }
-continue;
-}
-if (pc == 20) {
-t17 = cast[*u8]("  ret i64 0\n");
-IR(t17);
-pc = 18;
-continue;
-}
-if (pc == 21) {
-if (((v_f17).foreign != i64(0))) { pc = 23; } else { pc = 24; }
-continue;
-}
-if (pc == 22) {
-ctx.v_terminated = i8(1);
-pc = 19;
-continue;
-}
-if (pc == 23) {
-t18 = v_f17;
-ForeignWrapper(t18);
-pc = 22;
-continue;
-}
-if (pc == 24) {
-t19 = (v_f17).body;
-EmitStmt(t19);
-pc = 19;
-continue;
-}
-if (pc == 25) {
-t44 = !(((v_f17).foreign != i64(0)));
-if (t44) {
-t44 = (v_j8 < (v_f17).argc);
-}
-if (t44) { pc = 41; } else { pc = 21; }
-continue;
-}
-if (pc == 26) {
-t20 = v_j8;
-v_j8 = v_j8 + i64(1);
-pc = 25;
-continue;
-}
-if (pc == 27) {
-t21 = (&raw ((v_f17).arg_types)[0])[v_j8];
-t22 = TypeSlots(t21);
-v_offset2 = v_offset2 + t22;
-pc = 26;
-continue;
-}
-if (pc == 28) {
-t36 = (&raw ((v_f17).arg_types)[0])[v_j8];
-t37 = Aggregate(t36);
-if ((t37 != i8(0))) { pc = 29; } else { pc = 35; }
-continue;
-}
-if (pc == 29) {
-t23 = v_offset2;
-t24 = SlotAddress(t23);
-t25 = t24;
-t26 = v_parameter2;
-t27 = (&raw ((v_f17).arg_types)[0])[v_j8];
-EmitCopy(t25, t26, t27);
-pc = 27;
-continue;
-}
-if (pc == 30) {
-t28 = cast[*u8]("\n");
-IR(t28);
-pc = 27;
-continue;
-}
-if (pc == 31) {
-t29 = v_offset2;
-RI(t29);
-pc = 30;
-continue;
-}
-if (pc == 32) {
-t30 = cast[*u8](", ptr %v");
-IR(t30);
-pc = 31;
-continue;
-}
-if (pc == 33) {
-t31 = v_parameter2;
-Reg(t31);
-pc = 32;
-continue;
-}
-if (pc == 34) {
-t32 = cast[*u8]("  store i64 ");
-IR(t32);
-pc = 33;
-continue;
-}
-if (pc == 35) {
-t33 = v_parameter2;
-t34 = (&raw ((v_f17).arg_types)[0])[v_j8];
-t35 = LocalWrite(t33, t34);
-v_parameter2 = t35;
-pc = 34;
-continue;
-}
-if (pc == 36) {
-t38 = cast[*u8]("\n");
-IR(t38);
-pc = 28;
-continue;
-}
-if (pc == 37) {
-t39 = v_j8;
-RI(t39);
-pc = 36;
-continue;
-}
-if (pc == 38) {
-t40 = cast[*u8](" = add i64 0, %a");
-IR(t40);
-pc = 37;
-continue;
-}
-if (pc == 39) {
-t41 = v_parameter2;
-Reg(t41);
-pc = 38;
-continue;
-}
-if (pc == 40) {
-t42 = cast[*u8]("  ");
-IR(t42);
-pc = 39;
-continue;
-}
-if (pc == 41) {
-t43 = Fresh();
-v_parameter2 = t43;
-pc = 40;
-continue;
-}
-if (pc == 42) {
-v_j8 = 0;
-pc = 25;
-continue;
-}
-if (pc == 43) {
-v_offset2 = 0;
-pc = 42;
-continue;
-}
-if (pc == 44) {
-if (((v_f17).drops != null)) { pc = 47; } else { pc = 43; }
-continue;
-}
-if (pc == 45) {
-t45 = cast[*u8](")\n");
-IR(t45);
-pc = 43;
-continue;
-}
-if (pc == 46) {
-t46 = (((v_f17).slots + 1) * 8);
-RI(t46);
-pc = 45;
-continue;
-}
-if (pc == 47) {
-t47 = cast[*u8]("  %frame_address = ptrtoint ptr %frame to i64\n  call void @cool_zero(i64 %frame_address, i64 ");
-IR(t47);
-pc = 46;
-continue;
-}
-if (pc == 48) {
-if ((v_j8 < (v_f17).slots)) { pc = 54; } else { pc = 44; }
-continue;
-}
-if (pc == 49) {
-t48 = v_j8;
-v_j8 = v_j8 + i64(1);
-pc = 48;
-continue;
-}
-if (pc == 50) {
-t49 = cast[*u8]("\n");
-IR(t49);
-pc = 49;
-continue;
-}
-if (pc == 51) {
-t50 = v_j8;
-RI(t50);
-pc = 50;
-continue;
-}
-if (pc == 52) {
-t51 = cast[*u8](" = getelementptr i64, ptr %frame, i64 ");
-IR(t51);
-pc = 51;
-continue;
-}
-if (pc == 53) {
-t52 = v_j8;
-RI(t52);
-pc = 52;
-continue;
-}
-if (pc == 54) {
-t53 = cast[*u8]("  %v");
-IR(t53);
-pc = 53;
-continue;
-}
-if (pc == 55) {
-v_j8 = 0;
-pc = 48;
-continue;
-}
-if (pc == 56) {
-t54 = cast[*u8](" x i64], align 8\n");
-IR(t54);
-pc = 55;
-continue;
-}
-if (pc == 57) {
-t55 = ((v_f17).slots + 1);
-RI(t55);
-pc = 56;
-continue;
-}
-if (pc == 58) {
-t56 = cast[*u8]("  %frame = alloca [");
-IR(t56);
-pc = 57;
-continue;
-}
-if (pc == 59) {
-t57 = cast[*u8](") {\nentry:\n");
-IR(t57);
-pc = 58;
-continue;
-}
-if (pc == 60) {
-if ((v_j8 < (v_f17).argc)) { pc = 64; } else { pc = 59; }
-continue;
-}
-if (pc == 61) {
-t58 = v_j8;
-v_j8 = v_j8 + i64(1);
-pc = 60;
-continue;
-}
-if (pc == 62) {
-t59 = v_j8;
-RI(t59);
-pc = 61;
-continue;
-}
-if (pc == 63) {
-t60 = cast[*u8]("i64 %a");
-IR(t60);
-pc = 62;
-continue;
-}
-if (pc == 64) {
-t62 = (v_j8 != i64(0));
-if (!t62) {
-t63 = (v_f17).result;
-t64 = Aggregate(t63);
-t62 = (i64(t64) != i64(0));
-}
-if (t62) { pc = 65; } else { pc = 63; }
-continue;
-}
-if (pc == 65) {
-t61 = cast[*u8](", ");
-IR(t61);
-pc = 63;
-continue;
-}
-if (pc == 66) {
-v_j8 = 0;
-pc = 60;
-continue;
-}
-if (pc == 67) {
-t66 = (v_f17).result;
-t67 = Aggregate(t66);
-if ((t67 != i8(0))) { pc = 68; } else { pc = 66; }
-continue;
-}
-if (pc == 68) {
-t65 = cast[*u8]("i64 %result");
-IR(t65);
-pc = 66;
-continue;
-}
-if (pc == 69) {
-t68 = cast[*u8]("(");
-IR(t68);
-pc = 67;
-continue;
-}
-if (pc == 70) {
-t69 = v_i20;
-RI(t69);
-pc = 69;
-continue;
-}
-if (pc == 71) {
-t70 = cast[*u8]("define i64 @__cool_fn");
-IR(t70);
-pc = 70;
-continue;
-}
-if (pc == 72) {
-ctx.v_scope = null;
-pc = 71;
-continue;
-}
-if (pc == 73) {
-ctx.v_terminated = i8(0);
-pc = 72;
-continue;
-}
-if (pc == 74) {
-ctx.v_reg_id = 0;
-pc = 73;
-continue;
-}
-if (pc == 75) {
-if (((v_f17).generic_count != i64(0))) { pc = 76; } else { pc = 74; }
-continue;
-}
-if (pc == 76) {
-pc = 2;
-continue;
-}
-if (pc == 77) {
-v_f17 = &raw ((ctx.v_functions)[v_i20]);
-pc = 75;
-continue;
-}
-if (pc == 78) {
-v_i20 = 0;
-pc = 13;
-continue;
-}
-if (pc == 79) {
-EmitDropFunctions();
-pc = 78;
-continue;
-}
-if (pc == 80) {
-if ((v_i20 < ctx.v_nfun)) { pc = 90; } else { pc = 79; }
-continue;
-}
-if (pc == 81) {
-t71 = v_i20;
-v_i20 = v_i20 + i64(1);
-pc = 80;
-continue;
-}
-if (pc == 82) {
-pc = 81;
-continue;
-}
-if (pc == 83) {
-if (((v_f17).foreign != i64(0))) { pc = 89; } else { pc = 1; }
-continue;
-}
-if (pc == 84) {
-t72 = v_f17;
-ForeignDeclaration(t72);
-pc = 1;
-continue;
-}
-if (pc == 85) {
-if ((v_k5 < v_i20)) { pc = 87; } else { pc = 84; }
-continue;
-}
-if (pc == 86) {
-t73 = v_k5;
-v_k5 = v_k5 + i64(1);
-pc = 85;
-continue;
-}
-if (pc == 87) {
-t74 = (((ctx.v_functions)[v_k5]).foreign != i64(0));
-if (t74) {
-t75 = ((ctx.v_functions)[v_k5]).name;
-t76 = (v_f17).name;
-t77 = Eq(t75, t76);
-t74 = (i64(t77) != i64(0));
-}
-if (t74) { pc = 88; } else { pc = 86; }
-continue;
-}
-if (pc == 88) {
-pc = 1;
-continue;
-}
-if (pc == 89) {
-v_k5 = 0;
-pc = 85;
-continue;
-}
-if (pc == 90) {
-v_f17 = &raw ((ctx.v_functions)[v_i20]);
-pc = 83;
-continue;
-}
-if (pc == 91) {
-v_i20 = 0;
-pc = 80;
-continue;
-}
-if (pc == 92) {
-t78 = cast[*u8]("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n");
-IR(t78);
-pc = 91;
-continue;
-}
-if (pc == 93) {
-t79 = cast[*u8]("declare i64 @cool_cast(i64, i64, i64)\n");
-IR(t79);
-pc = 92;
-continue;
-}
-if (pc == 94) {
-t80 = cast[*u8]("declare void @cool_args_init(i32, ptr)\n");
-IR(t80);
-pc = 93;
-continue;
-}
-if (pc == 95) {
-t81 = cast[*u8]("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n");
-IR(t81);
-pc = 94;
-continue;
-}
-if (pc == 96) {
-t82 = cast[*u8]("declare void @cool_zero(i64, i64)\ndeclare i64 @cool_length(i64, i64, i64)\ndeclare i64 @cool_index(i64, i64, i64, i64, i64)\ndeclare void @cool_slice(i64, i64, i64, i64, i64, i64, i64)\n");
-IR(t82);
-pc = 95;
-continue;
-}
-if (pc == 97) {
-t83 = cast[*u8]("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare void @cool_drop_enqueue(i64, ptr)\ndeclare void @cool_drop_defer_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n");
-IR(t83);
-pc = 96;
-continue;
-}
-if (pc == 98) {
-t84 = cast[*u8]("; Generated by the Cool-written frontend. No C transpilation.\n");
-IR(t84);
-pc = 97;
-continue;
-}
-if (pc == 99) {
-t85 = TextNew();
-ctx.v_globals = t85;
-pc = 98;
-continue;
-}
-if (pc == 100) {
-t86 = TextNew();
-ctx.v_ir = t86;
-pc = 99;
-continue;
-}
-if (pc == 101) {
-t89 = (((ctx.v_functions)[v_main]).generic_count != i64(0));
-if (!t89) {
-t89 = (((ctx.v_functions)[v_main]).argc != i64(0));
-}
-t90 = t89;
-if (!t90) {
-t91 = (((ctx.v_functions)[v_main]).result != 0);
-if (t91) {
-t91 = (((ctx.v_functions)[v_main]).result != 4);
-}
-t92 = t91;
-if (t92) {
-t92 = (((ctx.v_functions)[v_main]).result != 1);
-}
-t90 = t92;
-}
-if (t90) { pc = 102; } else { pc = 100; }
-continue;
-}
-if (pc == 102) {
-t87 = ((ctx.v_functions)[v_main]).token;
-t88 = cast[*u8]("invalid main signature");
-ErrorAt(t87, t88);
-pc = 100;
-continue;
-}
-if (pc == 103) {
-if ((v_main < 0)) { pc = 104; } else { pc = 101; }
-continue;
-}
-if (pc == 104) {
-t93 = cast[*u8]("no main function");
-Error(t93);
-pc = 101;
-continue;
-}
-if (pc == 105) {
-pc = 103;
-continue;
-}
-if (pc == 106) {
-pc = 105;
-continue;
-}
-if (pc == 107) {
-t94 = cast[*u8]("main");
-t95 = FindFun(t94);
-v_main = t95;
-pc = 106;
-continue;
-}
-}
-}
-return;
+// Emit the whole module: runtime declarations, foreign declarations, drop
+// functions, one body per non-generic function and the C main wrapper. Globals
+// and function IR are buffered separately and concatenated for the write.
+fn EmitLLVM(output: *u8) {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let main_id = FindFun(cast[*u8]("main"));
+        if (main_id < 0) {
+            Error(cast[*u8]("no main function"));
+        }
+        let main_fn = & raw(ctx.v_functions)[main_id];
+        if (main_fn.generic_count != 0 || main_fn.argc != 0 || (main_fn.result != 0 && main_fn.result != 4 && main_fn.result != 1)) {
+            ErrorAt(main_fn.token, cast[*u8]("invalid main signature"));
+        }
+        ctx.v_ir = TextNew();
+        ctx.v_globals = TextNew();
+        IR(cast[*u8]("; Generated by the Cool-written frontend. No C transpilation.\n"));
+        IR(cast[*u8]("declare i64 @cool_owner_alloc(i64)\ndeclare void @cool_owner_free(i64)\ndeclare void @cool_drop_enqueue(i64, ptr)\ndeclare void @cool_drop_defer_free(i64)\ndeclare i64 @cool_owner_count()\ndeclare i64 @cool_owner_address(i64)\n"));
+        IR(cast[*u8]("declare void @cool_zero(i64, i64)\ndeclare i64 @cool_length(i64, i64, i64)\ndeclare i64 @cool_index(i64, i64, i64, i64, i64)\ndeclare void @cool_slice(i64, i64, i64, i64, i64, i64, i64)\n"));
+        IR(cast[*u8]("declare i64 @cool_alloc(i64)\ndeclare void @cool_free(i64)\ndeclare void @cool_copy(i64, i64, i64)\ndeclare i64 @cool_load(i64, i64)\ndeclare void @cool_store(i64, i64, i64)\n"));
+        IR(cast[*u8]("declare void @cool_args_init(i32, ptr)\n"));
+        IR(cast[*u8]("declare i64 @cool_cast(i64, i64, i64)\n"));
+        IR(cast[*u8]("declare void @cool_print(i64, i64, i64)\ndeclare void @cool_assert(i64)\ndeclare i64 @cool_div(i64, i64, i64, i64, i64)\ndeclare i64 @cool_shift(i64, i64, i64, i64, i64)\n"));
+        var i: i64 = 0;
+        while (i < ctx.v_nfun) {
+            let f = & raw(ctx.v_functions)[i];
+            if (f.foreign != 0) {
+                var k: i64 = 0;
+                while (k < i && !(ctx.v_functions[k].foreign != 0 && Eq(ctx.v_functions[k].name, f.name) != i8(0))) {
+                    k = k + 1;
+                }
+                if (k == i) {
+                    ForeignDeclaration(f);
+                }
+            }
+            i = i + 1;
+        }
+        EmitDropFunctions();
+        i = 0;
+        while (i < ctx.v_nfun) {
+            let f = & raw(ctx.v_functions)[i];
+            if (f.generic_count == 0) {
+                ctx.v_reg_id = 0;
+                ctx.v_terminated = i8(0);
+                ctx.v_scope = null;
+                IR(cast[*u8]("define i64 @__cool_fn"));
+                RI(i);
+                IR(cast[*u8]("("));
+                if (Aggregate(f.result) != i8(0)) {
+                    IR(cast[*u8]("i64 %result"));
+                }
+                var j: i64 = 0;
+                while (j < f.argc) {
+                    if (j != 0 || Aggregate(f.result) != i8(0)) {
+                        IR(cast[*u8](", "));
+                    }
+                    IR(cast[*u8]("i64 %a"));
+                    RI(j);
+                    j = j + 1;
+                }
+                IR(cast[*u8](") {\nentry:\n"));
+                IR(cast[*u8]("  %frame = alloca ["));
+                RI(f.slots + 1);
+                IR(cast[*u8](" x i64], align 8\n"));
+                j = 0;
+                while (j < f.slots) {
+                    IR(cast[*u8]("  %v"));
+                    RI(j);
+                    IR(cast[*u8](" = getelementptr i64, ptr %frame, i64 "));
+                    RI(j);
+                    IR(cast[*u8]("\n"));
+                    j = j + 1;
+                }
+                if (f.drops != null) {
+                    IR(cast[*u8]("  %frame_address = ptrtoint ptr %frame to i64\n  call void @cool_zero(i64 %frame_address, i64 "));
+                    RI((f.slots + 1) * 8);
+                    IR(cast[*u8](")\n"));
+                }
+                var offset: i64 = 0;
+                j = 0;
+                while (f.foreign == 0 && j < f.argc) {
+                    var parameter = Fresh();
+                    IR(cast[*u8]("  "));
+                    Reg(parameter);
+                    IR(cast[*u8](" = add i64 0, %a"));
+                    RI(j);
+                    IR(cast[*u8]("\n"));
+                    if (Aggregate(f.arg_types[j]) != i8(0)) {
+                        EmitCopy(SlotAddress(offset), parameter, f.arg_types[j]);
+                    } else {
+                        parameter = LocalWrite(parameter, f.arg_types[j]);
+                        IR(cast[*u8]("  store i64 "));
+                        Reg(parameter);
+                        IR(cast[*u8](", ptr %v"));
+                        RI(offset);
+                        IR(cast[*u8]("\n"));
+                    }
+                    offset = offset + TypeSlots(f.arg_types[j]);
+                    j = j + 1;
+                }
+                if (f.foreign != 0) {
+                    ForeignWrapper(f);
+                    ctx.v_terminated = i8(1);
+                } else {
+                    EmitStmt(f.body);
+                }
+                if (ctx.v_terminated == i8(0)) {
+                    IR(cast[*u8]("  ret i64 0\n"));
+                }
+                IR(cast[*u8]("}\n"));
+                if (f.exported != 0) {
+                    ExportWrapper(f, i);
+                }
+            }
+            i = i + 1;
+        }
+        IR(cast[*u8]("define i32 @main(i32 %argc, ptr %argv) {\nentry:\n  call void @cool_args_init(i32 %argc, ptr %argv)\n  %exit = call i64 @__cool_fn"));
+        RI(main_id);
+        IR(cast[*u8]("()\n  %status = trunc i64 %exit to i32\n  ret i32 %status\n}\n"));
+        let all = TextNew();
+        if (ctx.v_globals.len != 0) {
+            Append(all, ctx.v_globals.data);
+        }
+        Append(all, ctx.v_ir.data);
+        if (FileWrite(output, all.data, all.len) == 0) {
+            Error(cast[*u8]("failed to write LLVM IR"));
+        }
+    }
 }
 

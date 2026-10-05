@@ -3179,6 +3179,20 @@ through ordinary evaluation or library use.
   (02-lexer, 08-llvm, 15-native) plus the parser's `ParseProgram`; G3's complete
   audit stays Open.
 
+- Compiler maintenance: `compiler/08-llvm.cool` no longer contains a generated
+  dispatch state machine. `EmitLLVM` is now a direct sequential lowering pass:
+  it declares the C runtime helpers, walks the parsed program emitting each
+  function and expression form in order, and finishes the module, replacing the
+  former numbered-state control flow with named loops and helpers. Behavior is
+  unchanged: the export, stdlib, ownership/loan, collection and LLVM backend
+  suites pass, the full `make -k -j4 test lsp-test bootstrap-check
+  editor-distribution-test` run plus the borrowed-vector/nested-reference/
+  stores/drop-depth/ownership-fuzz/aggregate-fuzz sanitizer targets exits 0
+  (`build/drop-depth/reg13.log`), and both bootstrap paths converge (self-host
+  IR SHA256 `b9357702d23c3ee8981116b1e22db47238bdb705327b57e0bb4058d0453f8ecb`).
+  Two modules still contain generated dispatch sections (02-lexer, 15-native)
+  plus the parser's `ParseProgram`; G3's complete audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
