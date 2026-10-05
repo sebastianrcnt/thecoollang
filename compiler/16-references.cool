@@ -365,7 +365,7 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
                         loan.exclusive = exclusive & loan.exclusive;
                         // A scalar projection may retain extra shared roots. Keep
                         // them conservatively rather than losing the anchor.
-                        if (!ReferenceLayered(expression.type)) {
+                        if (!ReferenceLayered(expression.type) && !((expression.kind == 3 || expression.kind == 18 || expression.kind == 29) && TrackedBorrow(expression.type) && !IsReference(expression.type))) {
                             loan.indirect = 0;
                         }
                         loan.expression = expression;

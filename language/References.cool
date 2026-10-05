@@ -121,7 +121,7 @@ U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *t
         if(exclusive)ReferenceRequireComputedAuthority(check,place,origin,expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE);
         for(source=check->loans;source;source=source->next)if(origin && !source->owner_pin && source->expression==origin && !source->holder && (!(expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) || !ReferenceLayered(origin->type) || ReferenceLayered(expression->type) || source->indirect)){
             if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");if(check->pending_owner)check->loans=ReferenceNewFrom(check,source,source->parent,exclusive & source->exclusive,source->indirect,expression,check->loans);else{if(ReferenceComputedGraph(check,source,place,origin,expression,exclusive)){source->exclusive=exclusive & source->exclusive;
-            if(!ReferenceLayered(expression->type))source->indirect=0;source->expression=expression;}}found=TRUE;
+            if(!ReferenceLayered(expression->type) && !((expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) && TrackedBorrow(expression->type) && !IsReference(expression->type)))source->indirect=0;source->expression=expression;}}found=TRUE;
         }
         if(!found)ErrorAt(token,"reference result requires a tracked root");return;
     }

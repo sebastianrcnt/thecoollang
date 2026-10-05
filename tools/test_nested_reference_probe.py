@@ -469,6 +469,33 @@ SLICE_CASES.extend([
 ])
 STORE_DIAGNOSTICS.update({'nested_owner_move_slot_return':'outlive','nested_owner_move_heap_address_return':'outlive','nested_owner_move_shared_payload_mutation':'cannot mutate or move through a shared reference'})
 
+
+relocation_types='struct View{r:&i64;}struct Carrier{p:own[&View];}enum Box{None;Some(own[&View]);}'
+for style,transport in [
+ ('field','var source=Carrier{p:move owner};let result=Carrier{p:move source.p};return (**result.p).r;'),
+ ('array','var source=[1]own[&View]{move owner};let result=Carrier{p:move source[0]};return (**result.p).r;'),
+ ('slice','var source=[1]own[&View]{move owner};var values=source[:];let result=Carrier{p:move values[0]};return (**result.p).r;'),
+ ('enum','let source=Box.Some(move owner);match(move source){Box.None=>{return x;}Box.Some(value)=>{let result=Carrier{p:move value};return (**result.p).r;}}'),
+]:
+    program=relocation_types+'fn get(x:&i64)->&i64 borrows(x){let view=View{r:x};let owner=new[&View](&view);'+transport+'}fn main(){var a=7;let r=get(&a);assert(*r==7);}'
+    SLICE_CASES.append(('nested_owner_relocation_'+style,'accept',program))
+SLICE_CASES.append(('nested_owner_relocation_shared_receiver','reject',relocation_types+'fn bad(source:&Carrier){let result=Carrier{p:move (*source).p};}fn main(){}'))
+STORE_DIAGNOSTICS['nested_owner_relocation_shared_receiver']='cannot mutate or move through a shared reference'
+
+SLICE_CASES.append(('nested_owner_relocation_computed_slice','accept','struct View{r:&i64;}struct Carrier{p:own[&View];}fn identity(s:[]Carrier)->[]Carrier borrows(s){return s;}fn get(x:&i64)->&i64 borrows(x){let view=View{r:x};let owner=new[&View](&view);var source=[1]Carrier{Carrier{p:move owner}};var values=source[:];let result=Carrier{p:move identity(values)[0].p};return (**result.p).r;}fn main(){var a=7;let r=get(&a);assert(*r==7);}'))
+
+SLICE_CASES.append(('nested_owner_relocation_computed_receiver','accept','struct View{r:&i64;}struct Carrier{p:own[&View];}fn receiver(s:&mut Carrier)->&mut Carrier borrows(s){return s;}fn get(x:&i64)->&i64 borrows(x){let view=View{r:x};let owner=new[&View](&view);var source=[1]Carrier{Carrier{p:move owner}};var values=source[:];let result=Carrier{p:move (*receiver(&mut values[0])).p};return (**result.p).r;}fn main(){var a=7;let r=get(&a);assert(*r==7);}'))
+
+SLICE_CASES.append(('nested_owner_relocation_computed_shared_receiver','reject','struct View{r:&i64;}struct Carrier{p:own[&View];}fn receiver(s:&Carrier)->&Carrier borrows(s){return s;}fn get(x:&i64)->&i64 borrows(x){let view=View{r:x};let owner=new[&View](&view);var source=[1]Carrier{Carrier{p:move owner}};var values=source[:];let result=Carrier{p:move (*receiver(&values[0])).p};return (**result.p).r;}fn main(){var a=7;let r=get(&a);assert(*r==7);}'))
+STORE_DIAGNOSTICS['nested_owner_relocation_computed_shared_receiver']='cannot mutate or move through a shared reference'
+SLICE_CASES.append(('nested_owner_relocation_local_payload','reject','struct View{r:&i64;}struct Carrier{p:own[&View];}fn receiver(s:&mut Carrier)->&mut Carrier borrows(s){return s;}fn get(x:&i64)->&i64 borrows(x){var local=9;let view=View{r:&local};let owner=new[&View](&view);var source=[1]Carrier{Carrier{p:move owner}};var values=source[:];let result=Carrier{p:move (*receiver(&mut values[0])).p};return (**result.p).r;}fn main(){var a=7;let r=get(&a);assert(*r==7);}'))
+STORE_DIAGNOSTICS['nested_owner_relocation_local_payload']='outlive'
+SLICE_CASES.append(('nested_owner_relocation_slot_escape','reject','struct View{r:&i64;}struct Carrier{p:own[&View];}fn receiver(s:&mut Carrier)->&mut Carrier borrows(s){return s;}fn get(x:&i64)->& &View borrows(x){let view=View{r:x};let owner=new[&View](&view);var source=[1]Carrier{Carrier{p:move owner}};var values=source[:];let result=Carrier{p:move (*receiver(&mut values[0])).p};return &*result.p;}fn main(){var a=7;let r=get(&a);}'))
+STORE_DIAGNOSTICS['nested_owner_relocation_slot_escape']='outlive'
+SLICE_CASES.append(('reference_identity_unused_local', 'accept', 'fn first(x:&i64,y:&i64)->&i64 borrows(x,y){return x;}fn get(x:&i64)->&i64 borrows(x){var local=9;return first(x,&local);}fn main(){var a=7;assert(*get(&a)==7);}'))
+SLICE_CASES.append(('reference_branch_local_union', 'reject', 'fn choose(c:bool,x:&i64,y:&i64)->&i64 borrows(x,y){if(c){return x;}else{return y;}}fn get(x:&i64)->&i64 borrows(x){var local=9;return choose(true,x,&local);}fn main(){}'))
+STORE_DIAGNOSTICS['reference_branch_local_union']='outlive'
+
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',
   '',
@@ -666,6 +693,8 @@ SLICE_REPL_CASES.extend([
 ])
 
 SLICE_REPL_CASES.append(('nested_owned_recursive_runtime_recovery','import "std/mem";\nstruct View{r:&i64;}\nstruct Node{kids:[]Node;payload:own[View];}\nfn set(dst:&mut Node,src:&i64) stores(dst,src){(*(*dst).payload).r=src;}\nvar a=7;\nvar b=9;\nvar none=[0]Node{};\nvar root=new[Node](Node{kids:none[:],payload:new[View](View{r:&a})});\n{set(&mut *root,&b);assert(false);}\n*(*(*root).payload).r\na=8;\nb=10;\n:forget root\na=8;\nb=10;\na\nb\nmem.owner_count()\n:forget none\n:quit\n','9\n8\n10\n0\n',{'assertion failed':1,'access conflicts with a live scoped reference':2}))
+
+SLICE_REPL_CASES.append(('reference_identity_revalidation_rollback', 'fn choose(x:&i64,y:&i64)->&i64 borrows(x,y){return x;}\nfn caller(x:&i64)->&i64 borrows(x){var b=9;return choose(x,&b);}\nvar a=7;\n*caller(&a)\nfn choose(x:&i64,y:&i64)->&i64 borrows(x,y){return y;}\n*caller(&a)\n:quit\n', '7\n7\n', {'returned borrow may outlive local storage or violate its borrows contract': 1}))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

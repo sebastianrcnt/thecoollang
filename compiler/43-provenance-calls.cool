@@ -1,4 +1,4 @@
-// Nonzero argument-origin masks for pure slice aliases and boolean branches.
+// Nonzero argument-origin masks for pure slice/reference aliases and branches.
 // Bounds never identify individual elements; -1 denotes an opaque body.
 struct SliceProjectionScan {
     function:*Function;tokens:*Token;position:i64;end:i64;
@@ -11,6 +11,7 @@ fn SliceProjectionValue(scan:*SliceProjectionScan)->i64 {unsafe{
     if(selected==scan.count || scan.origins[selected]<=0){return -1;}
     let origin=scan.origins[selected];scan.position=scan.position+1;
     if(scan.position<scan.end && scan.tokens[scan.position].kind==91){
+        if (IsReference(scan.function.result)) { return -1; }
         scan.position=scan.position+1;
         if(scan.position<scan.end && scan.tokens[scan.position].kind==257){scan.position=scan.position+1;}
         if(scan.position>=scan.end || scan.tokens[scan.position].kind!=58){return -1;}
@@ -71,7 +72,7 @@ fn SliceProjectionBlock(scan:*SliceProjectionScan)->i64 {unsafe{
 }}
 fn ReferenceSliceProjection(function:*Function)->i64 {unsafe{
     let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-    if(function.foreign!=0 || function.generic_count!=0 || function.store_destinations!=0 || AggregateKind(function.result)!=3 || function.argc>32){return -1;}
+    if(function.foreign!=0 || function.generic_count!=0 || function.store_destinations!=0 || (AggregateKind(function.result)!=3 && !IsReference(function.result)) || function.argc>32){return -1;}
     if(function.begin<0 || function.end>ctx.v_ntok || function.end-function.begin<5 || function.end-function.begin>512){return -1;}
     var names=[32]*u8{};var origins=[32]i64{};
     for(var i:i64=0;i<function.argc;i=i+1){names[i]=function.arg_names[i];origins[i]=-1;if(function.arg_types[i]==function.result && (function.borrow_contract&(1<<i))!=0){origins[i]=1<<i;}}

@@ -951,3 +951,20 @@ production and seed source copies, without removing feature guards. They verify
 positive execution, required negative diagnostics, persistent REPL rollback and
 tracked allocation histories; sanitizer targets instrument the production
 frontend. This coverage does not close the whole 1.0 safety gate.
+
+
+### Relocation and pure reference calls
+
+An owner containing scoped references can move through fields, arrays, slices
+and computed receivers while retaining its external payload lifetimes. Copying
+its external payload and returning an address into local owner storage remain
+distinct operations. Intermediate descriptor/referent storage protects the
+operation but does not automatically become an origin of a selected copied
+value; imprecise graphs retain conservative roots.
+
+Pure same-type reference parameter returns and aliases now use the bounded
+origin proof described in specification draft 33, including pure boolean branch
+unions. This permits a returned value to exclude an unused contracted argument.
+Changing that proven origin set in a REPL rechecks retained callers and rolls
+back an unsafe replacement. Argument evaluation still protects every argument,
+and shared paths cannot move or mutate owned storage.

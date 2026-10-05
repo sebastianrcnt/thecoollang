@@ -94,7 +94,7 @@ fn ReferenceSelectGraphMode(check: *ReferenceCheck, source: *ReferenceLoan, path
                 if (node.type == type) { ReferenceSelectionJoin(check, &raw result, node, current.exclusive); }
                 else { ReferenceSelectFallback(check, &raw result, source.root, current.exclusive & root_mode); }
             } else {
-                if (node.opaque != 0 || node.type != cursor.type || (node.root != null && !(copy_value && cursor.kind == 2 && ReferenceBorrowedSlice(node.type)))) {
+                if (node.opaque != 0 || node.type != cursor.type || (node.root != null && !(copy_value && ((cursor.kind == 2 && ReferenceBorrowedSlice(node.type)) || (cursor.kind == 3 && IsReference(node.type)))))) {
                     ReferenceSelectFallback(check, &raw result, source.root, current.exclusive & node.exclusive & root_mode);
                 }
                 if (node.type == cursor.type) {
@@ -172,9 +172,56 @@ fn ReferenceGraphIntern(graph: *ProvenanceGraph, fresh: *ProvenanceNode) -> *Pro
         return fresh;
     }
 }
+// Rebase value layers at the selected endpoint. Ordinary fields, array
+// elements and owning payloads keep their role; scoped dereferences cross into
+// payload provenance. The finite node/role walk preserves both occurrences of
+// a root and treats opaque values conservatively.
+fn ReferenceValueLayers(source: *ReferenceLoan) -> i64 {
+    unsafe {
+        if (source.provenance == null) { if (source.provenance_known != 0) { return 0; } return 3; }
+        let first = cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));
+        first.node = source.provenance;
+        var tail = first;
+        var current = first;
+        var layers: i64 = 0;
+        while (current != null) {
+            let node = current.node;
+            if (node.opaque != 0) { layers = 3; }
+            if (node.root == source.root) { layers = layers | (1 << current.exclusive); }
+            var edge = node.edges;
+            while (edge != null) {
+                var role = current.exclusive;
+                if ((edge.kind == 3 && IsReference(node.type)) || (edge.kind == 2 && ReferenceBorrowedSlice(node.type))) { role = 1; }
+                tail = ProvenanceQueryAppend(first, tail, edge.target, null, role);
+                edge = edge.next;
+            }
+            current = current.next;
+        }
+        current = first;
+        while (current != null) { let next = current.next; Free(cast[*u8](current)); current = next; }
+        return layers;
+    }
+}
+fn ReferenceAttachSelected(check: *ReferenceCheck, source: *ReferenceLoan, selected: *ReferenceLoan, parent: *Local, exclusive: i64, layer: i64, expression: *Node, next: *ReferenceLoan) -> *ReferenceLoan {
+    unsafe {
+        var old = next;
+        while (old != null && old.expression == expression && old.holder == null && old.owner_pin == check.pending_owner) {
+            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == layer) {
+                ReferenceProvenanceJoin(check, old, selected);
+                return next;
+            }
+            old = old.next;
+        }
+        let loan = ReferenceNew(check, source.root, parent, exclusive, layer, expression, next);
+        loan.physical_provenance = selected.physical_provenance;
+        loan.provenance = selected.provenance;
+        loan.provenance_known = selected.provenance_known;
+        return loan;
+    }
+}
 fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Local, exclusive: i64, indirect: i64, expression: *Node, next: *ReferenceLoan, place: *Node, via: *Local, origin: *Node, payload: bool) -> *ReferenceLoan {
     unsafe {
-        let copy_value = AggregateKind(expression.type) == 3 && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29);
+        let copy_value = TrackedBorrow(expression.type) && !IsReference(expression.type) && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29);
         var selected = ReferenceLoan{};
         selected.physical_provenance = source.physical_provenance;
         selected.root = source.root;
@@ -191,7 +238,7 @@ fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: 
         if (expression.kind == 26 && expression.op == 2 && ReferenceBorrowedSlice(expression.type)) {
             ReferenceSliceElementGraph(check, &raw selected, &raw scoped, expression, place, via);
         } else {
-            ReferenceSelectLoanMode(check, &raw selected, &raw scoped, place, via, origin, payload, copy_value);
+            ReferenceSelectLoanMode(check, &raw selected, &raw scoped, place, via, origin, payload || (expression.kind == 23 && expression.op == 0 && NestedReference(expression.type) && source.indirect != 0), copy_value);
         }
         // Processed but proven absent: do not recreate a root for the result.
         if (copy_value && selected.provenance_known != 0 && selected.provenance == null) { return next; }
@@ -199,19 +246,14 @@ fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: 
         // physical storage. Deeper roots stay in the payload layer.
         var selected_layer = indirect;
         if (NestedReference(expression.type) && selected.provenance != null && selected.provenance_known != 0 && selected.provenance.root == source.root && selected.provenance.edges == null) { selected_layer = 0; }
-        var old = next;
-        while (old != null && old.expression == expression && old.holder == null && old.owner_pin == check.pending_owner) {
-            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == selected_layer) {
-                ReferenceProvenanceJoin(check, old, &raw selected);
-                return next;
-            }
-            old = old.next;
+        if (copy_value && !IsReference(expression.type) && !ReferenceBorrowedSlice(expression.type)) {
+            let layers = ReferenceValueLayers(&raw selected);
+            var result = next;
+            if ((layers & 1) != 0) { result = ReferenceAttachSelected(check, source, &raw selected, parent, exclusive, 0, expression, result); }
+            if ((layers & 2) != 0) { result = ReferenceAttachSelected(check, source, &raw selected, parent, exclusive, 1, expression, result); }
+            return result;
         }
-        let loan = ReferenceNew(check, source.root, parent, exclusive, selected_layer, expression, next);
-        loan.physical_provenance = selected.physical_provenance;
-        loan.provenance = selected.provenance;
-        loan.provenance_known = selected.provenance_known;
-        return loan;
+        return ReferenceAttachSelected(check, source, &raw selected, parent, exclusive, selected_layer, expression, next);
     }
 }
 // Coarsening a path may union origins but never invent stronger capability.
@@ -251,13 +293,20 @@ fn ReferenceComputedGraph(check: *ReferenceCheck, loan: *ReferenceLoan, place: *
         source.exclusive = source.exclusive & exclusive;
         var target = source;
         target.provenance_type = expression.type;
-        let copy_value = AggregateKind(expression.type) == 3 && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29);
+        let copy_value = TrackedBorrow(expression.type) && !IsReference(expression.type) && (expression.kind == 3 || expression.kind == 18 || expression.kind == 29);
         ReferenceSelectLoanMode(check, &raw target, &raw source, place, null, origin, loan.indirect != 0 && NestedReference(expression.type) && !(expression.kind == 3 || expression.kind == 18 || expression.kind == 29), copy_value);
         if (copy_value && target.provenance_known != 0 && target.provenance == null) { return false; }
         if (expression.kind == 23 && expression.op == 1) { loan.physical_provenance = null; }
         loan.provenance = target.provenance;
         loan.provenance_type = target.provenance_type;
         loan.provenance_known = target.provenance_known;
+        if (copy_value && !ReferenceBorrowedSlice(expression.type)) {
+            let layers = ReferenceValueLayers(&raw target);
+            if (layers == 0) { return false; }
+            loan.indirect = 0;
+            if ((layers & 1) == 0) { loan.indirect = 1; }
+            if (layers == 3) { check.loans = ReferenceAttachSelected(check, &raw source, &raw target, loan.parent, source.exclusive, 1, expression, check.loans); }
+        }
         if (NestedReference(expression.type) && target.provenance != null && target.provenance_known != 0 && target.provenance.root == loan.root && target.provenance.edges == null) { loan.indirect = 0; }
         return true;
     }

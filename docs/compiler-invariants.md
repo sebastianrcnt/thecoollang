@@ -1688,7 +1688,7 @@ audit work.
 ## Slice value selection and stable call projections
 
 `ReferenceSelectGraphMode` distinguishes a slice value copy from storage/address
-selection. Only copied slice-valued LOCAL/LOAD/MOVE results use the value mode.
+selection. Copied non-reference tracked LOCAL/LOAD/MOVE values use the value mode.
 A precise intermediate borrowed-slice terminal does not become the origin of
 a subsequently selected element value. Its payload edges still participate with
 the existing capability intersections. Cursor endpoints, opaque/mismatched
@@ -1801,3 +1801,24 @@ The nested-owner regression verifies external payload return after relocation,
 rejection of local descriptor/owned payload addresses and shared capability
 barriers. Complementary field-disjoint permission and nested slice return tests
 must continue to pass alongside this transport rule.
+
+
+## Relocated endpoint roles
+
+ReferenceValueLayers visits finite `(node, role)` states after typed selection.
+A role starts at zero and becomes one at a Referent edge of a scoped reference
+or an Element edge of a borrowed slice. Other edges preserve it. Root occurrence
+at both roles creates two records; opaque nodes conservatively retain both.
+Role visitation is separate from permission checking: no role bit grants write
+capability, and selected graphs keep the original intersected edge barriers.
+ReferenceAttachSelected deduplicates only identical root/parent/mode/layer and
+joins graphs without discarding physical metadata. Computed retagging must also
+rebase roles; the caller must not overwrite that result with blanket layer zero.
+
+Value selection omits intermediate borrowed-slice and scoped-reference storage
+terminals while consuming their Element/Referent cursor. Endpoint terminals,
+payload edges, full-place access checks and owner pins remain intact. Acquiring
+an address to a nested borrowed value wraps selected payload graphs under the
+new reference's Referent edge instead of replacing them with a type-mismatch
+fallback. Pure reference return proofs use the same bounds, capabilities and
+REPL invalidation as slice proofs and never accept reference reslicing syntax.

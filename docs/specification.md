@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 32
+# Cool language specification — 1.0 draft 33
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1097,3 +1097,24 @@ not their declared element types or ordinary borrow-mode queries.
 This draft establishes production availability; broader adversarial audits,
 tracked collection iteration and every outstanding release requirement remain
 mandatory. It does not declare the safety gate or the 1.0 release complete.
+
+
+## Draft 33: relocated value layers and pure reference projections
+
+Moving or copying a borrowed owner/aggregate through a field, array element,
+slice element or computed receiver retains the selected value's scoped roots.
+Physical storage protection is checked before selecting the result. Relative to
+that result, ordinary fields, fixed-array elements and owning payloads preserve
+root roles; crossing a scoped referent or borrowed-slice element enters the
+payload role. A root present in both roles retains both loans. Opaque paths keep
+both possible roles. This does not authorize escaping a local slot or upgrading
+a shared path's capability.
+
+The bounded pure-origin proof from draft 31 also applies to reference results
+whose returned parameters have exactly the result type. Bare parameters, inferred
+aliases and the same pure boolean branches are supported; reference reslicing
+is not part of this proof. Unsupported bodies retain the conservative contract.
+Changed established reference-origin sets use the same dependency-directed REPL
+revalidation and rollback as slice projections. Historical values keep their
+original roots. General body inference and all outstanding release gates remain
+required.

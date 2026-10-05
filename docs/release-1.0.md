@@ -2808,6 +2808,57 @@ through ordinary evaluation or library use.
   fuzzing, relocation/alias combinations, collection APIs and every remaining
   mandatory release gate stay Open.
 
+- Relocated borrowed endpoints and pure reference proofs (specification draft
+  33): a borrowed owner moved through a slice previously lost its deeper
+  external payload role. Selected non-reference tracked values now reconstruct
+  physical/payload roles with a finite node/role walk. Same-root dual roles keep
+  both records; opaque paths remain conservative. Computed retagging also keeps
+  those roles instead of overwriting all nonlayered results with layer zero.
+  Full-place authority and owner pins are checked before selection.
+
+  Computed receiver coverage exposed a second defect: acquiring an address to
+  a nested borrowed value could replace its payload graph with a type-mismatch
+  fallback. Payload graphs are now wrapped under the new reference's Referent
+  edge. Value copies consume intermediate slice/reference storage terminals
+  while retaining endpoint and payload roots. Field/array/slice/enum relocation,
+  call-produced slices and call-produced receivers all preserve valid external
+  returns. Local payload/owner-slot escapes and shared receiver moves retain
+  their required rejection diagnostics.
+
+  The bounded pure parameter/alias/boolean-branch origin proof now supports
+  exact-type reference returns as well as slices. Reference reslicing is not
+  accepted by that proof. Same-type proven calls preserve value graphs; changed
+  reference origin sets use the existing dependency-directed retained-caller
+  revalidation. A producer replacement that invalidates an established caller
+  rejects and restores its earlier execution (7 before and after rejection).
+  Unsupported bodies, foreign/generic functions and stores remain conservative.
+
+  Combined production/seed audit: 374 classifications, 158 positive programs,
+  948 tree/five-engine/O2 executions, 46 REPL observations, zero gaps and 12
+  allocation observations PASS. The combined production ASan/UBSan frontend
+  audit covers the same classifications, 158 tree positives and 46 REPL
+  observations PASS. Permanent slice reports cover 286 classifications, 126
+  positives, 756 executions (126 ASan tree runs), 46 REPL observations and zero
+  gaps. Final compiler/legacy hashes match all four reports. Allocation histories
+  at 64/1024 retain equal final/peak tracked resources. New-syntax bootstrap
+  stage2/stage3 and legacy generation 2/3 converge.
+
+  Full `make -k -j4 test bootstrap-check editor-distribution-test
+  nested-reference-slice-sanitize-test heap-borrows-sanitize-test
+  slice-descriptors-sanitize-test mixed-owned-references-sanitize-test
+  primary-forms-sanitize-test` exits 0 in
+  `build/release-audit/nested-relocation-final-regression.log`. Graph/copy/loan/
+  selection/access/physical/descriptor/stores/dependency sanitizer targets exit
+  0 in `nested-relocation-final-sanitize.log`. Final combined reports/logs:
+  `nested-relocation-final-combined{,-asan}.{json,log}`. Earlier baseline and
+  intermediate logs record the overrejections and are not final acceptance
+  evidence; the initial combined launch found a duplicate fixture name before
+  running its audit, corrected without removing either test.
+  Production stage-2 IR SHA256:
+  `9456025a81c362280b86f23b07bbe649539c867493fedc786c6d688e8659c3cb`.
+  Broader alias/relocation fuzzing, borrowed collection APIs, general body
+  inference and every outstanding mandatory gate remain Open.
+
 ## Next implementation checkpoints
 
 - Expand adversarial/model coverage for production nested references and
