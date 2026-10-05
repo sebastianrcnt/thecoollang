@@ -3243,17 +3243,20 @@ through ordinary evaluation or library use.
   and the deterministic bootstrap needs no source-translation tool.
 
 - Slice/reslicing fuzzing: `tools/test_slice_fuzz.py` generates seeded programs
-  that build an owning scalar array, derive a chain of nested subslices, perform
-  modeled reads and writes only through the deepest slice, call a function that
-  consumes a slice and store a slice in a struct, then release every loan and
-  verify the whole backing array directly and require zero owners. An independent
-  Python model of the array values decides every expected read. Seeds
+  in two workloads. The scalar workload builds a scalar array, derives a chain of
+  nested subslices, performs modeled reads and writes only through the deepest
+  slice, calls a slice-consuming function and stores a slice in a struct, then
+  releases every loan and verifies the whole backing array directly. The owned
+  workload builds an `own[i64]` array, reads and moves elements out through the
+  deepest slice and asserts the exact live-owner count after every move, then
+  verifies the surviving slots and requires zero owners at scope exit. An
+  independent Python model decides every expected read and owner count. Seeds
   7/42/2026/1/99 at 40 steps pass on five engines + release O2 on both frontends;
   `slice-fuzz-sanitize-test` adds runtime ASan/UBSan and an ASan-instrumented
   frontend. The target is wired into `make test` and the ARM64 CI workflow. This
   extends G9's deterministic fuzzing from scalar/aggregate owners to nested
-  slice chains and slice relocation; aggregate/slice relocation through shared
-  receivers and every remaining mandatory gate stay Open.
+  slice chains, slice relocation and owned-element moves; relocation through
+  shared receivers and every remaining mandatory gate stay Open.
 
 ## Next implementation checkpoints
 

@@ -82,6 +82,64 @@ def generate(seed, steps):
     return '\n'.join(lines) + '\n', ['7654321']
 
 
+def generate_owned(seed, steps):
+    """Owned backing array: model live owners across slice reads and element moves."""
+    rng = random.Random(seed)
+    lines = [PRELUDE, 'fn main(){']
+    for _ in range(steps):
+        size = rng.randrange(2, 7)
+        values = [rng.randrange(-999, 1000) for _ in range(size)]
+        alive = [True] * size
+        owners = size
+        literal = ', '.join(f'new[i64]({value})' for value in values)
+        lines.append('  {')
+        lines.append(f'    var a = [{size}]own[i64]{{{literal}}};')
+        lines.append(f'    assert(mem.owner_count() == {size});')
+        levels = []
+        base, length = 0, size
+        depth = rng.randrange(1, 4)
+        for level in range(depth):
+            if length < 2:
+                break
+            lo = rng.randrange(0, length - 1)
+            hi = rng.randrange(lo + 1, length + 1)
+            base = base + lo
+            length = hi - lo
+            levels.append((base, length))
+            lines.append('  ' * (level + 1) + '{')
+            source = 'a' if level == 0 else f's{level - 1}'
+            lines.append('  ' * (level + 2) + f'let s{level} = {source}[{lo}:{hi}];')
+            lines.append('  ' * (level + 2) + f'assert(len(s{level}) == {length});')
+        deepest = len(levels) - 1
+        indent = '  ' * (deepest + 2)
+        for _ in range(rng.randrange(2, 6)):
+            live = [index for index in range(length) if alive[base + index]]
+            if not live:
+                break
+            index = rng.choice(live)
+            if rng.random() < 0.5:
+                lines.append(indent + f'assert(*s{deepest}[{index}] == {values[base + index]});')
+            else:
+                lines.append(indent + '{')
+                lines.append(indent + f'  let moved = move s{deepest}[{index}];')
+                lines.append(indent + f'  assert(*moved == {values[base + index]});')
+                lines.append(indent + '}')
+                alive[base + index] = False
+                owners = owners - 1
+                lines.append(indent + f'assert(mem.owner_count() == {owners});')
+        for level in range(deepest, -1, -1):
+            lines.append('  ' * (level + 1) + '}')
+        lines.append(f'    assert(mem.owner_count() == {owners});')
+        for index in range(size):
+            if alive[index]:
+                lines.append(f'    assert(*a[{index}] == {values[index]});')
+        lines.append('  }')
+        lines.append('  assert(mem.owner_count() == 0);')
+    lines.append('  io.println(2468135);')
+    lines.append('}')
+    return '\n'.join(lines) + '\n', ['2468135']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seeds', default='7,42,2026,1,99')
@@ -102,8 +160,9 @@ def main():
             frontends.append(Path(args.frontend))
         observations = []
         for seed in (int(value) for value in args.seeds.split(',')):
-            program, expected = generate(seed, args.steps)
-            source = work / f'seed-{seed}.cool'
+          for workload, generator, marker in (('scalar', generate, 7654321), ('owned', generate_owned, 2468135)):
+            program, expected = generator(seed, args.steps)
+            source = work / f'seed-{seed}-{workload}.cool'
             source.write_text(program)
             want = '\n'.join(expected) + '\n'
             for front in frontends:
@@ -113,33 +172,33 @@ def main():
                 for engine in ENGINES:
                     run = subprocess.run([str(ROOT / 'tools/cool'), 'run', '--backend', engine, source],
                                          cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
-                    assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, front, engine, run)
-                    observations.append({'seed': seed, 'engine': engine, 'exit': run.returncode})
-                binary = work / f'seed-{seed}-{front}.bin'
+                    assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, workload, front, engine, run)
+                    observations.append({'seed': seed, 'workload': workload, 'engine': engine, 'exit': run.returncode})
+                binary = work / f'seed-{seed}-{workload}-{front}.bin'
                 build = subprocess.run([str(ROOT / 'tools/cool'), 'build', '--release', source, '-o', binary],
                                        cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
                 assert build.returncode == 0, (seed, front, build.stderr)
                 run = subprocess.run([str(binary)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
-                assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, front, 'O2', run)
-                observations.append({'seed': seed, 'engine': 'O2', 'exit': run.returncode})
+                assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, workload, front, 'O2', run)
+                observations.append({'seed': seed, 'workload': workload, 'engine': 'O2', 'exit': run.returncode})
                 if args.sanitize_runtime:
-                    ir = work / f'seed-{seed}-{front}.ll'
+                    ir = work / f'seed-{seed}-{workload}-{front}.ll'
                     emit = subprocess.run([str(ROOT / 'tools/cool'), 'emit-ir', source, '-o', ir],
                                           cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
                     assert emit.returncode == 0, (seed, front, emit.stderr)
-                    instrumented = work / f'seed-{seed}-{front}-asan.ll'
+                    instrumented = work / f'seed-{seed}-{workload}-{front}-asan.ll'
                     instrumented.write_text('\n'.join(
                         line.replace(' {', ' sanitize_address {') if line.startswith('define ') else line
                         for line in ir.read_text().splitlines()) + '\n')
-                    asan = work / f'seed-{seed}-{front}-asan.bin'
+                    asan = work / f'seed-{seed}-{workload}-{front}-asan.bin'
                     link = subprocess.run(['clang', '-Wno-override-module', '-O1', '-g',
                                            '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
                                            instrumented, ROOT / 'language/runtime.c', '-o', asan],
                                           cwd=ROOT, capture_output=True, text=True, timeout=180)
                     assert link.returncode == 0, (seed, front, link.stderr)
                     run = subprocess.run([str(asan)], cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
-                    assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, front, 'ASan', run)
-                    observations.append({'seed': seed, 'engine': 'ASan/UBSan', 'exit': run.returncode})
+                    assert (run.returncode, run.stdout, run.stderr) == (0, want, ''), (seed, workload, front, 'ASan', run)
+                    observations.append({'seed': seed, 'workload': workload, 'engine': 'ASan/UBSan', 'exit': run.returncode})
     if args.output:
         target = Path(args.output)
         target.parent.mkdir(parents=True, exist_ok=True)
