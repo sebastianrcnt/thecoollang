@@ -90,6 +90,9 @@ owner worklist 회피를 구현해 소멸 성능 회귀를 줄였다. `75304cb`�
    `tools/test_ownership_fuzz.py`, scoped loan은 `tools/test_borrow_fuzz.py`,
    aggregate 소유 payload는 `tools/test_aggregate_fuzz.py`로 추가됨). 발견된
    실패는 영구 회귀 테스트로 승격한다.
+4. G9: slice/reslicing fuzzer 추가됨(`tools/test_slice_fuzz.py`,
+   `make slice-fuzz-test`/`slice-fuzz-sanitize-test`, CI 포함). 다음은
+   shared-receiver relocation·borrowed slice element fuzz 확장.
 5. G3: **CLOSED**. 모든 생성 dispatch 머신을 서술적 Cool로 정리 완료
    (03-types InstantiateType, 13-repl Repl, 08-llvm EmitLLVM, 02-lexer
    LexSource, 15-native LanguageMain, 06-parser Expr/SpecializeFunction/

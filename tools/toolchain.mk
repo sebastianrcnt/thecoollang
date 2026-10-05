@@ -643,3 +643,11 @@ aggregate-fuzz-test: build/cool-compiler build/language.BIN build/language-runti
 test: aggregate-fuzz-test
 aggregate-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_aggregate_fuzz.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/aggregate-fuzz-asan-audit.json
+
+# Seeded slice/reslicing oracle: modeled values through nested slice chains.
+.PHONY: slice-fuzz-test slice-fuzz-sanitize-test
+slice-fuzz-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_slice_fuzz.py --output build/slice-fuzz-audit.json
+test: slice-fuzz-test
+slice-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_slice_fuzz.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/slice-fuzz-asan-audit.json
