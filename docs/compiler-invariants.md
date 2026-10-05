@@ -891,3 +891,47 @@ bounds repeated identical REPL replacement without discarding distinct
 capabilities or parent ancestry. Cross-engine replacement, independently modeled
 root permissions, runtime rollback and 64/1,024-input allocation histories cover
 this invariant.
+
+
+## Value regions and binding origins
+
+`04-borrow.cool` now expresses provenance directly, without generated temporary
+variables or numbered control-flow states. `BorrowRegion`/`BorrowPlaceRegion`
+share the AST cases for value and binding-origin queries. `Region` keeps all
+possible payload roots for escape contracts; `OriginRegion` follows reference
+binding sources independently of indirect storage writes. Parameter construction
+seeds both `Local.region` and `Local.place_region` with the parameter bit. Do not
+seed origins from an already-propagated value region on reanalysis: that would
+turn installed payload sources into possible physical destinations.
+
+`BorrowSource.storage` separates stores from binding initialization/replacement.
+`PropagateBorrowRegions` first gathers all binding edges, then records stores.
+Stores through a reference alias propagate to every reachable binding source,
+including reborrows and calls selected by a `borrows` contract. Store edges are
+excluded from destination traversal. Identical node/channel edges are recorded
+once. The monotone fixed point propagates both channels; loaded payloads use
+value regions because stored data may have changed. This is conservative root
+information, not a field-sensitive multi-layer provenance graph.
+
+`Local.destination_mark` uses the current RHS AST node as a query identity.
+Bindings are complete before traversal, so visiting each local once per store
+covers cycles and shared DAGs. Clear marks before/after propagation; they must
+never be persistent AST roots. Repeating propagation on the same function keeps
+origins/results stable and does not add duplicate source edges.
+
+`tools/test_borrow_origins.py` inserts trace calls into a private source copy,
+compiles it through the production frontend and compares 330 channel values with
+an independent worklist oracle. It runs propagation twice and counts destination
+visits, including a depth-32 alias diamond, cyclic aliases, multiple store
+queries, late branches, stored aliases, computed reborrows and contracted results.
+It copies host/runtime objects and records source/IR/object identities in
+`build/borrow-origins-audit.json`. Normal native/legacy and ASan frontends still
+reject unsupported receiver writes (or earlier live-alias conflicts). This audit
+proves the component's modeled provenance results, not cross-call mutation safety.
+
+The remaining cross-call implementation must validate destination/source
+relations in function signatures, preserve per-root capabilities, retain source
+loans at every actual destination's original marker, update live receiver
+payload loans and caller return-region edges, compare effects on REPL replacement,
+and preserve candidate roots after partially executed runtime failures. The
+origin split is prerequisite evidence; it does not itself relax those checks.

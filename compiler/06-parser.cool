@@ -1426,6 +1426,7 @@ continue;
 }
 if (pc == 21) {
 (v_parameter).region = (1 << v_j3);
+(v_parameter).place_region = (v_parameter).region;
 pc = 19;
 continue;
 }
@@ -4521,6 +4522,7 @@ continue;
 }
 if (pc == 15) {
 (v_parameter1).region = (1 << v_j4);
+(v_parameter1).place_region = (v_parameter1).region;
 pc = 13;
 continue;
 }

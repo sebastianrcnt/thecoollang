@@ -475,3 +475,10 @@ reference-replacement-test: build/cool-compiler build/language.BIN build/languag
 test: reference-replacement-test
 reference-replacement-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_reference_replacement.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime
+
+.PHONY: borrow-origins-test borrow-origins-sanitize-test
+borrow-origins-test: build/cool-compiler build/language.BIN build/compiler-host.o build/language-runtime.o
+	python3 tools/test_borrow_origins.py --output build/borrow-origins-audit.json
+test: borrow-origins-test
+borrow-origins-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o
+	python3 tools/test_borrow_origins.py --frontend build/repl-loans-asan/cool-compiler --output build/borrow-origins-asan-audit.json

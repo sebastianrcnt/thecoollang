@@ -1,62 +1,52 @@
-// Modular, conservative provenance checking. Parameter bits are borrow roots;
-// a frame bit marks storage that cannot outlive this invocation.
+// Value provenance and reference binding origins use separate monotone sets.
 #define REGION_FRAME 0x10000000000
-class BorrowSource { Node *node; BorrowSource *next; };
-extern I64 Region(Node *n);
-I64 PlaceRegion(Node *n) {
-    if (!n) return REGION_FRAME;
-    if(n->kind==N_OWN_ADDRESS){if(IsReference(n->a->type))return Region(n->a);if(n->a->kind==N_LOAD)return PlaceRegion(n->a->a);}
-    if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS) return PlaceRegion(n->a);
-    if (n->kind == N_INDEX_ADDRESS) { if (n->op == A_SLICE) return Region(n->a); return PlaceRegion(n->a); }
-    return REGION_FRAME;
+class BorrowSource { Bool storage;Node *node; BorrowSource *next; };
+extern I64 BorrowRegion(Node *n,Bool origin);
+extern Node *ReferencePlaceSource(Node *place);
+I64 BorrowPlaceRegion(Node *n,Bool origin){
+ if(!n)return REGION_FRAME;
+ if(n->kind==N_OWN_ADDRESS){if(IsReference(n->a->type))return BorrowRegion(n->a,origin);if(n->a->kind==N_LOAD)return BorrowPlaceRegion(n->a->a,origin);}
+ if(n->kind==N_LOAD || n->kind==N_FIELD_ADDRESS)return BorrowPlaceRegion(n->a,origin);
+ if(n->kind==N_INDEX_ADDRESS){if(n->op==A_SLICE)return BorrowRegion(n->a,origin);return BorrowPlaceRegion(n->a,origin);}
+ return REGION_FRAME;
 }
-I64 Region(Node *n) {
-    I64 result = 0, i; Node *arg;
-    if (!n || !Borrowed(n->type)) return 0;
-    if(IsReference(n->type) && n->kind==N_AGG_LITERAL){if(n->op==1)return Region(n->origin_source);return PlaceRegion(n->a);}
-    if (n->kind == N_MOVE) return Region(n->origin_source);
-    if (n->kind == N_NEW) return Region(n->a);
-    if (n->kind == N_LOCAL && n->local_ref) return n->local_ref->region;
-    if (n->kind == N_SLICE) { if (n->op == A_ARRAY) return PlaceRegion(n->a); return Region(n->origin_source); }
-    if (n->kind == N_LOAD) { if (n->origin_source) return Region(n->origin_source); return REGION_FRAME; }
-    if (n->kind == N_AGG_LITERAL) { for (arg = n->a; arg; arg = arg->next) result |= Region(arg); return result; }
-    if (n->kind == N_CALL && n->slot >= 0) {
-        i = 0; for (arg = n->a; arg; arg = arg->next) { if (functions[n->slot].borrow_contract & (1 << i)) result |= Region(arg); i++; } return result;
-    }
-    return REGION_FRAME;
+I64 BorrowRegion(Node *n,Bool origin){
+ I64 result=0,i;Node *arg;
+ if(!n || !Borrowed(n->type))return 0;
+ if(n->kind==N_MOVE)return BorrowRegion(n->origin_source,origin);
+ if(n->kind==N_NEW)return BorrowRegion(n->a,origin);
+ if(IsReference(n->type) && n->kind==N_AGG_LITERAL){if(n->op==1)return BorrowRegion(n->origin_source,origin);return BorrowPlaceRegion(n->a,origin);}
+ if(n->kind==N_LOCAL && n->local_ref){if(origin)return n->local_ref->place_region;return n->local_ref->region;}
+ if(n->kind==N_SLICE){if(n->op==A_ARRAY)return BorrowPlaceRegion(n->a,origin);return BorrowRegion(n->origin_source,origin);}
+ if(n->kind==N_LOAD){if(n->origin_source)return BorrowRegion(n->origin_source,FALSE);return REGION_FRAME;}
+ if(n->kind==N_AGG_LITERAL){for(arg=n->a;arg;arg=arg->next)result|=BorrowRegion(arg,origin);return result;}
+ if(n->kind==N_CALL && n->slot>=0){i=0;for(arg=n->a;arg;arg=arg->next){if(functions[n->slot].borrow_contract&(1<<i))result|=BorrowRegion(arg,origin);i++;}return result;}
+ return REGION_FRAME;
 }
-Local *BorrowRoot(Node *n) {
-    if (!n) return NULL;
-    if (n->local_ref) return n->local_ref;
-    if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS || n->kind == N_INDEX_ADDRESS || n->kind == N_LOCAL_ADDRESS || n->kind == N_OWN_ADDRESS) return BorrowRoot(n->a);
-    return NULL;
+I64 Region(Node *n){return BorrowRegion(n,FALSE);}
+I64 PlaceRegion(Node *n){return BorrowPlaceRegion(n,FALSE);}
+I64 OriginRegion(Node *n){return BorrowRegion(n,TRUE);}
+Local *BorrowRoot(Node *n){if(!n)return NULL;if(n->local_ref)return n->local_ref;if(n->kind==N_LOAD || n->kind==N_FIELD_ADDRESS || n->kind==N_INDEX_ADDRESS || n->kind==N_LOCAL_ADDRESS || n->kind==N_OWN_ADDRESS)return BorrowRoot(n->a);return NULL;}
+U0 RecordBorrowEdge(Local *local,Node *source,Bool storage){BorrowSource *edge;if(!local || !Borrowed(local->type))return;for(edge=local->sources;edge;edge=edge->next)if(edge->node==source && edge->storage==storage)return;edge=CAlloc(sizeof(BorrowSource));edge->node=source;edge->storage=storage;edge->next=local->sources;local->sources=edge;}
+U0 RecordBorrow(Local *local,Node *source){RecordBorrowEdge(local,source,FALSE);}
+U0 RecordBorrowDestination(Node *n,Node *source){
+ Local *local;BorrowSource *edge;Node *arg,*origin;I64 i;
+ if(!n)return;
+ if(n->kind==N_LOCAL && n->local_ref){local=n->local_ref;if(local->destination_mark==(U8*)source)return;local->destination_mark=(U8*)source;RecordBorrowEdge(local,source,TRUE);if(IsReference(local->type)){for(edge=local->sources;edge;edge=edge->next)if(!edge->storage)RecordBorrowDestination(edge->node,source);}return;}
+ if(n->kind==N_AGG_LITERAL && IsReference(n->type)){if(n->op==1)RecordBorrowDestination(n->origin_source,source);else{origin=ReferencePlaceSource(n->a);if(origin)RecordBorrowDestination(origin,source);else RecordBorrowEdge(BorrowRoot(n->a),source,TRUE);}return;}
+ if(n->kind==N_CALL && n->slot>=0){i=0;for(arg=n->a;arg;arg=arg->next){if(functions[n->slot].borrow_contract&(1<<i))RecordBorrowDestination(arg,source);i++;}return;}
+ if(n->kind==N_MOVE){RecordBorrowDestination(n->origin_source,source);return;}
+ if(n->kind==N_LOAD && n->origin_source){RecordBorrowDestination(n->origin_source,source);return;}
+ RecordBorrowEdge(BorrowRoot(n),source,TRUE);
 }
-U0 RecordBorrow(Local *local, Node *source) {
-    BorrowSource *edge;
-    if (!local || !Borrowed(local->type)) return;
-    edge = CAlloc(sizeof(BorrowSource)); edge->node = source; edge->next = local->sources; local->sources = edge;
+U0 BorrowEdges(Node *n){if(!n)return;if(n->kind==N_BIND || n->kind==N_ASSIGN)RecordBorrow(n->local_ref,n->a);BorrowEdges(n->a);BorrowEdges(n->b);BorrowEdges(n->c);BorrowEdges(n->next);}
+U0 BorrowStoredEdges(Node *n){Local *root;Node proxy;if(!n)return;if(n->kind==N_STORE && Borrowed(n->type)){root=BorrowRoot(n->a);if(root && IsReference(root->type)){MemSet(&proxy,0,sizeof(Node));proxy.kind=N_LOCAL;proxy.type=root->type;proxy.local_ref=root;RecordBorrowDestination(&proxy,n->b);}else RecordBorrowEdge(root,n->b,TRUE);}BorrowStoredEdges(n->a);BorrowStoredEdges(n->b);BorrowStoredEdges(n->c);BorrowStoredEdges(n->next);}
+U0 CheckBorrowReturns(Node *n,Function *f){if(!n)return;if(n->kind==N_RETURN && Borrowed(f->result) && (Region(n->a)&~f->borrow_contract))ErrorAt(n->token,"returned borrow may outlive local storage or violate its borrows contract");CheckBorrowReturns(n->a,f);CheckBorrowReturns(n->b,f);CheckBorrowReturns(n->c,f);CheckBorrowReturns(n->next,f);}
+U0 PropagateBorrowRegions(Function *f){
+ Local *local;BorrowSource *edge;Bool changed;I64 before,origin_before;
+ for(local=f->all_locals;local;local=local->all_next){local->destination_mark=NULL;}
+ BorrowEdges(f->body);BorrowStoredEdges(f->body);
+ do{changed=FALSE;for(local=f->all_locals;local;local=local->all_next){before=local->region;origin_before=local->place_region;for(edge=local->sources;edge;edge=edge->next){local->region|=Region(edge->node);if(!edge->storage)local->place_region|=OriginRegion(edge->node);}if(before!=local->region || origin_before!=local->place_region)changed=TRUE;}}while(changed);
+ for(local=f->all_locals;local;local=local->all_next)local->destination_mark=NULL;
 }
-U0 BorrowEdges(Node *n) {
-    if (!n) return;
-    if (n->kind == N_BIND || n->kind == N_ASSIGN) RecordBorrow(n->local_ref, n->a);
-    if (n->kind == N_STORE && Borrowed(n->type)) RecordBorrow(BorrowRoot(n->a), n->b);
-    BorrowEdges(n->a); BorrowEdges(n->b); BorrowEdges(n->c); BorrowEdges(n->next);
-}
-U0 CheckBorrowReturns(Node *n, Function *f) {
-    if (!n) return;
-    if (n->kind == N_RETURN && Borrowed(f->result) && (Region(n->a) & ~f->borrow_contract)) ErrorAt(n->token, "returned borrow may outlive local storage or violate its borrows contract");
-    CheckBorrowReturns(n->a, f); CheckBorrowReturns(n->b, f); CheckBorrowReturns(n->c, f); CheckBorrowReturns(n->next, f);
-}
-U0 AnalyzeBorrows(Function *f) {
-    Local *local; BorrowSource *edge; Bool changed; I64 before;
-    BorrowEdges(f->body);
-    do {
-        changed = FALSE;
-        for (local = f->all_locals; local; local = local->all_next) {
-            before = local->region;
-            for (edge = local->sources; edge; edge = edge->next) local->region |= Region(edge->node);
-            if (before != local->region) changed = TRUE;
-        }
-    } while (changed);
-    CheckBorrowReturns(f->body, f);
-}
+U0 AnalyzeBorrows(Function *f){PropagateBorrowRegions(f);CheckBorrowReturns(f->body,f); }

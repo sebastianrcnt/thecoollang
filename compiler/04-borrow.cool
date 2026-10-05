@@ -1,374 +1,128 @@
-fn Region(arg_v_n6: *Node) -> i64 {
-unsafe {
-if(arg_v_n6!=null && arg_v_n6.kind==29){return Region(arg_v_n6.origin_source);}
-if(arg_v_n6!=null && arg_v_n6.kind==28){return Region(arg_v_n6.a);}
-if(arg_v_n6!=null && IsReference(arg_v_n6.type) && arg_v_n6.kind==23){if(arg_v_n6.op==1){return Region(arg_v_n6.origin_source);}return PlaceRegion(arg_v_n6.a);}
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n6: *Node = arg_v_n6;
-var v_result: i64 = i64(0);
-var v_i8: i64 = i64(0);
-var v_arg: *Node = null;
-var t0: bool = false;
-var t1: i64 = i64(0);
-var t2: i8 = i8(0);
-var t3: bool = false;
-var t4: *Node = null;
-var t5: i64 = i64(0);
-var t6: *Node = null;
-var t7: i64 = i64(0);
-var t8: *Node = null;
-var t9: i64 = i64(0);
-var t10: *Node = null;
-var t11: i64 = i64(0);
-var t12: bool = false;
-var t13: *Node = null;
-var t14: i64 = i64(0);
-var t15: i64 = i64(0);
-v_result = 0;
-t0 = !((v_n6 != null));
-if (!t0) {
-t1 = (v_n6).type;
-t2 = Borrowed(t1);
-t0 = !((t2 != i8(0)));
-}
-if (t0) {
-return 0;
-}
-t3 = ((v_n6).kind == 3);
-if (t3) {
-t3 = ((v_n6).local_ref != null);
-}
-if (t3) {
-return ((v_n6).local_ref).region;
-}
-if (((v_n6).kind == 26)) {
-if (((v_n6).op == 2)) {
-t4 = (v_n6).a;
-t5 = PlaceRegion(t4);
-return t5;
-}
-t6 = (v_n6).origin_source;
-t7 = Region(t6);
-return t7;
-}
-if (((v_n6).kind == 18)) {
-if (((v_n6).origin_source != null)) {
-t8 = (v_n6).origin_source;
-t9 = Region(t8);
-return t9;
-}
-return 1099511627776;
-}
-if (((v_n6).kind == 23)) {
-v_arg = (v_n6).a;
-while (true) {
-if (!((v_arg != null))) { break; }
-t10 = v_arg;
-t11 = Region(t10);
-v_result = v_result | t11;
-v_arg = (v_arg).next;
-}
-return v_result;
-}
-t12 = ((v_n6).kind == 4);
-if (t12) {
-t12 = ((v_n6).slot >= 0);
-}
-if (t12) {
-v_i8 = 0;
-v_arg = (v_n6).a;
-while (true) {
-if (!((v_arg != null))) { break; }
-if (((((ctx.v_functions)[(v_n6).slot]).borrow_contract & (1 << v_i8)) != i64(0))) {
-t13 = v_arg;
-t14 = Region(t13);
-v_result = v_result | t14;
-}
-t15 = v_i8;
-v_i8 = v_i8 + i64(1);
-v_arg = (v_arg).next;
-}
-return v_result;
-}
-return 1099511627776;
-}
-return i64(0);
-}
-
-
-fn PlaceRegion(arg_v_n7: *Node) -> i64 {
-unsafe {
-if(arg_v_n7!=null && arg_v_n7.kind==30){if(IsReference(arg_v_n7.a.type)){return Region(arg_v_n7.a);}if(arg_v_n7.a.kind==18){return PlaceRegion(arg_v_n7.a.a);}}
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n7: *Node = arg_v_n7;
-var t0: bool = false;
-var t1: *Node = null;
-var t2: i64 = i64(0);
-var t3: *Node = null;
-var t4: i64 = i64(0);
-var t5: *Node = null;
-var t6: i64 = i64(0);
-if (!((v_n7 != null))) {
-return 1099511627776;
-}
-t0 = ((v_n7).kind == 18);
-if (!t0) {
-t0 = ((v_n7).kind == 24);
-}
-if (t0) {
-t1 = (v_n7).a;
-t2 = PlaceRegion(t1);
-return t2;
-}
-if (((v_n7).kind == 25)) {
-if (((v_n7).op == 3)) {
-t3 = (v_n7).a;
-t4 = Region(t3);
-return t4;
-}
-t5 = (v_n7).a;
-t6 = PlaceRegion(t5);
-return t6;
-}
-return 1099511627776;
-}
-return i64(0);
-}
-
-
-fn BorrowRoot(arg_v_n8: *Node) -> *Local {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n8: *Node = arg_v_n8;
-var t0: bool = false;
-var t1: bool = false;
-var t2: bool = false;
-var t3: bool = false;
-var t4: *Node = null;
-var t5: *Local = null;
-if (!((v_n8 != null))) {
-return null;
-}
-if (((v_n8).local_ref != null)) {
-return (v_n8).local_ref;
-}
-t0 = ((v_n8).kind == 18);
-if (!t0) {
-t0 = ((v_n8).kind == 24);
-}
-t1 = t0;
-if (!t1) {
-t1 = ((v_n8).kind == 25);
-}
-t2 = t1;
-if (!t2) {
-t2 = ((v_n8).kind == 22);
-}
-t3 = t2;
-if (!t3) {
-t3 = ((v_n8).kind == 30);
-}
-if (t3) {
-t4 = (v_n8).a;
-t5 = BorrowRoot(t4);
-return t5;
-}
-return null;
-}
-return null;
-}
-
-
-fn RecordBorrow(arg_v_local: *Local, arg_v_source: *Node) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_local: *Local = arg_v_local;
-var v_source: *Node = arg_v_source;
-var v_edge: *BorrowSource = null;
-var t0: bool = false;
-var t1: i64 = i64(0);
-var t2: i8 = i8(0);
-var t3: i64 = i64(0);
-var t4: *u8 = null;
-t0 = !((v_local != null));
-if (!t0) {
-t1 = (v_local).type;
-t2 = Borrowed(t1);
-t0 = !((t2 != i8(0)));
-}
-if (t0) {
-return;
-}
-t3 = i64(sizeof(BorrowSource));
-t4 = CAlloc(t3);
-v_edge = cast[*BorrowSource](t4);
-(v_edge).node = v_source;
-(v_edge).next = cast[*BorrowSource]((v_local).sources);
-(v_local).sources = cast[*u8](v_edge);
-}
-return;
-}
-
-
-fn BorrowEdges(arg_v_n9: *Node) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n9: *Node = arg_v_n9;
-var t0: bool = false;
-var t1: *Local = null;
-var t2: *Node = null;
-var t3: bool = false;
-var t4: i64 = i64(0);
-var t5: i8 = i8(0);
-var t6: *Node = null;
-var t7: *Local = null;
-var t8: *Local = null;
-var t9: *Node = null;
-var t10: *Node = null;
-var t11: *Node = null;
-var t12: *Node = null;
-var t13: *Node = null;
-if (!((v_n9 != null))) {
-return;
-}
-t0 = ((v_n9).kind == 7);
-if (!t0) {
-t0 = ((v_n9).kind == 8);
-}
-if (t0) {
-t1 = (v_n9).local_ref;
-t2 = (v_n9).a;
-RecordBorrow(t1, t2);
-}
-t3 = ((v_n9).kind == 19);
-if (t3) {
-t4 = (v_n9).type;
-t5 = Borrowed(t4);
-t3 = (i64(t5) != i64(0));
-}
-if (t3) {
-t6 = (v_n9).a;
-t7 = BorrowRoot(t6);
-t8 = t7;
-t9 = (v_n9).b;
-RecordBorrow(t8, t9);
-}
-t10 = (v_n9).a;
-BorrowEdges(t10);
-t11 = (v_n9).b;
-BorrowEdges(t11);
-t12 = (v_n9).c;
-BorrowEdges(t12);
-t13 = (v_n9).next;
-BorrowEdges(t13);
-}
-return;
-}
-
-
-fn CheckBorrowReturns(arg_v_n10: *Node, arg_v_f4: *Function) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_n10: *Node = arg_v_n10;
-var v_f4: *Function = arg_v_f4;
-var t0: bool = false;
-var t1: i64 = i64(0);
-var t2: i8 = i8(0);
-var t3: bool = false;
-var t4: *Node = null;
-var t5: i64 = i64(0);
-var t6: *Token = null;
-var t7: *u8 = null;
-var t8: *Node = null;
-var t9: *Function = null;
-var t10: *Node = null;
-var t11: *Function = null;
-var t12: *Node = null;
-var t13: *Function = null;
-var t14: *Node = null;
-var t15: *Function = null;
-if (!((v_n10 != null))) {
-return;
-}
-t0 = ((v_n10).kind == 9);
-if (t0) {
-t1 = (v_f4).result;
-t2 = Borrowed(t1);
-t0 = (i64(t2) != i64(0));
-}
-t3 = t0;
-if (t3) {
-t4 = (v_n10).a;
-t5 = Region(t4);
-t3 = ((t5 & (~(v_f4).borrow_contract)) != i64(0));
-}
-if (t3) {
-t6 = (v_n10).token;
-t7 = cast[*u8]("returned borrow may outlive local storage or violate its borrows contract");
-ErrorAt(t6, t7);
-}
-t8 = (v_n10).a;
-t9 = v_f4;
-CheckBorrowReturns(t8, t9);
-t10 = (v_n10).b;
-t11 = v_f4;
-CheckBorrowReturns(t10, t11);
-t12 = (v_n10).c;
-t13 = v_f4;
-CheckBorrowReturns(t12, t13);
-t14 = (v_n10).next;
-t15 = v_f4;
-CheckBorrowReturns(t14, t15);
-}
-return;
-}
-
-
-fn AnalyzeBorrows(arg_v_f5: *Function) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_f5: *Function = arg_v_f5;
-var v_local1: *Local = null;
-var v_edge1: *BorrowSource = null;
-var v_changed: i8 = i8(0);
-var v_before: i64 = i64(0);
-var t0: *Node = null;
-var t1: bool = false;
-var t2: *Node = null;
-var t3: i64 = i64(0);
-var t4: *Node = null;
-var t5: *Function = null;
-t0 = (v_f5).body;
-BorrowEdges(t0);
-t1 = true;
-while (true) {
-if (!t1) {
-if (!((v_changed != i8(0)))) { break; }
-}
-t1 = false;
-v_changed = i8(0);
-v_local1 = (v_f5).all_locals;
-while (true) {
-if (!((v_local1 != null))) { break; }
-v_before = (v_local1).region;
-v_edge1 = cast[*BorrowSource]((v_local1).sources);
-while (true) {
-if (!((v_edge1 != null))) { break; }
-t2 = (v_edge1).node;
-t3 = Region(t2);
-(v_local1).region = (v_local1).region | t3;
-v_edge1 = (v_edge1).next;
-}
-if ((v_before != (v_local1).region)) {
-v_changed = i8(1);
-}
-v_local1 = (v_local1).all_next;
-}
-}
-t4 = (v_f5).body;
-t5 = v_f5;
-CheckBorrowReturns(t4, t5);
-}
-return;
-}
-
+// Conservative value provenance and independent reference binding origins.
+// Parameter bits identify external roots; bit 40 identifies this frame.
+fn BorrowRegion(node:*Node,origin:bool)->i64{unsafe{
+ if(node==null || Borrowed(node.type)==i8(0)){return 0;}
+ if(node.kind==29){return BorrowRegion(node.origin_source,origin);}
+ if(node.kind==28){return BorrowRegion(node.a,origin);}
+ if(IsReference(node.type) && node.kind==23){
+  if(node.op==1){return BorrowRegion(node.origin_source,origin);}
+  return BorrowPlaceRegion(node.a,origin);
+ }
+ if(node.kind==3 && node.local_ref!=null){
+  if(origin){return node.local_ref.place_region;}
+  return node.local_ref.region;
+ }
+ if(node.kind==26){
+  if(node.op==2){return BorrowPlaceRegion(node.a,origin);}
+  return BorrowRegion(node.origin_source,origin);
+ }
+ // A load reads payload provenance, including values installed through aliases.
+ if(node.kind==18){if(node.origin_source!=null){return BorrowRegion(node.origin_source,false);}return 1099511627776;}
+ var result:i64=0;
+ if(node.kind==23){var item=node.a;while(item!=null){result=result|BorrowRegion(item,origin);item=item.next;}return result;}
+ if(node.kind==4 && node.slot>=0){
+  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+  var index:i64=0;var item=node.a;
+  while(item!=null){if((ctx.v_functions[node.slot].borrow_contract&(1<<index))!=0){result=result|BorrowRegion(item,origin);}index=index+1;item=item.next;}
+  return result;
+ }
+ return 1099511627776;
+}}
+fn BorrowPlaceRegion(node:*Node,origin:bool)->i64{unsafe{
+ if(node==null){return 1099511627776;}
+ if(node.kind==30){
+  if(IsReference(node.a.type)){return BorrowRegion(node.a,origin);}
+  if(node.a.kind==18){return BorrowPlaceRegion(node.a.a,origin);}
+ }
+ if(node.kind==18 || node.kind==24){return BorrowPlaceRegion(node.a,origin);}
+ if(node.kind==25){if(node.op==3){return BorrowRegion(node.a,origin);}return BorrowPlaceRegion(node.a,origin);}
+ return 1099511627776;
+}}
+fn Region(node:*Node)->i64{return BorrowRegion(node,false);}
+fn PlaceRegion(node:*Node)->i64{return BorrowPlaceRegion(node,false);}
+fn OriginRegion(node:*Node)->i64{return BorrowRegion(node,true);}
+fn BorrowRoot(node:*Node)->*Local{unsafe{
+ if(node==null){return null;}
+ if(node.local_ref!=null){return node.local_ref;}
+ if(node.kind==18 || node.kind==24 || node.kind==25 || node.kind==22 || node.kind==30){return BorrowRoot(node.a);}
+ return null;
+}}
+fn RecordBorrowEdge(local:*Local,source:*Node,storage:bool){unsafe{
+ if(local==null || Borrowed(local.type)==i8(0)){return;}
+ var previous=cast[*BorrowSource](local.sources);
+ while(previous!=null){if(previous.node==source && previous.storage==storage){return;}previous=previous.next;}
+ let edge=cast[*BorrowSource](CAlloc(i64(sizeof(BorrowSource))));
+ edge.node=source;edge.storage=storage;edge.next=cast[*BorrowSource](local.sources);local.sources=cast[*u8](edge);
+}}
+fn RecordBorrow(local:*Local,source:*Node){RecordBorrowEdge(local,source,false);}
+// Stores alter payload provenance, never the reference binding's physical origin.
+// Follow all binding sources to retain effects on every possible destination.
+fn RecordBorrowDestination(node:*Node,source:*Node){unsafe{
+ if(node==null){return;}
+ if(node.kind==3 && node.local_ref!=null){
+  let local=node.local_ref;
+  if(local.destination_mark==source){return;}local.destination_mark=source;
+  RecordBorrowEdge(local,source,true);
+  if(IsReference(local.type)){
+   var edge=cast[*BorrowSource](local.sources);
+   while(edge!=null){if(!edge.storage){RecordBorrowDestination(edge.node,source);}edge=edge.next;}
+  }
+  return;
+ }
+ if(node.kind==23 && IsReference(node.type)){
+  if(node.op==1){RecordBorrowDestination(node.origin_source,source);}
+  else{let origin=ReferencePlaceSource(node.a);if(origin!=null){RecordBorrowDestination(origin,source);}else{RecordBorrowEdge(BorrowRoot(node.a),source,true);}}
+  return;
+ }
+ if(node.kind==4 && node.slot>=0){
+  let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+  var index:i64=0;var item=node.a;
+  while(item!=null){if((ctx.v_functions[node.slot].borrow_contract&(1<<index))!=0){RecordBorrowDestination(item,source);}index=index+1;item=item.next;}
+  return;
+ }
+ if(node.kind==29){RecordBorrowDestination(node.origin_source,source);return;}
+ if(node.kind==18 && node.origin_source!=null){RecordBorrowDestination(node.origin_source,source);return;}
+ RecordBorrowEdge(BorrowRoot(node),source,true);
+}}
+fn BorrowEdges(node:*Node){unsafe{
+ if(node==null){return;}
+ if(node.kind==7 || node.kind==8){RecordBorrow(node.local_ref,node.a);}
+ // Gather binding sources before resolving stored destinations, independently
+ // of AST visitation order. BorrowStoredEdges performs the second phase.
+ BorrowEdges(node.a);BorrowEdges(node.b);BorrowEdges(node.c);BorrowEdges(node.next);
+}}
+fn BorrowStoredEdges(node:*Node){unsafe{
+ if(node==null){return;}
+ if(node.kind==19 && Borrowed(node.type)!=i8(0)){
+  let root=BorrowRoot(node.a);
+  if(root!=null && IsReference(root.type)){
+   var proxy=Node{};proxy.kind=3;proxy.type=root.type;proxy.local_ref=root;RecordBorrowDestination(&raw proxy,node.b);
+  }else{RecordBorrowEdge(root,node.b,true);}
+ }
+ BorrowStoredEdges(node.a);BorrowStoredEdges(node.b);BorrowStoredEdges(node.c);BorrowStoredEdges(node.next);
+}}
+fn CheckBorrowReturns(node:*Node,function:*Function){unsafe{
+ if(node==null){return;}
+ if(node.kind==9 && Borrowed(function.result)!=i8(0) && (Region(node.a)&~function.borrow_contract)!=0){ErrorAt(node.token,cast[*u8]("returned borrow may outlive local storage or violate its borrows contract"));}
+ CheckBorrowReturns(node.a,function);CheckBorrowReturns(node.b,function);CheckBorrowReturns(node.c,function);CheckBorrowReturns(node.next,function);
+}}
+fn PropagateBorrowRegions(function:*Function){unsafe{
+ var local=function.all_locals;
+ while(local!=null){local.destination_mark=null;local=local.all_next;}
+ BorrowEdges(function.body);BorrowStoredEdges(function.body);
+ var changed=true;
+ while(changed){
+  changed=false;local=function.all_locals;
+  while(local!=null){
+   let before=local.region;let origin_before=local.place_region;var edge=cast[*BorrowSource](local.sources);
+   while(edge!=null){local.region=local.region|Region(edge.node);if(!edge.storage){local.place_region=local.place_region|OriginRegion(edge.node);}edge=edge.next;}
+   if(before!=local.region || origin_before!=local.place_region){changed=true;}
+   local=local.all_next;
+  }
+ }
+ local=function.all_locals;while(local!=null){local.destination_mark=null;local=local.all_next;}
+}}
+fn AnalyzeBorrows(function:*Function){unsafe{
+ PropagateBorrowRegions(function);
+ CheckBorrowReturns(function.body,function);
+}}

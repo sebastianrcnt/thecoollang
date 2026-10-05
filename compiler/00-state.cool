@@ -67,6 +67,10 @@ depth: i64;
 
 region: i64;
 
+place_region: i64;
+
+destination_mark: *Node;
+
 moved: i64;
 
 loop_level: i64;
@@ -292,6 +296,8 @@ next: *TypeBinding;
 
 
 struct BorrowSource {
+
+storage: bool;
 
 node: *Node;
 

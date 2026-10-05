@@ -1512,6 +1512,30 @@ through ordinary evaluation or library use.
   slice elements remain mandatory work; this implementation does not close G2
   or declare 1.0 complete.
 
+- Borrow destination provenance foundation: rewrote the return-region module
+  from generated control flow into 128 lines of direct Cool, with aligned legacy
+  semantics. Separate binding-origin and value regions distinguish possible
+  destinations from sources installed into their payloads. Binding edges are
+  collected before stores; stored destinations follow every possible alias,
+  reborrow and contracted call source without treating stored payloads as aliases.
+  Query marks terminate cycles/shared alias DAGs, and source-edge deduplication
+  plus parameter-time origin seeding makes propagation idempotent. A private
+  instrumented compiler checks 330 independently modeled value/origin channels
+  across fifteen seeded/branch/cycle/computed cases and direct replacement;
+  destination visit bounds include a depth-32 diamond and repeated propagation.
+  Source/IR/host/runtime identities are recorded in `build/borrow-origins-audit.json`
+  and `build/borrow-origins-asan-audit.json`. Normal native/legacy and instrumented
+  frontends enforce existing receiver-write/conflict and return-contract errors.
+  Full regression, native/legacy bootstrap convergence, compiler/runtime ASan/UBSan
+  replacement checks and clean external editor/distribution validation pass.
+  Evidence: `build/release-audit/borrow-origins-{final-build,final-focused,final-regression,final-sanitize,final-distribution,final-audit}.log`.
+  Current IR SHA256:
+  `5114b6fcf3649fbb8f563faf22079f04e28c377b9fa44c804f9c41c6f7c93a78`.
+  This is a tested provenance component and compiler-maintenance change, not
+  acceptance of cross-call borrowed mutation. Destination lifetime contracts,
+  caller/receiver loan updates and nested stored provenance remain mandatory;
+  all release gates stay open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and lifetime-aware heap/slice
