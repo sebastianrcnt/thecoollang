@@ -1,0 +1,175 @@
+// Private frontend audit: inspect descriptor dependencies before any rollback mutation.
+struct AuditDependencies { seen: [4096]u8; queue: [4096]i64; count: i64; }
+fn AuditDependencyAdd(a: *AuditDependencies, type: i64) { unsafe {
+    var normalized = type;
+    while (normalized >= 100000) { normalized = normalized - 100000; }
+    if (normalized < 1000) { return; }
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    let index = normalized - 1000;
+    if (index >= ctx.v_naggregates || index >= 4096) { NativeExit(96); }
+    if (a.seen[index] != u8(0)) { return; }
+    a.seen[index] = u8(1);
+    a.queue[a.count] = normalized;
+    a.count = a.count + 1;
+}}
+fn AuditDependencyField(field: *Field) { unsafe {
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    var change = ctx.v_repl_type_changes;
+    while (change != null) {
+        var head = change.target.fields;
+        var previous = ctx.v_repl_type_changes;
+        while (previous != change) {
+            if (previous.target == change.target) { head = previous.saved.fields; }
+            previous = previous.next;
+        }
+        if (head != change.saved.fields) {
+            var current = head;
+            while (current != null) { if (current == field) { NativeExit(98); } current = current.next; }
+        }
+        change = change.next;
+    }
+    for (var i = ctx.v_repl_saved_types; i < ctx.v_naggregates; i = i + 1) {
+        var current = ctx.v_aggregate_types[i].fields;
+        while (current != null) { if (current == field) { NativeExit(98); } current = current.next; }
+    }
+}}
+fn AuditDependencyHeaders(shape: *AggregateType) { unsafe {
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    var change = ctx.v_repl_type_changes;
+    while (change != null) {
+        if (change.target == shape) {
+            let saved = &raw change.saved;
+            if (shape.kind != saved.kind || shape.element != saved.element ||
+                shape.origin != saved.origin || shape.generic_count != saved.generic_count) { NativeExit(99); }
+            if ((shape.kind == 2 || shape.kind == 6) && shape.count != saved.count) { NativeExit(99); }
+            for (var i:i64 = 0; i < 8; i = i + 1) {
+                if (shape.generic_args[i] != saved.generic_args[i]) { NativeExit(99); }
+            }
+        }
+        change = change.next;
+    }
+}}
+fn AuditDependencyLocal(a: *AuditDependencies, local: *Local) { unsafe {
+    if (local != null) { AuditDependencyAdd(a, local.type); }
+}}
+fn AuditDescriptorDependencies() -> i64 { unsafe {
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    let a = cast[*AuditDependencies](CAlloc(i64(sizeof(AuditDependencies))));
+    if (ctx.v_repl_graph != null) {
+        var node = ctx.v_repl_graph.nodes;
+        while (node != null) {
+            AuditDependencyAdd(a, node.type);
+            AuditDependencyLocal(a, node.root);
+            AuditDependencyLocal(a, node.summary_root);
+            var edge = node.edges;
+            while (edge != null) {
+                if (edge.kind == 1) {
+                    let field = cast[*Field](edge.key);
+                    if (field == null) { NativeExit(96); }
+                    AuditDependencyField(field);
+                    AuditDependencyAdd(a, field.type);
+                }
+                edge = edge.next;
+            }
+            node = node.next;
+        }
+    }
+    var loan = ctx.v_repl_loans;
+    while (loan != null) {
+        AuditDependencyAdd(a, loan.provenance_type);
+        AuditDependencyLocal(a, loan.root);
+        AuditDependencyLocal(a, loan.holder);
+        AuditDependencyLocal(a, loan.parent);
+        loan = loan.next;
+    }
+    var position:i64 = 0;
+    while (position < a.count) {
+        let type = a.queue[position];
+        position = position + 1;
+        if (type - 1000 >= ctx.v_repl_saved_types) { NativeExit(97); }
+        let shape = Shape(type);
+        AuditDependencyHeaders(shape);
+        // The final restored descriptor is the oldest matching snapshot. A lazy
+        // layout's scratch Fields are not retained dependencies unless a graph
+        // edge actually names them (checked separately above).
+        var change = ctx.v_repl_type_changes;
+        var effective = shape;
+        while (change != null) {
+            if (change.target == shape) { effective = &raw change.saved; }
+            change = change.next;
+        }
+        AuditDependencyAdd(a, effective.element);
+        AuditDependencyAdd(a, effective.origin);
+        for (var i:i64 = 0; i < 8; i = i + 1) { AuditDependencyAdd(a, effective.generic_args[i]); }
+        var field = effective.fields;
+        while (field != null) {
+            AuditDependencyField(field);
+            AuditDependencyAdd(a, field.type);
+            field = field.next;
+        }
+    }
+    let count = a.count;
+    Free(cast[*u8](a));
+    Out(cast[*u8]("AUDIT_DEPENDENCY_PREFLIGHT\n"));
+    return count;
+}}
+export "C" fn AuditDependencyProbe(mode: i64) { unsafe {
+    let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+    ctx.v_aggregate_types = cast[*AggregateType](CAlloc(4096 * i64(sizeof(AggregateType))));
+    ctx.v_naggregates = 2; ctx.v_repl_saved_types = 1;
+    var graph = ProvenanceGraph{};
+    ctx.v_repl_graph = &raw graph;
+    ProvenanceNodeNew(&raw graph, 101000, null, 1);
+    let root = &raw ctx.v_aggregate_types[0]; root.kind = 1;
+    ctx.v_aggregate_types[1].kind = 1;
+    var field = Field{}; var change = ReplTypeChange{}; var older = ReplTypeChange{};
+    if (mode == 1) { root.fields = &raw field; field.type = 101001; }
+    if (mode == 2) { root.kind = 5; root.element = 1001; }
+    if (mode == 3) { root.generic_args[0] = 1001; }
+    if (mode == 4) { root.origin = 1001; }
+    if (mode == 5) {
+        ctx.v_repl_saved_types = 2;
+        root.fields = &raw field; field.type = 101000;
+        root.element = 1001; ctx.v_aggregate_types[1].element = 1000;
+    }
+    if (mode == 6) {
+        ctx.v_repl_saved_types = 2;
+        change.target = root; change.saved = *root;
+        root.fields = &raw field; field.type = 1;
+        ctx.v_repl_type_changes = &raw change;
+        let node = graph.nodes;
+        if (!ProvenanceEdgeNew(node, 1, cast[i64](&raw field), node, 1)) { NativeExit(96); }
+    }
+    if (mode == 7) {
+        ctx.v_naggregates = 4096; ctx.v_repl_saved_types = 4096;
+        for (var i:i64 = 0; i < 4096; i = i + 1) {
+            ctx.v_aggregate_types[i].kind = 5;
+            if (i < 4095) { ctx.v_aggregate_types[i].element = i + 1001; }
+        }
+    }
+    if (mode == 8 || mode == 9) {
+        ctx.v_repl_saved_types = 2;
+        root.kind = 6; root.element = 1;
+        change.target = root; change.saved = *root;
+        ctx.v_repl_type_changes = &raw change;
+        if (mode == 8) { root.count = 1; }
+        if (mode == 9) { root.state = 2; root.size = 8; root.align = 8; }
+    }
+    if (mode == 10) {
+        change.target = root; change.saved = *root;
+        root.fields = &raw field; field.type = 1001;
+        ctx.v_repl_type_changes = &raw change;
+    }
+    if (mode == 11) {
+        ctx.v_repl_saved_types = 2;
+        change.target = root; change.saved = *root; change.saved.fields = &raw field;
+        older.target = root; older.saved = *root; change.next = &raw older;
+        field.type = 1; ctx.v_repl_type_changes = &raw change;
+        let node = graph.nodes;
+        if (!ProvenanceEdgeNew(node, 1, cast[i64](&raw field), node, 1)) { NativeExit(96); }
+    }
+    let count = AuditDescriptorDependencies();
+    if ((mode == 7 && count != 4096) || (mode == 5 && count != 2) ||
+        ((mode == 9 || mode == 10) && count != 1)) { NativeExit(96); }
+    NativeExit(0);
+}}

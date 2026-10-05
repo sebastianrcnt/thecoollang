@@ -1364,3 +1364,35 @@ Both lifecycle suites additionally exercise repeated generic parent assignments,
 on success and runtime failure, preserving old/new roots until forget. Production
 allocation tracking includes compiler allocations; legacy tracking covers graph
 internals only. Neither measures host-internal/JIT allocations or production RSS.
+
+
+## Recursive descriptor rollback preflight
+
+The descriptor audit now runs a pre-mutation worklist bounded by the compiler's
+4,096 aggregate-type limit. Seeds include every compact graph node type,
+root/summary-root Local type, loan result/root/holder/parent type and the type
+of every retained Field edge key. Pointer encodings normalize to their base.
+The closure follows elements, origins, generic arguments and nominal field types
+using the final effective descriptor after the journal is restored. Any reachable
+new type ID scheduled for clearing is rejected. Current graph Field keys are
+separately checked against scheduled frees, including Field lists from
+intermediate snapshots when a target appears in the journal more than once.
+
+Header checks cover kind/element/origin/generic binding, array length and
+reference mutability. Lazy-layout state/size/alignment and nominal field counts
+may be recomputed without changing those semantics. A scratch Field list absent
+from the effective saved layout need not remain allocated when no graph edge
+retains a key into it. Requiring every scratch Field in a pointer target to
+survive would confuse layout recomputation with retained descriptor identity.
+Eleven private metadata probes distinguish these cases: four transitive new-ID
+failures, direct/intermediate Field-key failures, a mutability-header failure,
+a descriptor cycle, a complete 4,096-type chain, state-only recomputation and
+unretained scratch layout restoration. Positive probes assert closure sizes.
+
+Ten supported source histories per frontend additionally include recursive
+owners, generic owner/raw-pointer arguments and scalar-slice stores before
+partial runtime failure. The audit tests these histories and modeled descriptor
+edges; it is not a proof of arbitrary nested borrowed storage or complete
+runtime/JIT lifetimes. ASan/UBSan instruments the generated production LLVM
+frontend plus host/runtime. The seed BIN/host remains an unsanitized parity
+control, including during `--sanitize` runs.

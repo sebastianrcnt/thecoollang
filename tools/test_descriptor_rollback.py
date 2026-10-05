@@ -53,10 +53,14 @@ U0 AuditAncestryGuards(){Local locals[6];ReferenceLoan loans[6];ProvenanceGraph 
 U0 AuditNegativeType(){ProvenanceGraph graph;MemSet(&graph,0,sizeof(ProvenanceGraph));repl_graph=&graph;ProvenanceNodeNew(&graph,101001,NULL,1);AuditDescriptorType(1001);NativeExit(99);}
 U0 AuditNegativeField(){ProvenanceGraph graph;Field field;ProvenanceNode *node;MemSet(&graph,0,sizeof(ProvenanceGraph));MemSet(&field,0,sizeof(Field));repl_graph=&graph;node=ProvenanceNodeNew(&graph,1,NULL,1);if(!ProvenanceEdgeNew(node,1,&field,node,1))NativeExit(99);AuditDescriptorField(&field);NativeExit(99);}
 '''
+AUDIT=(ROOT/'tools/fixtures/descriptor_dependencies.cool').read_text()+AUDIT
+LEGACY=(ROOT/'tools/fixtures/descriptor_dependencies_legacy.cool').read_text()+LEGACY
 DRIVER='''#include <string.h>
+#include <stdlib.h>
 extern int OriginalCompilerMain(int,char**);
+extern void AuditDependencyProbe(long long);
 extern void AuditNegativeType(void),AuditNegativeField(void),AuditAncestryGuards(void);
-int main(int argc,char**argv){if(argc==2 && !strcmp(argv[1],"audit-ancestry-guards"))AuditAncestryGuards();if(argc==2 && !strcmp(argv[1],"audit-negative-type"))AuditNegativeType();if(argc==2 && !strcmp(argv[1],"audit-negative-field"))AuditNegativeField();return OriginalCompilerMain(argc,argv);}
+int main(int argc,char**argv){if(argc==2 && !strncmp(argv[1],"audit-dependency-",17))AuditDependencyProbe(strtoll(argv[1]+17,0,10));if(argc==2 && !strcmp(argv[1],"audit-ancestry-guards"))AuditAncestryGuards();if(argc==2 && !strcmp(argv[1],"audit-negative-type"))AuditNegativeType();if(argc==2 && !strcmp(argv[1],"audit-negative-field"))AuditNegativeField();return OriginalCompilerMain(argc,argv);}
 '''
 CASES=[
  ('generic_parent', 'struct G[T]{r:&i64;v:T;}\nvar a=1;\nvar b=2;\nvar r=&a;\n{var temp=G[i64]{r:&b,v:3};r=temp.r;assert(false);}\n*r\nb=7;\n:forget r\nb=7;\nb\n','2\n7\n',2),
@@ -64,13 +68,17 @@ CASES=[
  ('generic_copy', 'struct G[T]{r:&i64;v:T;}\nvar a=1;\nvar b=2;\nvar r=&a;\n{let temp=G[[2]i64]{r:&b,v:[2]i64{3,4}};r=temp.r;assert(false);}\n*r\n:forget r\nb=8;\nb\n','2\n8\n',1),
  ('generic_return','struct G[T]{r:&i64;v:T;}\nfn get[T](p:G[T])->&i64 borrows(p){return p.r;}\nvar a=1;\nvar b=2;\nvar r=&a;\n{r=get[i64](G[i64]{r:&b,v:3});assert(false);}\n*r\n:forget r\nb=9;\nb\n','2\n9\n',1),
  ('physical_generic','struct G[T]{x:T;y:T;}\nvar p=G[i64]{x:1,y:2};\nlet r=&mut p;\nlet x=&mut (*r).x;\n{(*r).y=3;let temp=G[[2]i64]{x:[2]i64{1,2},y:[2]i64{3,4}};assert(false);}\n*x\n(*r).y\n:forget x\n:forget r\n:forget p\n','1\n3\n',1),
+ ('recursive_owner', 'import "std/mem";\nenum Chain{End;Link(Entry);}struct Entry{next:own[Chain];r:&i64;}\nstruct G[T]{v:T;}\nfn identity(p:own[Chain])->own[Chain] borrows(p){return move p;}\nvar a=7;\nvar p=new[Chain](Chain.Link(Entry{next:new[Chain](Chain.End),r:&a}));\n{p=identity(move p);let temp=G[[2]i64]{v:[2]i64{1,2}};assert(false);}\nmem.owner_count()\n:forget p\nmem.owner_count()\n','2\n0\n',1),
+ ('generic_owner', 'import "std/mem";\nenum Chain{End;Link(Entry);}struct Entry{next:own[Chain];r:&i64;}\nstruct G[T]{r:&i64;v:T;}\nvar a=1;\nvar b=2;\nvar p=G[own[Chain]]{r:&a,v:new[Chain](Chain.End)};\n{let temp=G[[2]i64]{r:&b,v:[2]i64{3,4}};p.r=temp.r;assert(false);}\n*p.r\nmem.owner_count()\nb=8;\n:forget p\nb=8;\nb\nmem.owner_count()\n','2\n1\n8\n0\n',2),
+ ('generic_raw_lazy', 'struct Inner{x:i64;}\nstruct G[T]{r:&i64;v:T;}\nvar a=1;\nvar b=2;\nvar p=G[*Inner]{r:&a,v:null};\n{let inner=Inner{x:3};let temp=G[[2]i64]{r:&b,v:[2]i64{3,4}};p.r=temp.r;assert(false);}\n*p.r\nb=8;\n:forget p\nb=8;\nb\n','2\n8\n',2),
+ ('slice_store', 'struct View{items:[]i64;}\nstruct G[T]{v:T;}\nfn set(dst:&mut View,src:[]i64) stores(dst,src){(*dst).items=src;}\nvar a=[2]i64{1,2};\nvar b=[2]i64{3,4};\nvar view=View{items:a[:]};\n{set(&mut view,b[:]);let temp=G[i64]{v:4};assert(false);}\nview.items[0]\nb[0]=7;\n:forget view\nb[0]=7;\nb[0]\n','3\n7\n',2),
  ('lazy_failure','struct Bad[T]{item:Bad[T];}\nstruct View{r:&i64;}\nvar a=1;\nvar v=View{r:&a};\nfn bad(){let x=Bad[i64]{};}\n*v.r\n:forget v\na=5;\na\n','1\n5\n',1),
 ]
 with tempfile.TemporaryDirectory(prefix='cool descriptor rollback ') as directory:
- tmp=Path(directory);production=sorted((ROOT/'compiler').glob('*.cool'));legacy=sorted((ROOT/'language').glob('*.cool'));files=production+legacy;hashes={str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files}
+ tmp=Path(directory);production=sorted((ROOT/'compiler').glob('*.cool'));legacy=sorted((ROOT/'language').glob('*.cool'));files=production+legacy+list((ROOT/'tools/fixtures').glob('descriptor_dependencies*.cool'));hashes={str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files}
  prod=tmp/'compiler';prod.mkdir()
  for f in production:(prod/f.name).write_bytes(f.read_bytes())
- types=prod/'28-repl-types.cool';s=types.read_text();assert s.count('Free(cast[*u8](current));')==1;s=s.replace('Free(cast[*u8](current));','AuditDescriptorField(current);Free(cast[*u8](current));');needle='ReplFreeFields(ctx.v_aggregate_types[i].fields);';assert s.count(needle)==1;s=s.replace(needle,'AuditDescriptorType(i + 1000);'+needle);types.write_text(s)
+ types=prod/'28-repl-types.cool';s=types.read_text();assert s.count('Free(cast[*u8](current));')==1;s=s.replace('Free(cast[*u8](current));','AuditDescriptorField(current);Free(cast[*u8](current));');needle='ReplFreeFields(ctx.v_aggregate_types[i].fields);';assert s.count(needle)==1;s=s.replace(needle,'AuditDescriptorType(i + 1000);'+needle);needle='while (ctx.v_repl_type_changes != null) {';assert s.count(needle)==2;s=s.replace(needle,'AuditDescriptorDependencies();'+needle,1);types.write_text(s)
  audit=prod/'99-descriptor-audit.cool';audit.write_text(AUDIT);manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(f)+'\n' for f in sorted(prod.glob('*.cool'))));ir=tmp/'compiler.ll'
  r=run([ROOT/'build/cool-compiler','llvm-bundle',manifest,ir]);assert r.returncode==0,r
  text=ir.read_text();assert text.count('define i32 @main(')==1;text=text.replace('define i32 @main(', 'define i32 @OriginalCompilerMain(')
@@ -83,25 +91,26 @@ with tempfile.TemporaryDirectory(prefix='cool descriptor rollback ') as director
   assert '__asan_report_load' in checked.read_text() and '__asan_report_store' in checked.read_text()
  seed=tmp/'language';seed.mkdir()
  for f in legacy:(seed/f.name).write_bytes(f.read_bytes())
- types=seed/'ReplTypes.cool';s=types.read_text();s='extern U0 AuditDescriptorField(Field *field);extern U0 AuditDescriptorType(I64 type);\n'+s;s=s.replace('next=field->next;Free(field);','next=field->next;AuditDescriptorField(field);Free(field);');s=s.replace('ReplFreeFields(aggregate_types[i].fields);','AuditDescriptorType(i+1000);ReplFreeFields(aggregate_types[i].fields);');types.write_text(s)
- native=seed/'Native.cool';s=native.read_text();assert s.endswith('LanguageMain;\n');s=s[:-len('LanguageMain;\n')]+LEGACY+'if(NativeArgCount()==2 && Eq(NativeArg(1),"audit-ancestry-guards"))AuditAncestryGuards();\nif(NativeArgCount()==2 && Eq(NativeArg(1),"audit-negative-type"))AuditNegativeType();\nif(NativeArgCount()==2 && Eq(NativeArg(1),"audit-negative-field"))AuditNegativeField();\nLanguageMain;\n';native.write_text(s)
+ types=seed/'ReplTypes.cool';s=types.read_text();s='extern I64 AuditDescriptorDependencies();extern U0 AuditDescriptorField(Field *field);extern U0 AuditDescriptorType(I64 type);\n'+s;assert s.count('next=field->next;Free(field);')==1;assert s.count('ReplFreeFields(aggregate_types[i].fields);')==1;assert s.count('U0 ReplRollbackTypes(){')==1;s=s.replace('U0 ReplRollbackTypes(){','U0 ReplRollbackTypes(){AuditDescriptorDependencies();');s=s.replace('next=field->next;Free(field);','next=field->next;AuditDescriptorField(field);Free(field);');s=s.replace('ReplFreeFields(aggregate_types[i].fields);','AuditDescriptorType(i+1000);ReplFreeFields(aggregate_types[i].fields);');types.write_text(s)
+ native=seed/'Native.cool';s=native.read_text();assert s.endswith('LanguageMain;\n');s=s[:-len('LanguageMain;\n')]+LEGACY+''.join(f'if(NativeArgCount()==2 && Eq(NativeArg(1),"audit-dependency-{i}"))AuditDependencyProbe({i});\n' for i in range(1,12))+'if(NativeArgCount()==2 && Eq(NativeArg(1),"audit-ancestry-guards"))AuditAncestryGuards();\nif(NativeArgCount()==2 && Eq(NativeArg(1),"audit-negative-type"))AuditNegativeType();\nif(NativeArgCount()==2 && Eq(NativeArg(1),"audit-negative-field"))AuditNegativeField();\nLanguageMain;\n';native.write_text(s)
  seed_binary=tmp/'frontend.BIN';env={**os.environ,'COOLC_COMPILER_BIN':str(ROOT/'coolc/seed/Compiler.BIN'),'ASAN_OPTIONS':'halt_on_error=1','UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1'}
  r=run([ROOT/'build/coolc',native,seed_binary],env=env);assert r.returncode==0,r
  observations=[]
  for name,front in [('production',[binary]),('seed',[ROOT/'build/coolc','--run',seed_binary])]:
-  for mode,exit_code in [('audit-ancestry-guards',0),('audit-negative-type',91),('audit-negative-field',92)]:
+  for mode,exit_code in [(f'audit-dependency-{i}',code) for i,code in enumerate([97,97,97,97,0,98,0,99,0,0,98],1)]+[('audit-ancestry-guards',0),('audit-negative-type',91),('audit-negative-field',92)]:
    r=run([*front,mode],env=env);assert r.returncode==exit_code,(name,mode,r)
   for case,source,output,errors in CASES:
    r=run([*front,'repl-quiet'],input=source+':quit\n',env=env)
    cleaned=''.join(line+'\n' for line in r.stdout.splitlines() if not line.startswith('AUDIT_'))
    assert (r.returncode,cleaned,r.stderr.count('error:'))==(0,output,errors),(name,case,r)
-   rows={key:r.stdout.count('AUDIT_'+label+'\n') for key,label in [('freed_fields','FIELD_FREE'),('cleared_types','TYPE_CLEAR'),('parent_type_matches','PARENT_TYPE')]}
+   rows={key:r.stdout.count('AUDIT_'+label+'\n') for key,label in [('freed_fields','FIELD_FREE'),('cleared_types','TYPE_CLEAR'),('parent_type_matches','PARENT_TYPE'),('dependency_preflights','DEPENDENCY_PREFLIGHT')]}
+   assert rows['dependency_preflights']>0,(name,case,rows)
    assert rows['parent_type_matches']==0,(name,case,rows)
    assert rows['cleared_types']>0 and (case=='lazy_failure' or rows['freed_fields']>0),(name,case,rows)
    print(name,case,rows)
    observations.append({'frontend':name,'case':case,**rows})
  assert hashes=={str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'source changed during audit'
- report={'source_sha256':hashes,'sanitize':args.sanitize,'observations':observations,'method':'Private copies of both actual frontends; before each rollback Field free and new type clear, reject matching live compact graph nodes/Field edges (including physical and auxiliary nodes), node roots/summary roots and loan root/holder/result types; negative controls prove detection. Dead ancestry leaves must be pruned before rollback; private role guards prove visible/root/holder/graph-root/summary-root descriptors remain unchanged and dead leaf metadata is not mutated. Direct encoded type IDs checked; this audit does not prove all recursive descriptor dependencies or arbitrary nested acceptance.'}
+ report={'source_sha256':hashes,'sanitize':args.sanitize,'sanitizer_scope':'Production generated LLVM/frontend, host and runtime only; seed BIN/host remains an unsanitized parity control.','dependency_controls':dict(enumerate([97,97,97,97,0,98,0,99,0,0,98],1)),'observations':observations,'method':'Private copies of both actual frontends; before each rollback Field free and new type clear, reject matching live compact graph nodes/Field edges (including physical and auxiliary nodes), node roots/summary roots and loan root/holder/result types; negative controls prove detection. Dead ancestry leaves must be pruned before rollback; private role guards prove visible/root/holder/graph-root/summary-root descriptors remain unchanged and dead leaf metadata is not mutated. A pre-mutation finite worklist follows pointer-normalized elements, nominal field types, origins and generic arguments using effective postrollback descriptors. It rejects new IDs, scheduled graph Field key frees (including intermediate journal snapshots) and semantic header changes, while allowing scratch lazy layouts with no retained key. Eleven synthetic dependency controls include cycles, 4096 types, generic/header changes and journal/scratch distinctions. Coverage is these histories and modeled metadata dependencies, not proof of arbitrary nested acceptance or complete runtime/JIT resource safety.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print('descriptor rollback: '+str(len(observations))+' actual frontend histories, negative controls and live graph/Field/type checks PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print('descriptor rollback: '+str(len(observations))+' actual frontend histories, negative controls and live graph/Field/type checks PASS'+(' with production LLVM/host/runtime ASan/UBSan (seed parity unsanitized)' if args.sanitize else ''))
  print(json.dumps(observations))

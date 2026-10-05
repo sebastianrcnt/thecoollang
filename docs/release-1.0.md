@@ -2221,7 +2221,8 @@ through ordinary evaluation or library use.
   actual frontends, inspecting all live compact arena nodes/edges, node roots/
   summary roots and loan result/root/holder/parent types. Negative controls prove
   detection and role probes preserve all live metadata. Six histories
-  per frontend pass normally and under ASan/UBSan, including generic return/copy,
+  per frontend pass normally; production LLVM/host/runtime additionally pass
+  ASan/UBSan (seed parity remains unsanitized), including generic return/copy,
   physical field recovery, failed recursive layout and reuse of rolled-back type
   IDs with a different generic layout. Direct encoded IDs are checked; recursive
   descriptor dependency coverage is still incomplete.
@@ -2242,6 +2243,33 @@ through ordinary evaluation or library use.
   Remaining recursive descriptor dependencies, parameter/aliased owner geometry,
   stored referents and borrowed slice elements are required work. All release
   gates remain Open.
+
+- Descriptor rollback coverage now includes finite recursive dependency closure
+  before any journal mutation, not only direct type IDs. The private audit follows
+  normalized pointer bases, element types, nominal field types, origins and
+  generic arguments through effective saved descriptors. It rejects reachable
+  IDs scheduled for clear, retained graph Field keys scheduled for free (including
+  intermediate journal snapshots), and graph-semantic header changes. Scratch
+  lazy-layout state/size/alignment and unretained Field lists may be restored.
+  Eleven synthetic controls on each actual frontend cover transitive failures,
+  cycles, an exactly 4,096-type closure, reference-mode changes, repeated target
+  snapshots and harmless scratch restoration. Ten actual source histories per
+  frontend pass, adding recursive owners, generic owner/raw-pointer arguments
+  and scalar-slice stores with runtime failure to the prior six histories.
+  Normal `descriptor-rollback-test` and `descriptor-rollback-sanitize-test` pass.
+  Sanitizers instrument production generated LLVM/host/runtime; seed execution
+  is an unsanitized parity control. Earlier wording implying sanitized seed
+  execution is corrected. These changes add validation only; compiler semantics
+  and emitted stage-2 IR are unchanged from the preceding verified commit:
+  `6a35a6f6c73e82911846faddf4a5306490b6671399557c76d42803a62470e509`.
+  Evidence: `build/release-audit/descriptor-dependencies-{focused,sanitize}.log`
+  and regenerated `build/descriptor-rollback{,-asan}-audit.json` with source and
+  helper hashes. This validates the modeled descriptor dependencies in these
+  histories, not all arbitrary nested storage or runtime/JIT lifetimes.
+  Before lifting nested storage guards, remaining implementation must preserve
+  external payload roots across arbitrary reference depth, connect borrowed
+  slice-element provenance separately from backing storage, and update stored
+  receiver aliases at arbitrary depth. All release gates remain Open.
 
 ## Next implementation checkpoints
 
