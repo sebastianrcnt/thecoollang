@@ -3118,6 +3118,18 @@ through ordinary evaluation or library use.
   and `ret` keyword). This closes the second documented G7 completion gap;
   broader recovery remains Open.
 
+- Runtime-failure contract: the specification now states the checked runtime
+  failures (integer division/remainder by zero or signed-minimum/-1, shift count
+  outside width, out-of-range floating conversion, index/slice bounds, null
+  dereference, failed assertion, allocation failure), that a checked failure
+  aborts with status 2 and a diagnostic naming the failure without unwinding or
+  running defers/owner drops, and that the tree/bytecode/JIT backends report the
+  source position while the optimized LLVM runtime reports the failure kind from
+  its C runtime. `make integer-semantics-test` already asserts exit status 2 and
+  the failure kind on both frontends, five engines and an optimized native build.
+  This completes G1's runtime-failure definition; the inference/coercion audit
+  and the other specification-freeze tasks stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

@@ -656,6 +656,34 @@ binaries. The sanitizer target adds compiler instrumentation and generated LLVM
 with the instrumented C runtime. These deterministic cases support this contract;
 they are not an exhaustive numerical equivalence proof.
 
+## Runtime failures
+
+Some operations are checked at run time rather than rejected statically.
+
+| Failure | Trigger |
+| --- | --- |
+| `invalid integer division` | integer division or remainder by zero, or signed minimum divided by -1, at any width |
+| `shift count outside operand width` | shift count negative or at least the operand width |
+| `floating conversion out of range` | an explicit floating conversion whose result is not representable |
+| `index out of bounds` | an array, slice or vector index outside `[0, length)` |
+| `slice bounds out of range` | `low < 0`, `high < low` or `high > length` |
+| `null pointer dereference` | a raw-pointer load or store through null |
+| `assertion failed` | `assert` with a false operand |
+| `out of memory`, `allocation size exceeds host range` | an allocation that cannot be satisfied |
+
+A checked failure aborts the program: it writes a diagnostic identifying the
+failure to standard error and exits with status 2. It does not unwind: no
+`defer`, implicit owner drop or scope cleanup runs, and no value is returned.
+The tree, bytecode and native-JIT backends include the source file, line and
+column in the diagnostic; the optimized LLVM runtime reports the failure kind
+from its linked C runtime. Source text and exact diagnostic wording are not a
+stable machine interface (see [compatibility](compatibility.md)).
+
+`make integer-semantics-test` runs the division/remainder/shift cases on both
+frontends, five engines and an optimized native build, asserting exit status 2
+and the failure kind in the diagnostic; the sanitizer target adds the
+ASan-instrumented runtime.
+
 ## Memory layout on the supported target
 
 The first supported target is little-endian 64-bit Apple Silicon macOS. Sizes
@@ -727,6 +755,9 @@ linked with the ASan/UBSan runtime. Dedicated ownership/reference/ABI tests rema
 necessary for validity and lifetime properties that a size/offset test cannot prove.
 
 ## Draft revisions
+
+- Draft 37: state the checked runtime-failure contract (triggers, abort with
+  status 2, no unwinding) and the source-position reporting of each backend.
 
 - Draft 26: add checked `stores(destination,source)` contracts, caller lifetime
   retention and compatible REPL replacement effects; keep nested stored work open.
@@ -1185,8 +1216,10 @@ Pop transfers a value before releasing its chunk; Big slots reset to None after
 transfer. Clear detaches chunks from the tail and drops each once, including all
 remaining owning payloads. The detached next pointer is null, so clear's
 recursive destruction depth for explicit clear does not grow with vector
-length. Ordinary scope-exit drop still follows the head chain recursively; this
-change does not establish bounded stack use for that path. Historical scoped
+length. Ordinary scope-exit drop of the head chain later became stack-bounded
+through the explicit-frame/worklist destruction described in
+[compiler invariants](compiler-invariants.md); this draft itself did not change
+that path. Historical scoped
 roots remain retained until the binding's scope ends. There is one chunk
 allocation per 32 elements and no per-element allocation.
 
@@ -1194,3 +1227,14 @@ The byte chunk is again 48 bytes rather than 528. Vector itself grows from 24
 to 32 bytes because it keeps two nullable heads. This is a private development
 layout change, not a frozen C ABI. G1/G2/G4/G5/G8 remain subject to the full
 release contract and final audits.
+
+### Draft 37: runtime failure contract
+
+Added the [runtime failures](#runtime-failures) section: the checked failures,
+their triggers, the abort with status 2, the absence of unwinding, and the
+backend source-position reporting. `make integer-semantics-test` asserts the exit
+status and failure kind across both frontends, five engines and an optimized
+native build. This completes the specification's runtime-failure item; the
+remaining specification-freeze tasks in
+[work required before freezing](#work-required-before-freezing-this-specification)
+stay open.
