@@ -758,10 +758,63 @@ The sanitizer target adds the ASan compiler and ASan-instrumented emitted LLVM
 linked with the ASan/UBSan runtime. Dedicated ownership/reference/ABI tests remain
 necessary for validity and lifetime properties that a size/offset test cannot prove.
 
+## Value copying, moving and initialization
+
+This section states the copy, move, initialization and cleanup rules in language
+terms, independent of any compiler-internal representation.
+
+A type is either copyable or move-only.
+
+- Scalars (`bool`, the fixed-width integers, `f32`/`f64`, `usize`/`isize`), raw
+  pointers and scoped references (`&T`, `&mut T`) are copyable. Binding,
+  passing, storing or returning one copies the value and leaves the source
+  usable. Copying a reference copies the reference itself, not its pointee, and
+  the copy is subject to the same loan and lifetime rules as the original.
+- An owning value (`own[T]`) is move-only. Copying it is rejected; `move`
+  transfers ownership and leaves the source unusable until it is reinitialized by
+  a new initializer or a valid assignment. Moving an owner transfers its pending
+  cleanup to the destination, so the source no longer drops it and the value is
+  dropped exactly once.
+- An aggregate (struct, fixed array or enum) is copyable exactly when every one
+  of its fields or elements is copyable, and move-only otherwise. A scalar array
+  and a struct/enum of scalars or references are copyable; an array, struct or
+  enum containing an owner is move-only.
+- A function-body slice (`[]T`) is a non-owning view. Binding it to another name
+  copies the view without transferring the source storage, and the copy shares
+  the source's loan.
+
+Initialization:
+
+- Every binding has an initializer. `new[T](value)` allocates an owner
+  initialized from `value`; `new[T]()` default-initializes `T` by zeroing it.
+- An aggregate literal must supply each field or element. `T{}` and `[N]T{}`
+  request default zero initialization. A stored scoped reference requires an
+  explicit initializer; an owner field or binding that has been moved out is
+  unusable until validly reinitialized.
+- Aggregate initializer expressions evaluate in their written order, and
+  `new[T](value)` evaluates `value` before storing it.
+
+Cleanup:
+
+- A bound owner registers an implicit drop at the end of its lexical scope.
+  Implicit drops and explicit `defer` calls run in reverse registration order, so
+  a later deferred observer runs before an earlier owner's drop and an earlier
+  observer runs after it.
+
+`make ownership-test`, `make owner-evaluation-test`, `make control-flow-test` and
+`make references-test` exercise these rules, including move-until-reinitialized,
+use-after-move rejection, copy-versus-move by field type, once-only drop and
+reverse cleanup ordering, across both frontends, five engines and optimized
+native builds.
+
 ## Draft revisions
 
 - Draft 37: state the checked runtime-failure contract (triggers, abort with
   status 2, no unwinding) and the source-position reporting of each backend.
+- Draft 38: state the value copy/move/initialization/cleanup rules in language
+  terms (copyable scalars, pointers and references; move-only owners; aggregate
+  copyability by field; slice views; default zero initialization; once-only drop
+  and reverse cleanup order) independent of compiler-internal representations.
 
 - Draft 26: add checked `stores(destination,source)` contracts, caller lifetime
   retention and compatible REPL replacement effects; keep nested stored work open.
@@ -836,6 +889,10 @@ a link is not proof that a release gate is closed.
    across tree, bytecode, native JIT and optimized LLVM.
 3. State layout/alignment, copy/move/initialization, evaluation order, cleanup and
    unsafe/C obligations independently of compiler-internal representations.
+   Layout/alignment, evaluation order, cleanup and value copy/move/initialization
+   are now stated normatively (see "Value copying, moving and initialization" and
+   "Memory layout on the supported target"); the consolidated unsafe/C obligation
+   statement and the remaining conformance mapping are pending.
 4. Consolidate package visibility, module-format/versioning and REPL replacement
    contracts, with executable positive and rejection examples.
 5. Resolve remaining ownership/storage restrictions and language decisions;

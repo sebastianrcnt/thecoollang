@@ -3346,6 +3346,18 @@ through ordinary evaluation or library use.
   is closed. Extending ergonomics further remains tracked improvement work, not
   a silent-acceptance defect.
 
+- Specification: added a normative "Value copying, moving and initialization"
+  section (draft 38) stating copyable versus move-only types (scalars, raw
+  pointers and references copy; owners move; aggregates copy by field; slices are
+  copied views), `new`/literal/default initialization, move-until-reinitialized,
+  once-only drop and reverse cleanup order in language terms rather than
+  compiler-internal ones. Each rule was checked against the implementation on
+  both frontends; the referenced `ownership-test`, `owner-evaluation-test`,
+  `control-flow-test` and `references-test` targets exercise them. This advances
+  G1's layout/copy/move/initialization/cleanup item; the consolidated unsafe/C
+  obligation statement, the whole-language conformance mapping and the remaining
+  freeze tasks stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
