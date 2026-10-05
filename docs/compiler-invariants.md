@@ -1555,3 +1555,47 @@ and new destination contracts, and pending-owner RHS move/replacement controls.
 Complete contracts execute; missing contracts reach the stores diagnostic;
 pending owner invalidation rejects. This does not enable production nested
 storage or establish the remaining slice-element and arbitrary alias guarantees.
+
+## Borrowed slice backing storage and element payloads
+
+A slice of borrowed elements must carry two lifetime layers. Array-to-slice
+formation always acquires the backing array's physical storage, even when its
+initializer already has element payload loans. Before this distinction, finding
+an initializer root suppressed the backing root: a private guard-bypass build
+accepted returning a local element slot and modifying an array while its slice
+was live. Neither accepted negative was executed.
+
+The backing loan has layer zero. Element values have layer one: formation
+selects the array element graph and wraps it under the slice Element edge.
+Its added selection cursor is stack storage and is detached before freeing the
+owned cursor chain. Copying an element selects the payload layer; taking its
+slot address still retains backing storage. Addressing the value behind the
+stored reference selects its payload root. Whole slice copies preserve both.
+Slice parameters likewise distinguish explicit external backing storage from
+borrowed element roots, rather than assigning the callee descriptor to either.
+
+`ReferenceLayered` includes borrowed slices as well as nested references for
+computed acquisitions, projections and call-result layer preservation. Slice
+call payload summaries use an Element edge and a distinct summary kind (5).
+They do not fabricate a referent edge or raise source capability. Repeated
+calls remain conservative about unknown field/element correspondence.
+
+Stores install into the backing holder and update its live slice receivers.
+Receiver graphs select the storage Element and wrap it as a slice Element;
+receiver mode is intersected with reference capability only for reference
+receivers. This preserves newly installed roots when a later element copy is
+returned. Local source escape rejects; contracted external source storage and
+return succeed. The pre-existing scoped checks reject live mutable aliases,
+and allow access after the derived borrow's scope ends.
+
+The private slice-readiness corpus covers 26 additional programs per frontend:
+local/external payload and slot returns, callee descriptor escape, short stores,
+retained source/array mutations, shared-path authority, complete/missing stores
+contracts, computed identity returns, subslices, stored return values and live
+versus released mutable aliases. It removes ReferenceStorage and exactly the
+slice-element type/parser guards in copied compiler sources; production guards
+remain active. Positives run on all engines/O2. A separate sanitizer target
+annotates every private production frontend function, verifies generated ASan
+load/store instrumentation, and executes the corpus with halt-on-error enabled.
+This is readiness evidence, not complete arbitrary nested slice/alias/recursive
+storage coverage or production feature enablement.

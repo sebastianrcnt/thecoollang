@@ -577,3 +577,12 @@ test: nested-reference-depth-readiness-test
 nested-reference-store-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
 	python3 tools/test_nested_reference_probe.py --legacy --stores --all-engines --assert-expectations --output build/nested-reference-store-readiness-audit.json
 test: nested-reference-store-readiness-test
+
+# Borrowed elements retain backing storage and payload roots separately.
+# This private guard-bypass audit does not enable the production feature.
+.PHONY: nested-reference-slice-readiness-test nested-reference-slice-sanitize-test
+nested-reference-slice-readiness-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_nested_reference_probe.py --legacy --slices --all-engines --assert-expectations --output build/nested-reference-slice-readiness-audit.json
+test: nested-reference-slice-readiness-test
+nested-reference-slice-sanitize-test: build/cool-compiler build/language.BIN build/coolc build/compiler-host.o build/language-runtime.o
+	python3 tools/test_nested_reference_probe.py --legacy --slices --sanitize --assert-expectations --output build/nested-reference-slice-asan-audit.json

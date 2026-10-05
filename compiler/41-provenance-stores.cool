@@ -67,7 +67,14 @@ fn ReferenceReceiverGraph(check: *ReferenceCheck, source: *ReferenceLoan, type: 
         if (result.provenance == null && source.provenance_known == 0) {
             result.provenance = ReferenceGraphValueNode(check.graph, source.provenance_type, source.root, ReferenceRootMode(source), 1);
         }
-        if (IsReference(type) && Shape(type).element == source.provenance_type) {
+        if (ReferenceBorrowedSlice(type)) {
+            var element = ProvenanceCursor{};
+            element.type = source.provenance_type; element.kind = 2;
+            var selected = ReferenceSelectGraph(check, source, &raw element, 1, Shape(type).element);
+            result.provenance = null;
+            result.provenance_known = selected.known;
+            if (selected.node != null) { result.provenance = ReferenceGraphParent(check.graph, type, 2, 0, selected.node); }
+        } else if (IsReference(type) && Shape(type).element == source.provenance_type) {
             if (result.provenance != null) { result.provenance = ReferenceGraphParent(check.graph, type, 3, 0, result.provenance); }
             result.provenance_known = 1;
         } else {

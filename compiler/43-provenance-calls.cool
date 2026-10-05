@@ -5,7 +5,7 @@
 fn ReferenceBoundedSummary(check: *ReferenceCheck, type: i64, root: *Local, mode: i64, payload: bool) -> *ProvenanceNode {
     unsafe {
         var kind: i64 = 2;
-        if (payload) { kind = 3; }
+        if (payload) { kind = 3; if (ReferenceBorrowedSlice(type)) { kind = 5; } }
         var old = check.graph.nodes;
         while (old != null) {
             if (old.summary_kind == kind && old.summary_root == root && old.type == type && old.summary_mode == mode) { return old; }
@@ -20,7 +20,9 @@ fn ReferenceBoundedSummary(check: *ReferenceCheck, type: i64, root: *Local, mode
         var result: *ProvenanceNode = null;
         if (payload) {
             result = ProvenanceNodeNew(check.graph, type, null, 1);
-            if (!ProvenanceEdgeNew(result, 3, 0, base, mode)) { Error(cast[*u8]("invalid internal call payload summary")); }
+            var edge_kind:i64 = 3;
+            if (ReferenceBorrowedSlice(type)) { edge_kind = 2; }
+            if (!ProvenanceEdgeNew(result, edge_kind, 0, base, mode)) { Error(cast[*u8]("invalid internal call payload summary")); }
         } else {
             result = ProvenanceNodeNew(check.graph, type, base.root, base.exclusive & mode);
             result.opaque = base.opaque;
@@ -42,11 +44,11 @@ fn ReferenceCallGraph(check: *ReferenceCheck, source: *ReferenceLoan, type: i64,
         result.provenance_type = type;
         if (source.provenance == null && source.provenance_known != 0) { return result; }
         let bound = source.exclusive & ReferenceRootMode(source);
-        if (NestedReference(type) && indirect == 0) {
+        if (ReferenceLayered(type) && indirect == 0) {
             // A result's physical address may be any contracted source anchor.
             result.provenance = ReferenceGraphLeaf(check.graph, type, source.root, bound);
         } else {
-            result.provenance = ReferenceBoundedSummary(check, type, source.root, bound, NestedReference(type) && indirect != 0);
+            result.provenance = ReferenceBoundedSummary(check, type, source.root, bound, ReferenceLayered(type) && indirect != 0);
         }
         result.provenance_known = 1;
         if (result.provenance != null) { result.provenance_known = BoolInt(result.provenance.opaque == 0); }

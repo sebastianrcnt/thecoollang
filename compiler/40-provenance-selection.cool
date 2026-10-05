@@ -179,7 +179,11 @@ fn ReferenceNewSelected(check: *ReferenceCheck, source: *ReferenceLoan, parent: 
             scoped.provenance_known = 0;
             selected.physical_provenance = null;
         }
-        ReferenceSelectLoan(check, &raw selected, &raw scoped, place, via, origin, payload);
+        if (expression.kind == 26 && expression.op == 2 && ReferenceBorrowedSlice(expression.type)) {
+            ReferenceSliceElementGraph(check, &raw selected, &raw scoped, expression, place, via);
+        } else {
+            ReferenceSelectLoan(check, &raw selected, &raw scoped, place, via, origin, payload);
+        }
         // A precise terminal at the selected reference value denotes its
         // physical storage. Deeper roots stay in the payload layer.
         var selected_layer = indirect;
@@ -244,3 +248,31 @@ fn ReferenceComputedGraph(check: *ReferenceCheck, loan: *ReferenceLoan, place: *
         if (NestedReference(expression.type) && target.provenance != null && target.provenance_known != 0 && target.provenance.root == loan.root && target.provenance.edges == null) { loan.indirect = 0; }
     }
 }
+
+// Keep array element value provenance under the slice's element edge, separate
+// from the mandatory backing-storage loan created by acquisition.
+fn ReferenceSliceElementGraph(check:*ReferenceCheck,target:*ReferenceLoan,source:*ReferenceLoan,expression:*Node,place:*Node,via:*Local) { unsafe {
+    var cursor = ReferencePlaceCursor(place, via, null);
+    var array_type = place.type;
+    if (Pointer(array_type) != i8(0)) { array_type = array_type - 100000; }
+    var element = ProvenanceCursor{};
+    element.type = array_type; element.kind = 2;
+    var path = cursor.path;
+    if (path == null) { path = &raw element; }
+    else {
+        var tail = path;
+        while (tail.next != null) { tail = tail.next; }
+        tail.next = &raw element;
+    }
+    var selected = ReferenceSelectGraph(check, source, path, cursor.complete, Shape(expression.type).element);
+    // The appended cursor is stack storage, never owned by ReferenceCursorFree.
+    if (cursor.path != null) {
+        var tail = cursor.path;
+        while (tail.next != &raw element) { tail = tail.next; }
+        tail.next = null;
+    }
+    ReferenceCursorFree(cursor.path);
+    target.provenance = null;
+    target.provenance_known = selected.known;
+    if (selected.node != null) { target.provenance = ReferenceGraphParent(check.graph, expression.type, 2, 0, selected.node); }
+}}

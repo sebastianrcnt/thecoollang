@@ -62,7 +62,14 @@ fn ReferenceTypeSummary(check: *ReferenceCheck, type: i64, root: *Local) -> *Pro
 fn ReferenceParameterGraph(check: *ReferenceCheck, loan: *ReferenceLoan, type: i64, payload: bool) {
     unsafe {
         loan.provenance_type = type;
-        if (payload && IsReference(type)) {
+        if (ReferenceBorrowedSlice(type)) {
+            loan.provenance = ReferenceGraphValueNode(check.graph, type, loan.root, loan.exclusive, 0);
+            if (payload) {
+                let child = ReferenceTypeSummary(check, Shape(type).element, loan.root);
+                loan.provenance = null;
+                if (child != null) { loan.provenance = ReferenceGraphParent(check.graph, type, 2, 0, child); }
+            }
+        } else if (payload && IsReference(type)) {
             let child = ReferenceTypeSummary(check, Shape(type).element, loan.root);
             loan.provenance = null;
             if (child != null) { loan.provenance = ReferenceGraphParent(check.graph, type, 3, 0, child); }

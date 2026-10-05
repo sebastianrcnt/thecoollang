@@ -193,6 +193,58 @@ for operation, helper, parameters, contracts, rhs in (
     STORE_CASES.append((name,'reject',code))
     STORE_DIAGNOSTICS[name]='conflicts'
 
+SLICE_CASES = [
+    ('slice_reference_read', 'accept', 'fn main(){var a=7;var b=9;var refs=[2]&i64{&a,&b};var s=refs[:];assert(*s[0]==7 && *s[1]==9);}'),
+    ('slice_local_payload_return', 'accept', 'fn get(x:&i64)->&i64 borrows(x){var refs=[1]&i64{x};var s=refs[:];return s[0];}fn main(){var a=7;let r=get(&a);assert(*r==7);}'),
+    ('slice_local_payload_address_return', 'accept', 'fn get(x:&i64)->&i64 borrows(x){var refs=[1]&i64{x};var s=refs[:];return &*s[0];}fn main(){var a=7;let r=get(&a);assert(*r==7);}'),
+    ('slice_local_scalar_return', 'reject', 'fn bad(x:&i64)->&i64 borrows(x){var a=7;var refs=[1]&i64{&a};var s=refs[:];return s[0];}fn main(){}'),
+    ('slice_local_slot_return', 'reject', 'fn bad(x:&i64)->& &i64 borrows(x){var refs=[1]&i64{x};var s=refs[:];return &s[0];}fn main(){}'),
+    ('slice_local_descriptor_return', 'reject', 'fn bad(x:&i64)->[]&i64 borrows(x){var refs=[1]&i64{x};return refs[:];}fn main(){}'),
+    ('slice_parameter_payload_return', 'accept', 'fn get(s:[]&i64)->&i64 borrows(s){return s[0];}fn main(){var a=7;var refs=[1]&i64{&a};let r=get(refs[:]);assert(*r==7);}'),
+    ('slice_parameter_slot_return', 'accept', 'fn get(s:[]&i64)->& &i64 borrows(s){return &s[0];}fn main(){var a=7;var refs=[1]&i64{&a};let r=get(refs[:]);assert(**r==7);}'),
+    ('slice_short_payload_store', 'reject', 'fn main(){var a=7;var refs=[1]&i64{&a};var s=refs[:];{var b=9;s[0]=&b;}assert(*s[0]==7);}'),
+    ('slice_retained_payload_mutation', 'reject', 'fn main(){var a=7;var b=9;var refs=[1]&i64{&a};var s=refs[:];s[0]=&b;b=11;}'),
+    ('slice_array_mutation_while_borrowed', 'reject', 'fn main(){var a=7;var b=9;var refs=[1]&i64{&a};var s=refs[:];refs[0]=&b;}'),
+    ('slice_mutable_payload', 'accept', 'fn main(){var a=7;var refs=[1]&mut i64{&mut a};{var s=refs[:];*s[0]=9;assert(*s[0]==9);}assert(*refs[0]==9);}'),
+    ('slice_shared_descriptor_mutable_copy', 'reject', 'fn bad(s:&[]&mut i64){let r=(*s)[0];*r=9;}fn main(){}'),
+    ('slice_shared_descriptor_mutable_address', 'reject', 'fn bad(s:&[]&mut i64){let r=&mut *(*s)[0];*r=9;}fn main(){}'),
+]
+SLICE_CASES.extend([
+    ('slice_computed_local_payload_return', 'accept', 'fn identity(s:[]&i64)->[]&i64 borrows(s){return s;}fn get(x:&i64)->&i64 borrows(x){var refs=[1]&i64{x};return identity(refs[:])[0];}fn main(){var a=7;let r=get(&a);assert(*r==7);}'),
+    ('slice_computed_local_slot_return', 'reject', 'fn identity(s:[]&i64)->[]&i64 borrows(s){return s;}fn bad(x:&i64)->& &i64 borrows(x){var refs=[1]&i64{x};return &identity(refs[:])[0];}fn main(){}'),
+    ('slice_parameter_descriptor_return', 'reject', 'fn bad(s:[]&i64)->&[]&i64 borrows(s){return &s;}fn main(){}'),
+    ('slice_subslice_payload_return', 'accept', 'fn get(x:&i64)->&i64 borrows(x){var refs=[2]&i64{x,x};var s=refs[:];var t=s[1:];return t[0];}fn main(){var a=7;let r=get(&a);assert(*r==7);}'),
+    ('slice_subslice_slot_return', 'reject', 'fn bad(x:&i64)->& &i64 borrows(x){var refs=[2]&i64{x,x};var s=refs[:];var t=s[1:];return &t[0];}fn main(){}'),
+    ('slice_subslice_store', 'accept', 'fn main(){var a=7;var b=9;var refs=[2]&i64{&a,&a};{var s=refs[:];{var t=s[1:];t[0]=&b;assert(*t[0]==9);}}assert(*refs[0]==7 && *refs[1]==9);}'),
+])
+
+SLICE_CASES.extend([
+    ('slice_stored_local_payload_return', 'reject', 'fn bad(x:&i64)->&i64 borrows(x){var refs=[1]&i64{x};var s=refs[:];var b=9;s[0]=&b;return s[0];}fn main(){}'),
+    ('slice_stored_external_payload_return', 'accept', 'fn get(x:&i64,y:&i64)->&i64 borrows(x,y){var refs=[1]&i64{x};var s=refs[:];s[0]=y;return s[0];}fn main(){var a=7;var b=9;let r=get(&a,&b);assert(*r==9);}'),
+])
+
+SLICE_CASES.extend([
+    ('slice_live_mutable_payload_alias', 'reject', 'fn main(){var a=7;var refs=[1]&mut i64{&mut a};var s=refs[:];let r=&mut *s[0];*s[0]=9;assert(*r==9);}'),
+    ('slice_released_mutable_payload_alias', 'accept', 'fn main(){var a=7;var refs=[1]&mut i64{&mut a};var s=refs[:];{let r=&mut *s[0];*r=8;}*s[0]=9;assert(*s[0]==9);}'),
+])
+STORE_DIAGNOSTICS['slice_live_mutable_payload_alias']='conflicts'
+
+STORE_DIAGNOSTICS.update({
+    'slice_short_payload_store':'assigned borrow may outlive local storage',
+    'slice_retained_payload_mutation':'conflicts',
+    'slice_array_mutation_while_borrowed':'conflicts',
+    'slice_shared_descriptor_mutable_copy':'shared reference',
+    'slice_shared_descriptor_mutable_address':'shared path',
+})
+
+for contract in (False, True):
+    header='fn set(s:&mut []&i64,x:&i64)'+(' stores(s,x)' if contract else '')
+    body='{(*s)[0]=x;}'
+    main='fn main(){var a=7;var b=9;var refs=[1]&i64{&a};{var s=refs[:];set(&mut s,&b);assert(*s[0]==9);}assert(*refs[0]==9);}' if contract else 'fn main(){}'
+    name='slice_store_'+('complete_contract' if contract else 'missing_contract')
+    SLICE_CASES.append((name,'accept' if contract else 'reject',header+body+main))
+    if not contract:STORE_DIAGNOSTICS[name]='matching stores'
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -202,9 +254,12 @@ def main():
     parser.add_argument('--unsafe-root-predicate', action='store_true', help='Private countermodel replacing explicit external-root identity with the disproven type predicate')
     parser.add_argument('--assert-expectations', action='store_true')
     parser.add_argument('--stores', action='store_true', help='Include nested receiver replacement and contract lifetime cases')
+    parser.add_argument('--sanitize', action='store_true', help='Instrument the private production frontend with AddressSanitizer/UBSan')
     parser.add_argument('--all-engines', action='store_true', help='Run accepted positives on tree/VM/JIT/LLVM/LLVM-JIT and release AOT')
     parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases')
+    parser.add_argument('--slices', action='store_true', help='Include borrowed slice element, lifetime, capability and stores cases')
     args = parser.parse_args()
+    if args.slices: CASES.extend(SLICE_CASES)
     if args.deep: CASES.extend(DEEP_CASES)
     if args.stores: CASES.extend(STORE_CASES)
     assert len({name for name, _, _ in CASES}) == len(CASES)
@@ -230,9 +285,24 @@ def main():
             assert text.count('root.reference_external == 0')==1
             text=text.replace('root.reference_external == 0','(root.type != 0 && !IsReference(root.type))')
         target.write_text(text)
+        if args.slices:
+            types=private/'03-types.cool';text=types.read_text()
+            guard='if(Borrowed(shape.element)!=i8(0)){ErrorAt(shape.token,cast[*u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));}'
+            assert text.count(guard)==1;types.write_text(text.replace(guard,''))
+            parser=private/'37-parser-projections.cool';text=parser.read_text()
+            guard='                    if (Borrowed(element) != i8(0)) {\n                        ErrorAt(token, cast[ * u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));\n                    }\n'
+            assert text.count(guard)==1;parser.write_text(text.replace(guard,''))
         manifest=tmp/'sources';manifest.write_text(''.join('__main\t'+str(p)+'\n' for p in sorted(private.glob('*.cool'))))
         ir=tmp/'compiler.ll';r=run([copies[0],'llvm-bundle',manifest,ir]);assert r.returncode==0,r
-        frontend=tmp/'probe-frontend';r=run(['clang','-Wno-override-module','-O2',ir,*copies[1:],'-lffi','-o',frontend]);assert r.returncode==0,r
+        frontend_flags=[]
+        if args.sanitize:
+            ir.write_text('\n'.join(line.replace(' {',' sanitize_address {') if line.startswith('define ') else line for line in ir.read_text().splitlines())+'\n')
+            checked=tmp/'instrumented-frontend.ll'
+            r=run(['clang','-Wno-override-module','-O1','-fsanitize=address','-S','-emit-llvm',ir,'-o',checked]);assert r.returncode==0,r
+            assert '__asan_report_load' in checked.read_text() and '__asan_report_store' in checked.read_text()
+            frontend_flags=['-fsanitize=address,undefined','-fno-omit-frame-pointer']
+            env.update(ASAN_OPTIONS='halt_on_error=1',UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
+        frontend=tmp/'probe-frontend';r=run(['clang','-Wno-override-module','-O2',*frontend_flags,ir,*copies[1:],'-lffi','-o',frontend]);assert r.returncode==0,r
         fronts=[('production',[frontend])]
         if args.legacy:
             seed=tmp/'language';seed.mkdir()
@@ -242,7 +312,15 @@ def main():
             if args.unsafe_root_predicate:
                 assert text.count('!root->reference_external')==1
                 text=text.replace('!root->reference_external','(root->type && !IsReference(root->type))')
-            refs.write_text(text);binary=tmp/'frontend.BIN';r=run([ROOT/'build/coolc',seed/'Native.cool',binary]);assert r.returncode==0,r
+            refs.write_text(text)
+            if args.slices:
+                types=seed/'Types.cool';text=types.read_text()
+                guard='if(Borrowed(shape->element))ErrorAt(shape->token,"slice elements cannot contain borrowed slices until lifetime analysis exists");'
+                assert text.count(guard)==1;types.write_text(text.replace(guard,''))
+                parser=seed/'Parser.cool';text=parser.read_text()
+                guard='                if (Borrowed(element)) ErrorAt(t, "slice elements cannot contain borrowed slices until lifetime analysis exists");\n'
+                assert text.count(guard)==1;parser.write_text(text.replace(guard,''))
+            binary=tmp/'frontend.BIN';r=run([ROOT/'build/coolc',seed/'Native.cool',binary]);assert r.returncode==0,r
             fronts.append(('seed',[ROOT/'build/coolc','--run',binary]))
         control_source=next(source for name,_,source in CASES if name=='reference_parameter_slot_return')
         control=tmp/'production-slot-control.cool';control.write_text(control_source)
@@ -279,7 +357,7 @@ def main():
                 # Accepted negative cases are intentionally never executed.
                 observations.append(row);print(front_name,name,expected,observed)
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,slices=args.slices,sanitize=args.sanitize,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; ReferenceStorage bypassed; --slices additionally removes only the slice-element type/parser restrictions. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:
             failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]

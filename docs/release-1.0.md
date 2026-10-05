@@ -2411,6 +2411,32 @@ through ordinary evaluation or library use.
   `e0801b26b44ab0cf4ba3e2d69ffded8080725fcbcc0676514028a7befa7d857e`.
   Production nested storage restrictions remain; all release gates remain Open.
 
+- Borrowed slice backing and element roots: private type/parser guard bypass
+  exposed two unsafe acceptances (local element-slot return and direct mutation
+  of a sliced array); neither negative was executed. Formation now always
+  retains backing storage and selects typed element payloads separately.
+  Slice parameters, computed/call values and subslices preserve their layers;
+  live receiver graphs acquire newly stored source roots. Local stored return
+  escape rejects, while contracted external source stores/returns succeed.
+  Added 26 private fixtures per frontend and permanent readiness/sanitizer
+  targets; actual production storage/type/parser restrictions remain active.
+  Combined depth/store/slice audit: 164 classifications and 384 positive
+  execution runs across five engines plus O2 PASS with no gaps. The private
+  frontend's instrumented slice audit passes 76 classifications and 32 tree
+  runs, with ASan load/store instrumentation explicitly verified. Existing
+  graph/copy/loan/selection/access/physical/descriptor/stores sanitizer targets
+  PASS. Reports match current compiler/legacy source hashes.
+  Evidence: `build/release-audit/slice-backing-{regression,sanitize,combined-readiness}.log`,
+  `build/release-audit/slice-backing-combined-readiness.json`,
+  `build/nested-reference-slice-asan-audit.json`, and the failing private
+  `build/release-audit/borrowed-slice-lifetime-baseline.json` countermodel.
+  Full `make -j4 test bootstrap-check editor-distribution-test` PASS, including
+  the new permanent slice-readiness target, external distribution and identical
+  bootstrap/stage2/stage3 IR/native binaries. Stage-2 IR SHA256:
+  `863864f64fc672bf531257cf6754bf2c99e97e78da2f06a82ffa61afa59be49b`.
+  Arbitrary nested/recursive/alias slice storage and persistent REPL lifetimes
+  still require audit before enabling the feature. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

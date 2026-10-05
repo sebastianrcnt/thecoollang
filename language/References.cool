@@ -78,6 +78,8 @@ U0 ReferenceMatchBinding(Node *binding){
 ReferenceLoan *ReferenceHolder(ReferenceCheck *check,Local *holder,Local *root){
     ReferenceLoan *loan;for(loan=check->loans;loan;loan=loan->next)if(holder && loan->holder==holder && loan->root==root)return loan;return NULL;
 }
+extern Bool ReferenceBorrowedSlice(I64 type);
+extern Bool ReferenceLayered(I64 type);
 Bool NestedReference(I64 type){return IsReference(type) && Borrowed(Shape(type)->element);}
 Bool ReferenceThroughStored(Node *place){Node *current=place;I64 kind;while(current){kind=PlaceProjectionKind(current);if(kind==2 && current->op==A_SLICE)return TRUE;if(kind==3)return current->a->kind==N_LOAD;current=PlaceProjectionParent(current);}return FALSE;}
 Bool ReferenceMatches(ReferenceCheck *check,Node *place,Local *via,Local *root,Bool writing){
@@ -131,26 +133,26 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
 extern I64 ReferenceAcquisitionLayer(Node *place,Local *via,Node *expression,I64 fallback);
 U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *token,Node *expression,Bool owner_slot){
     Local *via=BorrowRoot(place);ReferenceLoan *source,*before,selected_source;Node *origin;I64 layer=0,mode,indirect;
-    Bool nested=NestedReference(expression->type),found=FALSE,address,bridge,through,physical,preserve;
+    Bool nested=NestedReference(expression->type),found=FALSE,address,bridge,through,physical,preserve,slicing;
     origin=ReferencePlaceSource(place);
     if(!via || (origin && origin->kind!=N_LOCAL)){
         if(exclusive)ReferenceRequireComputedAuthority(check,place,origin,expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE);
-        for(source=check->loans;source;source=source->next)if(origin && !source->owner_pin && source->expression==origin && !source->holder && (!(expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) || !NestedReference(origin->type) || nested || source->indirect)){
+        for(source=check->loans;source;source=source->next)if(origin && !source->owner_pin && source->expression==origin && !source->holder && (!(expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE) || !ReferenceLayered(origin->type) || ReferenceLayered(expression->type) || source->indirect)){
             if(exclusive>ReferenceMode(origin->type))ErrorAt(token,"cannot make an exclusive borrow from a shared reference");if(check->pending_owner)check->loans=ReferenceNewFrom(check,source,source->parent,exclusive & source->exclusive,source->indirect,expression,check->loans);else{ReferenceComputedGraph(check,source,place,origin,expression,exclusive);source->exclusive=exclusive & source->exclusive;
-            if(!nested)source->indirect=0;source->expression=expression;}found=TRUE;
+            if(!ReferenceLayered(expression->type))source->indirect=0;source->expression=expression;}found=TRUE;
         }
         if(!found)ErrorAt(token,"reference result requires a tracked root");return;
     }
     ReferenceAccessMode(check,place,exclusive!=0,owner_slot);if(exclusive && (expression->kind==N_LOCAL || expression->kind==N_LOAD || expression->kind==N_MOVE))ReferenceRequirePayloadCopy(check,place,via);
     address=expression->kind==N_AGG_LITERAL && expression->op==0;
     bridge=expression->kind==N_AGG_LITERAL && expression->op==1;
-    through=ReferenceThroughStored(place);physical=address && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);
+    through=ReferenceThroughStored(place);slicing=expression->kind==N_SLICE && expression->op==A_ARRAY && ReferenceBorrowedSlice(expression->type);physical=(address || slicing) && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);
     if(NestedReference(via->type) && (through || expression->kind==N_LOAD || expression->kind==N_MOVE))layer=1;
-    if(!IsReference(via->type) && !bridge)layer=ReferenceAcquisitionLayer(place,via,expression,layer);preserve=nested && TrackedBorrow(via->type) && !physical && !bridge;before=check->loans;
+    if(!IsReference(via->type) && !bridge)layer=ReferenceAcquisitionLayer(place,via,expression,layer);preserve=(nested || ReferenceBorrowedSlice(expression->type)) && TrackedBorrow(via->type) && !physical && !bridge;before=check->loans;
     if(physical){check->loans=ReferenceNew(check,via,via,exclusive,0,expression,check->loans);ReferencePhysicalCapture(check,place,via,expression);found=TRUE;}
-    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || (physical && nested) || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
+    for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || (physical && (nested || slicing)) || source->indirect==layer) && (bridge || ReferencePayloadMayAccess(source,place,via))){
 
-        if(physical){if(nested){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin,source->physical_provenance,place);check->loans=ReferenceNewSelected(check,source,via,exclusive & source->exclusive,1,expression,check->loans,place,via,NULL,TRUE);}}
+        if(physical){if(nested || slicing){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin,source->physical_provenance,place);check->loans=ReferenceNewSelected(check,source,via,exclusive & source->exclusive,1,expression,check->loans,place,via,NULL,TRUE);}}
         else{mode=exclusive & source->exclusive;indirect=0;if(preserve)indirect=source->indirect;
             selected_source=*source;if(address)selected_source.physical_provenance=ReferencePhysicalSelected(check->graph,source,place,via);if(bridge)selected_source.physical_provenance=NULL;ReferenceSourceAccess(check,before,via,source->root,mode,token,origin,selected_source.physical_provenance,place);check->loans=ReferenceNewSelected(check,&selected_source,via,mode,indirect,expression,check->loans,place,via,NULL,FALSE);
             if(nested && (!preserve || (!source->indirect && source->root->reference_external && !source->root->type)))check->loans=ReferenceNewSelected(check,source,via,mode & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans,place,via,NULL,TRUE);found=TRUE;
@@ -182,7 +184,7 @@ U0 ReferenceProjection(ReferenceCheck *check,Node *node,I64 mode){
     before=check->loans;
     if(origin->kind==N_LOAD && TrackedBorrow(origin->type) && !BorrowRoot(origin->a))ReferenceProjection(check,origin,mode);
     else ReferenceValue(check,origin);
-    if(mode)ReferenceRequireComputedAuthority(check,node->a,origin,TRUE);for(source=check->loans;source!=before;source=source->next)if(!source->owner_pin && source->expression==origin && (!NestedReference(origin->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,NestedReference(node->type)*source->indirect,node,check->loans,node->a,NULL,origin,FALSE);
+    if(mode)ReferenceRequireComputedAuthority(check,node->a,origin,TRUE);for(source=check->loans;source!=before;source=source->next)if(!source->owner_pin && source->expression==origin && (!ReferenceLayered(origin->type) || ReferenceBorrowedSlice(node->type) || source->indirect))check->loans=ReferenceNewSelected(check,source,source->parent,mode & source->exclusive,ReferenceLayered(node->type)*source->indirect,node,check->loans,node->a,NULL,origin,FALSE);
     ReferenceAddressIndices(check,node->a);
 }
 extern U0 ReferenceCallStores(ReferenceCheck *check,Node *node,ReferenceLoan *stop);
@@ -216,7 +218,7 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
             if(contract & (1<<index)){
                 if(!TrackedBorrow(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
                 found=FALSE;
-                for(source=check->loans;source!=saved;source=source->next)if(!source->holder && !source->owner_pin && source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(NestedReference(node->type) && NestedReference(arg->type)){indirect=source->indirect;}results=ReferenceNewCall(check,source,source->parent,mode,indirect,node,results);if(NestedReference(node->type) && !NestedReference(arg->type))results=ReferenceNewCall(check,source,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
+                for(source=check->loans;source!=saved;source=source->next)if(!source->holder && !source->owner_pin && source->expression==arg){found=TRUE;mode=ReferenceMode(node->type) & source->exclusive;indirect=0;if(ReferenceLayered(node->type) && ReferenceLayered(arg->type)){indirect=source->indirect;}results=ReferenceNewCall(check,source,source->parent,mode,indirect,node,results);if(ReferenceLayered(node->type) && !ReferenceLayered(arg->type))results=ReferenceNewCall(check,source,source->parent,mode & ReferenceMode(Shape(node->type)->element),1,node,results);}
                 if(!found && IsReference(arg->type))ErrorAt(node->token,"reference return requires a tracked reference argument");
             }
             index++;
@@ -297,3 +299,7 @@ U0 ReferenceWriteCapability(Node *place){Node *current=place;while(current){if(P
 U0 ReferenceCheckReturn(ReferenceCheck *check,Node *value,ReferenceLoan *stop){ReferenceLoan *loan;Local *root;Bool found=FALSE;for(loan=check->loans;loan!=stop;loan=loan->next)if(!loan->owner_pin && loan->expression==value && !loan->holder && loan->root){root=loan->root;found=TRUE;if(!root->reference_external || root->depth || !root->place_region || (root->place_region&~check->function->borrow_contract))ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}if(!found)ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}
 
 Bool ReferenceTemporaryAccess(ReferenceLoan *loan,Node *place,Node *origin){Node *current=place;if(loan->holder)return FALSE;if(!loan->owner_pin)return loan->expression==origin;while(current){if(current==loan->owner_pin)return TRUE;current=PlaceProjectionParent(current);}return FALSE;}
+
+Bool ReferenceBorrowedSlice(I64 type){return AggregateKind(type)==A_SLICE && TrackedBorrow(Shape(type)->element);}
+
+Bool ReferenceLayered(I64 type){return NestedReference(type) || ReferenceBorrowedSlice(type);}
