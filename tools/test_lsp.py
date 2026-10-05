@@ -202,6 +202,10 @@ with tempfile.TemporaryDirectory(prefix='cool editor 한글 ') as temporary:
             failed=completion('package main;fn main(){let bad:bool=1;let visible=1;vis|}',set())
             assert failed['isIncomplete'] and failed['items']==[]
             completion('package main;import io "std/io";fn main(){io.pr|}',{'print','println'})
+            completion('package main;import "|";fn main(){}',{'std/io','std/mem','std/text','example.test/editor/lib'})
+            completion('package main;import "std/|";fn main(){}',{'std/io','std/text'},{'example.test/editor/lib'})
+            completion('package main;import "example.test/editor/|";fn main(){}',{'example.test/editor/lib'},{'std/io'})
+            completion('package main;import "std/text";import "|";fn main(){}',{'std/io'},{})
             completion(pre+'while(true){br|;}}',{'break'})
             completion(pre+'/* finished */pri|',{'prior'})
             assert completion(pre+'// pri|\n}',set())['items']==[]

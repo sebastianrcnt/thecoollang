@@ -3098,6 +3098,16 @@ through ordinary evaluation or library use.
   aggregate owned payloads; slice/relocation fuzzing and every remaining
   mandatory gate stay Open.
 
+- Import-path completion: the language server completes module paths inside an
+  `import "..."` string from the stdlib package directories, the `std/io` and
+  `std/mem` builtins and the workspace module graph (`cool.mod` module plus
+  every directory containing `.cool` files), filtered by the typed prefix. It
+  bypasses the token-stream completion engine, which still returns no items for
+  ordinary string literals. `make lsp-test` adds four import-string cases
+  (empty prefix, `std/`, a workspace package and a second import). This closes
+  one documented G7 completion gap; uninstantiated generic bodies and broader
+  recovery remain Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

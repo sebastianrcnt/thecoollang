@@ -2,12 +2,42 @@
 from dataclasses import dataclass
 from bisect import bisect_right
 import json
+import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
 from urllib.parse import unquote, urlsplit
 from driver_common import find_root
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def import_candidates(workspace):
+    """Import paths offered inside an import string: stdlib plus workspace packages."""
+    candidates = {'std/io', 'std/mem'}
+    stdlib = ROOT / 'stdlib'
+    if stdlib.is_dir():
+        for entry in sorted(stdlib.iterdir()):
+            if entry.is_dir() and (entry / (entry.name + '.cool')).is_file():
+                candidates.add('std/' + entry.name)
+    if workspace:
+        module = None
+        manifest = workspace / 'cool.mod'
+        if manifest.is_file():
+            for line in manifest.read_text().splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[0] == 'module':
+                    module = parts[1]
+                    break
+        if module:
+            for base, dirs, files in os.walk(workspace):
+                dirs[:] = sorted(d for d in dirs if not d.startswith('.') and d not in ('build', 'vendor'))
+                if any(name.endswith('.cool') for name in files):
+                    relative = Path(base).relative_to(workspace)
+                    candidates.add(module if str(relative) == '.' else module + '/' + str(relative).replace(os.sep, '/'))
+    return sorted(candidates)
 
 MAX_MESSAGE = 16 * 1024 * 1024
 
@@ -225,8 +255,19 @@ class Server:
     def complete(self,params):
         path = uri_path(params['textDocument']['uri'])
         content = self.documents[path].text if path in self.documents else path.read_bytes().decode('utf-8')
-        offset = len(content[:text_index(content,params['position'])].encode('utf-8'))
+        cursor = text_index(content,params['position'])
+        offset = len(content[:cursor].encode('utf-8'))
         positions = PositionMap(content)
+        # An import string is completed from the module graph rather than the token stream.
+        import_prefix = re.search(r'import[ \t]*"([^"\n]*)$', content[:cursor])
+        if import_prefix:
+            prefix = import_prefix.group(1)
+            start = len(content[:import_prefix.start(1)].encode('utf-8'))
+            items = [{'label': name, 'kind': 9,
+                      'textEdit': {'range': {'start': positions.position(start), 'end': positions.position(offset)},
+                                   'newText': name}}
+                     for name in import_candidates(find_root(path)) if name.startswith(prefix)]
+            return {'isIncomplete': False, 'items': items}
         with tempfile.TemporaryDirectory(prefix='cool-completion-') as directory:
             work = Path(directory)
             overlays = {}
