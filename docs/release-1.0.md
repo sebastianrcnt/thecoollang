@@ -3210,6 +3210,21 @@ through ordinary evaluation or library use.
   One module still contains a generated dispatch section (15-native) plus the
   parser's `ParseProgram`; G3's complete audit stays Open.
 
+- Compiler maintenance: `compiler/15-native.cool` no longer contains a generated
+  dispatch state machine. `LanguageMain` is now a direct driver: the hand-written
+  editor/scan-bundle entry points stay, followed by the repl, usage, `fmt`,
+  execution-mode, bundle/source-read, `scan`, `symbols`, `test-bundle`, run,
+  `llvm` and unknown-command paths in source order. The `symbols` and
+  `test-bundle` emitters use ordinary loops instead of numbered states. Behavior
+  is unchanged: the CLI/tooling, project, cache, REPL and editor suites pass, the
+  full `make -k -j4 test lsp-test bootstrap-check editor-distribution-test` run
+  plus the borrowed-vector/nested-reference/stores/drop-depth/ownership-fuzz/
+  aggregate-fuzz sanitizer targets exits 0 (`build/drop-depth/reg15.log`), and
+  both bootstrap paths converge (self-host IR SHA256
+  `398917f81328404905c73cc96c1d6424df91f9986eea2b41827a2ac2d48182f6`). The
+  parser's `ParseProgram` is the last generated dispatch section; G3's complete
+  audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
