@@ -210,3 +210,30 @@ index/RHS evaluation cannot move or replace an owner after loading its pointer.
 Moves, drops, replacements and ordinary whole value reads keep normal overlap.
 Aliased owners and borrowed external payload acquisition may remain conservative;
 this change does not infer their descriptor addresses or remove storage guards.
+
+### Named reference physical projections
+
+A stable typed address cursor through a named reference can now compose its
+referent-relative suffix with that holder's known root-relative physical address
+set. Every reachable terminal must name the same protected root and expected
+referent type. Any opaque, missing or incompatible alternative invalidates the
+whole proof. Raw/stored-reference/slice-element suffixes and cyclic syntax
+cursors keep the conservative fallback. Production callers supply validated
+parser AST cursors; this is not a public arbitrary-layout cursor API.
+
+Projection clones the source graph independently, then replaces every matching
+endpoint on that clone with Field/array Element/OwnedPayload suffix paths. The
+fresh terminal cannot reuse a clone endpoint, even when source and target types
+are equal. The clone node range is fixed before allocating suffix nodes, so
+cycles cannot cause repeated substitution. Original edges remain conservative
+alternatives and the holder's original graph is never changed. Acquisition
+checks and the resulting loan share one projected graph. Access queries use a
+scratch arena and free it after each possible source; persistent arena compaction
+keeps only live projected loans.
+
+Named reference handle reads during address formation observe local descriptor
+storage, not the referent. They still check exclusive descriptor-slot loans;
+ordinary reference copies and whole value reads use the usual acquisition and
+conflict rules. Unknown parameter addresses, aliased owner descriptors, stored
+referents and borrowed slice elements require further work. Call/raw returned
+geometry remains unknown. No arbitrary nested storage restriction is removed.

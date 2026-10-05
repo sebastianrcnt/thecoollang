@@ -15,6 +15,7 @@ extern U0 ReferenceRequireComputedAuthority(ReferenceCheck *check,Node *place,No
 extern U0 ReferenceRequirePayloadCopy(ReferenceCheck *check,Node *place,Local *via);
 extern U0 ReferenceRequirePayloadWrite(ReferenceCheck *check,Node *place,Local *via);
 extern U0 ReferencePhysicalCapture(ReferenceCheck *check,Node *place,Local *via,Node *expression);
+extern ProvenanceNode *ReferencePhysicalSelected(ProvenanceGraph *graph,ReferenceLoan *source,Node *place,Local *via);
 extern Bool ReferencePhysicalAccessOverlap(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Local *via,Bool owner_slot);
 extern Bool ReferencePhysicalMayOverlap(ReferenceCheck *check,ReferenceLoan *loan,Node *place,Local *via);
 extern Bool ReferencePayloadMayAccess(ReferenceLoan *source,Node *place,Local *via);
@@ -102,6 +103,8 @@ Bool ReferenceAncestor(ReferenceCheck *check,Local *holder,Local *via,Local *roo
     current=via;while(current){next=current->reference_next;current->reference_visit=0;current->reference_next=NULL;current=next;}
     return found;
 }
+extern U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing);
+U0 ReferenceHandleAccess(ReferenceCheck *check,Node *place){Local *via=BorrowRoot(place);ReferenceLoan *loan;if(!via || place->kind!=N_LOCAL || !IsReference(via->type)){ReferenceAccess(check,place,FALSE);return;}for(loan=check->loans;loan;loan=loan->next)if(loan->root==via && loan->exclusive && ReferencePhysicalMayOverlap(check,loan,place,via) && !ReferenceAncestor(check,loan->holder,via,via) && !(loan->holder==NULL && loan->expression==ReferencePlaceSource(place)))ErrorAt(place->token,"access conflicts with a live scoped reference");}
 extern U0 ReferenceAccessMode(ReferenceCheck *check,Node *place,Bool writing,Bool owner_slot);
 U0 ReferenceAccess(ReferenceCheck *check,Node *place,Bool writing){ReferenceAccessMode(check,place,writing,FALSE);}
 U0 ReferenceAccessMode(ReferenceCheck *check,Node *place,Bool writing,Bool owner_slot){
@@ -125,7 +128,7 @@ U0 ReferenceSourceAccess(ReferenceCheck *check,ReferenceLoan *before,Local *via,
 extern U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *token,Node *expression,Bool owner_slot);
 U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token,Node *expression){ReferenceAcquireMode(check,place,exclusive,token,expression,FALSE);}
 U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *token,Node *expression,Bool owner_slot){
-    Local *via=BorrowRoot(place);ReferenceLoan *source,*before;Node *origin;I64 layer=0,mode,indirect;ProvenanceNode *physical_source;
+    Local *via=BorrowRoot(place);ReferenceLoan *source,*before,selected_source;Node *origin;I64 layer=0,mode,indirect;
     Bool nested=NestedReference(expression->type),found=FALSE,address,bridge,through,physical,preserve;
     origin=ReferencePlaceSource(place);
     if(!via || (origin && origin->kind!=N_LOCAL)){
@@ -147,7 +150,7 @@ U0 ReferenceAcquireMode(ReferenceCheck *check,Node *place,I64 exclusive,Token *t
 
         if(physical){if(nested){ReferenceSourceAccess(check,before,via,source->root,exclusive & source->exclusive,token,origin,source->physical_provenance);check->loans=ReferenceNewSelected(check,source,via,exclusive & source->exclusive,1,expression,check->loans,place,via,NULL,TRUE);}}
         else{mode=exclusive & source->exclusive;indirect=0;if(preserve)indirect=source->indirect;
-            physical_source=source->physical_provenance;if(bridge)physical_source=NULL;ReferenceSourceAccess(check,before,via,source->root,mode,token,origin,physical_source);check->loans=ReferenceNewSelected(check,source,via,mode,indirect,expression,check->loans,place,via,NULL,FALSE);
+            selected_source=*source;if(address)selected_source.physical_provenance=ReferencePhysicalSelected(check->graph,source,place,via);if(bridge)selected_source.physical_provenance=NULL;ReferenceSourceAccess(check,before,via,source->root,mode,token,origin,selected_source.physical_provenance);check->loans=ReferenceNewSelected(check,&selected_source,via,mode,indirect,expression,check->loans,place,via,NULL,FALSE);
             if(nested && !preserve)check->loans=ReferenceNewSelected(check,source,via,mode & ReferenceMode(Shape(expression->type)->element),1,expression,check->loans,place,via,NULL,TRUE);found=TRUE;
         }
     }
@@ -163,7 +166,7 @@ U0 ReferenceAddressMode(ReferenceCheck *check,Node *node,Bool writing){
     if(!node)return;if(node->kind==N_LOCAL_ADDRESS)return;
     if(node->kind==N_FIELD_ADDRESS){ReferenceAddressMode(check,node->a,writing);return;}
     if(node->kind==N_INDEX_ADDRESS){if(node->op==A_SLICE)ReferenceSliceValue(check,node->a,writing);else ReferenceAddressMode(check,node->a,writing);ReferenceValue(check,node->b);return;}
-    if(node->kind==N_OWN_ADDRESS){if(writing && IsReference(node->a->type) && !Shape(node->a->type)->count)ErrorAt(node->token,"cannot mutate or move through a shared reference");if(IsReference(node->a->type) && node->a->kind==N_LOCAL)ReferenceAccess(check,node->a,FALSE);else{if(IsReference(node->a->type) && node->a->kind==N_LOAD){mode=Shape(node->a->type)->count;if(!writing)mode=0;if(BorrowRoot(node->a->a)){ReferenceAddressMode(check,node->a->a,FALSE);ReferenceAcquire(check,node->a->a,mode,node->a->token,node->a);}else ReferenceProjection(check,node->a,mode);}else{if(AggregateKind(node->a->type)==A_OWNER && node->a->kind==N_LOAD){ReferenceAddressMode(check,node->a->a,writing);ReferenceAccessMode(check,node->a->a,FALSE,TRUE);}else{if(AggregateKind(node->a->type)==A_OWNER && node->a->kind==N_LOCAL)ReferenceAccessMode(check,node->a,FALSE,TRUE);else ReferenceValue(check,node->a);}}if(AggregateKind(node->a->type)==A_OWNER){origin=ReferencePlaceSource(node);if(origin){retained=FALSE;for(pin=check->loans;pin;pin=pin->next)if(!pin->holder && pin->expression==origin)retained=TRUE;if(!retained)ReferenceAcquireMode(check,origin,0,node->token,origin,TRUE);}}}return;}
+    if(node->kind==N_OWN_ADDRESS){if(writing && IsReference(node->a->type) && !Shape(node->a->type)->count)ErrorAt(node->token,"cannot mutate or move through a shared reference");if(IsReference(node->a->type) && node->a->kind==N_LOCAL)ReferenceHandleAccess(check,node->a);else{if(IsReference(node->a->type) && node->a->kind==N_LOAD){mode=Shape(node->a->type)->count;if(!writing)mode=0;if(BorrowRoot(node->a->a)){ReferenceAddressMode(check,node->a->a,FALSE);ReferenceAcquire(check,node->a->a,mode,node->a->token,node->a);}else ReferenceProjection(check,node->a,mode);}else{if(AggregateKind(node->a->type)==A_OWNER && node->a->kind==N_LOAD){ReferenceAddressMode(check,node->a->a,writing);ReferenceAccessMode(check,node->a->a,FALSE,TRUE);}else{if(AggregateKind(node->a->type)==A_OWNER && node->a->kind==N_LOCAL)ReferenceAccessMode(check,node->a,FALSE,TRUE);else ReferenceValue(check,node->a);}}if(AggregateKind(node->a->type)==A_OWNER){origin=ReferencePlaceSource(node);if(origin){retained=FALSE;for(pin=check->loans;pin;pin=pin->next)if(!pin->holder && pin->expression==origin)retained=TRUE;if(!retained)ReferenceAcquireMode(check,origin,0,node->token,origin,TRUE);}}}return;}
     ReferenceValue(check,node);
 }
 U0 ReferenceAddress(ReferenceCheck *check,Node *node){ReferenceAddressMode(check,node,TRUE);}

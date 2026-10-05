@@ -17,6 +17,14 @@ fn bump(a:&mut i64,b:&mut i64){*a=10;*b=20;}
 fn opaque(p:&mut i64)->&mut i64 borrows(p){return p;}
 '''
 POSITIVES=[
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;(*r).y=7;*x=9;assert((*r).y==7);assert(*x==9);',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;let y=&mut (*r).y;*x=9;*y=7;assert(*x==9);assert(*y==7);',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&(*r).x;(*r).y=7;assert(*x==1);',
+ 'var p=Point{x:1,y:2};let r=&p;let x=&(*r).x;assert((*r).y==2);assert(*x==1);',
+ 'var p=Point{x:1,y:2};let r=&mut p;bump(&mut (*r).x,&mut (*r).y);assert((*r).x==10);assert((*r).y==20);',
+ 'var b=Box{a:Point{x:1,y:2},b:Point{x:3,y:4}};let r=&mut b;let x=&mut (*r).a.x;(*r).a.y=7;(*r).b.x=8;*x=9;assert((*r).b.x==8);',
+ 'var b=Box{a:Point{x:1,y:2},b:Point{x:3,y:4}};var r=&mut b.a;r=&mut b.b;let x=&mut (*r).x;(*r).y=7;*x=9;assert((*r).y==7);',
+ 'var a=[2]Point{Point{x:1,y:2},Point{x:3,y:4}};let r=&mut a;let x=&mut (*r)[0].x;(*r)[1].y=7;*x=9;assert((*r)[1].y==7);',
  'var h=Heap{p:new[Point](Point{x:1,y:2}),q:new[Point](Point{x:3,y:4})};let x=&mut (*h.p).x;(*h.p).y=7;(*h.q).x=8;*x=9;assert((*h.q).x==8);',
  'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=7;*x=9;assert((*p).y==7);',
  'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;let y=&mut (*p).y;*x=9;*y=7;assert(*x==9);assert(*y==7);',
@@ -33,6 +41,15 @@ POSITIVES=[
  'var a=[2]Point{Point{x:1,y:2},Point{x:3,y:4}};let x=&mut a[0].x;a[1].y=8;*x=9;assert(a[1].y==8);',
 ]
 NEGATIVES=[
+ 'var p=Point{x:1,y:2};let r=&p;(*r).x=7;',
+ 'var p=new[Point](Point{x:1,y:2});let r=&mut *p;let x=&mut (*r).x;(*r).y=consume(move p);',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;(*r).x=7;',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;let read=(*r).x;',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;let all=*r;',
+ 'var p=Point{x:1,y:2};let r=&mut p;let x=&mut (*r).x;let copy=r;',
+ 'var p=Point{x:1,y:2};var r=&mut p;let slot=&mut r;(*r).x=7;',
+ 'var b=Box{a:Point{x:1,y:2},b:Point{x:3,y:4}};var r=&mut b.a;r=&mut b.b;let x=&mut (*r).x;(*r).x=7;',
+ 'var a=[2]Point{Point{x:1,y:2},Point{x:3,y:4}};let r=&mut a;let x=&mut (*r)[0].x;(*r)[1].x=7;',
  'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=consume(move p);',
  'var p=new[Point](Point{x:1,y:2});let x=&mut (*p).x;(*p).y=replace(&mut p);',
  'var h=Heap{p:new[Point](Point{x:1,y:2}),q:new[Point](Point{x:3,y:4})};let x=&mut (*h.p).x;h=Heap{p:new[Point](Point{x:5,y:6}),q:new[Point](Point{x:7,y:8})};',
@@ -70,13 +87,16 @@ with tempfile.TemporaryDirectory(prefix='cool physical address ') as directory:
  for body in NEGATIVES:
   source.write_text(PRELUDE+'fn main(){'+body+'}')
   for front in fronts:
-   r=run([*front,'check',source]);assert r.returncode==2 and any(message in r.stderr for message in ('conflicts','owner moved while an access','moved value')),(body,r)
+   r=run([*front,'check',source]);diagnostics=('cannot assign through an immutable value',) if body=='var p=Point{x:1,y:2};let r=&p;(*r).x=7;' else ('conflicts','owner moved while an access','moved value','shared reference');assert r.returncode==2 and any(message in r.stderr for message in diagnostics),(body,r)
  repl='struct Point{x:i64;y:i64;}\nvar p=Point{x:1,y:2};\nlet x=&mut p.x;\nlet y=&mut p.y;\n*x=9;\n*y=7;\np.x=3;\n*x\n*y\n:forget x\np.x=11;\np.x\n:forget y\n:forget p\n:quit\n'
  for front in fronts:
   r=run([*front,'repl-quiet'],input=repl);assert r.returncode==0 and r.stdout=='9\n7\n11\n' and r.stderr.count('error:')==1,r
  owner_repl='struct Point{x:i64;y:i64;}\nvar p=new[Point](Point{x:1,y:2});\nlet x=&mut (*p).x;\nlet y=&mut (*p).y;\n*x=9;\n*y=7;\np=new[Point](Point{x:3,y:4});\n{*y=8;assert(false);}\n*x\n*y\n:forget x\n(*p).x=11;\n(*p).x\n:forget y\n:forget p\n:quit\n'
  for front in fronts:
   r=run([*front,'repl-quiet'],input=owner_repl);assert r.returncode==0 and r.stdout=='9\n8\n11\n' and r.stderr.count('error:')==2,r
- report={'frontend_sha256':hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':len(POSITIVES),'negative_cases':len(NEGATIVES),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual root-relative physical addresses: disjoint fields, named copies/call arguments, nested structs; owned payload field separation, conservative raw bridges and merged addresses; same-field/prefix/array/owner/opaque rejections and persistent REPL clone/recovery/forget.'}
+ named_repl='struct Point{x:i64;y:i64;}\nvar p=Point{x:1,y:2};\nlet r=&mut p;\nlet x=&mut (*r).x;\nlet y=&mut (*r).y;\n*x=9;\n*y=7;\n(*r).x=3;\n{*y=8;assert(false);}\n*x\n*y\n:forget x\n(*r).x=11;\n(*r).x\n:forget y\n:forget r\n:forget p\n:quit\n'
+ for front in fronts:
+  r=run([*front,'repl-quiet'],input=named_repl);assert r.returncode==0 and r.stdout=='9\n8\n11\n' and r.stderr.count('error:')==2,r
+ report={'frontend_sha256' :hashlib.sha256(frontend.read_bytes()).hexdigest(),'legacy_checked':args.legacy,'positive_cases':len(POSITIVES),'negative_cases':len(NEGATIVES),'engines':['tree','interp','jit','llvm','llvm-jit','native-O2'],'method':'Actual root-relative physical addresses: disjoint fields, named copies/call arguments, nested structs; owned payload field separation, conservative raw bridges and merged addresses; same-field/prefix/array/owner/opaque rejections and persistent REPL clone/recovery/forget.'}
  if args.output:args.output.write_text(json.dumps(report,indent=2)+'\n')
 print(f'physical address: {len(POSITIVES)} accepted, {len(NEGATIVES)} rejected, five engines/O2 and persistent REPL PASS'+(' on both frontends' if args.legacy else ' on production frontend'))

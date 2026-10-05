@@ -19,6 +19,10 @@ def workload(name,count):
   original={'prefix_write':'write_barrier','prefix_copy':'copy_barrier','computed_prefix_write':'computed_write','computed_prefix_copy':'computed_copy'}[name]
   source,output,errors=workload(original,count)
   return source.replace('write_probe','prefix_probe').replace('probe_return','prefix_return'),output,errors
+ if name=='named_physical_fields':
+  return ('struct Point{x:i64;y:i64;}\nvar p=Point{x:1,y:2};\nlet r=&mut p;\nlet x=&mut (*r).x;\n'+'{let y=&mut (*r).y;*y=*y+1;}\n'*count+'*x\n(*r).y\n:forget x\n:forget r\n:forget p\n',f'1\n{count+2}\n',0)
+ if name=='named_physical_recovery':
+  return ('struct Point{x:i64;y:i64;}\nvar p=Point{x:1,y:2};\nlet r=&mut p;\nlet x=&mut (*r).x;\n'+''.join('(*r).x=3;\n' if i%2==0 else '{(*r).y=(*r).y+1;assert(false);}\n' for i in range(count))+'*x\n(*r).y\n:forget x\n:forget r\n:forget p\n',f'1\n{count//2+2}\n',count)
  if name=='owner_descriptor_fields':
   return ('struct Point{x:i64;y:i64;}\nvar p=new[Point](Point{x:1,y:2});\nlet x=&mut (*p).x;\nlet y=&mut (*p).y;\n'+'*y=*y+1;\n'*count+'*x\n*y\n:forget x\n:forget y\n:forget p\n',f'1\n{count+2}\n',0)
  if name=='owner_descriptor_recovery':
@@ -60,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='cool legacy graph lifecycle ') as direc
  binary=tmp/'frontend.BIN';env={**os.environ,'COOLC_COMPILER_BIN':str(ROOT/'coolc/seed/Compiler.BIN')}
  r=subprocess.run([ROOT/'build/coolc',native,binary],env=env,cwd=ROOT,text=True,capture_output=True,timeout=90);assert r.returncode==0,r
  observations=[]
- for name in ('owner_descriptor_fields','owner_descriptor_recovery','field_access','opaque_returns','recursive_returns','failed_functions','stores','write_barrier','copy_barrier','computed_write','computed_copy','prefix_write','prefix_copy','computed_prefix_write','computed_prefix_copy'):
+ for name in ('named_physical_fields','named_physical_recovery','owner_descriptor_fields','owner_descriptor_recovery','field_access','opaque_returns','recursive_returns','failed_functions','stores','write_barrier','copy_barrier','computed_write','computed_copy','prefix_write','prefix_copy','computed_prefix_write','computed_prefix_copy'):
   rows=[]
   for count in args.counts:
    source,output,errors=workload(name,count)

@@ -34,7 +34,10 @@ fn ReferencePhysicalMayOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,place:*
   var source=check.loans;var known=false;
   while(source!=null){if(source.holder==via && source.root==loan.root && source.indirect==0){
    known=true;
-   if(source.physical_provenance==null || ProvenanceAddressOverlap(loan.physical_provenance,source.physical_provenance,loan.root)){found=true;}
+   var scratch=ProvenanceGraph{};
+   let candidate=ReferencePhysicalSelected(&raw scratch,source,place,via);
+   if(candidate==null || ProvenanceAddressOverlap(loan.physical_provenance,candidate,loan.root)){found=true;}
+   ProvenanceGraphFree(&raw scratch);
   }source=source.next;}
   if(!known){found=true;}
  }else{found=true;}
@@ -51,4 +54,46 @@ fn ReferencePhysicalAccessOverlap(check:*ReferenceCheck,loan:*ReferenceLoan,plac
  if(cursor.complete==0){ReferenceCursorFree(cursor.path);return true;}
  let found=ProvenanceOwnerSlotOverlap(loan.physical_provenance,cursor.path,type);
  ReferenceCursorFree(cursor.path);return found;
+}}
+// Substitute every physical endpoint on an independent clone. Unknown members
+// invalidate the whole address proof, including unioned alternatives.
+fn ReferencePhysicalProjectGraph(graph:*ProvenanceGraph,source:*ProvenanceNode,root:*Local,expected:i64,path:*ProvenanceCursor,type:i64)->*ProvenanceNode{unsafe{
+ if(source==null || path==null){return source;}
+ if(path.type!=expected){return null;}
+ var slow=path;var fast=path;
+ while(fast!=null && fast.next!=null){slow=slow.next;fast=fast.next.next;if(slow==fast){return null;}}
+ var step=path;
+ while(step!=null){if(step.kind<1 || step.kind>4 || step.kind==3 || (step.kind==2 && AggregateKind(step.type)==3)){return null;}step=step.next;}
+ let first=cast[*ProvenanceQueryState](CAlloc(i64(sizeof(ProvenanceQueryState))));first.node=source;
+ var current=first;var tail=first;var valid=true;var found=false;
+ while(current!=null && valid){let node=current.node;
+  if(node.opaque!=0){valid=false;}
+  if(node.root!=null){if(node.root!=root || node.type!=expected){valid=false;}found=true;}
+  var edge=node.edges;while(edge!=null){tail=ProvenanceQueryAppend(first,tail,edge.target,null,0);edge=edge.next;}
+  current=current.next;
+ }
+ current=first;while(current!=null){let next=current.next;Free(cast[*u8](current));current=next;}
+ if(!valid || !found){return null;}
+ let before=graph.nodes;let result=ProvenanceGraphCopy(graph,source);let copies=graph.nodes;
+ var projected=ProvenanceNodeNew(graph,type,root,1);
+ var reversed:*ProvenanceCursor=null;step=path;
+ while(step!=null){let copy=cast[*ProvenanceCursor](CAlloc(i64(sizeof(ProvenanceCursor))));copy.type=step.type;copy.kind=step.kind;copy.key=step.key;copy.next=reversed;reversed=copy;step=step.next;}
+ step=reversed;while(step!=null){projected=ReferenceGraphParent(graph,step.type,step.kind,step.key,projected);step=step.next;}
+ ReferenceCursorFree(reversed);
+ var node=copies;while(node!=before){
+  if(node.root==root && node.type==expected){node.root=null;var edge=projected.edges;while(edge!=null){if(!ProvenanceEdgeNew(node,edge.kind,edge.key,edge.target,1)){Error(cast[*u8]("invalid internal physical projection"));}edge=edge.next;}}
+  node=node.next;
+ }
+ return result;
+}}
+fn ReferencePhysicalSelected(graph:*ProvenanceGraph,source:*ReferenceLoan,place:*Node,via:*Local)->*ProvenanceNode{unsafe{
+ if(source.indirect!=0 || via==null || !IsReference(via.type)){return source.physical_provenance;}
+ var cursor=ReferencePlaceCursor(place,via,null);
+ var result=source.physical_provenance;
+ if(cursor.complete==0){result=null;}
+ else if(cursor.path!=null){
+  if(cursor.path.kind!=3 || cursor.path.type!=via.type || ReferenceThroughStored(place)){result=null;}
+  else{var type=place.type;if(Pointer(type)!=i8(0)){type=type-100000;}result=ReferencePhysicalProjectGraph(graph,result,source.root,Shape(via.type).element,cursor.path.next,type);}
+ }
+ ReferenceCursorFree(cursor.path);return result;
 }}

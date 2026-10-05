@@ -2167,6 +2167,42 @@ through ordinary evaluation or library use.
   Arbitrary nested borrowed storage, descriptor lifetime and indirect address
   mapping remain required work. All release gates remain Open.
 
+- Known named-reference physical addresses now compose stable typed place
+  suffixes with every possible original address endpoint. Projection validates
+  the whole reachable source set, independently clones it and substitutes all
+  terminals; any opaque/root/type/unsupported suffix alternative falls back.
+  New suffix terminals are fresh, original holder graphs remain unchanged and
+  the fixed clone range prevents recursive resubstitution. Query candidates use
+  freed scratch arenas; acquisition checks and resulting loans share one proof.
+  Named reference handle observation checks descriptor storage separately from
+  actual referent access. Ordinary reference copies still protect whole regions.
+
+  Actual fixtures pass 22 accepted and 32 rejected programs on both frontends,
+  five engines/O2 and persistent REPL recovery/forget. Cases include nested
+  fields, same-root unioned receiver targets, disjoint call arguments and array
+  field unions, descriptor aliases, shared receiver writes, whole reference/value
+  copies and same-field conflicts. Added private metadata probes verify both
+  union targets, source immutability, same-arena and equal source/target types,
+  recursive source edges, identity and all-or-unknown/cyclic suffix fallback.
+  The independent 1,648-case query suite still passes under sanitizers.
+
+  Two new seed lifecycle histories end at zero tracked graph allocations with
+  equal 64/1,024 repetition peaks: 1,992 bytes for repeated named field loans and
+  1,560 for named physical analysis/runtime recovery. All 17 graph histories
+  pass under the documented instrumentation exclusions. Full regression and
+  bootstrap convergence, four existing provenance sanitizer targets, corrected
+  physical-address sanitizer fixtures and external editor/distribution pass.
+  An initial shared-write fixture expected a later borrow error, but the parser
+  correctly rejected immutable assignment first; its exact diagnostic assertion
+  was corrected and the full suite and physical sanitizer were rerun.
+
+  Compiler IR SHA-256:
+  `9a2375460d283adcc5b10249ca692406ae783f694d9e8b5db7fd6ceedf00a62f`.
+  Evidence: `build/release-audit/reference-physical-project-{build,focused,fixtures,invariants,regression,sanitize,sanitize-fixtures,distribution}.log`.
+  Parameter/aliased owner descriptor geometry, stored referents, borrowed slice
+  elements, descriptor lifetime and arbitrary nested storage remain required.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

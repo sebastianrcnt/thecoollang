@@ -161,6 +161,30 @@ export "C" fn StoreGraphProbe(){unsafe{
  if(fallback.provenance==null || fallback.provenance_known!=0 || ReferenceLoanQuery(&raw fallback,null,&raw external,true)){NativeExit(65);}
  ProvenanceGraphFree(&raw graph);
 }}
+export "C" fn PhysicalProjectProbe(){unsafe{
+ var graph=ProvenanceGraph{};var root=Local{};var other=Local{};
+ let a=ProvenanceNodeNew(&raw graph,20,&raw root,1);
+ let b=ProvenanceNodeNew(&raw graph,20,&raw root,1);
+ let source=ProvenanceNodeNew(&raw graph,10,null,1);
+ if(!ProvenanceEdgeNew(source,1,200,a,1) || !ProvenanceEdgeNew(source,1,201,b,1) || !ProvenanceEdgeNew(source,4,0,source,1)){NativeExit(70);}
+ var last=ProvenanceCursor{type:10,kind:1,key:100,next:null};
+ var suffix=ProvenanceCursor{type:20,kind:4,key:0,next:&raw last};
+ var head=ProvenanceCursor{type:10,kind:1,key:200,next:&raw suffix};
+ let projected=ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20);
+ if(projected==null || projected==source || a.root!=&raw root || b.root!=&raw root || a.edges!=null || b.edges!=null){NativeExit(71);}
+ if(!ProvenanceQueryRoot(projected,&raw head,&raw root,1,true) || ProvenanceQueryRoot(source,&raw head,&raw root,1,true)){NativeExit(72);}
+ head.key=201;if(!ProvenanceQueryRoot(projected,&raw head,&raw root,1,true)){NativeExit(73);}
+ last.key=101;if(ProvenanceQueryRoot(projected,&raw head,&raw root,1,true)){NativeExit(74);}last.key=100;
+ let before=graph.nodes;
+ if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,null,20)!=source || graph.nodes!=before){NativeExit(75);}
+ b.opaque=1;if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20)!=null || graph.nodes!=before){NativeExit(76);}b.opaque=0;
+ b.root=&raw other;if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20)!=null){NativeExit(77);}b.root=&raw root;
+ b.type=30;if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20)!=null){NativeExit(78);}b.type=20;
+ suffix.next=&raw suffix;if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20)!=null){NativeExit(79);}suffix.next=&raw last;
+ suffix.kind=3;if(ReferencePhysicalProjectGraph(&raw graph,source,&raw root,20,&raw suffix,20)!=null){NativeExit(80);}suffix.kind=4;
+ if(ReferencePhysicalProjectGraph(&raw graph,null,&raw root,20,&raw suffix,20)!=null || graph.nodes!=before){NativeExit(81);}
+ ProvenanceGraphFree(&raw graph);
+}}
 export "C" fn SelectJoinProbe(){unsafe{
  var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
  var shared=ReferenceLoan{};shared.root=&raw root;shared.provenance_type=20;
@@ -226,10 +250,10 @@ DRIVER=r'''
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-extern void SelectJoinProbe(void);extern void StoreGraphProbe(void);
+extern void SelectJoinProbe(void);extern void StoreGraphProbe(void);extern void PhysicalProjectProbe(void);
 extern int64_t SelectProbe(int64_t,int64_t,int64_t*,int64_t*,int64_t,int64_t*,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t*,int64_t);
 static int64_t get(void){int64_t v;if(scanf("%"SCNd64,&v)!=1)abort();return v;}
-int main(void){SelectJoinProbe();StoreGraphProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
+int main(void){SelectJoinProbe();StoreGraphProbe();PhysicalProjectProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
  int64_t *ns=calloc(n*4+1,8),*es=calloc(e*5+1,8),*ps=calloc(c*4+1,8),*qs=calloc(q*4+1,8);
  for(int64_t i=0;i<n*4;i++)ns[i]=get();for(int64_t i=0;i<e*5;i++)es[i]=get();for(int64_t i=0;i<c*4;i++)ps[i]=get();for(int64_t i=0;i<q*4;i++)qs[i]=get();
  printf("%"PRId64"\n",SelectProbe(n,e,ns,es,c,ps,start,mode,complete,type,known,q,qs,writing));free(ns);free(es);free(ps);free(qs);
@@ -338,6 +362,6 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent owner descriptor slot and physical address pair-product overlap and access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query and independent owner descriptor slot and physical address pair-product overlap and access overlap/universal write-mode/copy-mode oracles (synthetic labels map to actual mutable/shared reference and slice descriptors); shared/exclusive alternatives, reversed edges, unknown and absence; physical terminal prefixes, whole-value descendants, opaque/type/incomplete fallback and precise absence;  same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Physical projection clone invariants: all union endpoints, same-arena source preservation, recursive edges, equal source/target endpoint types, identity, all-or-unknown alternatives, cyclic/unsupported suffix rejection. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
  print(f'provenance selection/overlap/authority: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
