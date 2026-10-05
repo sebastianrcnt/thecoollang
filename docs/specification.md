@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 21
+# Cool language specification — 1.0 draft 22
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -834,3 +834,19 @@ This preflight does not yet typecheck every nondependent subexpression, validate
 all call/constructor arities or establish ownership/loan validity in an unused
 body; those remain part of the complete semantic audit. It does not manufacture a
 substitute type for a generic parameter or run placeholder specializations.
+
+## Draft 22: session storage reuse
+
+REPL `:forget` releases a binding only after checking its dependent loans and
+cleaning owned values. Later input may reuse a contiguous interior or trailing
+storage gap. Live binding addresses are stable; values are not compacted or moved.
+All anonymous and named allocations made while checking one input stay reserved
+through its execution/recovery. Newly reserved ranges are zero-initialized before
+execution, including interior slots formerly used for another type. Compile-only
+rejection preserves existing live values.
+
+The 65,536-slot storage/register limits remain implementation bounds. A request
+that fits no contiguous gap can fail even when total free space is larger. Unsafe
+raw pointers may not access storage after its binding is forgotten. See
+[REPL storage checks](references.md#reusing-fragmented-repl-storage) and
+[allocation accounting](repl-memory.md) for reclamation evidence and its limits.

@@ -85,6 +85,14 @@ def workload(name,count):
         return ('var kept=7;\n'+'var rejected=[32768]i64{};\n'*count+'kept\n','7\n',count)
     if name=='package_rollback':
         return ('var kept=7;\n'+'import bad "example.test/lifecycle/bad";\n'*count+'kept\n','7\n',count)
+    if name=='interior_owner_reuse':
+        prefix='import "std/mem";\nvar hole=[16384]i64{};\nvar keeper=42;\nlet r=&mut keeper;\n:forget hole\n'
+        cycle='var next=[8192]own[i64]{};\nnext[8191]=new[i64](7);\n:forget next\n'
+        return (prefix+cycle*count+'*r\nmem.owner_count()\n','42\n0\n',0)
+    if name=='interior_runtime_rollback':
+        prefix='import "std/mem";\nvar hole=[16384]i64{};\nvar keeper=42;\nlet r=&mut keeper;\n:forget hole\nfn fail()->own[i64]{let owner=new[i64](7);assert(false);return move owner;}\n'
+        cycle='var poison=123;\n:forget poison\nvar bad=fail();\n'
+        return (prefix+cycle*count+'*r\nmem.owner_count()\n','42\n0\n',count)
     if name=='distinct_literals_policy':
         return ('var kept="stable";\n'+''.join(f'{{let temporary="unique {i}";assert(false);}}\n' for i in range(count))+'kept\n','stable\n',count)
     raise AssertionError(name)
@@ -106,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix='cool-repl-lifecycle-') as directory:
     (project/'cool.mod').write_text('module example.test/lifecycle\n')
     (project/'bad/bad.cool').write_text('package bad;pub fn broken()->i64{return missing;}')
     observations=[]
-    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','distinct_literals_policy'):
+    for name in ('rejected_literals','rejected_types','lazy_layout_rollback','lexer_rollback','replacements','scratch_calls','runtime_rollback','rejected_imports','mixed_declaration_rollback','existing_layout_signature_rollback','source_generic_compaction','duplicate_batch_rollback','oversized_local_rollback','package_rollback','interior_owner_reuse','interior_runtime_rollback','distinct_literals_policy'):
         rows=[]
         for count in args.counts:
             source,output,errors=workload(name,count)

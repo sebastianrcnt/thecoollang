@@ -708,14 +708,7 @@ if (ctx.v_allow_redefinition != i8(0) && ctx.v_current_fun == 0) { v_res.name = 
 (v_res).mutable = i64(v_mutable);
 (v_res).depth = ctx.v_depth;
 (v_res).loop_level = ctx.v_loop_depth;
-(v_res).slot = ((ctx.v_functions)[ctx.v_current_fun]).slots;
-t7 = v_type3;
-t8 = TypeSlots(t7);
-((ctx.v_functions)[ctx.v_current_fun]).slots = ((ctx.v_functions)[ctx.v_current_fun]).slots + t8;
-if ((((ctx.v_functions)[ctx.v_current_fun]).slots > 65536)) {
-t9 = cast[*u8]("function storage limit exceeded");
-Error(t9);
-}
+(v_res).slot = ReserveStorage(v_type3);
 (v_res).next = ctx.v_locals;
 ctx.v_locals = v_res;
 t10 = (v_res).slot;
@@ -789,30 +782,10 @@ return null;
 }
 
 
-fn Storage(arg_v_type9: i64) -> i64 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_type9: i64 = arg_v_type9;
-var v_slot1: i64 = i64(0);
-var t0: i64 = i64(0);
-var t1: i64 = i64(0);
-var t2: *u8 = null;
-var t3: i64 = i64(0);
-var t4: i64 = i64(0);
-v_slot1 = ((ctx.v_functions)[ctx.v_current_fun]).slots;
-t0 = v_type9;
-t1 = TypeSlots(t0);
-((ctx.v_functions)[ctx.v_current_fun]).slots = ((ctx.v_functions)[ctx.v_current_fun]).slots + t1;
-if ((((ctx.v_functions)[ctx.v_current_fun]).slots > 65536)) {
-t2 = cast[*u8]("function storage limit exceeded");
-Error(t2);
-}
-t3 = v_slot1;
-t4 = v_type9;
-RegisterDrop(t3, t4);
-return v_slot1;
-}
-return i64(0);
+fn Storage(type:i64)->i64 {
+    let slot=ReserveStorage(type);
+    RegisterDrop(slot,type);
+    return slot;
 }
 
 

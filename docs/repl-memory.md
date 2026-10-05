@@ -15,7 +15,7 @@ absence of memory leaks, dangling storage or other lifetime defects.
 | Parser/resolver/move/type-binding scratch | Current submission, including nonlocal recovery | Registered buffers are released after checking/execution/recovery; scratch-list records are released too |
 | Lazy layout field lists and transaction journal | Current type descriptors; journal entries only for previously existing layouts changed during a submission | Rollback frees new field lists and restores old descriptors; newly allocated descriptors' fields are freed before type-ID reuse; commit releases journal records |
 | Alias and package registration nodes | Accepted imports and loaded packages | Failed loads/definitions free registrations before restoring previous heads; accepted aliases/packs retain their source dependencies |
-| Session locals and borrowed identities | Visible bindings plus live loan roots/holders/parents | Forgotten/dead tail storage can be reused; provenance identities required by surviving loans remain live |
+| Session locals and borrowed identities | Visible bindings plus live loan roots/holders/parents | Forgotten/dead interior and tail storage can be reused; provenance identities required by surviving loans remain live |
 | Owning user values | Live session bindings and active frames | Runtime recovery unwinds user frames before layout rollback; forgetting bindings and session exit drop owners |
 | Interned literal text and declared symbols | Stable immutable text for the whole session; equal bytes share storage | Failed compile-only submissions discard newly interned text; executed submissions keep it because values or unsafe pointers may have escaped before a runtime failure |
 
@@ -57,12 +57,13 @@ metadata are still counted: the compiler context intentionally lasts until
 process termination. Input checking, expected values, diagnostic counts and
 owner cleanup are verified independently of allocation counts.
 
-The 14 bounded-history cases cover unique cancelled literals/function names,
+The 16 bounded-history cases cover unique cancelled literals/function names,
 invalid nominal declarations, repeated dependent layout failures, partial lexing,
 function replacements, generic-call scratch, runtime owner unwinding, cancelled
 import aliases, mixed declaration batches, completed existing layout rollback,
 source compaction with lazy generic bodies, duplicate declaration rejection,
-incomplete local storage allocation and real framed CLI package-import failure.
+incomplete local storage allocation, real framed CLI package-import failure,
+interior owning-array reuse and poisoned interior-slot runtime failure.
 For each case, 64 and 1,024 repetitions must finish with exactly equal tracked
 live bytes and allocation count. The distinct-literal runtime-error workload is
 an explicit policy control: its retention grows and is not asserted constant.
@@ -84,7 +85,7 @@ can affect execution time but is not used to infer allocation counts.
 
 ## Audit result
 
-The focused observations found no accumulating tracked allocations in the 14
+The focused observations found no accumulating tracked allocations in the 16
 bounded-history cases, including rejected package loads with source-file buffers.
 The executed distinct-literal control grows according to the documented session
 lifetime policy. No production reclamation change was made because these
@@ -145,3 +146,16 @@ The heap lifecycle audit and sanitizer suites remain separate complementary
 checks. No production change was needed: these workloads reproduced neither
 obsolete mapping growth nor an invalid release. Whole G6 acceptance still needs
 an assessment of all resource policies and unsupported session operations.
+
+## Fragmented local storage
+
+The session allocator now excludes persistent binding ranges and all named or
+anonymous reservations in the current input, then reuses the earliest fitting
+gap. Range metadata is transaction scratch and is reclaimed after success/error.
+Execution zeroes new ranges before any initializer can fail. Live values never
+move; `:forget` checks dependent loans before releasing a binding. The hole tests
+and two additional fixed-history heap-accounting workloads exercise reuse,
+rollback and drop-descriptor cleanup. This is contiguous slot reuse, not moving
+compaction: a request larger than every free contiguous gap can still fail even
+when the sum of free slots would suffice. Lifetime-free raw pointers must not be
+used after their source binding is forgotten.

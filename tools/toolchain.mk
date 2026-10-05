@@ -440,3 +440,10 @@ template-names-sanitize-test: repl-loans-sanitize-test
 repl-jit-lifecycle-test: build/cool-compiler build/compiler-host.o build/language-runtime.o
 	python3 tools/test_repl_jit_lifecycle.py --output build/repl-jit-lifecycle-audit.json
 test: repl-jit-lifecycle-test
+
+.PHONY: repl-holes-test repl-holes-sanitize-test
+repl-holes-test: build/cool-compiler build/language.BIN
+	python3 tools/test_repl_holes.py
+test: repl-holes-test
+repl-holes-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_repl_holes.py --frontend build/repl-loans-asan/cool-compiler

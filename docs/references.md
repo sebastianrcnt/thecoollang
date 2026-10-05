@@ -727,3 +727,21 @@ reference-containing owned allocations still require further implementation.
 31 negative programs, 30 independent permission-model queries and persistent
 REPL loans. `make slice-descriptors-sanitize-test` adds an ASan compiler and
 instrumented generated LLVM/C runtime checks.
+
+## Reusing fragmented REPL storage
+
+Forgetting a binding releases its storage even when newer bindings remain above
+it. A later declaration may use that interior gap; live references and slices
+continue to point to the same values. Contiguous allocation is still required,
+and a single input's anonymous temporaries remain reserved until it completes.
+Live data is not compacted or moved. The existing 65,536-slot limit still applies
+to actual simultaneous storage plus bytecode registers; fragmentation without a
+large enough contiguous gap can still reach that limit.
+
+`make repl-holes-test` covers large interior array gaps, simultaneous arrays and
+returned aggregates, repeated owner/type changes, compile/runtime rollback,
+initialization failure over stale scalar bytes, live root rejection, persistent
+slice descriptor references and anonymous match storage. Both frontends run the
+eight focused sessions; `make repl-holes-sanitize-test` adds the ASan compiler.
+The heap lifecycle regression compares 64/1,024 interior reuse and runtime-failure
+histories while checking stable referenced values and zero user owners.

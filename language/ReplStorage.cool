@@ -1,0 +1,16 @@
+// One-input ranges are registered parser scratch, not retained session metadata.
+U0 ReplStorageBegin(){repl_storage_ranges=NULL;}
+I64 ReserveStorage(I64 type){
+    I64 size=TypeSlots(type),slot,next,end;Local *local;ReplStorageRange *range,*reservation;Function *f=&functions[current_fun];
+    if(!allow_redefinition || current_fun!=0){slot=f->slots;f->slots+=size;if(f->slots>65536)Error("function storage limit exceeded");return slot;}
+    slot=0;
+    while(TRUE){
+        if(slot+size>65536)Error("function storage limit exceeded");next=slot;
+        for(local=repl_locals;local;local=local->next){end=local->slot+TypeSlots(local->type);if(slot<end && slot+size>local->slot && end>next)next=end;}
+        for(range=repl_storage_ranges;range;range=range->next){end=range->slot+range->size;if(slot<end && slot+size>range->slot && end>next)next=end;}
+        if(next==slot)break;slot=next;
+    }
+    reservation=ScratchAllocate(sizeof(ReplStorageRange));reservation->slot=slot;reservation->size=size;reservation->next=repl_storage_ranges;repl_storage_ranges=reservation;
+    if(slot+size>f->slots)f->slots=slot+size;return slot;
+}
+U0 ReplStorageInitialize(){ReplStorageRange *range;for(range=repl_storage_ranges;range;range=range->next)MemSet(&repl_values[range->slot],0,range->size*8);}

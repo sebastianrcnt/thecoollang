@@ -1390,6 +1390,27 @@ through ordinary evaluation or library use.
   No production mapping leak was reproduced; full resource-policy acceptance
   and broader unsupported session operations remain G6 work.
 
+- Fragmented REPL storage (specification draft 22): deleting a large interior
+  array previously left unusable space below a live scalar and rejected a new
+  array despite sufficient available slots. Both frontends now share first-fit
+  reservation for named/anonymous session allocations, pin visible bindings and
+  every current-input temporary, and keep ordinary function allocation unchanged.
+  Live addresses never move; executing inputs zero every reserved range before
+  owner initialization can fail. Reservation records use transaction scratch and
+  are reclaimed after success/error; old DropSlot records remain protected by
+  snapshot-prefix cleanup. Eight sessions cover large/multiple array reuse,
+  returned aggregates, owner/type changes, parser/runtime rollback over stale
+  scalar slots, live root rejection, descriptor references and anonymous matches.
+  Both frontends and the instrumented compiler pass. Two 64/1,024 history models
+  have identical final tracked live bytes/count, bringing the heap lifecycle
+  corpus to sixteen bounded-history workloads. Full regression, native/legacy
+  bootstrap convergence, sanitizer and installed editor/distribution verification
+  pass. Evidence: `build/release-audit/repl-holes-{build,focused,storage,regression,sanitize,lifecycle,distribution}.log`.
+  Current IR SHA256:
+  `d7a32a6b2a846b3966c2ed0eecc7b5fd32f8fc008ce496690011a15e3f659f0d`.
+  Contiguous-gap fragmentation and live declaration/cache policy remain explicit;
+  this improves reclamation without declaring every G6 requirement complete.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and lifetime-aware slice

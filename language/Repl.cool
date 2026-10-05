@@ -108,7 +108,7 @@ U0 ReplStep(Text *text) {
     if (!At()->kind) return;
     if(ReplLoanCommand())return;
     if (Is("fn") || Is("pub") || Is("import") || Is("extern") || Is("export") || Is("struct") || Is("enum")) { repl_keep_tokens=TRUE;ReplLoadImports(start); ParseProgram(); return; }
-    current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0;
+    current_fun = 0; f = &functions[0]; locals = repl_locals; depth = 0; loop_depth = 0; unsafe_depth = 0; ReplStorageBegin();
     // Expression submissions may omit the trailing semicolon.
     if (ntok > start && tokens[ntok-1].kind != ';' && tokens[ntok-1].kind != '}') {
         tokens[ntok] = tokens[ntok-1];tokens[ntok].text=NULL;tokens[ntok].raw=NULL; tokens[ntok++].kind = ';'; tokens[ntok].kind = 0;
@@ -128,7 +128,7 @@ U0 ReplStep(Text *text) {
         for (i = 0; i < repl_capacity; i++) grown[i] = repl_values[i];
         Free(repl_values); repl_values = grown; repl_capacity = 65536;
     }
-    for (i = repl_snapshot[0].slots; i < f->slots; i++) repl_values[i] = 0;
+    ReplStorageInitialize();
     // The session's locals remain live; expression temporaries are regenerated.
     repl_executing = TRUE; result = RunBytecode(f, repl_values); no_warn result;
     ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage(); FreeBytecode(f);

@@ -221,11 +221,16 @@ Local *FindLocal(U8 *name) { Local *l = locals; while (l) { if (Eq(l->name, name
 extern I64 TypeSlots(I64 type);
 extern Bool Owned(I64 type);
 U0 RegisterDrop(I64 slot, I64 type) { DropSlot *d; if (!Owned(type)) return; d = CAlloc(sizeof(DropSlot)); d->slot = slot; d->type = type; d->next = functions[current_fun].drops; functions[current_fun].drops = d; }
+class ReplStorageRange { I64 slot,size;ReplStorageRange *next; };
+ReplStorageRange *repl_storage_ranges;
+extern I64 ReserveStorage(I64 type);
+extern U0 ReplStorageBegin();
+extern U0 ReplStorageInitialize();
 Local *AddLocal(U8 *name, I64 type, Bool mutable) {
     Local *l = locals, *res;
     while (l && l->depth == depth) { if (Eq(l->name, name)) Error("duplicate local declaration"); l = l->next; }
     res = AllocateLocal(); res->name = name; if(allow_redefinition && current_fun==0)res->name=StrNew(name); res->type = type; res->mutable = mutable; res->depth = depth; res->loop_level = loop_depth;
-    res->slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); res->next = locals; locals = res; RegisterDrop(res->slot, type); res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
+    res->slot = ReserveStorage(type); res->next = locals; locals = res; RegisterDrop(res->slot, type); res->all_next = functions[current_fun].all_locals; functions[current_fun].all_locals = res; return res;
 }
 Bool Integer(I64 type) { return type == T_INT || type == T_I32 || (T_U8 <= type <= T_U64); }
 Bool Pointer(I64 type) { return type >= T_PTR; }
@@ -237,7 +242,7 @@ I64 naggregates;
 Bool Aggregate(I64 type) { return T_AGG <= type < T_AGG + naggregates; }
 AggregateType *Shape(I64 type) { return &aggregate_types[type - T_AGG]; }
 extern U0 Layout(I64 type);
-I64 Storage(I64 type) { I64 slot = functions[current_fun].slots; functions[current_fun].slots += TypeSlots(type); if (functions[current_fun].slots > 65536) Error("function storage limit exceeded"); RegisterDrop(slot, type); return slot; }
+I64 Storage(I64 type) { I64 slot=ReserveStorage(type);RegisterDrop(slot,type);return slot; }
 I64 AggregateKind(I64 type) { if (!Aggregate(type)) return 0; return Shape(type)->kind; }
 
 Bool Floating(I64 type) { return type == T_F64 || type == T_F32; }

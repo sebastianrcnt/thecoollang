@@ -4,4 +4,4 @@ CompilerScratch *repl_scratch;
 U8 *ScratchOwn(U8 *data){CompilerScratch *item;if(allow_redefinition && data){item=CAlloc(sizeof(CompilerScratch));item->data=data;item->next=repl_scratch;repl_scratch=item;}return data;}
 U8 *ScratchAllocate(I64 size){return ScratchOwn(CAlloc(size));}
 U0 ScratchRelease(U8 *data){if(!allow_redefinition)Free(data);}
-U0 ReplFreeScratch(){CompilerScratch *item;while(repl_scratch){item=repl_scratch;repl_scratch=item->next;Free(item->data);Free(item);}repl_moves=NULL;type_bindings=NULL;}
+U0 ReplFreeScratch(){CompilerScratch *item;while(repl_scratch){item=repl_scratch;repl_scratch=item->next;Free(item->data);Free(item);}repl_storage_ranges=NULL;repl_moves=NULL;type_bindings=NULL;}

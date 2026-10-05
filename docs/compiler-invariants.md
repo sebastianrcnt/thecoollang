@@ -302,10 +302,11 @@ candidate check records are freed on replacement and exit.
 It drops owning storage, removes the binding from name lookup, and frees its
 held loans. `ReplTrimStorage` removes dead drop descriptors and reduces the
 slot high-water mark to the maximum end of a visible binding; live bindings
-never move. Dead statement temporaries and forgotten trailing bindings can
-then reuse storage. Never retain a dead drop descriptor across reuse: its
-former owner type could interpret a new scalar as an owned pointer. Interior
-holes and AST/local metadata/tokens still require general bounded reclamation.
+never move. `ReserveStorage` reuses interior as well as trailing gaps while
+protecting all visible bindings and current-input reservations. Never retain a
+dead drop descriptor across reuse: its former owner type could interpret a new
+scalar as an owned pointer. The focused heap/JIT audits complement broader
+resource-policy acceptance.
 
 `ReplDiscardNewDrops` traverses only records above the saved drop-list head.
 Execution failure drops new initialized owners before restoring the old
@@ -474,7 +475,7 @@ also free the builder's offsets, patches and temporary machine-code text.
 Snapshots copy only the active function prefix. Rollback clears discarded tail
 entries before reusing their IDs, including specialization origins and ownership
 fields. Cached callers survive callee replacement and rejected submissions.
-Pinned mixed declaration blocks, storage holes, distinct immutable text and
+Pinned mixed declaration blocks, distinct immutable text and
 other auxiliary allocations still require a complete lifetime audit; this
 remains an open release gate.
 
@@ -797,3 +798,28 @@ layouts, nodes, slots, move state or loans. Member names after a local/dependent
 root remain deferred to concrete specialization; rejecting every unknown-looking
 member here would break valid generic code. Undefined root names are independent
 of substitutions and must be rejected even when the template is unused.
+
+## REPL interior storage reservations
+
+`ReserveStorage` is shared by `AddLocal` and anonymous `Storage`. Ordinary
+functions keep monotonic allocation. Session function zero searches for the first
+contiguous range that does not overlap a visible binding or any reservation made
+in the current input. It advances past colliding range ends, without moving live
+values. `Function.slots` remains the highest allocated end, so bytecode virtual
+registers start beyond physical local/temporary storage.
+
+Every current-input allocation, including match scrutinees, aggregate call
+results, literals and locals inside a block, enters `ReplStorageRange`. Checking
+only lexical locals would lose anonymous or ended-block temporaries. Range records
+use `ScratchAllocate` and survive nonlocal recovery; `ReplFreeScratch` releases
+them and clears the head. A new statement starts with an empty reservation list.
+No allocation-time mutation of the old drop list is allowed: rollback compares
+new DropSlot records to the saved list head.
+
+Before executing bytecode, `ReplStorageInitialize` zeroes each reserved range,
+including holes below the previous high-water mark. A failure before storing an
+owner must drop zero, not stale scalar bytes interpreted as an owner address.
+Compile-only failure does not initialize/rewrite existing live values. After
+execution/recovery, existing frame/drop/loan cleanup runs before metadata disposal.
+`:forget` still rejects a root or parent with surviving dependent loans. Raw
+pointers escaped through unsafe code must not outlive a forgotten binding.

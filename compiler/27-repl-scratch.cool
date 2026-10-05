@@ -27,6 +27,7 @@ fn ReplFreeScratch() {
             Free(item.data);
             Free(cast[*u8](item));
         }
+        ctx.v_repl_storage_ranges = null;
         ctx.v_repl_moves = null;
         ctx.v_type_bindings = null;
     }

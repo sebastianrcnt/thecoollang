@@ -15,6 +15,7 @@
 #include "Bytecode.cool"
 #include "JIT.cool"
 #include "Repl.cool"
+#include "ReplStorage.cool"
 #include "Format.cool"
 U0 ReadSource(U8 *file) {
     I64 size; U8 *src = FileRead(file, &size, NULL);

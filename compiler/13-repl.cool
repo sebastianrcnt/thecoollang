@@ -33,7 +33,7 @@ fn ReplTrimStorage() {
             local = local.next;
         }
         // Values were already dropped; prune their old type descriptors before
-        // reusing storage. Interior holes remain and live addresses never move.
+        // reusing storage. Interior holes can be reused; live addresses never move.
         var link = &raw ctx.v_functions[0].drops;
         while (*link != null) {
             let drop = *link;
@@ -379,6 +379,7 @@ ctx.v_locals = ctx.v_repl_locals;
 ctx.v_depth = 0;
 ctx.v_loop_depth = 0;
 ctx.v_unsafe_depth = 0;
+ReplStorageBegin();
 t23 = (ctx.v_ntok > v_start3);
 if (t23) {
 t23 = (((ctx.v_tokens)[(ctx.v_ntok - 1)]).kind != 59);
@@ -483,13 +484,7 @@ Free(t60);
 ctx.v_repl_values = v_grown1;
 ctx.v_repl_capacity = 65536;
 }
-v_i26 = ((ctx.v_repl_snapshot)[0]).slots;
-while (true) {
-if (!((v_i26 < (v_f19).slots))) { break; }
-(ctx.v_repl_values)[v_i26] = 0;
-t61 = v_i26;
-v_i26 = v_i26 + i64(1);
-}
+ReplStorageInitialize();
 ctx.v_repl_executing = i8(1);
 t62 = v_f19;
 t63 = ctx.v_repl_values;

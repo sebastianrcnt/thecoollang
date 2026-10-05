@@ -1,0 +1,56 @@
+// Reservations cover named locals and anonymous temporaries for one input.
+// Their scratch lifetime survives parser/runtime error recovery.
+struct ReplStorageRange { slot:i64; size:i64; next:*ReplStorageRange; }
+fn ReplStorageBegin() {
+    unsafe {
+        let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        ctx.v_repl_storage_ranges=null;
+    }
+}
+fn ReserveStorage(type:i64)->i64 {
+    unsafe {
+        let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        let f=&raw ctx.v_functions[ctx.v_current_fun];
+        let size=TypeSlots(type);
+        if (ctx.v_allow_redefinition==i8(0) || ctx.v_current_fun!=0) {
+            let slot=f.slots;
+            f.slots=f.slots+size;
+            if (f.slots>65536) { Error(cast[*u8]("function storage limit exceeded")); }
+            return slot;
+        }
+        var slot:i64=0;
+        while (true) {
+            if (slot+size>65536) { Error(cast[*u8]("function storage limit exceeded")); }
+            var next=slot;
+            var local=ctx.v_repl_locals;
+            while (local!=null) {
+                let end=local.slot+TypeSlots(local.type);
+                if (slot<end && slot+size>local.slot && end>next) { next=end; }
+                local=local.next;
+            }
+            var range=ctx.v_repl_storage_ranges;
+            while (range!=null) {
+                let end=range.slot+range.size;
+                if (slot<end && slot+size>range.slot && end>next) { next=end; }
+                range=range.next;
+            }
+            if (next==slot) { break; }
+            slot=next;
+        }
+        let reservation=cast[*ReplStorageRange](ScratchAllocate(i64(sizeof(ReplStorageRange))));
+        reservation.slot=slot;reservation.size=size;
+        reservation.next=ctx.v_repl_storage_ranges;ctx.v_repl_storage_ranges=reservation;
+        if (slot+size>f.slots) { f.slots=slot+size; }
+        return slot;
+    }
+}
+fn ReplStorageInitialize() {
+    unsafe {
+        let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var range=ctx.v_repl_storage_ranges;
+        while (range!=null) {
+            MemSet(cast[*u8](&raw ctx.v_repl_values[range.slot]),0,range.size*8);
+            range=range.next;
+        }
+    }
+}

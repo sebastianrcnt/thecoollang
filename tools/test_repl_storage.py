@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Long REPL sessions reuse dead tail storage without moving surviving values."""
+"""Long REPL sessions reuse forgotten storage without moving surviving values."""
 from pathlib import Path
 import argparse
 import subprocess
@@ -47,7 +47,7 @@ x+y''', '7\n16\n',
     check(front, 'forgotten arrays', start + bindings + '\n*r=42;\n*r\n:forget r\na[0]+a[1]', '42\n49\n')
 
     # Forgetting an interior owner must remove its drop descriptor even though
-    # its hole cannot yet be reused. Later reuse stores a non-owner there.
+    # its former slot may hold a different type. Later reuse stores a non-owner there.
     check(front, 'interior owner descriptor', '''import "std/mem";
 var first=new[i64](11);
 var middle=new[[2]i64]([2]i64{22,33});
