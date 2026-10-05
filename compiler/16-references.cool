@@ -124,7 +124,7 @@ fn ReferenceStorage(type: i64) -> bool {
         let shape = Shape(type);
         if (shape.kind == 3) { return Borrowed(shape.element) == i8(0); }
         if (shape.kind == 5) {
-            return false;
+            return Borrowed(shape.element) == i8(0);
         }
         if (shape.kind == 2) {
             return ReferenceStorage(shape.element);
@@ -176,7 +176,7 @@ fn ValidateReferenceStorage(type: i64, token: * Token) {
             }
         } else {
             if (ContainsReference(type) && !ReferenceStorage(type)) {
-                ErrorAt(token, cast[ * u8]("stored references currently require non-owning, single-layer aggregate storage"));
+                ErrorAt(token, cast[ * u8]("stored references require single-layer aggregate storage and borrow-free owned payloads"));
             }
         }
     }
@@ -381,7 +381,7 @@ fn ReferenceAcquire(check: * ReferenceCheck, place: * Node, exclusive: i64, toke
         let through = ReferenceThroughStored(place);
         let physical = address && !through && (!IsReference(via.type) || place.kind == 22);
         var layer: i64 = 0;
-        if (NestedReference(via.type) && (through || expression.kind == 18)) {
+        if (NestedReference(via.type) && (through || expression.kind == 18 || expression.kind == 29)) {
             layer = 1;
         }
         let preserve = nested && NestedReference(via.type) && !physical && !bridge;
@@ -607,6 +607,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
         }
         if (node.kind == 29) {
             ReferenceAddress(check, node.a);
+            if (Owned(node.type) != i8(0)) { ReferenceAccess(check, node.a, true); }
             if (TrackedBorrow(node.type)) { ReferenceAcquire(check, node.a, ReferenceMode(node.type), node.token, node); }
             else { ReferenceAccess(check, node.a, true); }
             return;

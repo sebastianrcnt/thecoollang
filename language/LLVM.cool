@@ -37,7 +37,7 @@ I64 LocalWrite(I64 r, I64 type) {
 }
 I64 SlotAddress(I64 slot) { I64 r = Fresh(); IR("  "); Reg(r); IR(" = ptrtoint ptr %v"); RI(slot); IR(" to i64\n"); return r; }
 extern U0 EmitDrop(I64 address, I64 type);
-U0 EmitCopy(I64 destination, I64 source, I64 type) { EmitDrop(destination, type); IR("  call void @cool_copy(i64 "); Reg(destination); IR(", i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); if (Owned(type)) { IR("  call void @cool_zero(i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); } }
+U0 EmitCopy(I64 destination, I64 source, I64 type) { EmitDrop(destination, type); IR("  call void @cool_copy(i64 "); Reg(destination); IR(", i64 "); Reg(source); IR(", i64 "); RI(ByteSize(type)); IR(")\n"); if (Owned(type)) { IR("  call void @__cool_clear");RI(type);IR("(i64 ");Reg(source);IR(")\n"); } }
 U0 EmitWrite(I64 destination, I64 source, I64 type) {
     if (Aggregate(type)) { EmitCopy(destination, source, type); return; }
     IR("  call void @cool_store(i64 "); Reg(destination); IR(", i64 "); RI(type); IR(", i64 "); Reg(source); IR(")\n");

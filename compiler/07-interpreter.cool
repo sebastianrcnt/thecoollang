@@ -1,3 +1,15 @@
+// Moving a borrowed aggregate must leave its non-owning fields initialized.
+// Transfer only owning subobjects; their old handles must never be dropped twice.
+fn ClearMoved(address:i64,type:i64){unsafe{
+ if(Owned(type)==i8(0)){return;}
+ if(Borrowed(type)==i8(0)){MemSet(cast[*u8](address),0,ByteSize(type));return;}
+ let shape=Shape(type);
+ if(shape.kind==2){var i:i64=0;while(i<shape.count){ClearMoved(address+i*ByteSize(shape.element),shape.element);i=i+1;}return;}
+ var field=shape.fields;
+ if(shape.kind==4){let tag=*cast[*i64](address);while(field!=null){if(field.tag==tag){ClearMoved(address+field.offset,field.type);return;}field=field.next;}return;}
+ while(field!=null){ClearMoved(address+field.offset,field.type);field=field.next;}
+}}
+
 fn Eval(arg_v_n22: *Node, arg_v_frame: *Frame) -> i64 {
 unsafe {
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
@@ -955,49 +967,13 @@ return;
 }
 
 
-fn MoveValue(arg_v_destination: i64, arg_v_source1: i64, arg_v_type33: i64) -> i64 {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_destination: i64 = arg_v_destination;
-var v_source1: i64 = arg_v_source1;
-var v_type33: i64 = arg_v_type33;
-var t0: i64 = i64(0);
-var t1: i64 = i64(0);
-var t2: *u8 = null;
-var t3: *u8 = null;
-var t4: i64 = i64(0);
-var t5: i64 = i64(0);
-var t6: i64 = i64(0);
-var t7: *u8 = null;
-var t8: *u8 = null;
-var t9: i64 = i64(0);
-var t10: i64 = i64(0);
-var t11: i64 = i64(0);
-var t12: i64 = i64(0);
-var t13: *u8 = null;
-if ((v_destination == v_source1)) {
-return v_destination;
-}
-t0 = v_destination;
-t1 = v_type33;
-DropValue(t0, t1);
-t2 = cast[*u8](v_destination);
-t3 = cast[*u8](v_source1);
-t4 = v_type33;
-t5 = ByteSize(t4);
-t6 = t5;
-t7 = MemCpy(t2, t3, t6);
-t8 = cast[*u8](v_source1);
-t9 = 0;
-t10 = v_type33;
-t11 = ByteSize(t10);
-t12 = t11;
-t13 = MemSet(t8, t9, t12);
-return v_destination;
-}
-return i64(0);
-}
-
+fn MoveValue(destination:i64,source:i64,type:i64)->i64{unsafe{
+ if(destination==source){return destination;}
+ DropValue(destination,type);
+ MemCpy(cast[*u8](destination),cast[*u8](source),ByteSize(type));
+ ClearMoved(source,type);
+ return destination;
+}}
 
 fn ValueRead(arg_v_address6: i64, arg_v_type34: i64, arg_v_destination1: i64) -> i64 {
 unsafe {

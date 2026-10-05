@@ -456,71 +456,13 @@ return i64(0);
 }
 
 
-fn EmitCopy(arg_v_destination4: i64, arg_v_source5: i64, arg_v_type40: i64) {
-unsafe {
-var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
-var v_destination4: i64 = arg_v_destination4;
-var v_source5: i64 = arg_v_source5;
-var v_type40: i64 = arg_v_type40;
-var t0: i64 = i64(0);
-var t1: i64 = i64(0);
-var t2: *u8 = null;
-var t3: i64 = i64(0);
-var t4: *u8 = null;
-var t5: i64 = i64(0);
-var t6: *u8 = null;
-var t7: i64 = i64(0);
-var t8: i64 = i64(0);
-var t9: i64 = i64(0);
-var t10: *u8 = null;
-var t11: i64 = i64(0);
-var t12: i8 = i8(0);
-var t13: *u8 = null;
-var t14: i64 = i64(0);
-var t15: *u8 = null;
-var t16: i64 = i64(0);
-var t17: i64 = i64(0);
-var t18: i64 = i64(0);
-var t19: *u8 = null;
-t0 = v_destination4;
-t1 = v_type40;
-EmitDrop(t0, t1);
-t2 = cast[*u8]("  call void @cool_copy(i64 ");
-IR(t2);
-t3 = v_destination4;
-Reg(t3);
-t4 = cast[*u8](", i64 ");
-IR(t4);
-t5 = v_source5;
-Reg(t5);
-t6 = cast[*u8](", i64 ");
-IR(t6);
-t7 = v_type40;
-t8 = ByteSize(t7);
-t9 = t8;
-RI(t9);
-t10 = cast[*u8](")\n");
-IR(t10);
-t11 = v_type40;
-t12 = Owned(t11);
-if ((t12 != i8(0))) {
-t13 = cast[*u8]("  call void @cool_zero(i64 ");
-IR(t13);
-t14 = v_source5;
-Reg(t14);
-t15 = cast[*u8](", i64 ");
-IR(t15);
-t16 = v_type40;
-t17 = ByteSize(t16);
-t18 = t17;
-RI(t18);
-t19 = cast[*u8](")\n");
-IR(t19);
-}
-}
-return;
-}
-
+fn EmitCopy(destination:i64,source:i64,type:i64){unsafe{
+ EmitDrop(destination,type);
+ IR(cast[*u8]("  call void @cool_copy(i64 "));Reg(destination);IR(cast[*u8](", i64 "));Reg(source);IR(cast[*u8](", i64 "));RI(ByteSize(type));IR(cast[*u8](")\n"));
+ if(Owned(type)!=i8(0)){
+  IR(cast[*u8]("  call void @__cool_clear"));RI(type);IR(cast[*u8]("(i64 "));Reg(source);IR(cast[*u8](")\n"));
+ }
+}}
 
 fn EmitWrite(arg_v_destination5: i64, arg_v_source6: i64, arg_v_type41: i64) {
 unsafe {

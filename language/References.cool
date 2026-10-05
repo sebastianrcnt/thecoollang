@@ -41,7 +41,7 @@ Bool ReferenceStorage(I64 type){
     AggregateType *shape;Field *field;
     if(IsReference(type))return !Borrowed(Shape(type)->element);
     if(!Aggregate(type))return TRUE;shape=Shape(type);
-    if(shape->kind==A_SLICE)return !Borrowed(shape->element);if(shape->kind==A_OWNER)return FALSE;
+    if(shape->kind==A_SLICE)return !Borrowed(shape->element);if(shape->kind==A_OWNER)return !Borrowed(shape->element);
     if(shape->kind==A_ARRAY)return ReferenceStorage(shape->element);
     for(field=shape->fields;field;field=field->next)if(!ReferenceStorage(field->type))return FALSE;
     return TRUE;
@@ -56,7 +56,7 @@ I64 ReferenceMode(I64 type){
 }
 U0 ValidateReferenceStorage(I64 type,Token *token){
     if(IsReference(type)){if(Borrowed(Shape(type)->element) && !ReferenceStorage(Shape(type)->element))ErrorAt(token,"nested borrowed storage is not yet supported by scoped references");}
-    else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references currently require non-owning, single-layer aggregate storage");
+    else if(ContainsReference(type) && !ReferenceStorage(type))ErrorAt(token,"stored references require single-layer aggregate storage and borrow-free owned payloads");
 }
 U0 ReferenceMatchBinding(Node *binding){
     Local *local;if(!TrackedBorrow(binding->type))return;
@@ -118,7 +118,7 @@ U0 ReferenceAcquire(ReferenceCheck *check,Node *place,I64 exclusive,Token *token
     address=expression->kind==N_AGG_LITERAL && expression->op==0;
     bridge=expression->kind==N_AGG_LITERAL && expression->op==1;
     through=ReferenceThroughStored(place);physical=address && !through && (!IsReference(via->type) || place->kind==N_LOCAL_ADDRESS);
-    if(NestedReference(via->type) && (through || expression->kind==N_LOAD))layer=1;
+    if(NestedReference(via->type) && (through || expression->kind==N_LOAD || expression->kind==N_MOVE))layer=1;
     preserve=nested && NestedReference(via->type) && !physical && !bridge;before=check->loans;
     if(physical){check->loans=ReferenceNew(via,via,exclusive,0,expression,check->loans);found=TRUE;}
     for(source=before;source;source=source->next)if(source->root && source->holder==via && (preserve || bridge || source->indirect==layer)){
@@ -177,7 +177,7 @@ U0 ReferenceValue(ReferenceCheck *check,Node *node){
     }
     if(node->kind==N_LOCAL){ReferenceAccess(check,node,FALSE);return;}
     if(node->kind==N_LOAD){before=check->loans;ReferenceAddressMode(check,node->a,FALSE);ReferenceAccess(check,node->a,FALSE);if(!Owned(node->type))ReferenceRelease(check,before);return;}
-    if(node->kind==N_MOVE){ReferenceAddress(check,node->a);if(TrackedBorrow(node->type))ReferenceAcquire(check,node->a,ReferenceMode(node->type),node->token,node);else ReferenceAccess(check,node->a,TRUE);return;}
+    if(node->kind==N_MOVE){ReferenceAddress(check,node->a);if(Owned(node->type))ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type))ReferenceAcquire(check,node->a,ReferenceMode(node->type),node->token,node);else ReferenceAccess(check,node->a,TRUE);return;}
     if(node->kind==N_LOCAL_ADDRESS || node->kind==N_FIELD_ADDRESS || node->kind==N_INDEX_ADDRESS || node->kind==N_OWN_ADDRESS){ReferenceAddressMode(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);ReferenceAccess(check,node,node->op!=1 || node->kind!=N_OWN_ADDRESS);return;}
     if(node->kind==N_CALL){
         saved=check->loans;contract=0;results=NULL;

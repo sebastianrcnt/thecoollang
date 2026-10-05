@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 22
+# Cool language specification — 1.0 draft 23
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -414,8 +414,9 @@ This construct does not infer allocation validity from an arbitrary pointer.
 `new[T]()` requests default initialization. Borrowed values cannot be hidden in
 owned storage contrary to the current storage rules. Moving an owned binding or
 projection requires `move` where ownership transfers; a fresh owned result can
-transfer directly. Moved places are unusable until validly reinitialized. The
-full move/loan and cleanup rules remain in the ownership/reference contract.
+transfer directly. Direct moved bindings follow whole-root checking and are
+unusable until validly reinitialized. Moves through exclusive receivers preserve
+non-owning fields of borrowed aggregates as described in draft 23. The full move/loan and cleanup rules remain in the ownership/reference contract.
 
 `make primary-forms-test` runs combined construction/access/conversion/ownership
 examples with zero surviving owners, plus 26 rejected grammar/type/place cases,
@@ -850,3 +851,26 @@ that fits no contiguous gap can fail even when total free space is larger. Unsaf
 raw pointers may not access storage after its binding is forgotten. See
 [REPL storage checks](references.md#reusing-fragmented-repl-storage) and
 [allocation accounting](repl-memory.md) for reclamation evidence and its limits.
+
+## Draft 23: owning aggregates with stored borrows
+
+Structs, arrays and enums may combine scoped references/slices with owning
+fields when every owned allocation's payload is borrow-free. Ownership transfer
+of such an aggregate preserves its external borrow provenance; an explicit
+`borrows` return contract is still required. An owned field does not establish
+external provenance: returning a reference into a by-value parameter's owned
+allocation remains rejected. A reference into an owner accessed through a
+receiver is tied to the receiver's physical storage lifetime.
+
+A move conflicts with live references to the source aggregate or its owned
+pointees. Through an exclusive receiver, moving a borrowed owning aggregate
+clears owning subobjects but preserves initialized references, slice descriptors
+and enum tags. The destination retains its external loans; conflicting access
+through the retained source stays rejected while those loans are live. Empty
+owned handles fault on dereference. Direct moved bindings remain unusable under
+existing whole-root move tracking; this revision does not introduce granular
+partial-move tracking or permit reference-field replacement.
+
+`own[BorrowedType]`, borrowed owned heap allocations and nested stored references
+remain rejected pending lifetime-aware heap tracking. See
+[mixed aggregate rules](references.md#owning-aggregates-with-stored-borrows).

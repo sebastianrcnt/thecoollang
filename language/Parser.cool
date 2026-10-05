@@ -99,7 +99,7 @@ Node *Atom() {
         l = BorrowRoot(n); if (l && Owned(l->type)) { if (l->moved) ErrorAt(t, "use of moved value"); if (l->loop_level < loop_depth) ErrorAt(t, "cannot move an outer owner inside a loop"); l->moved = TRUE; }
         if (n->kind == N_LOCAL) { arg = NewNode(N_LOCAL_ADDRESS, t); arg->slot = n->slot; arg->type = T_PTR+n->type; arg->local_ref = n->local_ref; }
         else if (n->kind == N_LOAD) arg = n->a; else ErrorAt(t, "move requires a place or a fresh value");
-        tail = NewNode(N_MOVE, t); tail->a = arg; tail->type = n->type; tail->storage = Storage(n->type); return tail;
+        tail = NewNode(N_MOVE, t); tail->a = arg; tail->origin_source = n; tail->type = n->type; tail->storage = Storage(n->type); return tail;
     }
     if (Is("new")) {
         pos++; Need('[', "expected '[' after new"); ty = ParseType(); Need(']', "expected ']'"); ValidateBorrowedElements(ty);
@@ -322,7 +322,7 @@ Node *MatchStatement() {
                 if (!Eq(name, "_")) {
                     branch = NewNode(N_FIELD_ADDRESS, token); branch->a = address; branch->value = 8; branch->type = T_PTR+variant->type;
                     load = NewNode(N_LOAD, token); load->a = branch; load->origin_source = value; load->type = variant->type; if (Aggregate(load->type)) load->storage = Storage(load->type);
-                    local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); if (Owned(load->type)) { constant = NewNode(N_MOVE, token); constant->a = branch; constant->type = load->type; constant->storage = Storage(load->type); load = constant; }
+                    local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); if (Owned(load->type)) { constant = NewNode(N_MOVE, token); constant->a = branch; constant->origin_source = load; constant->type = load->type; constant->storage = Storage(load->type); load = constant; }
                     payload_bind->a = load; payload_bind->local_ref = local; payload_bind->type = variant->type; payload_bind->slot = local->slot;
                 }
             } else if (Take('(')) Need(')', "unit variant takes no binding");

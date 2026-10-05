@@ -1411,6 +1411,32 @@ through ordinary evaluation or library use.
   Contiguous-gap fragmentation and live declaration/cache policy remain explicit;
   this improves reclamation without declaring every G6 requirement complete.
 
+
+- Mixed owning/borrowed aggregate audit (specification draft 23): allow structs,
+  arrays and enums to combine stored scoped references/slices with owning fields
+  whose heap payloads are borrow-free. Reproduced and fixed a move accepted under
+  a shared physical loan, and a safe move-return rejected because its value
+  provenance was lost. Move nodes now retain their source value separately from
+  their address; return regions and nested receiver payload loans follow it.
+  Owned pointee getters through receivers retain physical storage, while pointers
+  into a by-value parameter's owned allocation remain rejected. A further audit
+  found that clearing a moved mixed aggregate completely could invalidate its
+  retained receiver's reference fields. Interpreter/bytecode/native JIT and typed
+  LLVM clearing now preserve borrowed fields and enum tags while clearing owning
+  subobjects. Direct moved bindings retain whole-root checking; this does not
+  implement granular partial moves or borrowed owned heap allocations. Tests
+  cover nested/generic aggregates, exclusive retained receivers, repeated enum
+  matches, anonymous payload cleanup, move/return contracts, checked empty-owner
+  faults, seventeen rejected programs, fourteen independent permission queries
+  and persistent REPL roots on both frontends, five engines and O2. ASan compiler,
+  generated LLVM load/store checks and ASan/UBSan runtime pass. Full regression,
+  native/legacy bootstrap convergence and installed editor/distribution pass.
+  Evidence: `build/release-audit/mixed-owned-{build,regression,sanitize,distribution}.log`.
+  Current IR SHA256:
+  `32139c192d87d8f71abb158c1bf06084284c3e773b945653fc6de9946eb0fb42`.
+  This extends ordinary borrowed aggregate use; G2 and the overall release gates
+  remain open for the documented heap/nested/replacement lifetime work.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and lifetime-aware slice

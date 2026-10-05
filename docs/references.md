@@ -72,10 +72,10 @@ with unsafe code. There is no implicit reference-to-pointer conversion.
 
 This is a development foundation, not completion of the 1.0 borrowing gate.
 
-- Shared and exclusive references can be stored in non-owning structs, arrays
-  and enums, including aggregates that also contain slices. A stored reference's pointee must not itself contain
-  borrowed storage. Reference-containing owned allocations and aggregates mixing
-  references with owners remain rejected. Reassignment of reference
+- Shared and exclusive references can be stored in structs, arrays and enums,
+  including aggregates that also contain slices and owning fields with borrow-free
+  payloads. A stored reference's pointee must not itself contain borrowed storage.
+  Reference-containing owned allocations remain rejected. Reassignment of reference
   bindings/fields and general nested stored lifetimes need further tracking.
 - Function-body slices use the same lexical provenance as references. A slice
   exclusively borrows its elements; element references reborrow it, and disjoint
@@ -713,7 +713,8 @@ underlying root. Return contracts retain all selected roots conservatively:
 anchor as well, so `len(*s)` can conflict while its returned element reference is
 live. Projection-specific return contracts are not implemented.
 
-Non-owning aggregates may combine slice fields and reference fields. Direct
+Aggregates may combine slice fields, reference fields and owning fields with
+borrow-free owned payloads. Direct
 references to these aggregates preserve physical and payload loans separately.
 Slices of owning elements support reading, explicit moves and replacement through
 an exclusive descriptor reference; moving their backing owner remains rejected.
@@ -745,3 +746,39 @@ slice descriptor references and anonymous match storage. Both frontends run the
 eight focused sessions; `make repl-holes-sanitize-test` adds the ASan compiler.
 The heap lifecycle regression compares 64/1,024 interior reuse and runtime-failure
 histories while checking stable referenced values and zero user owners.
+
+## Owning aggregates with stored borrows
+
+```cool
+struct Mixed { label: &i64; payload: own[i64]; }
+fn identity(value: Mixed) -> Mixed borrows(value) { return move value; }
+fn take(value: &mut Mixed) -> Mixed borrows(value) { return move *value; }
+fn payload(value: &Mixed) -> &i64 borrows(value) { return &*(*value).payload; }
+```
+
+The outer struct, fixed array or enum stores borrowed handles; each owned
+allocation must contain a borrow-free payload. Moving it preserves the borrowed
+handles' root sets and return regions. Loans into its own physical storage or
+owned pointees prevent a move, including shared physical loans. The owned
+payload getter above retains the receiver's physical root; a getter for `label`
+retains the external referent. A by-value `Mixed` parameter cannot return a
+reference into its owned payload, because that allocation is dropped on return.
+
+Moving through `&mut` clears only owning subobjects of a borrowed aggregate.
+References, slices, scalar fields and enum tags remain initialized in the source;
+owned handles become empty and dereferencing them produces a checked fault.
+The moved destination keeps its external loans. A retained exclusive reference
+field cannot be used incompatibly with the destination's loan. Once the
+latter's scope ends, the receiver's preserved borrowed fields can be used again.
+Direct moved bindings still follow whole-root move checking, and reference fields
+cannot be replaced. REPL dependents must be forgotten before their parent loan
+holders; moving a value does not remove its lexical or persistent root record.
+
+This supports nested ordinary aggregates and generic layouts, shared/exclusive
+fields, arrays, named/anonymous enum matches and aggregates combining slices and
+owners. It does not support `own[BorrowedType]`, stored references to borrowed
+pointees or general heap lifetimes. `make mixed-owned-references-test` checks both
+frontends, five engines and O2, zero leaked owners, checked empty-owner faults,
+17 rejected programs, 14 independent permission queries and persistent REPL
+roots. `make mixed-owned-references-sanitize-test` adds an ASan compiler and
+instrumented LLVM runtime verification.

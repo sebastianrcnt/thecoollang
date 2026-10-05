@@ -73,9 +73,19 @@ U0 DropValue(I64 address, I64 type) {
     if (AggregateKind(type) == A_ENUM) { tag = address(I64 *)[0]; for (field = Shape(type)->fields; field; field = field->next) if (field->tag == tag) { DropValue(address+field->offset, field->type); return; } }
     else for (field = Shape(type)->fields; field; field = field->next) DropValue(address+field->offset, field->type);
 }
+U0 ClearMoved(I64 address,I64 type){
+    AggregateType *shape; Field *field; I64 i,tag;
+    if(!Owned(type))return;
+    if(!Borrowed(type)){MemSet(address(U8 *),0,ByteSize(type));return;}
+    shape=Shape(type);
+    if(shape->kind==A_ARRAY){for(i=0;i<shape->count;i++)ClearMoved(address+i*ByteSize(shape->element),shape->element);return;}
+    if(shape->kind==A_ENUM){tag=address(I64 *)[0];for(field=shape->fields;field;field=field->next)if(field->tag==tag){ClearMoved(address+field->offset,field->type);return;}return;}
+    for(field=shape->fields;field;field=field->next)ClearMoved(address+field->offset,field->type);
+}
+
 I64 MoveValue(I64 destination, I64 source, I64 type) {
     if (destination == source) return destination;
-    DropValue(destination, type); MemCpy(destination(U8 *), source(U8 *), ByteSize(type)); MemSet(source(U8 *), 0, ByteSize(type)); return destination;
+    DropValue(destination, type); MemCpy(destination(U8 *), source(U8 *), ByteSize(type)); ClearMoved(source,type); return destination;
 }
 I64 ValueRead(I64 address, I64 type, I64 destination) {
     if (!address) Error("null pointer dereference");

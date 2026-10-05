@@ -5,7 +5,7 @@ class BorrowSource { Node *node; BorrowSource *next; };
 extern I64 Region(Node *n);
 I64 PlaceRegion(Node *n) {
     if (!n) return REGION_FRAME;
-    if(n->kind==N_OWN_ADDRESS && IsReference(n->a->type))return Region(n->a);
+    if(n->kind==N_OWN_ADDRESS){if(IsReference(n->a->type))return Region(n->a);if(n->a->kind==N_LOAD)return PlaceRegion(n->a->a);}
     if (n->kind == N_LOAD || n->kind == N_FIELD_ADDRESS) return PlaceRegion(n->a);
     if (n->kind == N_INDEX_ADDRESS) { if (n->op == A_SLICE) return Region(n->a); return PlaceRegion(n->a); }
     return REGION_FRAME;
@@ -14,6 +14,7 @@ I64 Region(Node *n) {
     I64 result = 0, i; Node *arg;
     if (!n || !Borrowed(n->type)) return 0;
     if(IsReference(n->type) && n->kind==N_AGG_LITERAL){if(n->op==1)return Region(n->origin_source);return PlaceRegion(n->a);}
+    if (n->kind == N_MOVE) return Region(n->origin_source);
     if (n->kind == N_LOCAL && n->local_ref) return n->local_ref->region;
     if (n->kind == N_SLICE) { if (n->op == A_ARRAY) return PlaceRegion(n->a); return Region(n->origin_source); }
     if (n->kind == N_LOAD) { if (n->origin_source) return Region(n->origin_source); return REGION_FRAME; }

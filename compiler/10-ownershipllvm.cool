@@ -68,6 +68,7 @@ return;
 
 fn EmitDropFunctions() {
 unsafe {
+EmitClearFunctions();
 var ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
 var v_i19: i64 = i64(0);
 var v_type47: i64 = i64(0);
@@ -457,3 +458,36 @@ continue;
 return;
 }
 
+
+fn ClearFieldIR(field:*Field){unsafe{
+ IR(cast[*u8]("  %field"));RI(field.tag);IR(cast[*u8](" = add i64 %address, "));RI(field.offset);
+ IR(cast[*u8]("\n  call void @__cool_clear"));RI(field.type);IR(cast[*u8]("(i64 %field"));RI(field.tag);IR(cast[*u8](")\n"));
+}}
+fn EmitClearFunctions(){unsafe{
+ let ctx=cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+ var i:i64=0;
+ while(i<ctx.v_naggregates){
+  let type=1000+i;let shape=Shape(type);i=i+1;
+  if(shape.generic_count==0 && Owned(type)!=i8(0)){
+   IR(cast[*u8]("define void @__cool_clear"));RI(type);IR(cast[*u8]("(i64 %address) {\nentry:\n  %cell = inttoptr i64 %address to ptr\n"));
+   if(Borrowed(type)==i8(0)){
+    IR(cast[*u8]("  call void @cool_zero(i64 %address, i64 "));RI(ByteSize(type));IR(cast[*u8](")\n  ret void\n"));
+   }else if(shape.kind==2){
+    IR(cast[*u8]("  br label %loop\nloop:\n  %index = phi i64 [0, %entry], [%next, %body]\n  %more = icmp ult i64 %index, "));RI(shape.count);
+    IR(cast[*u8]("\n  br i1 %more, label %body, label %done\nbody:\n  %offset = mul i64 %index, "));RI(ByteSize(shape.element));
+    IR(cast[*u8]("\n  %element = add i64 %address, %offset\n  call void @__cool_clear"));RI(shape.element);
+    IR(cast[*u8]("(i64 %element)\n  %next = add i64 %index, 1\n  br label %loop\ndone:\n  ret void\n"));
+   }else if(shape.kind==4){
+    IR(cast[*u8]("  %tag = load i64, ptr %cell\n  switch i64 %tag, label %done [\n"));
+    var field=shape.fields;while(field!=null){if(Owned(field.type)!=i8(0)){IR(cast[*u8]("    i64 "));RI(field.tag);IR(cast[*u8](", label %variant"));RI(field.tag);IR(cast[*u8]("\n"));}field=field.next;}
+    IR(cast[*u8]("  ]\n"));field=shape.fields;
+    while(field!=null){if(Owned(field.type)!=i8(0)){IR(cast[*u8]("variant"));RI(field.tag);IR(cast[*u8](":\n"));ClearFieldIR(field);IR(cast[*u8]("  br label %done\n"));}field=field.next;}
+    IR(cast[*u8]("done:\n  ret void\n"));
+   }else{
+    var field=shape.fields;while(field!=null){if(Owned(field.type)!=i8(0)){ClearFieldIR(field);}field=field.next;}
+    IR(cast[*u8]("  ret void\n"));
+   }
+   IR(cast[*u8]("}\n"));
+  }
+ }
+}}

@@ -823,3 +823,20 @@ Compile-only failure does not initialize/rewrite existing live values. After
 execution/recovery, existing frame/drop/loan cleanup runs before metadata disposal.
 `:forget` still rejects a root or parent with surviving dependent loans. Raw
 pointers escaped through unsafe code must not outlive a forgotten binding.
+
+## Moving aggregates that contain borrows
+
+`N_MOVE.origin_source` preserves the original value expression separately from
+its address operand. Region analysis follows that value, including enum payload
+loads. Physical move access is checked as a write before external payload loans
+are acquired. A move through a nested receiver selects payload layer one like
+an ordinary load, while owned pointee loans use physical layer zero. Place
+regions of an owned handle loaded from a receiver follow its address; by-value
+owned handles still belong to the current frame.
+
+`ClearMoved` and generated LLVM `__cool_clearTYPE` routines clear owning
+subobjects recursively. Borrow-free owned subobjects keep the previous complete
+zeroing behavior. Borrowed aggregate fields and enum tags remain initialized;
+this prevents a retained exclusive receiver from exposing null scoped references
+after a move. Destruction of emptied handles remains a no-op. Both interpreter
+paths, native JIT's bytecode operation and LLVM AOT/JIT use this contract.
