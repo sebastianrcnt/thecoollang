@@ -85,8 +85,9 @@ owner worklist 회피를 구현해 소멸 성능 회귀를 줄였다. `75304cb`�
 2. G2/G4/G5: 저장된 참조, tracked iteration, 남은 collection API와 임시
    receiver 제약을 확장한다. 명세/참조 문서의 제약을 갱신한다.
 3. G6: REPL 세션 자원의 bounded/reclaimable 처리를 완성한다.
-4. G9: 평가 순서·소유권·borrowed storage에 대한 결정적 fuzz를 확장하고
-   발견된 실패를 영구 회귀 테스트로 승격한다.
+4. G9: borrowed storage·slice loan에 대한 결정적 fuzz를 확장한다(평가 순서·
+   소유권은 `tools/test_ownership_fuzz.py`로 추가됨). 발견된 실패는 영구
+   회귀 테스트로 승격한다.
 5. G1/G3/G7/G10: 언어 명세 동결, frontend 정리, 도구/LSP 회복 범위 확대,
    원격 CI와 1.0 릴리스 노트를 완료한다. 빌드 성공만으로 1.0 완료 아님.
 

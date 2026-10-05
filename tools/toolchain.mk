@@ -609,3 +609,11 @@ drop-depth-test: build/cool-compiler build/language.BIN build/language-runtime.o
 test: drop-depth-test
 drop-depth-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_drop_depth.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/drop-depth-asan-audit.json
+
+# Seeded ownership/evaluation-order oracle with exact live-owner counts.
+.PHONY: ownership-fuzz-test ownership-fuzz-sanitize-test
+ownership-fuzz-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_ownership_fuzz.py --output build/ownership-fuzz-audit.json
+test: ownership-fuzz-test
+ownership-fuzz-sanitize-test: repl-loans-sanitize-test build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_ownership_fuzz.py --frontend build/repl-loans-asan/cool-compiler --sanitize-runtime --output build/ownership-fuzz-asan-audit.json

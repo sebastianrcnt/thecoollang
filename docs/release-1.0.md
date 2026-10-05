@@ -3040,6 +3040,18 @@ through ordinary evaluation or library use.
   depth/store/slice audits, safety fuzzing and every remaining mandatory gate
   stay Open.
 
+- Ownership/evaluation-order fuzzing: `tools/test_ownership_fuzz.py` generates
+  seeded programs that move, replace, mutate, swap, scope-drop and branch on a
+  set of owning slots, plus a fixed left-to-right argument-evaluation probe
+  (`pick(new[i64](next(&mut c1)), new[i64](next(&mut c2)))`). An independent
+  Python model of live owners and values drives exact `mem.owner_count()`
+  assertions after every operation and a zero-owner scope exit. Seeds
+  7/42/2026/1/99 at 80 steps pass on five engines + release O2 on both
+  frontends; `ownership-fuzz-sanitize-test` adds runtime ASan/UBSan and an
+  ASan-instrumented frontend. This extends G9's adversarial/deterministic
+  coverage for evaluation order and ownership; borrowed-storage fuzzing and
+  every remaining mandatory gate stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
@@ -3053,8 +3065,10 @@ through ordinary evaluation or library use.
   and the separate unsafe raw-pointer obligations.
 - Complete bounded/reclaimable REPL session resources while preserving loaded
   packages, persistent loans and runtime-error recovery.
-- Add adversarial/deterministic fuzz cases for evaluation order, ownership and
-  borrowed storage. Promote every discovered failure to a permanent regression.
+- Add adversarial/deterministic fuzz cases for borrowed storage and slice
+  loans (evaluation-order and ownership fuzzing now exist in
+  `tools/test_ownership_fuzz.py`). Promote every discovered failure to a
+  permanent regression.
 - Maintain the documented AST/slot/ownership invariants while simplifying
   remaining port-generated compiler sections. Both frontend implementations
   must remain semantically aligned and bootstrap must continue to converge.
