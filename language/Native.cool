@@ -6,6 +6,7 @@
 #include "Ownership.cool"
 #include "Completion.cool"
 #include "Parser.cool"
+#include "TemplateBody.cool"
 #include "References.cool"
 #include "Methods.cool"
 #include "Interpreter.cool"

@@ -1119,6 +1119,23 @@ through ordinary evaluation or library use.
   Unused body syntax and dependent layout/ownership/borrow semantics remain open;
   this change resolves the previous void/array probes, not the remaining gates.
 
+- Unused generic body grammar: draft 16 replaces unchecked body skipping with
+  allocation-free statement/expression syntax parsing after declaration collection.
+  Both frontends reject malformed initializers, operands, calls/type lists,
+  constructors, indexes/slices, conditions, for headers, match arms, return/defer
+  and loop control before any specialization. A stack-local table tracks parameters,
+  block bindings, loop initializers and match payloads so locals can shadow import
+  aliases; a positive regression covers scope exit and restored qualified enum
+  construction. Fifty invalid unused bodies and REPL rejection/redeclaration pass.
+  Generic versions of the existing primary-expression and control-flow programs
+  preserve their exact output across five engines and optimized native binaries.
+  Full regression, self-host/bootstrap convergence, compiler-instrumented ASan
+  and installed Neovim/distribution checks pass.
+  Evidence: `build/release-audit/template-body-{final-build,final-focused,final-regression,final-sanitize,distribution}.log`.
+  IR SHA256: `a98a176f87ccb2bd911a880d4f73bef9f295dd899389d6d49a41e47d40ccf528`.
+  Concrete expression typing, return coverage, moves/loans and unused nominal
+  template layouts still need audit; mandatory gates remain open.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

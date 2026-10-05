@@ -523,6 +523,7 @@ I64 SpecializeFunction(I64 template_id, I64 *types, I64 count) {
     f->body = Block(); AnalyzeBorrows(f); AnalyzeReferences(f); InjectDrops(f); f->end = pos; if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");
     pos = saved_pos; current_fun = saved_fun; depth = saved_depth; loop_depth = saved_loop; unsafe_depth = saved_unsafe; locals = saved_locals; type_bindings = saved_bindings; specialization_depth--; return id;
 }
+extern U0 TemplateBodyCheck(Function *f);
 U0 ParseProgram() {
     Function previous,*f, *old; U8 *name, *alias, *path; I64 braces, i, j, k, id, parsed[4096], count = 0; Bool public, foreign, exported; Token *t;
     if (!functions) functions = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -598,7 +599,7 @@ declaration_next:;
     }
     CompletionOrder(parsed,count);
     for (i = 0; i < count; i++) {
-        current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign || f->generic_count) goto parsed_next; pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
+        current_fun = parsed[i]; f = &functions[current_fun]; if (f->foreign) goto parsed_next; if(f->generic_count){pos=f->begin;TemplateBodyCheck(f);goto parsed_next;} pos = f->begin; locals = NULL; depth = 0; unsafe_depth = 0;
         for (j = 0; j < f->argc; j++) { Local *parameter = AddLocal(f->arg_names[j], f->arg_types[j], FALSE); if (Borrowed(parameter->type)) parameter->region = 1 << j; }
         f->body = Block(); AnalyzeBorrows(f); AnalyzeReferences(f); InjectDrops(f);
         if (f->result != T_VOID && !Returns(f->body)) ErrorAt(f->token, "not every path returns a value");

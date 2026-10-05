@@ -383,3 +383,10 @@ source-utf8-test: build/cool-compiler build/language.BIN
 test: source-utf8-test
 source-utf8-sanitize-test: repl-loans-sanitize-test
 	python3 tools/test_source_utf8.py --frontend build/repl-loans-asan/cool-compiler
+
+.PHONY: template-body-test template-body-sanitize-test
+template-body-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_template_body.py
+test: template-body-test
+template-body-sanitize-test: repl-loans-sanitize-test
+	python3 tools/test_template_body.py --frontend build/repl-loans-asan/cool-compiler

@@ -1,0 +1,362 @@
+// Stack-local names distinguish import qualifiers from shadowing local projections.
+struct TemplateScope {
+    names: [4096] * u8;
+    count: i64;
+}
+fn TemplateHasLocal(scope: * TemplateScope, name: * u8) -> bool {
+    unsafe {
+        for (var i = scope.count - 1; i >= 0; i = i - 1) {
+            if (Eq(scope.names[i], name) != i8(0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+fn TemplateLocal(scope: * TemplateScope, name: * u8) {
+    unsafe {
+        if (scope.count == 4096) {
+            Error(cast[ * u8]("template local syntax limit exceeded"));
+        }
+        scope.names[scope.count] = name;
+        scope.count = scope.count + 1;
+    }
+}
+// Allocation-free grammar checking; semantic checks remain in specialization.
+fn TemplateDepth(nesting: i64) {
+    if (nesting > 256) {
+        unsafe {
+            Error(cast[ * u8]("template body syntax nesting limit exceeded"));
+        }
+    }
+}
+fn TemplateList(f: * Function, scope: * TemplateScope, close: i64, mode: i64, nesting: i64) {
+    unsafe {
+        if (Take(close) != i8(0)) {
+            return;
+        }
+        while (true) {
+            if (mode == 1) {
+                Ident();
+                Need(58, cast[ * u8]("expected ':' after initializer field"));
+            }
+            TemplateExpression(f, scope, 1, nesting + 1);
+            if (Take(44) == i8(0)) {
+                break;
+            }
+            if (mode != 0 && Take(close) != i8(0)) {
+                return;
+            }
+        }
+        Need(close, cast[ * u8]("expected closing delimiter after expression list"));
+    }
+}
+// Calls and constructors distinguish explicit type lists from value indexing.
+fn TemplateArgumentsAhead() -> bool {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var i = ctx.v_pos;
+        var depth: i64 = 0;
+        if (ctx.v_tokens[i].kind != 91) {
+            return false;
+        }
+        while (true) {
+            if (ctx.v_tokens[i].kind == 91) {
+                depth = depth + 1;
+            }
+            if (ctx.v_tokens[i].kind == 93) {
+                depth = depth - 1;
+            }
+            i = i + 1;
+            if (depth == 0 || ctx.v_tokens[i].kind == 0) {
+                break;
+            }
+        }
+        return depth == 0 && (ctx.v_tokens[i].kind == 40 || ctx.v_tokens[i].kind == 123);
+    }
+}
+fn TemplateArguments(f: * Function, scope: * TemplateScope, nesting: i64) {
+    unsafe {
+        var count: i64 = 0;
+        Need(91, cast[ * u8]("expected type arguments"));
+        while (true) {
+            if (count == 8) {
+                Error(cast[ * u8]("generic argument limit exceeded"));
+            }
+            count = count + 1;
+            if (TemplateTypeSyntax(f, nesting + 1) != 0) {
+                Error(cast[ * u8]("generic argument cannot be void"));
+            }
+            if (Take(44) == i8(0)) {
+                break;
+            }
+        }
+        Need(93, cast[ * u8]("expected ']' after type arguments"));
+    }
+}
+fn TemplatePrimary(f: * Function, scope: * TemplateScope, nesting: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var kind = At().kind;
+        TemplateDepth(nesting);
+        if (kind == 45 || kind == 33 || kind == 126 || kind == 42 || kind == 38 || Is(cast[ * u8]("move")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            if (kind == 38 && (Is(cast[ * u8]("mut")) != i8(0) || Is(cast[ * u8]("raw")) != i8(0))) {
+                ctx.v_pos = ctx.v_pos + 1;
+            }
+            TemplatePrimary(f, scope, nesting + 1);
+            return;
+        }
+        if (Is(cast[ * u8]("sizeof")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[ * u8]("expected '(' after sizeof"));
+            TemplateTypeSyntax(f, 0);
+            Need(41, cast[ * u8]("expected ')' after sizeof"));
+        } else if (Is(cast[ * u8]("new")) != i8(0) || Is(cast[ * u8]("borrow_raw")) != i8(0) || (Is(cast[ * u8]("cast")) != i8(0) && ctx.v_tokens[ctx.v_pos + 1].kind == 91)) {
+            kind = 0;
+            if (Is(cast[ * u8]("cast")) != i8(0)) {
+                kind = 1;
+            }
+            if (Is(cast[ * u8]("borrow_raw")) != i8(0)) {
+                kind = 2;
+            }
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(91, cast[ * u8]("expected type argument"));
+            TemplateTypeSyntax(f, 0);
+            Need(93, cast[ * u8]("expected ']'"));
+            Need(40, cast[ * u8]("expected '('"));
+            if (kind != 0 || At().kind != 41) {
+                TemplateExpression(f, scope, 1, nesting + 1);
+            }
+            if (kind == 2) {
+                Need(44, cast[ * u8]("expected borrow anchor"));
+                TemplateExpression(f, scope, 1, nesting + 1);
+            }
+            Need(41, cast[ * u8]("expected ')'"));
+        } else if (kind == 91) {
+            TemplateTypeSyntax(f, 0);
+            Need(123, cast[ * u8]("expected aggregate initializer"));
+            TemplateList(f, scope, 125, 2, nesting);
+        } else if (Take(40) != i8(0)) {
+            TemplateExpression(f, scope, 1, nesting + 1);
+            Need(41, cast[ * u8]("expected ')'"));
+        } else if (kind == 257 || kind == 268 || kind == 258) {
+            ctx.v_pos = ctx.v_pos + 1;
+        } else {
+            let token = At();
+            var name = Ident();
+            var package = token.package;
+            var typed = FindType(package, name) >= 0;
+            if (!typed && !TemplateHasLocal(scope, name) && At().kind == 46 && ctx.v_tokens[ctx.v_pos + 1].kind == 256) {
+                var a = ctx.v_aliases;
+                while (a != null) {
+                    if (Eq(a.file, token.file) != i8(0) && Eq(a.name, name) != i8(0)) {
+                        package = a.path;
+                        ctx.v_pos = ctx.v_pos + 1;
+                        name = Ident();
+                        typed = FindType(package, name) >= 0;
+                        break;
+                    }
+                    a = a.next;
+                }
+            }
+            if (At().kind == 91 && (typed || TemplateArgumentsAhead())) {
+                TemplateArguments(f, scope, nesting);
+            }
+            if (Take(123) != i8(0)) {
+                TemplateList(f, scope, 125, 1, nesting);
+            } else if (Take(40) != i8(0)) {
+                TemplateList(f, scope, 41, 0, nesting);
+            }
+        }
+        while (true) {
+            if (Take(46) != i8(0)) {
+                Ident();
+                if (TemplateArgumentsAhead()) {
+                    TemplateArguments(f, scope, nesting);
+                }
+                if (Take(40) != i8(0)) {
+                    TemplateList(f, scope, 41, 0, nesting);
+                }
+            } else if (Take(91) != i8(0)) {
+                if (At().kind != 58) {
+                    TemplateExpression(f, scope, 1, nesting + 1);
+                }
+                if (Take(58) != i8(0)) {
+                    if (At().kind != 93) {
+                        TemplateExpression(f, scope, 1, nesting + 1);
+                    }
+                }
+                Need(93, cast[ * u8]("expected ']' after index or slice"));
+            } else {
+                break;
+            }
+        }
+    }
+}
+fn TemplateExpression(f: * Function, scope: * TemplateScope, minimum: i64, nesting: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        TemplateDepth(nesting);
+        TemplatePrimary(f, scope, nesting + 1);
+        while (Prec(At().kind) >= minimum) {
+            let precedence = Prec(At().kind);
+            ctx.v_pos = ctx.v_pos + 1;
+            TemplateExpression(f, scope, precedence + 1, nesting + 1);
+        }
+    }
+}
+fn TemplateSimple(f: * Function, scope: * TemplateScope, binding: bool, nesting: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        if (binding && (Is(cast[ * u8]("let")) != i8(0) || Is(cast[ * u8]("var")) != i8(0))) {
+            ctx.v_pos = ctx.v_pos + 1;
+            let name = Ident();
+            if (Take(58) != i8(0)) {
+                if (TemplateTypeSyntax(f, 0) != 0) {
+                    Error(cast[ * u8]("cannot bind a void value"));
+                }
+            }
+            Need(61, cast[ * u8]("variables must have an initializer"));
+            TemplateExpression(f, scope, 1, nesting + 1);
+            TemplateLocal(scope, name);
+        } else {
+            TemplateExpression(f, scope, 1, nesting + 1);
+            if (Take(61) != i8(0)) {
+                TemplateExpression(f, scope, 1, nesting + 1);
+            }
+        }
+    }
+}
+fn TemplateBlock(f: * Function, scope: * TemplateScope, nesting: i64, loops: i64) {
+    unsafe {
+        let saved = scope.count;
+        TemplateDepth(nesting);
+        Need(123, cast[ * u8]("expected '{'"));
+        while (Take(125) == i8(0)) {
+            if (At().kind == 0) {
+                Error(cast[ * u8]("unterminated block"));
+            }
+            TemplateStatement(f, scope, nesting + 1, loops);
+        }
+        scope.count = saved;
+    }
+}
+fn TemplateStatement(f: * Function, scope: * TemplateScope, nesting: i64, loops: i64) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        TemplateDepth(nesting);
+        if (At().kind == 123) {
+            TemplateBlock(f, scope, nesting + 1, loops);
+            return;
+        }
+        if (Is(cast[ * u8]("unsafe")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            TemplateBlock(f, scope, nesting + 1, loops);
+            return;
+        }
+        if (Is(cast[ * u8]("if")) != i8(0) || Is(cast[ * u8]("while")) != i8(0)) {
+            let loop = Is(cast[ * u8]("while")) != i8(0);
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[ * u8]("expected '(' before condition"));
+            TemplateExpression(f, scope, 1, nesting + 1);
+            Need(41, cast[ * u8]("expected ')'"));
+            TemplateBlock(f, scope, nesting + 1, loops + BoolInt(loop));
+            if (!loop && Is(cast[ * u8]("else")) != i8(0)) {
+                ctx.v_pos = ctx.v_pos + 1;
+                if (Is(cast[ * u8]("if")) != i8(0)) {
+                    TemplateStatement(f, scope, nesting + 1, loops);
+                } else {
+                    TemplateBlock(f, scope, nesting + 1, loops);
+                }
+            }
+            return;
+        }
+        if (Is(cast[ * u8]("for")) != i8(0)) {
+            let saved = scope.count;
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[ * u8]("expected '(' after for"));
+            if (Take(59) == i8(0)) {
+                TemplateSimple(f, scope, true, nesting);
+                Need(59, cast[ * u8]("expected ';'"));
+            }
+            if (Take(59) == i8(0)) {
+                TemplateExpression(f, scope, 1, nesting + 1);
+                Need(59, cast[ * u8]("expected ';'"));
+            }
+            if (Take(41) == i8(0)) {
+                TemplateSimple(f, scope, false, nesting);
+                Need(41, cast[ * u8]("expected ')'"));
+            }
+            TemplateBlock(f, scope, nesting + 1, loops + 1);
+            scope.count = saved;
+            return;
+        }
+        if (Is(cast[ * u8]("match")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(40, cast[ * u8]("expected '(' after match"));
+            TemplateExpression(f, scope, 1, nesting + 1);
+            Need(41, cast[ * u8]("expected ')'"));
+            Need(123, cast[ * u8]("expected match arms"));
+            while (Take(125) == i8(0)) {
+                let saved = scope.count;
+                if (Is(cast[ * u8]("_")) != i8(0)) {
+                    ctx.v_pos = ctx.v_pos + 1;
+                } else {
+                    TemplateTypeSyntax(f, 0);
+                    Need(46, cast[ * u8]("expected enum variant"));
+                    Ident();
+                    if (Take(40) != i8(0)) {
+                        if (Take(41) == i8(0)) {
+                            let name = Ident();
+                            TemplateLocal(scope, name);
+                            Need(41, cast[ * u8]("expected ')' after pattern binding"));
+                        }
+                    }
+                }
+                Need(269, cast[ * u8]("expected '=>' after match pattern"));
+                TemplateBlock(f, scope, nesting + 1, loops);
+                scope.count = saved;
+                Take(44);
+            }
+            return;
+        }
+        if (Is(cast[ * u8]("break")) != i8(0) || Is(cast[ * u8]("continue")) != i8(0)) {
+            if (loops == 0) {
+                Error(cast[ * u8]("loop control outside a loop"));
+            }
+            ctx.v_pos = ctx.v_pos + 1;
+            Need(59, cast[ * u8]("expected ';'"));
+            return;
+        }
+        if (Is(cast[ * u8]("return")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            if (Take(59) == i8(0)) {
+                TemplateExpression(f, scope, 1, nesting + 1);
+                Need(59, cast[ * u8]("expected ';'"));
+            }
+            return;
+        }
+        if (Is(cast[ * u8]("defer")) != i8(0)) {
+            ctx.v_pos = ctx.v_pos + 1;
+            TemplateExpression(f, scope, 1, nesting + 1);
+            Need(59, cast[ * u8]("expected ';'"));
+            return;
+        }
+        TemplateSimple(f, scope, true, nesting);
+        Need(59, cast[ * u8]("expected ';'"));
+    }
+}
+fn TemplateBodyCheck(f: * Function) {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var scope = TemplateScope {
+        };
+        for (var i = f.signature; i < f.begin; i = i + 1) {
+            if (ctx.v_tokens[i].kind == 256 && ctx.v_tokens[i + 1].kind == 58) {
+                TemplateLocal( & raw scope, ctx.v_tokens[i].text);
+            }
+        }
+        TemplateBlock(f, & raw scope, 0, 0);
+    }
+}

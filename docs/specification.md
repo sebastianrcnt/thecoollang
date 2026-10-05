@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 15
+# Cool language specification — 1.0 draft 16
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -176,8 +176,15 @@ actual `void` parameters, sequence/reference elements and generic arguments;
 `*void` and a type parameter named `void` retain their ordinary meanings. Array
 lengths must be in 0..65,536 even in unused signatures. Template signature type syntax is limited to 256 nested type operators
 or argument lists. Concrete type substitution, layout, borrowed-result contracts
-and body semantics are still checked on instantiation. Complete validation of
-unused templates remains release work.
+and body semantics are still checked on instantiation. Unused function bodies
+are parsed for statement/expression grammar after declaration collection, without
+inventing concrete types: missing initializers/operands, malformed calls, lists,
+indexing, conditions, loop headers and match arms are errors before any call.
+Loop control must be inside a loop. This syntax pass has a 256-level nesting
+budget and room for 4,096 simultaneously tracked parameter/local names. It tracks
+block, for and match scopes so locals may shadow file import aliases. Expression
+name resolution, operand types, return coverage, moves and loans still require
+specialization; complete semantic validation of unused templates remains work.
 
 `make declarations-test` covers 20 valid declaration/type/boundary cases and
 87 rejections, including duplicate extern/ordinary/export/unused-generic
@@ -187,6 +194,9 @@ additional bundle cases check qualified type visibility and argument counts. REP
 recovery also verifies that a rejected template does not reserve its name or
 change existing values, on both frontends.
 The wider package/method/reference suites cover visibility and lifetime behavior.
+`make template-body-test` executes generic versions of the primary-expression and
+control-flow suites on five engines plus optimized native binaries, rejects 50
+unused malformed bodies, and checks import-alias shadowing and REPL recovery.
 
 ## Source files and package assembly
 
@@ -622,6 +632,14 @@ necessary for validity and lifetime properties that a size/offset test cannot pr
 
 ## Draft revisions
 
+- Draft 16: check unused generic body statement/expression grammar with lexical
+  import-alias shadowing and bounded recursion; preserve specialization semantics.
+- Draft 15: reject actual void values/elements and out-of-range array lengths in
+  unused template signatures, while preserving raw void pointers and shadowing.
+- Draft 14: resolve non-dependent nominal signature types, visibility and arity
+  before specialization; preserve forward names and type-parameter precedence.
+- Draft 13: check unused generic signature syntax, duplicate parameter names
+  and names in borrow contracts at declaration time.
 - Draft 12: require well-formed UTF-8 across external inputs, preserve byte-based
   native ranges, and retain invalid dependency diagnostics on their actual URI.
 - Draft 11: specify supported-target sizes, alignments, structure/array/enum

@@ -4574,6 +4574,7 @@ pc = 20;
 continue;
 }
 if (pc == 22) {
+if (v_f9.foreign == 0 && v_f9.generic_count != 0) { ctx.v_pos = v_f9.begin; TemplateBodyCheck(v_f9); }
 t16 = ((v_f9).foreign != i64(0));
 if (!t16) {
 t16 = ((v_f9).generic_count != i64(0));

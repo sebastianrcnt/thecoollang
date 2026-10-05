@@ -672,3 +672,24 @@ flag and returns zero; references/owners/arrays/slices and generic argument list
 reject it. The signature rejects it in value parameter position, while permitting
 a void result. Literal array counts are checked before constructing any layout,
 including unsigned literals whose token bits appear negative as signed i64.
+
+## Template body grammar
+
+After collecting declarations, `TemplateBodyCheck` parses each unspecialized
+function's body from `Function.begin`. This pass creates no AST, slots, concrete
+types, move state or loan state. `TemplateScope` is a stack-local name table;
+parameter names come from the already checked signature. Bindings enter after
+their initializer. Blocks restore the entry count; for loops additionally restore
+the initializer scope, and each match arm restores its payload binding. This is
+needed to distinguish imported nominal constructors from ordinary projections
+when a local shadows an import alias. The scope does not certify local resolution
+or lifetimes. The cursor/recursive-depth limits bound grammar work and stack
+usage; all state disappears on normal return or native error recovery.
+
+Expressions use the ordinary `Prec` table. Type-list lookahead is limited to
+balanced square brackets followed by a call or constructor; collected nominal
+names also permit enum type arguments before a variant selection. Type syntax
+uses the signature preflight. Concrete specialization still runs the normal
+parser and every semantic/ownership/borrow pass. Keep `TemplateBody.cool` and
+`32-template-body.cool` aligned and extend the positive cross-engine fixture and
+unused rejection suite whenever grammar changes.
