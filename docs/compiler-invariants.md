@@ -1647,3 +1647,28 @@ reference field must require explicit initialization. Actual production
 frontends also reject unsupported recursive borrowed types with an ordinary
 diagnostic instead of overflowing the compiler stack. These regressions do not
 remove production nested-storage restrictions or certify arbitrary type graphs.
+
+## Slice return roots and root-free values
+
+Slice returns with nonzero regions use `ReferenceCheckReturn`, as scoped
+reference returns do. Each retained root must identify external caller storage
+at depth zero and belong to the function's `borrows` sources. Selecting an inner
+slice descriptor from a locally backed slice-of-slices must discard the outer
+local backing and retain the selected inner slice's backing. Whole outer-slice
+returns must still retain that backing and reject when it is local. Call results
+and stored source replacements follow the same physical/payload distinction.
+A `stores(dst,src)` contract authorizes installation, not returning `src` under
+a `borrows(dst)` contract.
+
+Region-zero slices preserve the prior root-free return policy: empty literals,
+bindings and empty-return calls have no backing lifetime to require. This is not
+a length test. Empty views of local arrays retain the frame bit even for
+`[0]T{}` or `[0:0]` and must reject. Aggregate returns other than slices continue
+to use the conservative region check. Region accumulation through aliases,
+branches, stores and foreign/raw boundaries remains a separate audit obligation;
+this change does not claim that an incorrectly computed zero region is safe.
+
+Return authorization now runs after scoped statement checking, so an earlier
+conflicting reborrow in a branch may be diagnosed before a later return escape.
+The language regression checks that first conflict separately from a one-branch
+local-backing return rejection. Production nested-storage guards remain active.

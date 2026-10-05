@@ -248,6 +248,24 @@ STORE_DIAGNOSTICS.update({
 SLICE_CASES.append(('recursive_slice_reference_initializer','reject','struct Node{next:[]Node;r:&i64;}fn main(){let node=new[Node]();}'))
 STORE_DIAGNOSTICS['recursive_slice_reference_initializer']='reference storage requires an explicit initializer'
 
+
+SLICE_CASES.extend([
+    ('mutual_slice_read', 'accept', 'struct Left{right:[]Right;value:i64;}struct Right{left:[]Left;value:i64;}fn main(){var empty=[0]Left{};var right=Right{left:empty[:],value:7};var rights=[1]Right{right};var left=Left{right:rights[:],value:9};assert(left.right[0].value==7);}'),
+    ('mutual_slice_reference_initializer', 'reject', 'struct Left{right:[]Right;}struct Right{left:[]Left;r:&i64;}fn main(){let node=new[Left]();}'),
+    ('recursive_slice_external_address_return', 'accept', 'struct Node{kids:[]Node;value:i64;}fn get(x:[]Node)->&i64 borrows(x){var root=Node{kids:x,value:9};return &root.kids[0].value;}fn main(){var none=[0]Node{};var leaf=Node{kids:none[:],value:7};var kids=[1]Node{leaf};let r=get(kids[:]);assert(*r==7);}'),
+    ('recursive_slice_local_field_return', 'reject', 'struct Node{kids:[]Node;value:i64;}fn bad(x:[]Node)->&i64 borrows(x){var root=Node{kids:x,value:9};return &root.value;}fn main(){}'),
+    ('recursive_slice_retained_backing_mutation', 'reject', 'struct Node{kids:[]Node;value:i64;}fn main(){var none=[0]Node{};var leaf=Node{kids:none[:],value:7};var kids=[1]Node{leaf};var root=Node{kids:kids[:],value:9};kids[0].value=11;}'),
+    ('nested_slice_external_descriptor_return', 'accept', 'fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};var s=rows[:];return s[0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('nested_slice_computed_descriptor_return', 'accept', 'fn identity(s:[][]i64)->[][]i64 borrows(s){return s;}fn get(x:[]i64)->[]i64 borrows(x){var rows=[1][]i64{x};return identity(rows[:])[0];}fn main(){var a=[1]i64{7};let r=get(a[:]);assert(r[0]==7);}'),
+    ('nested_slice_local_descriptor_return', 'reject', 'fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};var rows=[1][]i64{a[:]};var s=rows[:];return s[0];}fn main(){}'),
+])
+STORE_DIAGNOSTICS.update({
+    'mutual_slice_reference_initializer':'reference storage requires an explicit initializer',
+    'recursive_slice_local_field_return':'outlive',
+    'recursive_slice_retained_backing_mutation':'conflicts',
+    'nested_slice_local_descriptor_return':'outlive',
+})
+
 STORE_DIAGNOSTICS.update({
     'slice_short_payload_store':'assigned borrow may outlive local storage',
     'slice_retained_payload_mutation':'conflicts',
@@ -263,6 +281,17 @@ for contract in (False, True):
     name='slice_store_'+('complete_contract' if contract else 'missing_contract')
     SLICE_CASES.append((name,'accept' if contract else 'reject',header+body+main))
     if not contract:STORE_DIAGNOSTICS[name]='matching stores'
+
+
+SLICE_CASES.extend([
+    ('plain_slice_local_backing_return', 'reject', 'fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};return a[:];}fn main(){}'),
+    ('plain_slice_empty_local_backing_return', 'reject', 'fn bad(x:[]i64)->[]i64 borrows(x){var a=[0]i64{};return a[:];}fn main(){}'),
+    ('plain_slice_zero_length_local_return', 'reject', 'fn bad(x:[]i64)->[]i64 borrows(x){var a=[1]i64{7};return a[0:0];}fn main(){}'),
+    ('plain_slice_empty_value_return', 'accept', 'fn empty()->[]i64 borrows(){return []i64{};}fn main(){let s=empty();assert(len(s)==0);}'),
+    ('plain_slice_empty_binding_return', 'accept', 'fn empty()->[]i64 borrows(){let s=[]i64{};return s;}fn main(){let s=empty();assert(len(s)==0);}'),
+    ('nested_slice_stores_return_missing_source', 'reject', 'fn bad(dst:&mut [][]i64,src:[]i64)->[]i64 borrows(dst) stores(dst,src){(*dst)[0]=src;return (*dst)[0];}fn main(){}'),
+])
+STORE_DIAGNOSTICS.update({name:'outlive' for name in ('plain_slice_local_backing_return','plain_slice_empty_local_backing_return','plain_slice_zero_length_local_return','nested_slice_stores_return_missing_source')})
 
 SLICE_REPL_CASES = [('backing_forget',
   'var a=7;\nvar refs=[1]&i64{&a};\nvar s=refs[:];\n:forget refs\n:quit\n',

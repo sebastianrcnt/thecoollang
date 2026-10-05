@@ -109,7 +109,10 @@ bad('struct Box[T]{x:T;} fn main(){let x:Box=Box[i64]{x:1};}', 'generic argument
 good('fn tail[T](values: []T) -> []T borrows(values) { return values[1:]; } fn empty() -> []i32 borrows() { return []i32{}; } fn main() { var a=[3]i32{1,2,3}; let s=tail[i32](a[:]); io.println(s[0]); io.println(len(empty())); }', '2\n0\n')
 good('struct View { data: []i32; } fn view(s: []i32) -> View borrows(s) { return View{data:s}; } fn extract(v: View) -> []i32 borrows(v) { return v.data; } fn main(){var a=[2]i32{7,8}; io.println(extract(view(a[:]))[1]);}', '8\n')
 bad('fn bad(s: []i32) -> []i32 borrows(s) { var a=[1]i32{3}; return a[:]; } fn main() {}', 'outlive local storage')
-bad('fn bad(s: []i32) -> []i32 borrows(s) { var a=[1]i32{3}; var x=s; if(true){x=a[:];}else{x=s;} return x; } fn main() {}', 'outlive local storage')
+# The scoped checker now runs before return authorization: the second branch
+# reborrows s while x retains its exclusive capability. Check that first error.
+bad('fn bad(s: []i32) -> []i32 borrows(s) { var a=[1]i32{3}; var x=s; if(true){x=a[:];}else{x=s;} return x; } fn main() {}', 'access conflicts with a live scoped reference')
+bad('fn bad(s: []i32) -> []i32 borrows(s) { var a=[1]i32{3}; var x=s; if(true){x=a[:];} return x; } fn main() {}', 'outlive local storage')
 bad('struct V {s: []i32;} fn bad(s: []i32)->V borrows(s){var v=V{s:s};var a=[1]i32{3};v.s=a[:];return v;} fn main(){}', 'outlive local storage')
 bad('fn bad(a: []i32,b: []i32)->[]i32 borrows(a){return b;} fn main(){}', 'borrows contract')
 bad('fn bad(a: [1]i32)->[]i32 borrows(a){return a[:];} fn main(){}', 'borrowed references')

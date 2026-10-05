@@ -902,7 +902,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
                 }
             }
         }
-        if (node.kind == 9 && IsReference(check.function.result)) { ReferenceCheckReturn(check, node.a, saved); }
+        if (node.kind == 9 && (IsReference(check.function.result) || AggregateKind(check.function.result) == 3)) { ReferenceCheckReturn(check, node.a, saved); }
         if (node.kind != 15) {
             ReferenceRelease(check, saved);
         }
@@ -1058,6 +1058,9 @@ fn ReferenceAcquisitionLayer(place: *Node, via: *Local, expression: *Node, fallb
 // Every retained result root must be caller storage named by the contract.
 // Parameter descriptor slots and local physical roots are never external.
 fn ReferenceCheckReturn(check: *ReferenceCheck, value: *Node, stop: *ReferenceLoan) { unsafe {
+    // Root-free slices (empty literals and their copies/calls) preserve the
+    // existing zero-region contract. Empty views of local arrays are not zero.
+    if (AggregateKind(value.type) == 3 && Region(value) == 0) { return; }
     var loan = check.loans;
     var found = false;
     while (loan != stop) {

@@ -241,7 +241,7 @@ U0 ReferenceStatement(ReferenceCheck *check,Node *node){
     else if(node->kind==N_STORE){ReferenceWriteCapability(node->a);ReferenceAddressMode(check,node->a,FALSE);ReferenceValue(check,node->b);ReferenceAccess(check,node->a,TRUE);if(TrackedBorrow(node->type)){ReferenceStore(check,node->a,node->b,saved);}}
     else if(node->kind==N_IF || node->kind==N_WHILE || node->kind==N_FOR){ReferenceValue(check,node->a);ReferenceRelease(check,saved);ReferenceStatement(check,node->b);ReferenceStatement(check,node->c);}
     else ReferenceValue(check,node->a);
-    if(node->kind==N_RETURN && IsReference(check->function->result))ReferenceCheckReturn(check,node->a,saved);
+    if(node->kind==N_RETURN && (IsReference(check->function->result) || AggregateKind(check->function->result)==A_SLICE))ReferenceCheckReturn(check,node->a,saved);
     if(node->kind!=N_DEFER)ReferenceRelease(check,saved);
 }
 U0 AnalyzeReferences(Function *function){ReferenceCheck *check=CAlloc(sizeof(ReferenceCheck));check->function=function;check->next=reference_checks;reference_checks=check;ReferenceParameters(check);ReferenceStatement(check,function->body);reference_checks=check->next;ReferenceCheckFree(check);}
@@ -289,7 +289,7 @@ U0 ReferenceWriteCapability(Node *place){Node *current=place;while(current){if(P
 
 // Handwritten mirrors of typed acquisition routing and caller lifetime checks.
 
-U0 ReferenceCheckReturn(ReferenceCheck *check,Node *value,ReferenceLoan *stop){ReferenceLoan *loan;Local *root;Bool found=FALSE;for(loan=check->loans;loan!=stop;loan=loan->next)if(!loan->owner_pin && loan->expression==value && !loan->holder && loan->root){root=loan->root;found=TRUE;if(!root->reference_external || root->depth || !root->place_region || (root->place_region&~check->function->borrow_contract))ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}if(!found)ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}
+U0 ReferenceCheckReturn(ReferenceCheck *check,Node *value,ReferenceLoan *stop){ReferenceLoan *loan;Local *root;Bool found=FALSE;if(AggregateKind(value->type)==A_SLICE && !Region(value))return;for(loan=check->loans;loan!=stop;loan=loan->next)if(!loan->owner_pin && loan->expression==value && !loan->holder && loan->root){root=loan->root;found=TRUE;if(!root->reference_external || root->depth || !root->place_region || (root->place_region&~check->function->borrow_contract))ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}if(!found)ErrorAt(value->token,"returned borrow may outlive local storage or violate its borrows contract");}
 
 Bool ReferenceTemporaryAccess(ReferenceLoan *loan,Node *place,Node *origin){Node *current=place;if(loan->holder)return FALSE;if(!loan->owner_pin)return loan->expression==origin;while(current){if(current==loan->owner_pin)return TRUE;current=PlaceProjectionParent(current);}return FALSE;}
 

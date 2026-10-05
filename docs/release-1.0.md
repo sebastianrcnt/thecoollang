@@ -2479,6 +2479,38 @@ through ordinary evaluation or library use.
   Production guards remain; mutual recursion, aliases and broader lifetime
   coverage remain required. All release gates remain Open.
 
+- Slice return root selection: eight new private mutual-recursion/nested
+  descriptor fixtures exposed two valid external inner-slice returns rejected
+  by the coarse Region union, on both frontends. Slice returns with nonzero
+  regions now use physical root authorization alongside reference returns;
+  other aggregate returns keep the conservative region gate. Region-zero
+  empty values preserve the existing root-free contract. An initial full test
+  caught rejection of a valid empty literal; that regression is fixed rather
+  than excluding the existing language case. Six further private fixtures
+  distinguish literal/binding empties from local zero-length array views and
+  separate `stores` installation from `borrows` return authorization.
+  Scoped conflicts may now precede return diagnostics; the mixed-branch
+  language case checks that first conflicting reborrow, and a separate
+  one-branch case still requires local-return lifetime rejection.
+  Combined depth/store/slice audit: 210 classifications and 82 positives,
+  492 executions across both frontends/five engines plus O2, no gaps. Slice
+  sanitizer: 122 classifications/50 tree runs plus 12 persistent scenarios and
+  eight allocation observations PASS; primary-forms sanitizer also PASS.
+  Evidence: `build/release-audit/mutual-slice-{baseline,precise-return}.{json,log}`,
+  `build/release-audit/slice-return-{boundary,final-combined}.{json,log}`,
+  `build/release-audit/slice-return-{language,sanitize}.log`.
+  Initial regression logs document empty-value rejection and the changed first
+  diagnostic; they are not passing acceptance evidence.
+  Full `make -j4 test bootstrap-check editor-distribution-test` PASS, including
+  external installation and bootstrap/stage2/stage3 convergence. Permanent
+  slice readiness: 122 classifications/50 positives and 300 execution runs,
+  plus persistent and allocation observations PASS. Final full regression:
+  `build/release-audit/slice-return-verified-regression.log`. Stage-2 IR SHA256:
+  `82b83e55bfb9aecc87bf76b120ea8f21987e22a0ed40af3beeb4b1f28273ab64`.
+  Zero-region accumulation still needs permanent adversarial branch/alias/store
+  and foreign/raw coverage; production nested guards and all release gates
+  remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve
