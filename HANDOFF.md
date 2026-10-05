@@ -90,10 +90,10 @@ owner worklist 회피를 구현해 소멸 성능 회귀를 줄였다. `75304cb`�
    `tools/test_ownership_fuzz.py`, scoped loan은 `tools/test_borrow_fuzz.py`,
    aggregate 소유 payload는 `tools/test_aggregate_fuzz.py`로 추가됨). 발견된
    실패는 영구 회귀 테스트로 승격한다.
-5. G3: 남은 생성 dispatch 모듈(02-lexer, 15-native)과 parser의
+5. G3: 남은 생성 dispatch 모듈(15-native의 LanguageMain)과 parser의
    ParseProgram을 서술적 Cool로 정리한다(03-types의 InstantiateType,
-   13-repl의 Repl, 08-llvm의 EmitLLVM, 06-parser의 Expr/SpecializeFunction
-   정리됨).
+   13-repl의 Repl, 08-llvm의 EmitLLVM, 02-lexer의 LexSource,
+   06-parser의 Expr/SpecializeFunction 정리됨).
    G1: 명세 freeze 작업(추론/coercion 감사 등)을 이어간다. G4: 진단·ergonomics 감사를 넓힌다(오해 유발 narrowing 메시지 수정 및
    `tools/test_diagnostics.py` 추가됨). G7: LSP 회복 범위를 넓힌다(import 경로
    완성과 generic body 완성 추가됨). G1/G3/G10: 언어 명세 동결, frontend 정리,

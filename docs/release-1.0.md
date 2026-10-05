@@ -3193,6 +3193,23 @@ through ordinary evaluation or library use.
   Two modules still contain generated dispatch sections (02-lexer, 15-native)
   plus the parser's `ParseProgram`; G3's complete audit stays Open.
 
+- Compiler maintenance: `compiler/02-lexer.cool` no longer contains a generated
+  dispatch state machine. `LexSource` is now a direct scanning loop: skip
+  whitespace, consume line and block comments (reporting unterminated comments
+  and excluding completed comments from completion), allocate the next token,
+  then dispatch once on identifier, number, string or operator. Number scanning
+  keeps the decimal/hex/binary prefixes, digit separators, overflow detection and
+  decimal float/exponent path; string scanning keeps escapes and its
+  newline/unterminated/unsupported diagnostics. Behavior is unchanged: the
+  integer-token, input-bytes, float-literal, expression, declaration, editor and
+  REPL suites pass, the full `make -k -j4 test lsp-test bootstrap-check
+  editor-distribution-test` run plus the borrowed-vector/nested-reference/
+  stores/drop-depth/ownership-fuzz/aggregate-fuzz sanitizer targets exits 0
+  (`build/drop-depth/reg14.log`), and both bootstrap paths converge (self-host
+  IR SHA256 `ad04c6554f5cc201d137698b79a4d253144e53f323e73e3010e2adb64cd9a8ac`).
+  One module still contains a generated dispatch section (15-native) plus the
+  parser's `ParseProgram`; G3's complete audit stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
