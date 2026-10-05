@@ -1,4 +1,4 @@
-# Cool language specification — 1.0 draft 35
+# Cool language specification — 1.0 draft 36
 
 Status: **partial specification under implementation audit**. This document does
 not declare the language complete or freeze the 1.0 contract. It starts a
@@ -1165,3 +1165,32 @@ must only expose payloads of initialized Some slots. Chunk allocation count is
 unchanged, but tag/alignment storage increases chunk size. Measuring and tuning
 that runtime cost remains part of the performance gate. This draft does not
 close the full safety, library, performance or release gates.
+
+
+### Draft 36: private narrow Vector storage
+
+The public Vector API, conditional stores effects and popped-value borrow
+contracts are unchanged. Private storage selects 32 inline byte slots only when
+`sizeof(T)==1`; no actual reference or ownership handle fits in that size.
+Other types keep 32 explicitly initialized Option[T] slots. Zero-length fields
+have no actual handles, but their alignment may increase sizeof(T), in which
+case they use the ordinary Option storage. No enum ABI or syntax changes.
+
+A Vector holds separate nullable owners for the small/big chunk families. Only
+one head is active, selected by the size predicate, and every raw tail/cursor
+operation uses the matching family. Live indexed references still prevent growth,
+removal, clear and destruction at safe call sites. Internal Small bytes are read
+as T only while their index is below count. Big payload reads assert Some first.
+Pop transfers a value before releasing its chunk; Big slots reset to None after
+transfer. Clear detaches chunks from the tail and drops each once, including all
+remaining owning payloads. The detached next pointer is null, so clear's
+recursive destruction depth for explicit clear does not grow with vector
+length. Ordinary scope-exit drop still follows the head chain recursively; this
+change does not establish bounded stack use for that path. Historical scoped
+roots remain retained until the binding's scope ends. There is one chunk
+allocation per 32 elements and no per-element allocation.
+
+The byte chunk is again 48 bytes rather than 528. Vector itself grows from 24
+to 32 bytes because it keeps two nullable heads. This is a private development
+layout change, not a frozen C ABI. G1/G2/G4/G5/G8 remain subject to the full
+release contract and final audits.

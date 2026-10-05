@@ -35,6 +35,26 @@ var a=7;var b=8;
   assert(mem.owner_count()==0);items.append(new[View](View{r:&b}));items.clear();}
  assert(mem.owner_count()==0);a=20;b=21;io.println(123);}
 '''
+# Narrow inline storage must match Option storage at every chunk boundary.
+narrow_cases=[
+ ('u8','u8(i%101)','i64(*items.at(usize(i)))','i64(p)','i%101'),
+ ('i8','i8(i%101-50)','i64(*items.at(usize(i)))','i64(p)','i%101-50'),
+ ('bool','i%2==0','*items.at(usize(i))','p','i%2==0'),
+ ('Tiny','Tiny{value:u8(i%101)}','i64((*items.at(usize(i))).value)','i64(p.value)','i%101'),
+ ('[1]u8','[1]u8{u8(i%101)}','i64((*items.at(usize(i)))[0])','i64(p[0])','i%101'),
+ ('Phantom','Phantom{value:u8(i%101),refs:[0]&i64{},owners:[0]own[i64]{}}','i64((*items.at(usize(i))).value)','i64(p.value)','i%101'),
+]
+prefix+='struct Tiny{value:u8;}struct Phantom{value:u8;refs:[0]&i64;owners:[0]own[i64];}\n'
+program=program.replace('fn main(){','struct Tiny{value:u8;}struct Phantom{value:u8;refs:[0]&i64;owners:[0]own[i64];}fn main(){',1)
+extra=''
+for typ,value,read,pop_read,expected in narrow_cases:
+ extra+=f'{{var items=v.create[{typ}]();for(var i=0;i<65;i=i+1){{items.append({value});assert(items.len()==usize(i+1));assert(mem.owner_count()==usize((i+32)/32));assert({read}==({expected}));}}'
+ extra+=f'for(var i=64;i>=0;i=i-1){{{{let popped=items.pop();match(move popped){{o.Option[{typ}].None=>{{assert(false);}}o.Option[{typ}].Some(p)=>{{assert({pop_read}==({expected}));}}}}}}assert(items.len()==usize(i));assert(mem.owner_count()==usize((i+31)/32));}}'
+ extra+=f'for(var i=0;i<33;i=i+1){{items.append({value});}}assert(mem.owner_count()==2);{{let popped=items.pop();}}assert(mem.owner_count()==1);{{let i=32;items.append({value});assert({read}==({expected}));}}assert(mem.owner_count()==2);}}assert(mem.owner_count()==0);\n'
+# Leave live owned/borrowed Big chunks to exercise recursive drop too.
+extra+='var source=9;{var items=v.create[own[View]]();for(var i=0;i<33;i=i+1){items.append(new[View](View{r:&source}));}assert(mem.owner_count()==35);}assert(mem.owner_count()==0);source=10;\n'
+program=program.replace('io.println(123);}',extra+'io.println(123);}')
+
 negative=[
  ('shared_at_mutable_payload','var a=1;var items=v.create[&mut i64]();items.append(&mut a);**items.at(0)=2;','shared reference'),
  ('shared_iterator_mutable_payload','var a=1;var items=v.create[&mut i64]();items.append(&mut a);var it=items.iter();match(it.next()){o.Option[& &mut i64].None=>{}o.Option[& &mut i64].Some(r)=>{**r=2;}}','shared reference'),
@@ -46,6 +66,7 @@ negative=[
 ]
 negative.extend([
  ('live_element_pop','var a=1;var items=v.create[&i64]();items.append(&a);let r=items.at(0);let last=items.pop();','conflicts'),
+ ('cleared_source_mutation','var a=1;var items=v.create[&i64]();items.append(&a);items.clear();a=2;','conflicts'),
  ('live_element_clear','var a=1;var items=v.create[&i64]();items.append(&a);let r=items.at(0);items.clear();','conflicts'),
  ('reused_slot_source_mutation','var a=1;var b=2;var items=v.create[&i64]();items.append(&a);items.append(&a);{let removed=items.pop();}items.append(&b);b=3;','conflicts'),
 ])
@@ -80,5 +101,5 @@ with tempfile.TemporaryDirectory(prefix='cool borrowed vector ') as directory:
    observations.append(dict(frontend=front.name,name=name,exit=r.returncode,diagnostic=diagnostic,stderr=r.stderr))
 assert hashes==source_hashes(),'source changed during borrowed vector audit'
 if args.output:
- args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(dict(source_sha256=hashes,model_values=values,program=program,observations=observations),indent=2)+'\n')
-print('borrowed vector: 65 independently modeled shared values/chunk boundaries, shared/mutable iterators, aggregate/owned payloads, pop/clear/reuse and exact owner counts; ten lifetime/capability rejections PASS')
+ args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(dict(source_sha256=hashes,model_values=values,narrow_types=[case[0] for case in narrow_cases],program=program,observations=observations),indent=2)+'\n')
+print('borrowed vector: 65 independently modeled shared values/chunk boundaries, shared/mutable iterators, aggregate/owned payloads, pop/clear/reuse and exact owner counts; eleven lifetime/capability rejections and six narrow/zero-field storage models PASS')

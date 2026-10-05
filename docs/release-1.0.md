@@ -2951,10 +2951,62 @@ through ordinary evaluation or library use.
   Reducing plain-value slot overhead while preserving safe borrowed storage is
   now required before G8 closure. All mandatory gates remain Open.
 
+- Narrow Vector storage and chunk-wise clear (specification draft 36):
+  sizeof(T)==1 selects 32 inline byte slots, which cannot hold actual scoped
+  reference or ownership handles. Larger types retain explicitly initialized
+  Option slots and ordinary payload destructors. Separate nullable small/big
+  heads remove enum-head handling while keeping one chunk allocation per 32
+  elements; only the size-selected family is active. Raw tail/cursor operations
+  use that family. Vector itself grows 24→32 bytes; a byte chunk returns to
+  48 bytes from 528. The large Option initializer is isolated in a construction
+  helper instead of the hot append frame. Pop transfers its value before chunk
+  release. Public APIs, stores effects and conservative borrowed pop lifetimes
+  remain unchanged.
+
+  Clear now detaches and drops complete tail chunks, avoiding an Option return
+  for each discarded element. Each chunk's next owner is already null when
+  dropped, bounding explicit clear's chunk recursion. All owned payloads are
+  still dropped once. Ordinary scope-exit drop still follows the head chain
+  recursively and needs separate resource-depth validation; this change does
+  not claim to bound that path. Historical scoped roots remain protected after
+  clear, now with a permanent required rejection case.
+
+  Expanded Vector tests add u8/i8/bool, one-byte struct/fixed-array and a struct
+  with zero-length reference/owner fields, with 65 values, exact chunk ownership,
+  32/33 boundary reuse, ordered pops and live scope-exit cleanup. Zero-length
+  fields may increase alignment; their storage selection follows actual sizeof.
+  A 33-element owned borrowed-view scope checks both chunk and element cleanup.
+  Normal production/legacy reports have 34 observations; instrumented frontend
+  plus runtime ASan/UBSan reports have 52, including 11 required negatives.
+  Existing owning collection seeds 7/42/2026 pass normal/runtime sanitizers.
+
+  Full `make -k -j4 test bootstrap-check editor-distribution-test
+  borrowed-vector-sanitize-test nested-reference-slice-sanitize-test
+  stores-sanitize-test` exits 0 in
+  `build/release-audit/vector-inline-final-regression.log`. Both bootstrap paths,
+  external distribution and editor client validation pass. Permanent nested
+  readiness reports retain 304 classifications, 136 positives, 816 engine
+  executions, 48 REPL scenarios, zero gaps and equal tracked lifecycle resources
+  at histories 64/1024; the ASan frontend report covers the same classifications,
+  136 tree positives and 48 scenarios. All four Vector/nested normal/sanitizer
+  reports match current compiler/legacy/stdlib hashes. Production stage-2 IR
+  SHA256 remains `e0937220990e13a54c5abccf45f1811bb169215d52747d5e3ade77075aa4e755`.
+
+  Final same-compiler standalone O2 byte workload (500,000 elements, independent
+  checksum, warm-up and seven alternating samples, no competing validation)
+  measures old plain storage at 23dbe7d: 58.367 ms median; current: 56.555 ms.
+  Both byte chunks are 48 bytes. This restores the earlier workload range rather
+  than proving a general speedup. Evidence and source/compiler/binary hashes:
+  `docs/benchmarks/vector-inline-arm64.json` and
+  `build/release-audit/vector-inline-final-benchmark.log`. Intermediate prototype
+  rejection logs and slower enum-head measurements are not acceptance evidence.
+  Broader element-size performance, scope-exit depth, safety fuzzing and every
+  remaining mandatory release gate remain Open.
+
 ## Next implementation checkpoints
 
-- Reduce the measured plain-value Vector slot overhead while retaining explicit
-  borrowed initialization, active-slot checks and correct destructor lifetimes.
+- Measure larger plain/borrowed Vector elements and long-chain scope-exit
+  destruction; reduce remaining costs while preserving lifetime/destructor checks.
 
 - Expand adversarial/model coverage for production nested references and
   borrowed slice elements, including repeated relocation through fields, arrays,

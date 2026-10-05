@@ -1,14 +1,28 @@
 package vector;
 import option "std/option";
-// Stable chunks avoid relocating live elements when the vector grows.
-struct Chunk[T] {
-    values: [32]option.Option[T];
-    previous: * Chunk[T];
-    next: own[Chunk[T]];
+// Narrow values need no reference slots or element destructors. Keep their
+// bytes inline in one stable chunk; larger values retain initialized options.
+struct SmallChunk {
+    values: [32]u8;
+    previous: * SmallChunk;
+    next: own[SmallChunk];
 }
+struct BigChunk[T] {
+    values: [32]option.Option[T];
+    previous: * BigChunk[T];
+    next: own[BigChunk[T]];
+}
+struct EmptyBig[T] {
+    next: own[BigChunk[T]];
+}
+// Exactly one head is non-null when count > 0, selected by sizeof(T)==1.
+// tail points to that same chunk family; dereference it only in its size branch.
+// Small bytes cannot contain an actual reference/owner handle. Larger values
+// retain initialized Some/None slots and their ordinary element destructors.
 pub struct Vector[T] {
-    head: own[Chunk[T]];
-    tail: * Chunk[T];
+    small: own[SmallChunk];
+    big: own[BigChunk[T]];
+    tail: * BigChunk[T];
     count: usize;
 }
 pub fn create[T]() -> Vector[T]borrows() {
@@ -16,40 +30,79 @@ pub fn create[T]() -> Vector[T]borrows() {
     };
 }
 pub fn len[T](vector: & Vector[T]) -> usize {
+    return ( * vector).count;
+}
+fn small_head[T](vector: * Vector[T]) -> * SmallChunk {
     unsafe {
-        return ( * vector).count;
+        let pointer = & raw * ( * vector).small;
+        assert(pointer != null);
+        return pointer;
     }
+}
+fn big_head[T](vector: * Vector[T]) -> * BigChunk[T] {
+    unsafe {
+        let pointer = & raw * ( * vector).big;
+        assert(pointer != null);
+        return pointer;
+    }
+}
+fn new_big[T]() -> own[BigChunk[T]]borrows() {
+    var empty = EmptyBig[T] {
+    };
+    let chunk = new[BigChunk[T]](BigChunk[T] {
+        previous: null, next: move empty.next, values: [32]option.Option[T] {
+            option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None
+        }
+    }
+    );
+    return move chunk;
 }
 pub fn append[T](vector: & mut Vector[T], value: T) stores(vector, value) {
     unsafe {
         let index = ( * vector).count % 32;
-        if (index == 0) {
-            var empty = Vector[T] {
-            };
-            let chunk = new[Chunk[T]](Chunk[T] {
-                previous: null, next: move empty.head, values: [32]option.Option[T] {
-                    option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None, option.Option[T].None
+        if (sizeof(T) == 1) {
+            if (index == 0) {
+                let chunk = new[SmallChunk]();
+                let pointer = & raw * chunk;
+                ( * pointer).previous = cast[ * SmallChunk](( * vector).tail);
+                if (( * vector).count == 0) {
+                    ( * vector).small = move chunk;
+                } else {
+                    ( * cast[ * SmallChunk](( * vector).tail)).next = move chunk;
                 }
+                ( * vector).tail = cast[ * BigChunk[T]](pointer);
             }
-            );
-            let pointer = & raw * chunk;
-            ( * pointer).previous = ( * vector).tail;
-            if (( * vector).count == 0) {
-                ( * vector).head = move chunk;
-            } else {
-                ( * ( * vector).tail).next = move chunk;
+            ( * cast[ * SmallChunk](( * vector).tail)).values[index] = * cast[ * u8](cast[ * T]( & value));
+        } else {
+            if (index == 0) {
+                let chunk = new_big[T]();
+                let pointer = & raw * chunk;
+                ( * pointer).previous = cast[ * BigChunk[T]](( * vector).tail);
+                if (( * vector).count == 0) {
+                    ( * vector).big = move chunk;
+                } else {
+                    ( * ( * vector).tail).next = move chunk;
+                }
+                ( * vector).tail = cast[ * BigChunk[T]](pointer);
             }
-            ( * vector).tail = pointer;
+            ( * ( * vector).tail).values[index] = option.Option[T].Some(move value);
         }
-        ( * ( * vector).tail).values[index] = option.Option[T].Some(move value);
         ( * vector).count = ( * vector).count + 1;
     }
 }
 fn pointer_at[T](vector: * Vector[T], index: usize) -> * T {
     unsafe {
         assert(index < ( * vector).count);
-        var chunk = & raw * ( * vector).head;
         var block = index / 32;
+        if (sizeof(T) == 1) {
+            var chunk = small_head[T](vector);
+            while (block > 0) {
+                chunk = & raw * ( * chunk).next;
+                block = block - 1;
+            }
+            return cast[ * T]( & raw( * chunk).values[index % 32]);
+        }
+        var chunk = big_head[T](vector);
         while (block > 0) {
             chunk = & raw * ( * chunk).next;
             block = block - 1;
@@ -66,16 +119,33 @@ pub fn pop[T](vector: & mut Vector[T]) -> option.Option[T]borrows(vector) {
             return option.Option[T].None;
         }
         let index = (( * raw).count - 1) % 32;
-        let chunk = ( * raw).tail;
+        let small = & raw( * raw).small;
+        let big = & raw( * raw).big;
+        if (sizeof(T) == 1) {
+            let chunk = cast[ * SmallChunk](( * raw).tail);
+            let value = move * borrow_raw[ & mut T](cast[ * T]( & raw( * chunk).values[index]), vector);
+            ( * raw).count = ( * raw).count - 1;
+            if (index == 0) {
+                let previous = ( * chunk).previous;
+                ( * raw).tail = cast[ * BigChunk[T]](previous);
+                if (previous == null) {
+                    let released = move * small;
+                } else {
+                    let released = move( * previous).next;
+                }
+            }
+            return option.Option[T].Some(move value);
+        }
+        let chunk = cast[ * BigChunk[T]](( * raw).tail);
         let slot = & raw( * chunk).values[index];
         let value = move * borrow_raw[ & mut option.Option[T]](slot, vector);
         * slot = option.Option[T].None;
         ( * raw).count = ( * raw).count - 1;
         if (index == 0) {
             let previous = ( * chunk).previous;
-            ( * raw).tail = previous;
+            ( * raw).tail = cast[ * BigChunk[T]](previous);
             if (previous == null) {
-                let released = move( * raw).head;
+                let released = move * big;
             } else {
                 let released = move( * previous).next;
             }
@@ -83,25 +153,53 @@ pub fn pop[T](vector: & mut Vector[T]) -> option.Option[T]borrows(vector) {
         return move value;
     }
 }
+// Detach from the tail one chunk at a time. This bounds destructor recursion
+// and avoids building an Option return for every discarded element.
 pub fn clear[T](vector: & mut Vector[T]) {
     unsafe {
-        while (( * vector).count > 0) {
-            pop[T](vector);
+        let raw = cast[ * Vector[T]](vector);
+        let small = & raw( * raw).small;
+        let big = & raw( * raw).big;
+        while (( * raw).count > 0) {
+            if (sizeof(T) == 1) {
+                let chunk = cast[ * SmallChunk](( * raw).tail);
+                let previous = ( * chunk).previous;
+                ( * raw).tail = cast[ * BigChunk[T]](previous);
+                ( * raw).count = (( * raw).count - 1) / 32 * 32;
+                if (previous == null) {
+                    let released = move * small;
+                } else {
+                    let released = move( * previous).next;
+                }
+            } else {
+                let chunk = ( * raw).tail;
+                let previous = ( * chunk).previous;
+                ( * raw).tail = previous;
+                ( * raw).count = (( * raw).count - 1) / 32 * 32;
+                if (previous == null) {
+                    let released = move * big;
+                } else {
+                    let released = move( * previous).next;
+                }
+            }
         }
     }
 }
-// A raw cursor borrows the vector; removal, clear or destruction can invalidate it.
 pub struct Cursor[T] {
-    chunk: * Chunk[T];
+    chunk: * u8;
     index: usize;
     remaining: usize;
 }
 pub fn cursor[T](source: & Vector[T]) -> Cursor[T] {
     unsafe {
         let vector = cast[ * Vector[T]](source);
-        var first: * Chunk[T] = null;
+        var first: * u8 = null;
         if (( * vector).count > 0) {
-            first = & raw * ( * vector).head;
+            if (sizeof(T) == 1) {
+                first = cast[ * u8](small_head[T](vector));
+            } else {
+                first = cast[ * u8](big_head[T](vector));
+            }
         }
         return Cursor[T] {
             chunk: first, index: 0, remaining: ( * vector).count
@@ -113,29 +211,35 @@ pub fn next[T](cursor: * Cursor[T]) -> * T {
         if (( * cursor).remaining == 0) {
             return null;
         }
-        let slot = & raw( * ( * cursor).chunk).values[( * cursor).index];
-        assert( * cast[ * i64](slot) == 1);
-        let value = cast[ * T](cast[ * u8](slot) + 8);
+        var value: * T = null;
+        if (sizeof(T) == 1) {
+            value = cast[ * T]( & raw( * cast[ * SmallChunk](( * cursor).chunk)).values[( * cursor).index]);
+        } else {
+            let slot = & raw( * cast[ * BigChunk[T]](( * cursor).chunk)).values[( * cursor).index];
+            assert( * cast[ * i64](slot) == 1);
+            value = cast[ * T](cast[ * u8](slot) + 8);
+        }
         ( * cursor).index = ( * cursor).index + 1;
         ( * cursor).remaining = ( * cursor).remaining - 1;
         if (( * cursor).index == 32 && ( * cursor).remaining > 0) {
-            ( * cursor).chunk = & raw * ( * ( * cursor).chunk).next;
+            if (sizeof(T) == 1) {
+                ( * cursor).chunk = cast[ * u8]( & raw * ( * cast[ * SmallChunk](( * cursor).chunk)).next);
+            } else {
+                ( * cursor).chunk = cast[ * u8]( & raw * ( * cast[ * BigChunk[T]](( * cursor).chunk)).next);
+            }
             ( * cursor).index = 0;
         }
         return value;
     }
 }
-// The caller's loan keeps the vector alive and prevents removal or replacement.
 pub fn at[T](vector: & Vector[T], index: usize) -> & T borrows(vector) {
     unsafe {
-        let pointer = pointer_at[T](cast[ * Vector[T]](vector), index);
-        return borrow_raw[ & T](pointer, vector);
+        return borrow_raw[ & T](pointer_at[T](cast[ * Vector[T]](vector), index), vector);
     }
 }
 pub fn at_mut[T](vector: & mut Vector[T], index: usize) -> & mut T borrows(vector) {
     unsafe {
-        let pointer = pointer_at[T](cast[ * Vector[T]](vector), index);
-        return borrow_raw[ & mut T](pointer, vector);
+        return borrow_raw[ & mut T](pointer_at[T](cast[ * Vector[T]](vector), index), vector);
     }
 }
 // Instance syntax preserves the free-function APIs and their borrow contracts.

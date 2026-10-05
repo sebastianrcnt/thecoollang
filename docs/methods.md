@@ -141,3 +141,6 @@ at/iteration preserve inner-reference barriers, and mutable operations suspend
 conflicting receiver/element loans. Borrowed pop results conservatively retain
 the vector lifetime; clear releases runtime storage but does not erase historical
 scoped roots before the binding's scope ends.
+
+Draft 36 changes only private Vector storage and chunk-wise clear. The public
+methods and their stores/borrow effects retain the draft-35 behavior.

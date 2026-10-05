@@ -1006,11 +1006,16 @@ fn main() {
 Pop returns `Option[T]` borrowing the source vector for borrowed T. Popped values
 may not escape that source's lifetime through this conservative API. Clear frees
 runtime storage but retains prior scoped roots until the vector binding's scope
-ends. Internal Option slots distinguish empty storage from initialized elements;
-they add no per-element heap allocation. The private representation includes an
-enum tag and padding per slot. `make borrowed-vector-test` and
+ends. For sizeof(T)>1, internal Option slots distinguish empty storage from
+initialized elements. One-byte types use inline byte slots; they cannot contain
+an actual reference or ownership handle. Both families allocate one chunk per
+32 elements, without per-element allocation. Clear detaches whole chunks from
+the tail and drops remaining owned elements with bounded recursion. `make borrowed-vector-test` and
 `make borrowed-vector-sanitize-test` cover chunk boundaries, iteration, popped
 values, aggregates/owners, exact owner cleanup and required capability/lifetime
 rejections. Specification draft 35 also permits copying a known root-free named
 enum/owner without creating a fictitious borrow of its local storage; physical
 addresses and pending owner accesses keep ordinary protection.
+
+Specification draft 36 documents the private narrow-storage invariants and the
+extra nullable head slot. Scoped lifetime/capability rules are unchanged.

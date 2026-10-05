@@ -347,12 +347,12 @@ types across separate queries. This removes exponential work within a query,
 without claiming linear overall compilation or closing G8.
 
 
-## Borrowed-vector storage cost (development regression)
+## Borrowed-vector storage cost (draft-35 regression)
 
 The draft-35 Vector implementation uses initialized Option[T] slots for both
 plain and borrowed T. This removes unsafe zero initialization of reference
 slots without per-element heap wrappers, but it increases tag/padding bytes and
-adds slot handling. This regression must be addressed before closing G8.
+adds slot handling. The draft-36 measurements below supersede this implementation.
 
 `python3 tools/bench_vector_storage.py --before-ref 23dbe7d --output
 build/vector-storage-benchmark/report.json` builds old/current package copies
@@ -375,3 +375,29 @@ programs and source/compiler/binary hashes are retained in
 slot representation especially affects narrow element types. Preserve borrowed
 slot initialization and destructor safety while reducing plain-value overhead;
 do not revert to uninitialized scoped references to recover performance.
+
+
+## Narrow Vector storage (draft 36)
+
+One-byte elements now use 48-byte inline chunks. Other T retains the initialized
+Option slots required for borrowed values. Separate nullable head owners keep
+one allocation per chunk; Vector itself is 32 rather than 24 bytes. The larger
+Option initializer is isolated in a chunk-construction helper. Clear detaches
+whole chunks from the tail rather than constructing a popped Option for each
+removed element, while still dropping every owned payload once with bounded
+chunk recursion during explicit clear. Ordinary scope-exit drop still traverses
+the owner chain recursively. These changes preserve the public lifetime contracts.
+
+The same 500,000-byte append/raw-cursor/checksum/clear workload, compiler,
+release-O2 flags, warm-up and seven alternating samples compare the old plain
+storage at 23dbe7d against current storage. The retained run has no unrelated
+validation running. Current byte chunk size matches the old 48 bytes; raw
+samples and source/compiler/binary hashes are in
+[vector-inline-arm64.json](benchmarks/vector-inline-arm64.json).
+
+The final whole-process medians are 58.367 ms for old plain storage and
+56.555 ms for current storage. This restores
+this workload's earlier elapsed-time range; small differences within that range
+are not evidence of a general speedup. It does not close G8 or certify the
+performance of larger/borrowed element types. Earlier 528-byte/91.655ms samples
+remain above as evidence of the actual regression and its cause.
