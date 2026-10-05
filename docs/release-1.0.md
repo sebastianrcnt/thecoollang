@@ -1253,6 +1253,24 @@ through ordinary evaluation or library use.
   dependency transport and a wider real application corpus remain outside this
   measurement; G8 stays open.
 
+- Batched native dependency checking: default native build/LLVM execution now
+  acquires one driver lock and invokes make once for frontend plus runtime.o.
+  Explicit COOL_FRONTEND still validates its executable and checks only the
+  runtime; ordinary checking retains frontend-only dependencies. The actual
+  dependency recipes and all content/artifact cache identities remain active.
+  The cache regression forwards real make, refreshes a changed runtime object,
+  verifies changed standalone output/cache invalidation, and ensures an external
+  frontend does not create a checkout frontend. Project/cache and installed
+  editor/distribution validation pass. Evidence:
+  `build/release-audit/batched-ensure-{focused,project,distribution}.log`.
+  Identical frontend/runtime seven-sample before/after snapshots are published in
+  `docs/benchmarks/default-cli-batched-{before,after}-arm64.json`: cached O2 build
+  medians decrease 103.063 to 95.269 ms for Tally and 121.760 to 113.160 ms for the
+  expanded corpus. Cached-command observations support a local 7.6%/7.1%
+  improvement; cold/edit variability and unchanged-path control measurements
+  are documented without claiming all differences as dependency-check savings.
+  G8 remains open for broader real projects and incremental compilation scope.
+
 ## Next implementation checkpoints
 
 - Extend reference-containing owned/nested storage and references to slice

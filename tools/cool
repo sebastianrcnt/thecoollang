@@ -19,11 +19,13 @@ ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = Path(os.environ.get('COOL_FRONTEND', ROOT/'build/cool-compiler')).resolve()
 _FRONTEND_DIGEST = None
 
-def ensure_frontend():
+def ensure_frontend(*runtime_targets):
     if 'COOL_FRONTEND' not in os.environ:
-        ensure('build/cool-compiler')
+        ensure('build/cool-compiler', *runtime_targets)
     elif not FRONTEND.is_file():
         raise ValueError(f'frontend executable not found: {FRONTEND}')
+    elif runtime_targets:
+        ensure(*runtime_targets)
 
 
 
@@ -335,7 +337,8 @@ def main():
         raise SystemExit(0 if doctor(ROOT) else 2)
     if args.command in ('mod', 'get'):
         module_command(args); return
-    ensure_frontend()
+    native_command = args.command == 'build' or (args.command == 'run' and args.backend == 'llvm')
+    ensure_frontend(*(('build/language-runtime.o',) if native_command else ()))
     if args.command == 'lsp':
         from lsp_server import serve
         raise SystemExit(serve(FRONTEND, bundle, ROOT))
@@ -380,8 +383,6 @@ def main():
                 return bundle(Path.cwd(),work,args.offline,args.frozen,import_path=package)[1]
             run_repl(FRONTEND,sys.stdin.isatty(),work,resolve)
         return
-    if args.command == 'build' or (args.command == 'run' and args.backend == 'llvm'):
-        ensure('build/language-runtime.o')
     with tempfile.TemporaryDirectory(prefix='cool-') as tmp:
         work = Path(tmp)
         manifest, files = bundle(args.source, work, args.offline, args.frozen, args.command == 'test')

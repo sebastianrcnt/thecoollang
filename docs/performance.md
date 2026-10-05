@@ -262,10 +262,61 @@ identify concrete remaining orchestration costs. They are not additive predicted
 speedups: paired invocation differences include driver locking and branch costs,
 and microbenchmark timings occur in different call contexts.
 
-A possible next improvement is combining the native command's frontend/runtime
-up-to-date checks into one locked `make` invocation, while retaining all actual
-content/dependency invalidation rules. Avoiding repeated toolchain-version
-queries would require a correctly invalidated Clang identity cache. Neither
-change was implemented or benchmarked here; the measured numbers are the current
-behavior. Cold native optimization/linking and full-graph checking still remain
+Those observations motivated combining the native command's frontend/runtime
+up-to-date checks into one locked `make` invocation, measured below. Avoiding
+repeated toolchain-version queries would require a correctly invalidated Clang
+identity cache; that remains an unimplemented proposal with no predicted speedup
+claim. Cold native optimization/linking and full-graph checking still remain
 outside true incremental compilation.
+
+### Batched native dependency checks: measured change
+
+The default native build and LLVM execution paths now check the frontend and
+runtime object together in one locked `make` invocation. An explicit
+`COOL_FRONTEND` still checks only the runtime object; ordinary check/adaptive
+execution keeps its frontend-only check. The underlying Makefile rules and
+native artifact content identities continue to decide rebuilds and cache hits.
+
+Seven repetitions with the same `--default-cli --files 512` options are in
+[default-cli-batched-before-arm64.json](benchmarks/default-cli-batched-before-arm64.json)
+and
+[default-cli-batched-after-arm64.json](benchmarks/default-cli-batched-after-arm64.json).
+Both captures use frontend SHA256
+`5a338e3e1ae8d524b2e8bad93ee4b7aaa9a1367ab8838c57822001744dc3d742`,
+the same runtime digest and identical workload sizes. Comparing full captured
+inventories shows only `tools/cool` and its cache regression test changed;
+compiler, libraries, build artifacts and benchmark implementation are identical.
+Each capture independently verifies real up-to-date dependencies and every
+program output/artifact digest. No compiler/runtime rebuild or concurrent heavy
+release check is included in these observations.
+
+| Default native workload (median ms) | Tally before | Tally after | Expanded before | Expanded after |
+| --- | ---: | ---: | ---: | ---: |
+| O2 build, cold native artifact | 387.139 | 381.335 | 515.879 | 503.863 |
+| O2 build, cached native artifact | 103.063 | 95.269 | 121.760 | 113.160 |
+| O2 build, one-file edit | 408.398 | 385.205 | 512.630 | 502.208 |
+| LLVM run, cached native artifact | 111.878 | 97.377 | 124.750 | 115.235 |
+| Warm check (unchanged dependency path) | 104.710 | 103.681 | 147.303 | 145.434 |
+
+The cached O2 build medians decrease by 7.794 ms (7.6%) for Tally and 8.600 ms
+(7.1%) for the expanded corpus. Their seven-sample before/after ranges do not
+overlap in this local observation. Cached LLVM execution medians also decrease,
+by 14.501 and 9.516 ms respectively; those end-to-end measurements include program
+execution/file output, so their whole difference is not an isolated dependency
+checker speedup. Warm-check control medians differ by 1.029 and 1.869 ms.
+
+Cold and edited native builds include Clang optimization/linking and show wider
+variation. In particular the Tally edit baseline includes a 466.348 ms sample
+and has a 23.192 ms median difference; that larger difference should not be
+attributed entirely to eliminating one make invocation. Cold-build sample ranges
+overlap. These sequential seven-sample measurements establish a useful local
+cached-command improvement, not a general latency guarantee or a confidence
+interval across hosts and workloads.
+
+The driver-cache regression passes with checks that native commands issue one
+make call for both targets, check retains its frontend-only target, and an
+explicit frontend does not generate a checkout frontend. It also changes an
+actual runtime prerequisite and verifies that make rebuilds the object and that
+native output/cache invalidation reflect the change. This optimization reduces
+orchestration overhead without certifying incremental typechecking or closing
+the wider 1.0 release gates.
