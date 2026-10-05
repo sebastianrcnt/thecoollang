@@ -1068,3 +1068,33 @@ exact node/edge counts after two joint copies, duplicate/null roots and failed
 copy rollback, and measures graph allocation balance at each query/destruction.
 Neither copy nor query has a linear performance claim: source mapping currently
 uses list lookup.
+
+
+## Production loan graph arenas
+
+`ReferenceCheck.graph` owns graph nodes; `ReferenceLoan.provenance` only borrows
+them. Loan release never frees nodes directly. Initializer metadata wraps known
+struct/enum declaration keys, conservative elements and owning payloads. Same-type
+value copies and whole-binding replacement preserve/union that metadata; equal
+argument/result types on opaque calls do not imply field identity. Terminal and
+single-edge nodes are reused within an arena so repeated equivalent assignments
+do not retain duplicate subtree histories. Queries enter with loan.exclusive
+and intersect edge/root permissions; source graphs may retain stronger capability
+than a shared copied loan.
+
+Function analyses use heap checks registered in `CompilerState.v_reference_checks`
+until normal completion; REPL exception cleanup frees remaining checks before
+function metadata reclamation. Candidate session loans jointly clone reachable
+graphs into independent arenas. Commit compacts surviving loan roots and then
+frees both old candidate and persistent arenas. Rejection frees only candidates;
+runtime failure keeps candidate roots under existing partial execution policy.
+Forgetting bindings compacts survivors; session cleanup frees persistent graphs.
+Graph root Locals are marked during reclamation. Graph nodes never retain Nodes.
+
+The private production audit checks actual initializer/copy/assignment loan
+records against field/root/mode expectations, including same-root fields and
+mixed shared/exclusive fields, five engines/O2 and REPL recovery. Separate
+64/1,024-submission allocation histories cover retained field assignments and
+failed function reference analysis. Typed metadata does not replace the two-layer
+permission checker yet: computed field selection, opaque call/partial-store
+substitution, parameter summaries and descriptor-lifetime audit remain required.

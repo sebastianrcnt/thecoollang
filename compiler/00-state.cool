@@ -559,6 +559,8 @@ v_repl_allocated_locals: *Local;
 v_repl_loans: *ReferenceLoan;
 
 v_repl_candidate: *ReferenceCheck;
+v_reference_checks: *ReferenceCheck;
+v_repl_graph: *ProvenanceGraph;
 
 v_repl_packages: *ReplPackage;
 

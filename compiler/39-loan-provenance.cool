@@ -1,0 +1,133 @@
+// Loan root/capability checks remain authoritative while graph paths are wired.
+// Graph arenas own nodes; removing a loan never frees a shared graph node.
+fn ReferenceGraphFree(graph: *ProvenanceGraph) {
+    unsafe {
+        if (graph != null) { ProvenanceGraphFree(graph); Free(cast[*u8](graph)); }
+    }
+}
+fn ReferenceCheckFree(check: *ReferenceCheck) {
+    unsafe {
+        ReferenceRelease(check, null);
+        ReferenceGraphFree(check.graph);
+        Free(cast[*u8](check));
+    }
+}
+fn ReferenceChecksAbort() {
+    unsafe {
+        let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        while (ctx.v_reference_checks != null) {
+            let check = ctx.v_reference_checks;
+            ctx.v_reference_checks = check.next;
+            ReferenceCheckFree(check);
+        }
+    }
+}
+fn ReferenceAggregateProvenance(check: *ReferenceCheck, loan: *ReferenceLoan, aggregate: *Node, item: *Node) {
+    unsafe {
+        if (loan.provenance == null) { return; }
+        let kind = AggregateKind(aggregate.type);
+        var edge: i64 = 0;
+        var key: i64 = 0;
+        if (kind == 1 || kind == 4) { edge = 1; key = item.field_key; }
+        if (kind == 2) { edge = 2; }
+        if (kind == 5) { edge = 4; }
+        // Untyped initializer children retain their conservative root record.
+        if (edge == 0 || (edge == 1 && key == 0)) { return; }
+        loan.provenance = ReferenceGraphParent(check.graph, aggregate.type, edge, key, loan.provenance);
+    }
+}
+// Copy all live loan graphs through one map and drop unreachable graph history.
+// The caller owns both arenas until this non-failing internal copy completes.
+fn ReferenceLoansCopyGraph(loans: *ReferenceLoan) -> *ProvenanceGraph {
+    unsafe {
+        var count: i64 = 0;
+        var loan = loans;
+        while (loan != null) { count = count + 1; loan = loan.next; }
+        if (count == 0) { return null; }
+        let sources = cast[**ProvenanceNode](CAlloc(count * 8));
+        let targets = cast[**ProvenanceNode](CAlloc(count * 8));
+        var index: i64 = 0;
+        loan = loans;
+        while (loan != null) { sources[index] = loan.provenance; index = index + 1; loan = loan.next; }
+        let graph = cast[*ProvenanceGraph](CAlloc(i64(sizeof(ProvenanceGraph))));
+        let valid = ProvenanceGraphCopyRoots(graph, sources, targets, count);
+        if (valid) {
+            index = 0;
+            loan = loans;
+            while (loan != null) { loan.provenance = targets[index]; index = index + 1; loan = loan.next; }
+        }
+        Free(cast[*u8](sources)); Free(cast[*u8](targets));
+        if (!valid) { ReferenceGraphFree(graph); Error(cast[*u8]("invalid internal persistent loan graph")); }
+        return graph;
+    }
+}
+// Preserve known same-type value graphs for copies and binding replacement.
+// Opaque calls must not assume that equal argument/result types preserve fields.
+fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source: *ReferenceLoan) {
+    unsafe {
+        let left = loan.provenance;
+        let right = source.provenance;
+        if (right == null || left == null || left == right || left.type != right.type) { return; }
+        let joined = ProvenanceNodeNew(check.graph, left.type, left.root, left.exclusive);
+        if (joined.root == null) {
+            joined.root = right.root;
+            joined.exclusive = right.exclusive;
+        } else if (right.root != null) {
+            joined.exclusive = joined.exclusive | right.exclusive;
+        }
+        var edge = left.edges;
+        while (edge != null) {
+            ProvenanceEdgeNew(joined, edge.kind, edge.key, edge.target, edge.exclusive);
+            edge = edge.next;
+        }
+        edge = right.edges;
+        while (edge != null) {
+            ProvenanceEdgeNew(joined, edge.kind, edge.key, edge.target, edge.exclusive);
+            edge = edge.next;
+        }
+        loan.provenance = joined;
+    }
+}
+fn ReferenceNewFrom(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Local, exclusive: i64, indirect: i64, expression: *Node, next: *ReferenceLoan) -> *ReferenceLoan {
+    unsafe {
+        var old = next;
+        while (old != null && old.expression == expression && old.holder == null) {
+            if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
+                ReferenceProvenanceJoin(check, old, source);
+                return next;
+            }
+            old = old.next;
+        }
+        let loan = ReferenceNew(check, source.root, parent, exclusive, indirect, expression, next);
+        if (source.provenance != null && loan.provenance.type == source.provenance.type) { loan.provenance = source.provenance; }
+        return loan;
+    }
+}
+fn ReferenceGraphLeaf(graph: *ProvenanceGraph, type: i64, root: *Local, mode: i64) -> *ProvenanceNode {
+    unsafe {
+        var node = graph.nodes;
+        while (node != null) {
+            if (node.type == type && node.root == root && node.exclusive == mode && node.edges == null) { return node; }
+            node = node.next;
+        }
+        return ProvenanceNodeNew(graph, type, root, mode);
+    }
+}
+fn ReferenceGraphParent(graph: *ProvenanceGraph, type: i64, kind: i64, key: i64, child: *ProvenanceNode) -> *ProvenanceNode {
+    unsafe {
+        var node = graph.nodes;
+        while (node != null) {
+            let edge = node.edges;
+            if (node.type == type && node.root == null && edge != null && edge.next == null && edge.kind == kind && edge.key == key && edge.target == child && edge.exclusive == 1) { return node; }
+            node = node.next;
+        }
+        let parent = ProvenanceNodeNew(graph, type, null, 1);
+        if (!ProvenanceEdgeNew(parent, kind, key, child, 1)) { Error(cast[*u8]("invalid internal loan projection")); }
+        return parent;
+    }
+}
+// A copied graph can retain stronger source permissions. Every loan query
+// intersects its entry mode so a shared reborrow cannot regain write access.
+fn ReferenceLoanQuery(loan: *ReferenceLoan, cursor: *ProvenanceCursor, root: *Local, writing: bool) -> bool {
+    unsafe { return ProvenanceQueryRoot(loan.provenance, cursor, root, loan.exclusive, writing); }
+}

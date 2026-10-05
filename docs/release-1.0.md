@@ -1702,6 +1702,44 @@ through ordinary evaluation or library use.
   lookup is currently linear and no whole-compiler speed claim is made. All
   release gates remain Open.
 
+- Production loan graph ownership: `ReferenceLoan.provenance` now points into
+  a check-owned arena. Struct/enum initializer declarations, conservative
+  elements and owned payloads retain typed edges. Known same-type copies and
+  whole-binding assignment preserve/union value graphs; opaque calls do not
+  infer field identity from equal types. Reused terminals and single-edge nodes
+  avoid duplicate equivalent subtree history. `ReferenceLoanQuery` intersects
+  the loan entry mode with graph permissions. Joining a shared opaque root with
+  a structural parent uses the actual root permission, not the parent's neutral
+  mode; private probes also verify shared loans cannot regain stronger source
+  graph permissions.
+
+  REPL candidate loans jointly clone into independent arenas. Commit compacts
+  reachable live roots before freeing old arenas; rejection discards candidates,
+  runtime failure retains potentially executed effects, `:forget` compacts and
+  session cleanup frees persistent graphs. Graph root Locals participate in
+  reclamation. Function checks use a heap registry so failed reference analysis
+  releases both loans and graphs before function metadata rollback.
+
+  Private production-source LLVM checks 30 actual field/root/mode records across
+  initialization, copy, whole assignment, same-root fields and mixed shared/
+  exclusive fields. Compiler/generated private LLVM ASan and host/runtime
+  ASan/UBSan, five engines/O2 and partial-runtime/failed-function REPL recovery
+  pass. Repeated retained field assignments and rejected function loan analysis
+  have equal final allocation bytes/counts and equal peak bytes at 64/1,024
+  submissions. Full regression, exact self-hosted IR/native convergence and
+  external editor/distribution installation pass. Reports:
+  `build/loan-provenance{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/loan-provenance-{final-build,final-focused,final-regression,final-sanitize,final-lifecycle,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `4e3ca4bdbaa71fc78dfa56763c453ce0c7ea30b240c71639584d770b4d8cf92e`.
+
+  Metadata/lifetime checks concern the production compiler; the legacy seed
+  checker keeps its old internal records and unchanged permission behavior.
+  Existing two-layer checks remain authoritative on both frontends. Field load
+  selection, physical protection, opaque call/partial-store substitution,
+  parameter summaries and descriptor-lifetime audit must be completed before
+  arbitrary nested borrowed storage is accepted. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

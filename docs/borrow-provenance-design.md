@@ -84,10 +84,23 @@ and clears output roots. Local/type/declaration metadata remains borrowed.
 Independent tests destroy the source arena before querying copied graphs,
 compare copied node/edge counts and check malformed-copy rollback.
 
-This module is not yet installed in `ReferenceLoan`. Payload selection is not
-physical prefix overlap, and graph ownership does not pin type/field descriptors.
-Persistent transaction ownership, call substitution, stored receiver updates and
-nested acceptance remain required. The initial state deduplication scans a list:
+Production `ReferenceLoan.provenance` now carries a node in a check-owned
+arena. Initializers preserve Field/Element/OwnedPayload edges; known same-type
+value copies and whole-binding assignment retain/union graphs. REPL begin copies
+all surviving loan roots jointly into an independent arena; commit compacts
+reachable roots, rejection frees candidates, and runtime failure keeps candidate
+roots. `:forget` compacts again and session cleanup frees the arena. Failed
+function analysis is registered under a heap check list for exception cleanup.
+Graph roots participate in Local reclamation. Loan queries intersect the loan's
+entry capability before following graph barriers.
+
+The existing two-layer checker remains authoritative; typed graph paths are not
+yet used to authorize access. Field loads, opaque calls, partial stores and
+parameter summaries still need graph selection/substitution. Legacy bootstrap
+checking retains its old internal records and unchanged permission behavior;
+private metadata validation concerns production-source LLVM (also compiled by
+legacy during self-hosting). Physical prefix overlap, descriptor-lifetime audit
+and arbitrary nested acceptance remain required. The initial state deduplication scans a list:
 state visits are bounded but membership search can be quadratic. The independent
 product-graph audit counts both visits and membership comparisons; no linear
 compiler performance claim follows from its state bound.

@@ -589,6 +589,9 @@ continue;
 if (pc == 6) {
 ReplLoanListFree(ctx.v_repl_loans);
 ctx.v_repl_loans = null;
+ReferenceGraphFree(ctx.v_repl_graph);
+ctx.v_repl_graph = null;
+ReferenceChecksAbort();
 v_d10 = ((ctx.v_functions)[0]).drops;
 pc = 3;
 continue;

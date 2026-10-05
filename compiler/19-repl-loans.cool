@@ -26,12 +26,14 @@ fn ReplLoansBegin(statement: *Node) {
             tail = &raw copy.next;
             original = original.next;
         }
+        candidate.graph = ReferenceLoansCopyGraph(candidate.loans);
         ReferenceStatement(candidate, statement);
     }
 }
 fn ReplLoansFinish(keep: bool, visible: *Local) {
     unsafe {
         let ctx = cast[*CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        ReferenceChecksAbort();
         let candidate = ctx.v_repl_candidate;
         if (candidate == null) { return; }
         if (keep) {
@@ -43,9 +45,16 @@ fn ReplLoansFinish(keep: bool, visible: *Local) {
                 if (local != null) { link = &raw loan.next; }
                 else { *link = loan.next; Free(cast[*u8](loan)); }
             }
+            let compact = ReferenceLoansCopyGraph(candidate.loans);
+            ReferenceGraphFree(candidate.graph);
+            candidate.graph = compact;
             ReplLoanListFree(ctx.v_repl_loans);
+            ReferenceGraphFree(ctx.v_repl_graph);
+            ctx.v_repl_graph = candidate.graph;
+            candidate.graph = null;
             ctx.v_repl_loans = candidate.loans;
         } else { ReplLoanListFree(candidate.loans); }
+        ReferenceGraphFree(candidate.graph);
         Free(cast[*u8](candidate));
         ctx.v_repl_candidate = null;
     }
@@ -77,6 +86,9 @@ fn ReplForget(name: *u8) {
         var binding = &raw ctx.v_repl_locals;
         while (*binding != local) { binding = &raw (*binding).next; }
         *binding = local.next;
+        let compact = ReferenceLoansCopyGraph(ctx.v_repl_loans);
+        ReferenceGraphFree(ctx.v_repl_graph);
+        ctx.v_repl_graph = compact;
         ctx.v_locals = ctx.v_repl_locals;
         ReplTrimStorage();
     }

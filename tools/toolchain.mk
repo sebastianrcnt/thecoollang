@@ -519,3 +519,10 @@ provenance-copy-test: build/cool-compiler build/language.BIN build/coolc build/c
 test: provenance-copy-test
 provenance-copy-sanitize-test: repl-loans-sanitize-test build/compiler-host.o build/language-runtime.o
 	python3 tools/test_provenance_graph.py --copy --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/provenance-copy-asan-audit.json
+
+.PHONY: loan-provenance-test loan-provenance-sanitize-test
+loan-provenance-test: build/cool-compiler build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_loan_provenance.py --output build/loan-provenance-audit.json
+test: loan-provenance-test
+loan-provenance-sanitize-test: repl-loans-sanitize-test build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_loan_provenance.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/loan-provenance-asan-audit.json

@@ -140,7 +140,7 @@ fn ReferenceStoreRetain(check: * ReferenceCheck, target: * Local, source: * Refe
             existing = existing.next;
         }
         if (existing == null) {
-            let retained = ReferenceNew(source.root, ancestry, source.exclusive, layer, value, marker.next);
+            let retained = ReferenceNew(check, source.root, ancestry, source.exclusive, layer, value, marker.next);
             retained.holder = target;
             marker.next = retained;
         }
@@ -232,7 +232,7 @@ fn ReferenceCallStores(check: * ReferenceCheck, node: * Node, stop: * ReferenceL
                             var source = check.loans;
                             while (source != stop) {
                                 if (source.expression == value && source.holder == null && source.root != null) {
-                                    check.loans = ReferenceNew(source.root, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
+                                    check.loans = ReferenceNew(check, source.root, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
                                 }
                                 source = source.next;
                             }
@@ -264,13 +264,13 @@ fn ReferenceParameters(check: * ReferenceCheck) {
                 if (!IsReference(local.type)) {
                     physical = payload;
                 }
-                check.loans = ReferenceNew(physical, null, ReferenceMode(local.type), 0, null, check.loans);
+                check.loans = ReferenceNew(check, physical, null, ReferenceMode(local.type), 0, null, check.loans);
                 check.loans.holder = local;
                 if (NestedReference(local.type)) {
-                    check.loans = ReferenceNew(payload, null, Shape(local.type).count & ReferenceMode(Shape(local.type).element), 1, null, check.loans);
+                    check.loans = ReferenceNew(check, payload, null, Shape(local.type).count & ReferenceMode(Shape(local.type).element), 1, null, check.loans);
                     check.loans.holder = local;
                 }
-                check.loans = ReferenceNew(null, null, 0, 0, null, check.loans);
+                check.loans = ReferenceNew(check, null, null, 0, 0, null, check.loans);
                 check.loans.holder = local;
             }
             local = local.all_next;
