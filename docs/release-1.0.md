@@ -2363,6 +2363,31 @@ through ordinary evaluation or library use.
   and `build/nested-reference-depth-readiness-audit.json`.
   All release gates remain Open.
 
+- Nested receiver contracts: added twelve private store fixtures per frontend.
+  Depth-two/three local replacements and lifetime rejection already worked;
+  valid `stores(p,src)` nested writes falsely mixed payload origins into
+  destination authorization. Contracts now check actual physical caller roots.
+  Retargeting `p.next=other` revealed that an incomplete trial accepted a write
+  without `stores(other,src)`; this negative was never executed or promoted.
+  Precise parameter terminals and referent-typed storage graphs now retain that
+  new physical destination, so missing contracts reject and complete contracts
+  execute with the expected stored value. Source modes are not upgraded.
+  Combined depth/store audit: 78 classifications and 180 positive execution
+  runs PASS across both frontends, five engines plus O2. Production nested
+  guards remain; arbitrary alias/store and borrowed slice elements are still
+  required unfinished work. Dedicated store-readiness joins the test target.
+  Validation: `make -j4 test bootstrap-check editor-distribution-test` PASS;
+  dedicated permanent store-readiness PASS (48 classifications/108 runs).
+  Graph, copy, loan, selection, physical-address, descriptor-rollback and stores
+  sanitizer targets PASS. Bootstrap/stage2/stage3 IR and binaries converge.
+  Stage-2 IR SHA256:
+  `18d5713cda60a00f56b5aef0b2191b5e5860a27474df811c3d484580d9233faa`.
+  Evidence: `build/release-audit/nested-store-{regression,sanitize,fixed-readiness,permanent-readiness}.log`,
+  `build/release-audit/nested-store-fixed-readiness.json`,
+  `build/nested-reference-store-readiness-audit.json` and private trial
+  `nested-store-retarget-{physical,precise,storage-type}.json` reports.
+  All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

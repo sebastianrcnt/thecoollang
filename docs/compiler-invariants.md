@@ -1486,3 +1486,39 @@ failed baseline and private intermediate attempts remain recorded in
 release-audit artifacts. Normal scoped protection remains conservative; unknown
 roots are not treated as absence and reference-return checks still require
 explicit caller lifetime identity and a matching borrows contract.
+
+
+## Nested receiver replacement contracts
+
+Contract authorization uses each resolved physical destination's explicit caller
+root and parameter place-region bits. A frame root needs ordinary depth/loan
+checks; an external root additionally requires the function's stores relation.
+Body assignments and forwarded calls check every candidate physical root before
+installing its source. They do not authorize a new destination solely from the
+old receiver's syntactic binding or from payload value Region bits.
+
+A stored value changes payload provenance, not necessarily the address of the
+receiver. Coarse OriginRegion of a nested LOAD includes installed sources and
+therefore overrejects a valid `stores(p,src)` write through `p.next`. Conversely,
+checking only the old physical root is unsafe after `p.next=other`: a subsequent
+write through that field must also require `stores(other,src)`. The private
+countermodel without precise referent storage graphs accepted that invalid
+case; it was checked without execution and was not promoted.
+
+ReferenceParameterGraph gives the physical reference an exact terminal; its
+borrowed payload stays in a separate summary loan. Synthetic reference roots
+have the parameter's reference type for physical value checking, but their
+storage graph is installed using the referent element type. This preserves
+field correspondence and wraps receiver payloads exactly once. Using the
+parameter descriptor type for storage made the receiver adaptation opaque,
+preventing a retargeted reference terminal from becoming a physical destination.
+These rules do not add capability: modes are intersected with receiver/source
+capability and old roots remain conservatively retained.
+
+The `--stores` corpus adds twelve cases per frontend: depth-two/three local
+replacement, short-source escape, retained-source mutation, complete/missing
+contracts, and retargeted destination contracts. Accepted contracts assert the
+stored result, including an actual retarget-then-write call. The dedicated
+store-readiness target runs accepted positives on five engines plus O2 and is
+part of test. Production nested storage guards remain until the broader alias,
+branch, recursive/call and slice-element audit is complete.

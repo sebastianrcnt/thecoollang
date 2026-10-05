@@ -115,6 +115,37 @@ for depth in (2, 3, 4):
         DEEP_CASES.append((f'depth{depth}_level{level}_frame_return', 'reject', source))
 
 
+STORE_CASES=[]
+STORE_DIAGNOSTICS={}
+for depth in (2, 3):
+    declarations='struct L0{r:&i64;}' + ''.join(f'struct L{i}{{next:&mut L{i-1};}}' for i in range(1,depth))
+    setup='var l0=L0{r:&a};' + ''.join(f'var l{i}=L{i}{{next:&mut l{i-1}}};' for i in range(1,depth))
+    access='(*p)'
+    for level in reversed(range(depth-1)):access=f'(*{access}.next)'
+    prefix=declarations+'fn main(){var a=7;var b=9;'+setup+f'let p=&mut l{depth-1};'
+    STORE_CASES.append((f'store_depth{depth}_replace', 'accept', prefix+f'{access}.r=&b;assert(*{access}.r==9);}}'))
+    name=f'store_depth{depth}_short_source'
+    STORE_CASES.append((name,'reject',prefix+f'{{var short=11;{access}.r=&short;}}assert(*{access}.r==11);}}'))
+    STORE_DIAGNOSTICS[name]='outlive'
+    name=f'store_depth{depth}_retained_source'
+    STORE_CASES.append((name,'reject',prefix+f'{access}.r=&b;b=11;}}'))
+    STORE_DIAGNOSTICS[name]='conflicts'
+    function=declarations+f'fn set(p:&mut L{depth-1},src:&i64) stores(p,src){{{access}.r=src;assert(*{access}.r==*src);}}'
+    STORE_CASES.append((f'store_depth{depth}_contract','accept',function+'fn main(){var a=7;var b=9;'+setup+f'set(&mut l{depth-1},&b);}}'))
+    name=f'store_depth{depth}_missing_contract'
+    STORE_CASES.append((name,'reject',function.replace(' stores(p,src)','')+'fn main(){}'))
+    STORE_DIAGNOSTICS[name]='matching stores'
+
+# Retarget an inner descriptor to another parameter, then write through it.
+# A destination contract for the old outer parameter cannot authorize effects
+# on the other parameter's caller storage.
+retarget='struct L0{r:&i64;}struct L1{next:&mut L0;}fn bad(p:&mut L1,other:&mut L0,src:&i64) stores(p,other) stores(p,src){(*p).next=other;(*(*p).next).r=src;}fn main(){}'
+STORE_CASES.append(('store_retarget_missing_destination_contract','reject',retarget))
+STORE_DIAGNOSTICS['store_retarget_missing_destination_contract']='matching stores'
+complete_retarget=retarget.replace(' stores(p,src){',' stores(p,src) stores(other,src){').replace('fn main(){}','fn main(){var a=7;var b=9;var c=11;var first=L0{r:&a};var second=L0{r:&b};var outer=L1{next:&mut first};bad(&mut outer,&mut second,&c);assert(*(*outer.next).r==11);}')
+STORE_CASES.append(('store_retarget_complete_destination_contract','accept',complete_retarget))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frontend', type=Path, default=ROOT / 'build/cool-compiler')
@@ -122,10 +153,12 @@ def main():
     parser.add_argument('--legacy', action='store_true')
     parser.add_argument('--unsafe-root-predicate', action='store_true', help='Private countermodel replacing explicit external-root identity with the disproven type predicate')
     parser.add_argument('--assert-expectations', action='store_true')
+    parser.add_argument('--stores', action='store_true', help='Include nested receiver replacement and contract lifetime cases')
     parser.add_argument('--all-engines', action='store_true', help='Run accepted positives on tree/VM/JIT/LLVM/LLVM-JIT and release AOT')
     parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases; currently exposes unsupported deeper acquisition')
     args = parser.parse_args()
     if args.deep: CASES.extend(DEEP_CASES)
+    if args.stores: CASES.extend(STORE_CASES)
     assert len({name for name, _, _ in CASES}) == len(CASES)
     sources = sorted((ROOT/'compiler').glob('*.cool'))
     legacy_sources = sorted((ROOT/'language').glob('*.cool')) if args.legacy else []
@@ -178,6 +211,7 @@ def main():
                 row=dict(frontend=front_name,name=name,expected=expected,observed=observed,matches_expectation=observed==expected,source=source,source_sha256=digest(fixture),check_exit=r.returncode,check_stdout=r.stdout,check_stderr=r.stderr)
                 if expected=='reject':
                     diagnostic=('assigned borrow may outlive local storage' if name=='short_inner_escape' else 'cannot mutate or move through a shared reference' if name=='shared_outer_mutable_inner' else 'reference requires a tracked local or parameter root' if name=='temporary_owner_slot_return' else 'returned borrow may outlive local storage')
+                    diagnostic=STORE_DIAGNOSTICS.get(name,diagnostic)
                     row.update(expected_diagnostic=diagnostic,matches_diagnostic=diagnostic in r.stderr)
                 if observed=='accept' and expected=='accept':
                     r=run([*front,'run',fixture]);row.update(run_exit=r.returncode,run_stdout=r.stdout,run_stderr=r.stderr)
@@ -197,7 +231,7 @@ def main():
                 # Accepted negative cases are intentionally never executed.
                 observations.append(row);print(front_name,name,expected,observed)
         assert hashes=={str(p.relative_to(ROOT)):digest(p) for p in sources+legacy_sources},'source changed during audit'
-        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
+        report=dict(source_sha256=hashes,artifact_sha256=artifact_hashes,private_ir_sha256=digest(ir),unsafe_root_predicate=args.unsafe_root_predicate,deep=args.deep,stores=args.stores,all_engines=args.all_engines,production_slot_control=dict(source=control_source,exit=controlled.returncode,stderr=controlled.stderr),observations=observations,gaps=[dict(frontend=r['frontend'],name=r['name'],kind='unsafe_acceptance' if r['observed']=='accept' else 'over_rejection') for r in observations if not r['matches_expectation']],method='Private copies of actual frontends; only ReferenceStorage bypassed normally. Optional countermodel replaces explicit external-root identity with the disproven reference-type predicate. Positive tree runs always, plus optional five-engine/O2 execution records; accepted negatives never execute. Public frontend separately rejects parameter-slot escape. This is nested-lifetime readiness coverage, not production feature acceptance or cross-engine safety proof.')
         if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
         if args.assert_expectations:
             failures=[dict(frontend=r['frontend'],name=r['name'],expected=r['expected'],observed=r['observed'],diagnostic_matches=r.get('matches_diagnostic',True)) for r in observations if not r['matches_expectation'] or not r.get('matches_diagnostic',True)]

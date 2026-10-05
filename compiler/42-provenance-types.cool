@@ -71,7 +71,7 @@ fn ReferenceParameterGraph(check: *ReferenceCheck, loan: *ReferenceLoan, type: i
         } else {
             // The parameter's physical anchor is not a callee-owned referent
             // graph. Its payload, where borrowed, is in a separate loan.
-            loan.provenance = ReferenceGraphLeaf(check.graph, type, loan.root, loan.exclusive);
+            loan.provenance = ReferenceGraphValueNode(check.graph, type, loan.root, loan.exclusive, 0);
         }
         loan.provenance_known = 1;
         if (loan.provenance != null) { loan.provenance_known = BoolInt(loan.provenance.opaque == 0); }
