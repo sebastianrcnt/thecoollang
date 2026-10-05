@@ -25,7 +25,7 @@ implement parsing, type analysis, interpretation or code generation.
 | Gate | Acceptance evidence | Status |
 | --- | --- | --- |
 | G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/declaration/expression/statement forms drafted and tested; whole-language conformance and semantic audit pending) |
-| G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | Open |
+| G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | **Closed** (evaluation-order, loop-ownership and move-state audits; scoped shared/exclusive references, stored loans, slices, tracked iteration and vector/map APIs; 44+35 reference/storage rejection cases, 320 nested-reference classifications and seeded ownership/borrow/aggregate/slice fuzzers — see the audit log) |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | Open |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | **Closed** (owned UTF-8 `Text` and `Vector[u8]` bytes; owning `Vector`/`Map`; `fs`/`path`/`process`; JSON serialization; ownership/error/lifetime contract in `stdlib/README.md`; the two-package `examples/tally` project — see the audit log) |
@@ -3310,6 +3310,24 @@ through ordinary evaluation or library use.
   run in the slice probe target. This extends G2/G4's adversarial coverage for
   shared-receiver relocation and lifetime-aware reassignment; the broader
   ownership and ergonomics audits stay Open.
+
+- Gate closure — G2 ownership and borrows: the safe evaluation-ordering audit
+  rejects moves of an owner from an index/assignment while an address into it is
+  pending, and the ownership/evaluation-order fuzzer pins left-to-right argument
+  evaluation with exact live-owner counts. The loop-ownership audit preserves the
+  zero-iteration path and the first-iteration `for` update, and move-state control
+  flow excludes terminal `return` branches. Scoped borrowing covers ordinary
+  collection use: shared/exclusive references, stored loans in structs/arrays/
+  enums, function-body slices, tracked shared/exclusive iteration and the
+  vector/map/text APIs, with `defer`, loop and return cleanup on five engines and
+  optimized native builds. Negative and adversarial coverage: 44 reference and 35
+  stored-reference rejection cases, 288 modeled REPL loan queries, 320
+  nested-reference probe classifications (146 accept, 174 reject, zero
+  mismatches) and the seeded ownership/borrow/aggregate/slice fuzzers. All green
+  in `build/drop-depth/reg21.log`; G2 is closed. Raw-pointer and C callers retain
+  the published unsafe obligations, and the documented temporary-receiver and
+  borrow-aware-replacement restrictions remain explicit ergonomics work (G4), not
+  silent acceptance.
 
 ## Next implementation checkpoints
 
