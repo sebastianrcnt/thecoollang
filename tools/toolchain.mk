@@ -496,3 +496,10 @@ reference-ancestry-test: build/cool-compiler build/language.BIN build/compiler-h
 test: reference-ancestry-test
 reference-ancestry-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_reference_ancestry.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/reference-ancestry-asan-audit.json
+
+.PHONY: place-projections-test place-projections-sanitize-test
+place-projections-test: build/cool-compiler build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_place_projections.py --output build/place-projections-audit.json
+test: place-projections-test
+place-projections-sanitize-test: repl-loans-sanitize-test build/language.BIN build/compiler-host.o build/language-runtime.o build/language-runtime.dylib
+	python3 tools/test_place_projections.py --frontend build/repl-loans-asan/cool-compiler --sanitize --output build/place-projections-asan-audit.json

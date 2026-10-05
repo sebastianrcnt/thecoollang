@@ -317,6 +317,9 @@ extern Bool MethodAhead();
 extern Node *MethodCall(Node *receiver,Token *token);
 
 extern Node *ReferencePlaceSource(Node *place);
+extern I64 PlaceProjectionKind(Node *place);
+extern Node *PlaceProjectionParent(Node *place);
+extern I64 PlaceProjectionType(Node *place);
 
 extern U8 *ScratchAllocate(I64 size);
 extern U8 *ScratchOwn(U8 *data);

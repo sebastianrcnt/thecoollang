@@ -201,26 +201,16 @@ fn NestedReference(type: i64) -> bool {
         return IsReference(type) && Borrowed(Shape(type).element) != i8(0);
     }
 }
-fn ReferenceThroughStored(place: * Node) -> bool {
-    unsafe {
-        if (place == null) {
-            return false;
-        }
-        if (place.kind == 25 && place.op == 3) {
-            return true;
-        }
-        if (place.kind == 30) {
-            if (IsReference(place.a.type)) {
-                return place.a.kind == 18;
-            }
-            return ReferenceThroughStored(place.a);
-        }
-        if (place.kind == 18 || place.kind == 24 || place.kind == 25) {
-            return ReferenceThroughStored(place.a);
-        }
-        return false;
-    }
-}
+fn ReferenceThroughStored(place: *Node) -> bool { unsafe {
+ var current=place;
+ while(current!=null){
+  let kind=PlaceProjectionKind(current);
+  if(kind==2 && current.op==3){return true;}
+  if(kind==3){return current.a.kind==18;}
+  current=PlaceProjectionParent(current);
+ }
+ return false;
+}}
 fn ReferenceMatches(check: * ReferenceCheck, place: * Node, via: * Local, root: * Local, writing: bool) -> bool {
     unsafe {
         if (via == root) {
@@ -960,16 +950,10 @@ fn ReferenceLength(check: * ReferenceCheck, node: * Node) -> bool {
 }
 // Read-mode destination pins must not erase write permission of any enclosing
 // reference, including computed receivers and stored reference projections.
-fn ReferenceWriteCapability(place: * Node) {
-    unsafe {
-        if (place == null) {
-            return;
-        }
-        if (place.kind == 30 && IsReference(place.a.type) && Shape(place.a.type).count == 0) {
-            ErrorAt(place.token, cast[ * u8]("cannot mutate or move through a shared reference"));
-        }
-        if (place.kind == 18 || place.kind == 24 || place.kind == 25 || place.kind == 30) {
-            ReferenceWriteCapability(place.a);
-        }
-    }
-}
+fn ReferenceWriteCapability(place: *Node) { unsafe {
+ var current=place;
+ while(current!=null){
+  if(PlaceProjectionKind(current)==3 && Shape(current.a.type).count==0){ErrorAt(current.token,cast[*u8]("cannot mutate or move through a shared reference"));}
+  current=PlaceProjectionParent(current);
+ }
+}}

@@ -1,0 +1,213 @@
+// Typed place edges keep nominal declaration identity separate from offsets.
+// Kind 1=field, 2=element, 3=referent, 4=owned payload, 5=raw address boundary.
+fn PlaceProjectionKind(place: * Node) -> i64 {
+    unsafe {
+        if (place == null) {
+            return 0;
+        }
+        if (place.kind == 24) {
+            return 1;
+        }
+        if (place.kind == 25) {
+            return 2;
+        }
+        if (place.kind == 30) {
+            if (IsReference(place.a.type)) {
+                return 3;
+            }
+            if (AggregateKind(place.a.type) == 5) {
+                return 4;
+            }
+            return 5;
+        }
+        return 0;
+    }
+}
+fn PlaceProjectionParent(place: * Node) -> * Node {
+    unsafe {
+        if (place != null && (place.kind == 18 || PlaceProjectionKind(place) != 0)) {
+            return place.a;
+        }
+        return null;
+    }
+}
+fn PlaceProjectionType(place: * Node) -> i64 {
+    unsafe {
+        let kind = PlaceProjectionKind(place);
+        if (kind == 0) {
+            return 0;
+        }
+        var type = place.a.type;
+        if (kind == 1 || (kind == 2 && place.op == 2)) {
+            if (Pointer(type) != i8(0)) {
+                type = type - 100000;
+            }
+        }
+        return type;
+    }
+}
+// Postfix parsing stays ordinary control flow, with checks before constructing
+// address nodes. origin_source preserves the value which produced a projection.
+fn Primary() -> * Node {
+    unsafe {
+        let ctx = cast[ * CompilerState](NativeCompilerState(i64(sizeof(CompilerState))));
+        var node = Atom();
+        while (At().kind == 91 || At().kind == 46) {
+            let token = At();
+            if (Take(46) != i8(0)) {
+                CompletionMembers(node.type, false);
+                if (MethodAhead()) {
+                    node = MethodCall(node, token);
+                    continue;
+                }
+                var type = node.type;
+                var mutable = node.mutable;
+                var address: * Node = null;
+                if (Pointer(type) != i8(0)) {
+                    if (ctx.v_unsafe_depth == 0) {
+                        ErrorAt(token, cast[ * u8]("pointer field access requires unsafe"));
+                    }
+                    type = type - 100000;
+                    address = node;
+                    mutable = 1;
+                } else {
+                    address = AggregateAddress(node);
+                }
+                if (AggregateKind(type) != 1) {
+                    ErrorAt(token, cast[ * u8]("field access requires a struct"));
+                }
+                let field = FindField(type, Ident(), token);
+                let projection = NewNode(24, token);
+                projection.a = address;
+                projection.value = field.offset;
+                projection.field_key = cast[i64](field);
+                projection.type = 100000 + field.type;
+                projection.origin_source = node;
+                node = NewNode(18, token);
+                node.origin_source = projection.origin_source;
+                node.a = projection;
+                node.type = field.type;
+                node.mutable = mutable;
+                if (Aggregate(node.type) != i8(0)) {
+                    node.storage = Storage(node.type);
+                }
+            } else {
+                ctx.v_pos = ctx.v_pos + 1;
+                let kind = AggregateKind(node.type);
+                let mutable = node.mutable;
+                if (kind != 2 && kind != 3 && (Pointer(node.type) == i8(0) || node.type == 100000)) {
+                    ErrorAt(token, cast[ * u8]("indexing requires an array, slice or typed pointer"));
+                }
+                if (kind == 0 && ctx.v_unsafe_depth == 0) {
+                    ErrorAt(token, cast[ * u8]("raw pointer indexing requires unsafe"));
+                }
+                var index: * Node = null;
+                if (At().kind == 58) {
+                    index = NewNode(1, token);
+                    index.type = 1;
+                } else {
+                    index = Expr(1);
+                }
+                CheckLivePlace(node);
+                if (Integer(index.type) == i8(0)) {
+                    ErrorAt(token, cast[ * u8]("index must be an integer"));
+                }
+                var element: i64 = 0;
+                if (kind != 0) {
+                    element = Shape(node.type).element;
+                } else {
+                    element = node.type - 100000;
+                }
+                if (Take(58) != i8(0)) {
+                    if (kind == 0) {
+                        ErrorAt(token, cast[ * u8]("slicing requires an array or slice"));
+                    }
+                    if (Borrowed(element) != i8(0)) {
+                        ErrorAt(token, cast[ * u8]("slice elements cannot contain borrowed slices until lifetime analysis exists"));
+                    }
+                    if (kind == 2 && mutable == 0) {
+                        ErrorAt(token, cast[ * u8]("mutable slice requires a var array"));
+                    }
+                    var high: * Node = null;
+                    if (At().kind != 93) {
+                        high = Expr(1);
+                        if (Integer(high.type) == i8(0)) {
+                            ErrorAt(token, cast[ * u8]("slice bound must be an integer"));
+                        }
+                    }
+                    Need(93, cast[ * u8]("expected ']'"));
+                    let projection = NewNode(26, token);
+                    projection.a = node;
+                    if (kind == 2) {
+                        projection.a = AggregateAddress(node);
+                    }
+                    projection.origin_source = node;
+                    projection.b = index;
+                    projection.c = high;
+                    projection.op = kind;
+                    projection.value = Shape(node.type).count;
+                    projection.type = SequenceType(3, element, 0, token);
+                    projection.storage = Storage(projection.type);
+                    node = projection;
+                } else {
+                    Need(93, cast[ * u8]("expected ']'"));
+                    let projection = NewNode(20, token);
+                    projection.a = node;
+                    projection.b = index;
+                    projection.type = 100000 + element;
+                    if (kind != 0) {
+                        projection.kind = 25;
+                        projection.op = kind;
+                        projection.value = Shape(node.type).count;
+                        if (kind == 2) {
+                            projection.a = AggregateAddress(node);
+                        }
+                    }
+                    let load = NewNode(18, token);
+                    load.origin_source = node;
+                    load.a = projection;
+                    load.type = element;
+                    load.mutable = BoolInt(mutable != 0 || kind == 3 || kind == 0);
+                    if (Aggregate(element) != i8(0)) {
+                        load.storage = Storage(element);
+                    }
+                    node = load;
+                }
+            }
+        }
+        return node;
+    }
+}
+fn EnumLiteral(type: i64, token: * Token) -> * Node {
+    unsafe {
+        Layout(type);
+        ValidateBorrowedElements(type);
+        ValidateReferenceStorage(type, At());
+        Need(46, cast[ * u8]("enum construction requires a variant"));
+        CompletionMembers(type, true);
+        let variant = FindField(type, Ident(), token);
+        let node = NewNode(23, token);
+        node.type = type;
+        node.storage = Storage(type);
+        let tag = NewNode(1, token);
+        tag.type = 1;
+        tag.value = variant.tag;
+        tag.field_key = cast[i64](variant);
+        node.a = tag;
+        if (variant.type != 0) {
+            Need(40, cast[ * u8]("variant requires a payload"));
+            let payload = Expr(1);
+            Coerce(payload, variant.type);
+            Transfer(payload);
+            Need(41, cast[ * u8]("expected ')' after payload"));
+            payload.offset = 8;
+            payload.field_key = cast[i64](variant);
+            tag.next = payload;
+        } else {
+            if (Take(40) != i8(0)) {
+                Need(41, cast[ * u8]("unit variant takes no arguments"));
+            }
+        }
+        return node;
+    }
+}

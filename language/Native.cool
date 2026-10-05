@@ -8,6 +8,7 @@
 #include "Parser.cool"
 #include "TemplateBody.cool"
 #include "TemplateAggregate.cool"
+#include "Projections.cool"
 #include "References.cool"
 #include "Stores.cool"
 #include "Methods.cool"

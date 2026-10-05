@@ -35,11 +35,15 @@ from the provenance of values stored in that protected space.
 | OwnedPayload(owner type) | Storage inside the owning allocation |
 
 Offsets alone are insufficient: enum payloads can occupy the same offset, and
-zero-sized fields can share offsets. `Node.field_key` currently identifies
-resolved struct initializer fields; field-address and enum payload producers
-must retain the corresponding declaration identity as well. It is compiler
-metadata, not emitted runtime representation. Layout and source reclamation
-must preserve descriptor lifetimes for retained nodes.
+zero-sized fields can share offsets. `Node.field_key` retains resolved declaration identity in struct initializer
+children, field addresses, enum tags/payloads and match guards/payloads.
+`PlaceProjectionKind`, `PlaceProjectionParent` and `PlaceProjectionType` expose
+typed AST edges; existing stored-reference and write-capability guards use the
+parent walk without changing their permission rules. This is compiler metadata,
+not emitted runtime representation. Private AST checks cover compatible REPL
+function replacement and failed lazy-layout construction under sanitizers.
+Future persistent cursor graphs still need explicit descriptor ownership across
+layout rollback and source reclamation; these AST checks do not implement it.
 
 Dynamic indexing selects every possible element cursor. Constant indexing may
 refine the selection only when all writes, moves and opaque calls use a compatible

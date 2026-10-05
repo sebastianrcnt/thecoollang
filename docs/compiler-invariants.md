@@ -993,3 +993,33 @@ necessary; synthetic graph evidence does not prove nested stored acceptance.
 
 The next projection graph design is in [nested provenance](borrow-provenance-design.md).
 The current two-layer restrictions remain mandatory implementation work.
+
+
+## Typed AST projection identities
+
+Postfix `Primary` and `EnumLiteral` are ordinary control flow in
+`compiler/37-parser-projections.cool`. Check order, address construction,
+`origin_source`, method calls and existing borrowed-element restrictions remain
+unchanged. Legacy parser producers retain the same declaration identities.
+
+`Node.field_key` has a role-specific meaning: resolved field declaration for
+field addresses and struct initializer children; resolved variant declaration
+for enum tags/payloads and match tag constants/payloads. It is never a byte
+offset identity. Zero-sized fields can share offset zero; different variants
+can share payload offset eight. Concrete generic layouts own distinct fields.
+Retained nodes rely on existing layout ownership. Persistent provenance graphs
+must establish their own commit/rollback and descriptor-lifetime rules.
+
+Projection helpers distinguish fields, elements, referents and owned payloads.
+`PlaceProjectionParent` follows LOAD/FIELD/INDEX/OWN address nodes; raw pointer
+indexing node kind 20 stays a boundary. Stored-reference and write-capability
+guards walk these parents iteratively with their existing semantics. There is
+no persistent loan cursor yet, and no nested-borrow restriction is relaxed.
+
+`tools/test_place_projections.py` checks 49 typed records in private production
+LLVM against actual layout membership, types, tags and offsets, including
+equal-offset fields/variants and distinct generic layouts. REPL probes check
+compatible function replacement and failed lazy-layout construction followed
+by valid field access. Native/legacy execution across five engines and O2,
+private LLVM load/store ASan and host/runtime ASan/UBSan are complementary
+evidence; metadata validity alone does not prove loan permission correctness.

@@ -1614,6 +1614,34 @@ through ordinary evaluation or library use.
   Stored borrowed pointees and borrowed slice elements remain mandatory; all
   release gates remain Open.
 
+- Typed AST projections and parser maintenance: field addresses, struct
+  initializer children, enum constructors and match guards/payloads retain
+  resolved declaration identities in `Node.field_key`. Equal byte offsets no
+  longer make those identities ambiguous to future provenance analysis. Typed
+  field/element/referent/owned-payload helpers expose existing AST edges. Two
+  existing reference guards now walk those edges iteratively while preserving
+  their permission rules and raw pointer boundaries. `Primary` and `EnumLiteral`
+  move from generated parser control flow into readable ordinary Cool. Legacy
+  producers remain aligned. No borrowed-storage restriction is removed.
+
+  Private production LLVM checks 49 records against actual declaration
+  membership, concrete generic layouts, source/result types, tags and offsets.
+  Zero-sized fields and enum variants with equal offsets retain different keys.
+  Compatible REPL function replacement and failed lazy-layout construction
+  followed by valid projection access pass under ASan. Focused native/legacy
+  and sanitizer execution passes on five engines and O2. Full regression and
+  exact three-generation bootstrap convergence, clean external editor/distribution
+  installation and 64/1,024-submission compiler allocation histories pass.
+  Reports: `build/place-projections{,-asan}-audit.json` and
+  `build/repl-projections-lifecycle-audit.json`. Evidence:
+  `build/release-audit/projections-{focused,adjacent,final-build,final-regression,final-sanitize,final-distribution,final-lifecycle}.log`.
+  Emitted compiler IR SHA-256:
+  `368ef3ca0691c1ecba3f33cf8549e9938d12cf172f1605bf2e07a43a24f6f0b2`.
+
+  This preserves inputs for a typed provenance graph. Persistent cursor
+  ownership, arbitrary nested stored borrowed pointees and borrowed slice
+  elements remain required implementation work. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

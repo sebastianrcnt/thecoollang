@@ -84,8 +84,8 @@ Node *EnumLiteral(I64 type, Token *token) {
     Field *variant; Node *n, *tag, *payload;
     Layout(type); ValidateBorrowedElements(type); Need('.', "enum construction requires a variant"); CompletionMembers(type,TRUE); variant = FindField(type, Ident(), token);
     n = NewNode(N_AGG_LITERAL, token); n->type = type; n->storage = Storage(type);
-    tag = NewNode(N_INT, token); tag->type = T_INT; tag->value = variant->tag; n->a = tag;
-    if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Transfer(payload); Need(')', "expected ')' after payload"); payload->offset = 8; tag->next = payload; }
+    tag = NewNode(N_INT, token); tag->type = T_INT; tag->value = variant->tag; tag->field_key=variant; n->a = tag;
+    if (variant->type) { Need('(', "variant requires a payload"); payload = Expr(1); Coerce(payload, variant->type); Transfer(payload); Need(')', "expected ')' after payload"); payload->offset = 8; payload->field_key=variant; tag->next = payload; }
     else if (Take('(')) Need(')', "unit variant takes no arguments");
     return n;
 }
@@ -227,7 +227,7 @@ Node *Primary() {
             if (Pointer(kind)) { if (!unsafe_depth) ErrorAt(t, "pointer field access requires unsafe"); kind -= T_PTR; address = n; mutable = TRUE; }
             else address = AggregateAddress(n);
             if (AggregateKind(kind) != A_STRUCT) ErrorAt(t, "field access requires a struct");
-            field = FindField(kind, Ident(), t); load = NewNode(N_FIELD_ADDRESS, t); load->a = address; load->value = field->offset; load->type = T_PTR+field->type;
+            field = FindField(kind, Ident(), t); load = NewNode(N_FIELD_ADDRESS, t); load->a = address; load->value = field->offset; load->field_key=field; load->type = T_PTR+field->type;
             load->origin_source = n; n = NewNode(N_LOAD, t); n->origin_source = load->origin_source; n->a = load; n->type = field->type; n->mutable = mutable; if (Aggregate(n->type)) n->storage = Storage(n->type);
         } else {
             pos++; kind = AggregateKind(n->type); mutable = n->mutable;
@@ -315,12 +315,12 @@ Node *MatchStatement() {
             if (seen[variant->tag]) Error("duplicate match arm"); seen[variant->tag] = TRUE; count++;
             address = NewNode(N_LOCAL_ADDRESS, token); address->slot = slot; address->local_ref = binding->local_ref; address->type = T_PTR+type;
             load = NewNode(N_LOAD, token); load->a = address; load->type = T_INT;
-            constant = NewNode(N_INT, token); constant->type = T_INT; constant->value = variant->tag;
+            constant = NewNode(N_INT, token); constant->type = T_INT; constant->value = variant->tag; constant->field_key=variant;
             test = NewNode(N_BINARY, token); test->op = K_EQ; test->a = load; test->b = constant; test->type = T_BOOL;
             if (variant->type) {
                 Need('(', "payload variant requires a binding"); name = Ident(); Need(')', "expected ')' after pattern binding");
                 if (!Eq(name, "_")) {
-                    branch = NewNode(N_FIELD_ADDRESS, token); branch->a = address; branch->value = 8; branch->type = T_PTR+variant->type;
+                    branch = NewNode(N_FIELD_ADDRESS, token); branch->a = address; branch->value = 8; branch->field_key=variant; branch->type = T_PTR+variant->type;
                     load = NewNode(N_LOAD, token); load->a = branch; load->origin_source = value; load->type = variant->type; if (Aggregate(load->type)) load->storage = Storage(load->type);
                     local = AddLocal(name, variant->type, FALSE); payload_bind = NewNode(N_BIND, token); if (Owned(load->type)) { constant = NewNode(N_MOVE, token); constant->a = branch; constant->origin_source = load; constant->type = load->type; constant->storage = Storage(load->type); load = constant; }
                     payload_bind->a = load; payload_bind->local_ref = local; payload_bind->type = variant->type; payload_bind->slot = local->slot;

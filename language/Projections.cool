@@ -1,0 +1,4 @@
+// Typed place edges aligned with compiler/37-parser-projections.cool.
+I64 PlaceProjectionKind(Node *place){if(!place)return 0;if(place->kind==N_FIELD_ADDRESS)return 1;if(place->kind==N_INDEX_ADDRESS)return 2;if(place->kind==N_OWN_ADDRESS){if(IsReference(place->a->type))return 3;if(AggregateKind(place->a->type)==A_OWNER)return 4;return 5;}return 0;}
+Node *PlaceProjectionParent(Node *place){if(place && (place->kind==N_LOAD || PlaceProjectionKind(place)))return place->a;return NULL;}
+I64 PlaceProjectionType(Node *place){I64 kind=PlaceProjectionKind(place),type;if(!kind)return 0;type=place->a->type;if(kind==1 || (kind==2 && place->op==A_ARRAY))if(Pointer(type))type-=T_PTR;return type;}

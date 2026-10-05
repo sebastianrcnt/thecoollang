@@ -60,12 +60,7 @@ ReferenceLoan *ReferenceHolder(ReferenceCheck *check,Local *holder,Local *root){
     ReferenceLoan *loan;for(loan=check->loans;loan;loan=loan->next)if(holder && loan->holder==holder && loan->root==root)return loan;return NULL;
 }
 Bool NestedReference(I64 type){return IsReference(type) && Borrowed(Shape(type)->element);}
-Bool ReferenceThroughStored(Node *place){
-    if(!place)return FALSE;
-    if(place->kind==N_INDEX_ADDRESS && place->op==A_SLICE)return TRUE;if(place->kind==N_OWN_ADDRESS){if(IsReference(place->a->type))return place->a->kind==N_LOAD;return ReferenceThroughStored(place->a);}
-    if(place->kind==N_LOAD || place->kind==N_FIELD_ADDRESS || place->kind==N_INDEX_ADDRESS)return ReferenceThroughStored(place->a);
-    return FALSE;
-}
+Bool ReferenceThroughStored(Node *place){Node *current=place;I64 kind;while(current){kind=PlaceProjectionKind(current);if(kind==2 && current->op==A_SLICE)return TRUE;if(kind==3)return current->a->kind==N_LOAD;current=PlaceProjectionParent(current);}return FALSE;}
 Bool ReferenceMatches(ReferenceCheck *check,Node *place,Local *via,Local *root,Bool writing){
     ReferenceLoan *loan;Bool through;I64 layer=0;
     if(via==root)return TRUE;through=ReferenceThroughStored(place);
@@ -265,8 +260,4 @@ Bool ReferenceLength(ReferenceCheck *check,Node *node){
     return FALSE;
 }
 
-U0 ReferenceWriteCapability(Node *place){
-    if(!place)return;
-    if(place->kind==N_OWN_ADDRESS && IsReference(place->a->type) && !Shape(place->a->type)->count)ErrorAt(place->token,"cannot mutate or move through a shared reference");
-    if(place->kind==N_LOAD || place->kind==N_FIELD_ADDRESS || place->kind==N_INDEX_ADDRESS || place->kind==N_OWN_ADDRESS)ReferenceWriteCapability(place->a);
-}
+U0 ReferenceWriteCapability(Node *place){Node *current=place;while(current){if(PlaceProjectionKind(current)==3 && !Shape(current->a->type)->count)ErrorAt(current->token,"cannot mutate or move through a shared reference");current=PlaceProjectionParent(current);}}
