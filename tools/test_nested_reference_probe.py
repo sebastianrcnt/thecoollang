@@ -145,6 +145,54 @@ STORE_DIAGNOSTICS['store_retarget_missing_destination_contract']='matching store
 complete_retarget=retarget.replace(' stores(p,src){',' stores(p,src) stores(other,src){').replace('fn main(){}','fn main(){var a=7;var b=9;var c=11;var first=L0{r:&a};var second=L0{r:&b};var outer=L1{next:&mut first};bad(&mut outer,&mut second,&c);assert(*(*outer.next).r==11);}')
 STORE_CASES.append(('store_retarget_complete_destination_contract','accept',complete_retarget))
 
+for style in ('direct','alias','forward'):
+    declarations='struct L0{r:&i64;}struct L1{next:&mut L0;}'
+    helper='fn set0(dst:&mut L0,src:&i64) stores(dst,src){(*dst).r=src;}' if style=='forward' else ''
+    write='(*(*p).next).r=src;' if style=='direct' else 'let alias=(*p).next;(*alias).r=src;' if style=='alias' else 'set0((*p).next,src);'
+    body=f'if(yes){{(*p).next=other;}}{write}'
+    header='fn change(p:&mut L1,other:&mut L0,src:&i64,yes:bool) stores(p,other)'
+    runtime='fn main(){var a=7;var b=9;var c=11;'
+    for yes in ('true','false'):
+        runtime+='{var first=L0{r:&a};var second=L0{r:&b};var outer=L1{next:&mut first};change(&mut outer,&mut second,&c,'+yes+');assert(*(*outer.next).r==11);}'
+    runtime+='}'
+    for omitted in ('old','new','none'):
+        contracts=(' stores(p,src)' if omitted!='old' else '')+(' stores(other,src)' if omitted!='new' else '')
+        name=f'store_branch_{style}_{omitted}_destination_contract'
+        code=declarations+helper+header+contracts+'{'+body+'}'+(runtime if omitted=='none' else 'fn main(){}')
+        STORE_CASES.append((name,'accept' if omitted=='none' else 'reject',code))
+        if omitted!='none':STORE_DIAGNOSTICS[name]='matching stores'
+
+for container in ('array','owned'):
+    declarations='struct L0{r:&i64;}struct L1{next:&mut L0;}'
+    if container=='array':
+        parameter='&mut [2]&mut L0';replace='(*p)[0]=other;';access='(*(*p)[index])'
+        args='yes:bool,index:usize';runtime='fn main(){var a=7;var b=9;var c=11;var first=L0{r:&a};var second=L0{r:&b};var third=L0{r:&a};var array=[2]&mut L0{&mut first,&mut second};change(&mut array,&mut third,&c,true,0);assert(*(*array[0]).r==11);}'
+    else:
+        declarations='import "std/mem";'+declarations
+        parameter='&mut own[L1]';replace='(*(*p)).next=other;';access='(*(*(*p)).next)'
+        args='yes:bool';runtime='fn main(){var a=7;var b=9;var c=11;var first=L0{r:&a};var second=L0{r:&b};{var owner=new[L1](L1{next:&mut first});change(&mut owner,&mut second,&c,true);assert(*(*(*owner).next).r==11);}assert(mem.owner_count()==0);}'
+    header=f'fn change(p:{parameter},other:&mut L0,src:&i64,{args}) stores(p,other)'
+    for omitted in ('old','new','none'):
+        contracts=(' stores(p,src)' if omitted!='old' else '')+(' stores(other,src)' if omitted!='new' else '')
+        name=f'store_{container}_{omitted}_destination_contract'
+        code=declarations+header+contracts+f'{{if(yes){{{replace}}}{access}.r=src;}}'+(runtime if omitted=='none' else 'fn main(){}')
+        STORE_CASES.append((name,'accept' if omitted=='none' else 'reject',code))
+        if omitted!='none':STORE_DIAGNOSTICS[name]='matching stores'
+
+# A pending owned address must still block moves and aliasing replacements
+# evaluated on another AST path, even with complete stores contracts.
+owned_types='struct L0{r:&i64;}struct L1{next:&mut L0;}'
+for operation, helper, parameters, contracts, rhs in (
+    ('move', 'fn take(p:own[L1],src:&i64)->&i64 borrows(src){return src;}',
+     '', '', 'take(move *p,src)'),
+    ('replace', 'fn replace(p:&mut own[L1],other:own[L1],src:&i64)->&i64 borrows(src) stores(p,other){*p=move other;return src;}',
+     ',other:own[L1]', ' stores(p,other)', 'replace(p,move other,src)'),
+):
+    name='store_owned_pending_'+operation
+    code=owned_types+helper+f'fn change(p:&mut own[L1],src:&i64{parameters}) stores(p,src){contracts}{{(*(*(*p)).next).r={rhs};}}fn main(){{}}'
+    STORE_CASES.append((name,'reject',code))
+    STORE_DIAGNOSTICS[name]='conflicts'
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -155,7 +203,7 @@ def main():
     parser.add_argument('--assert-expectations', action='store_true')
     parser.add_argument('--stores', action='store_true', help='Include nested receiver replacement and contract lifetime cases')
     parser.add_argument('--all-engines', action='store_true', help='Run accepted positives on tree/VM/JIT/LLVM/LLVM-JIT and release AOT')
-    parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases; currently exposes unsupported deeper acquisition')
+    parser.add_argument('--deep', action='store_true', help='Include depth-2/3/4 lifetime cases')
     args = parser.parse_args()
     if args.deep: CASES.extend(DEEP_CASES)
     if args.stores: CASES.extend(STORE_CASES)

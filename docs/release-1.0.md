@@ -2388,6 +2388,29 @@ through ordinary evaluation or library use.
   `nested-store-retarget-{physical,precise,storage-type}.json` reports.
   All release gates remain Open.
 
+- Pending owner addresses: separated temporary lifetime pins from borrowed
+  values, using exact owned AST path identity for the current address operation.
+  This removes the owned nested-store false rejection while preserving RHS
+  move and aliasing replacement rejection. Computed reference results clone
+  their existing roots into mode-zero pins without modifying ordinary value
+  capability. Pins are excluded from value/authority/store/return selection;
+  constructor deduplication distinguishes their role. Both frontends align.
+  Expanded final private depth/store audit: 112 classifications, 40 positives
+  and 240 execution runs across five engines plus O2, with no gaps.
+  Legacy lifecycle adds repeated owner reborrows and rejects any holder carrying
+  a pin; 64/1024 submissions retain equal graph peaks and clean up to zero.
+  Graph/copy/loan/selection/access/physical-address/descriptor/stores ASan/UBSan
+  targets PASS. The existing owner-evaluation and standard library checks PASS,
+  including dereferencing a function's returned reference to an owner.
+  Evidence: `build/release-audit/owner-pin-{regression,sanitize}.log`,
+  `build/release-audit/nested-owned-pin-final-readiness.{json,log}` and
+  `build/legacy-graph-lifecycle-audit.json`.
+  Full `make -j4 test bootstrap-check editor-distribution-test` PASS; external
+  installation/distribution and bootstrap/stage2/stage3 convergence PASS.
+  Stage-2 IR SHA256:
+  `e0801b26b44ab0cf4ba3e2d69ffded8080725fcbcc0676514028a7befa7d857e`.
+  Production nested storage restrictions remain; all release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

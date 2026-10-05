@@ -126,7 +126,7 @@ fn ReferenceProvenanceJoin(check: *ReferenceCheck, loan: *ReferenceLoan, source:
 fn ReferenceNewFrom(check: *ReferenceCheck, source: *ReferenceLoan, parent: *Local, exclusive: i64, indirect: i64, expression: *Node, next: *ReferenceLoan) -> *ReferenceLoan {
     unsafe {
         var old = next;
-        while (old != null && old.expression == expression && old.holder == null) {
+        while (old != null && old.expression == expression && old.holder == null && old.owner_pin == check.pending_owner) {
             if (old.root == source.root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
                 ReferenceProvenanceJoin(check, old, source);
                 return next;

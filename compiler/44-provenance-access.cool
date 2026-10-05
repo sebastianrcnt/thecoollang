@@ -163,7 +163,7 @@ fn ReferenceRequireComputedAuthority(check: *ReferenceCheck, place: *Node, origi
             if (parent == null || parent == current) { break; }
             var candidate = check.loans;
             while (candidate != null) {
-                if (candidate.holder == null && candidate.expression == parent && candidate.root != null) { boundary = parent; }
+                if (candidate.holder == null && candidate.owner_pin == null && candidate.expression == parent && candidate.root != null) { boundary = parent; }
                 candidate = candidate.next;
             }
             current = parent;
@@ -172,7 +172,7 @@ fn ReferenceRequireComputedAuthority(check: *ReferenceCheck, place: *Node, origi
         var source = check.loans;
         var shared = false;
         while (source != null) {
-            if (source.holder == null && source.expression == boundary && source.root != null) {
+            if (source.holder == null && source.owner_pin == null && source.expression == boundary && source.root != null) {
                 if ((ReferencePathAuthorityModes(source, cursor.path, cursor.complete, copying) & 2) != 0) { shared = true; }
             }
             source = source.next;

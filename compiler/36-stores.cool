@@ -154,7 +154,7 @@ fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, sto
     unsafe {
         var source = check.loans;
         while (source != stop) {
-            if (source.expression == value && source.root != null && source.holder == null) {
+            if (source.owner_pin == null && source.expression == value && source.root != null && source.holder == null) {
                 var layer = source.indirect;
                 if (NestedReference(target.type)) {
                     layer = 1;
@@ -210,7 +210,7 @@ fn ReferenceStoreDestination(check: * ReferenceCheck, destination: * Node, origi
         }
         var loan = check.loans;
         while (loan != null) {
-            if (loan.root != null && loan.indirect == 0 && ((origin != null && origin.kind != 3 && loan.holder == null && loan.expression == origin) || (via != null && loan.holder == via))) {
+            if (loan.root != null && loan.indirect == 0 && ((origin != null && origin.kind != 3 && loan.holder == null && loan.owner_pin == null && loan.expression == origin) || (via != null && loan.holder == via))) {
                 if (loan.root.reference_external != 0) { ReferenceStoreContract(check, loan.root.place_region, value, destination.token); }
                 ReferenceInstall(check, loan.root, value, stop, destination, false);
                 resolved = true;
@@ -248,13 +248,13 @@ fn ReferenceCallStores(check: * ReferenceCheck, node: * Node, stop: * ReferenceL
                     var physical = check.loans;
                     var resolved = false;
                     while (physical != stop) {
-                        if (physical.expression == destination && physical.holder == null && physical.indirect == 0 && physical.root != null) {
+                        if (physical.owner_pin == null && physical.expression == destination && physical.holder == null && physical.indirect == 0 && physical.root != null) {
                             if (physical.root.reference_external != 0) { ReferenceStoreContract(check, physical.root.place_region, value, node.token); }
                             ReferenceInstall(check, physical.root, value, stop, destination, true);
                             resolved = true;
                             var source = check.loans;
                             while (source != stop) {
-                                if (source.expression == value && source.holder == null && source.root != null) {
+                                if (source.owner_pin == null && source.expression == value && source.holder == null && source.root != null) {
                                     check.loans = ReferenceNewCall(check, source, physical.parent, source.exclusive & Shape(destination.type).count, 1, destination, check.loans);
                                 }
                                 source = source.next;

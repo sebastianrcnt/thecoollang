@@ -1522,3 +1522,36 @@ stored result, including an actual retarget-then-write call. The dedicated
 store-readiness target runs accepted positives on five engines plus O2 and is
 part of test. Production nested storage guards remain until the broader alias,
 branch, recursive/call and slice-element audit is complete.
+
+## Pending owner addresses are not borrowed values
+
+`ReferenceLoan.owner_pin` records the exact owned LOAD/LOCAL whose pointer is
+being used to evaluate a derived address. It remains a temporary lifetime
+protection, separate from the payload value graph. A temporary pin permits
+access only when its exact owned AST node occurs on the current place's
+PlaceProjectionParent chain. A separate RHS, index, argument or aliasing call
+has a different path and still conflicts with moving/replacing the owner.
+The ordinary temporary-origin exception applies only to non-pin loans.
+
+`ReferenceCheck.pending_owner` scopes pin construction and is restored after
+acquisition. Constructors deduplicate by role as well as root/parent/mode/layer.
+For an already-computed reference result, all matching ordinary temporary roots
+are cloned with mode zero; their original capabilities and graphs are unchanged.
+For named storage without a temporary value, acquisition obtains its tracked
+roots. Computed acquisition clones under pin construction instead of retagging
+the original value. Null/opaque physical provenance remains conservative.
+
+Pins participate in conflict protection, but not in computed authority,
+projection, slice renaming, aggregate construction, assignment, installation,
+stores destination resolution, call-result selection, binding or return values.
+Physical capture and the four loan constructors distinguish their construction
+role. A retained holder must never receive a pending pin. The private legacy
+lifecycle audit checks this invariant and exercises 64/1024 repeated owner
+reborrows with equal graph peaks and zero remaining tracked allocations.
+
+The expanded private stores corpus adds branch retargeting through direct,
+alias and forwarded writes, arrays and owned receivers, complete/missing old
+and new destination contracts, and pending-owner RHS move/replacement controls.
+Complete contracts execute; missing contracts reach the stores diagnostic;
+pending owner invalidation rejects. This does not enable production nested
+storage or establish the remaining slice-element and arbitrary alias guarantees.

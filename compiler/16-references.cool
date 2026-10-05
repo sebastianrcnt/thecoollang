@@ -10,10 +10,13 @@ struct ReferenceLoan {
     parent: * Local;
     exclusive: i64;
     indirect: i64;
+    // Pending owner addresses protect evaluation; they are not borrowed values.
+    owner_pin: *Node;
     expression: * Node;
     next: * ReferenceLoan;
 }
 struct ReferenceCheck {
+    pending_owner: *Node;
     graph: *ProvenanceGraph;
     next: *ReferenceCheck;
     loans: * ReferenceLoan;
@@ -290,7 +293,7 @@ fn ReferenceHandleAccess(check:*ReferenceCheck,place:*Node){unsafe{
  let via=BorrowRoot(place);
  if(via==null || place.kind!=3 || !IsReference(via.type)){ReferenceAccess(check,place,false);return;}
  var loan=check.loans;
- while(loan!=null){if(loan.root==via && loan.exclusive!=0 && ReferencePhysicalMayOverlap(check,loan,place,via) && !ReferenceAncestor(check,loan.holder,via,via) && !(loan.holder==null && loan.expression==ReferencePlaceSource(place))){ErrorAt(place.token,cast[*u8]("access conflicts with a live scoped reference"));}loan=loan.next;}
+ while(loan!=null){if(loan.root==via && loan.exclusive!=0 && ReferencePhysicalMayOverlap(check,loan,place,via) && !ReferenceAncestor(check,loan.holder,via,via) && !ReferenceTemporaryAccess(loan, place, ReferencePlaceSource(place))){ErrorAt(place.token,cast[*u8]("access conflicts with a live scoped reference"));}loan=loan.next;}
 }}
 fn ReferenceAccess(check: *ReferenceCheck, place: *Node, writing: bool) {
     ReferenceAccessMode(check, place, writing, false);
@@ -309,7 +312,7 @@ fn ReferenceAccessMode(check: * ReferenceCheck, place: * Node, writing: bool, ow
         if (writing) { ReferenceRequirePayloadWrite(check, place, via); }
         var loan = check.loans;
         while (loan != null) {
-            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root, writing) && ReferencePhysicalAccessOverlap(check, loan, place, via, owner_slot) && !ReferenceAncestor(check, loan.holder, via, loan.root) && !(loan.holder == null && loan.expression == ReferencePlaceSource(place))) {
+            if ((writing || loan.exclusive != 0) && ReferenceMatches(check, place, via, loan.root, writing) && ReferencePhysicalAccessOverlap(check, loan, place, via, owner_slot) && !ReferenceAncestor(check, loan.holder, via, loan.root) && !ReferenceTemporaryAccess(loan, place, ReferencePlaceSource(place))) {
                 ErrorAt(place.token, cast[ * u8]("access conflicts with a live scoped reference"));
             }
             loan = loan.next;
@@ -319,7 +322,7 @@ fn ReferenceAccessMode(check: * ReferenceCheck, place: * Node, writing: bool, ow
 fn ReferenceNew(check: *ReferenceCheck, root: * Local, parent: * Local, exclusive: i64, indirect: i64, expression: * Node, next: * ReferenceLoan) -> * ReferenceLoan {
     unsafe {
         var old = next;
-        while (old != null && old.expression == expression && old.holder == null) {
+        while (old != null && old.expression == expression && old.holder == null && old.owner_pin == check.pending_owner) {
             if (old.root == root && old.parent == parent && old.exclusive == exclusive && old.indirect == indirect) {
                 return next;
             }
@@ -334,6 +337,7 @@ fn ReferenceNew(check: *ReferenceCheck, root: * Local, parent: * Local, exclusiv
             loan.provenance_type = type;
             loan.provenance_known = BoolInt(loan.provenance.opaque == 0);
         }
+        loan.owner_pin = check.pending_owner;
         loan.root = root;
         loan.parent = parent;
         loan.exclusive = exclusive;
@@ -363,11 +367,11 @@ fn ReferencePlaceSource(place: * Node) -> * Node {
         return null;
     }
 }
-fn ReferenceSourceAccess(check: * ReferenceCheck, before: * ReferenceLoan, via: * Local, root: * Local, exclusive: i64, token: * Token, origin: * Node, physical: *ProvenanceNode) {
+fn ReferenceSourceAccess(check: * ReferenceCheck, before: * ReferenceLoan, via: * Local, root: * Local, exclusive: i64, token: * Token, origin: * Node, physical: *ProvenanceNode, place: *Node) {
     unsafe {
         var loan = before;
         while (loan != null) {
-            if (loan.root == root && (exclusive != 0 || loan.exclusive != 0) && (physical == null || loan.physical_provenance == null || ProvenanceAddressOverlap(loan.physical_provenance, physical, root)) && !ReferenceAncestor(check, loan.holder, via, root) && !(loan.holder == null && loan.expression == origin)) {
+            if (loan.root == root && (exclusive != 0 || loan.exclusive != 0) && (physical == null || loan.physical_provenance == null || ProvenanceAddressOverlap(loan.physical_provenance, physical, root)) && !ReferenceAncestor(check, loan.holder, via, root) && !ReferenceTemporaryAccess(loan, place, origin)) {
                 ErrorAt(token, cast[ * u8]("access conflicts with a live scoped reference"));
             }
             loan = loan.next;
@@ -389,20 +393,24 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
             var loan = check.loans;
             var found = false;
             while (loan != null) {
-                if (origin != null && loan.expression == origin && loan.holder == null &&
+                if (origin != null && loan.owner_pin == null && loan.expression == origin && loan.holder == null &&
                     (!(expression.kind == 3 || expression.kind == 18 || expression.kind == 29) ||
                      !NestedReference(origin.type) || nested || loan.indirect != 0)) {
                     if (exclusive > ReferenceMode(origin.type)) {
                         ErrorAt(token, cast[ * u8]("cannot make an exclusive borrow from a shared reference"));
                     }
-                    ReferenceComputedGraph(check, loan, place, origin, expression, exclusive);
-                    loan.exclusive = exclusive & loan.exclusive;
-                    // A scalar projection may retain extra shared roots. Keep
-                    // them conservatively rather than losing the anchor.
-                    if (!nested) {
-                        loan.indirect = 0;
+                    if (check.pending_owner != null) {
+                        check.loans = ReferenceNewFrom(check, loan, loan.parent, exclusive & loan.exclusive, loan.indirect, expression, check.loans);
+                    } else {
+                        ReferenceComputedGraph(check, loan, place, origin, expression, exclusive);
+                        loan.exclusive = exclusive & loan.exclusive;
+                        // A scalar projection may retain extra shared roots. Keep
+                        // them conservatively rather than losing the anchor.
+                        if (!nested) {
+                            loan.indirect = 0;
+                        }
+                        loan.expression = expression;
                     }
-                    loan.expression = expression;
                     found = true;
                 }
                 loan = loan.next;
@@ -438,7 +446,7 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
             if (source.root != null && source.holder == via && (preserve || bridge || (physical && nested) || source.indirect == layer) && (bridge || ReferencePayloadMayAccess(source, place, via))) {
                 if (physical) {
                     if (nested) {
-                        ReferenceSourceAccess(check, before, via, source.root, exclusive & source.exclusive, token, origin, source.physical_provenance);
+                        ReferenceSourceAccess(check, before, via, source.root, exclusive & source.exclusive, token, origin, source.physical_provenance, place);
                         check.loans = ReferenceNewSelected(check, source, via, exclusive & source.exclusive, 1, expression, check.loans, place, via, null, true);
                     }
                 } else {
@@ -450,7 +458,7 @@ fn ReferenceAcquireMode(check: * ReferenceCheck, place: * Node, exclusive: i64, 
                     var selected_source = *source;
                     if (address) { selected_source.physical_provenance = ReferencePhysicalSelected(check.graph, source, place, via); }
                     if (bridge) { selected_source.physical_provenance = null; }
-                    ReferenceSourceAccess(check, before, via, source.root, mode, token, origin, selected_source.physical_provenance);
+                    ReferenceSourceAccess(check, before, via, source.root, mode, token, origin, selected_source.physical_provenance, place);
                     check.loans = ReferenceNewSelected(check, &raw selected_source, via, mode, indirect, expression, check.loans, place, via, null, false);
                     if (nested && (!preserve || (source.indirect == 0 && source.root.reference_external != 0 && source.root.type == 0))) {
                         check.loans = ReferenceNewSelected(check, source, via, mode & ReferenceMode(Shape(expression.type).element), 1, expression, check.loans, place, via, null, true);
@@ -537,7 +545,7 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                         var pin = check.loans;
                         var retained = false;
                         while (pin != null) {
-                            if (pin.holder == null && pin.expression == origin) {
+                            if (pin.holder == null && pin.owner_pin == node.a) {
                                 retained = true;
                             }
                             pin = pin.next;
@@ -546,7 +554,19 @@ fn ReferenceAddressMode(check: * ReferenceCheck, node: * Node, writing: bool) {
                         // A named reference must not move/replace that owner
                         // while a later index or assignment RHS is evaluated.
                         if (!retained) {
-                            ReferenceAcquireMode(check, origin, 0, node.token, origin, true);
+                            let pending = check.pending_owner;
+                            check.pending_owner = node.a;
+                            var source = check.loans;
+                            var found = false;
+                            while (source != null) {
+                                if (source.owner_pin == null && source.holder == null && source.expression == origin && source.root != null) {
+                                    check.loans = ReferenceNewFrom(check, source, source.parent, 0, source.indirect, origin, check.loans);
+                                    found = true;
+                                }
+                                source = source.next;
+                            }
+                            if (!found) { ReferenceAcquireMode(check, origin, 0, node.token, origin, true); }
+                            check.pending_owner = pending;
                         }
                     }
                 }
@@ -587,7 +607,7 @@ fn ReferenceProjection(check: * ReferenceCheck, node: * Node, mode: i64) {
         if (mode != 0) { ReferenceRequireComputedAuthority(check, node.a, origin, true); }
         var source = check.loans;
         while (source != before) {
-            if (source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {
+            if (source.owner_pin == null && source.expression == origin && (!NestedReference(origin.type) || source.indirect != 0)) {
                 check.loans = ReferenceNewSelected(check, source, source.parent, mode & source.exclusive, BoolInt(NestedReference(node.type)) * source.indirect, node, check.loans, node.a, null, origin, false);
             }
             source = source.next;
@@ -613,7 +633,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 ReferenceValue(check, node.a);
                 var loan = check.loans;
                 while (loan != before) {
-                    if (loan.expression == node.a) {
+                    if (loan.owner_pin == null && loan.expression == node.a) {
                         loan.expression = node;
                     }
                     loan = loan.next;
@@ -715,7 +735,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                     var source = check.loans;
                     var found = false;
                     while (source != saved) {
-                        if (source.holder == null && source.expression == arg) {
+                        if (source.holder == null && source.owner_pin == null && source.expression == arg) {
                             found = true;
                             var mode = ReferenceMode(node.type) & source.exclusive;
                             var indirect: i64 = 0;
@@ -762,7 +782,7 @@ fn ReferenceValue(check: * ReferenceCheck, node: * Node) {
                 if (TrackedBorrow(node.type)) {
                     var source = check.loans;
                     while (source != before) {
-                        if (source.expression == item) {
+                        if (source.owner_pin == null && source.expression == item) {
                             ReferenceAggregateProvenance(check, source, node, item);
                             source.expression = node;
                         }
@@ -791,7 +811,7 @@ fn ReferenceAssign(check: * ReferenceCheck, target: * Local, value: * Node, stop
         }
         var loan = check.loans;
         while (loan != stop) {
-            if (loan.expression == value && loan.root != null) {
+            if (loan.owner_pin == null && loan.expression == value && loan.root != null) {
                 if (loan.root.depth > target.depth) {
                     ErrorAt(value.token, cast[ * u8]("assigned borrow may outlive local storage"));
                 }
@@ -841,7 +861,7 @@ fn ReferenceStatement(check: * ReferenceCheck, node: * Node) {
             var link = & raw check.loans;
             while ( * link != saved) {
                 let loan = * link;
-                if (loan.expression == node.a) {
+                if (loan.owner_pin == null && loan.expression == node.a) {
                     loan.holder = node.local_ref;
                     link = & raw loan.next;
                 } else {
@@ -1037,7 +1057,7 @@ fn ReferenceCheckReturn(check: *ReferenceCheck, value: *Node, stop: *ReferenceLo
     var loan = check.loans;
     var found = false;
     while (loan != stop) {
-        if (loan.expression == value && loan.holder == null && loan.root != null) {
+        if (loan.owner_pin == null && loan.expression == value && loan.holder == null && loan.root != null) {
             let root = loan.root;
             found = true;
             if (root.reference_external == 0 || root.depth != 0 || root.place_region == 0 ||
@@ -1049,3 +1069,18 @@ fn ReferenceCheckReturn(check: *ReferenceCheck, value: *Node, stop: *ReferenceLo
     }
     if (!found) { ErrorAt(value.token, cast[*u8]("returned borrow may outlive local storage or violate its borrows contract")); }
 }}
+
+// An owner pointer is pinned only while evaluating its exact derived place.
+// Other AST paths (including later arguments and the RHS) must still conflict.
+fn ReferenceTemporaryAccess(loan:*ReferenceLoan,place:*Node,origin:*Node)->bool {
+    unsafe {
+        if (loan.holder != null) { return false; }
+        if (loan.owner_pin == null) { return loan.expression == origin; }
+        var current = place;
+        while (current != null) {
+            if (current == loan.owner_pin) { return true; }
+            current = PlaceProjectionParent(current);
+        }
+        return false;
+    }
+}
