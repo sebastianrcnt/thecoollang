@@ -1778,6 +1778,45 @@ through ordinary evaluation or library use.
   integrated and checked before arbitrary nested borrowed storage is accepted.
   All release gates remain Open.
 
+- Typed installed-value metadata: direct partial stores wrap the incoming
+  value graph in the destination's field/element/owned-payload cursor, producing
+  the original holder's declared value type. Retention joins this graph with
+  existing historical provenance instead of leaving only the old initializer
+  graph or a mismatched field-value type. Live physical receivers gain a
+  separate Referent payload wrapper; layer-zero protection is unchanged.
+  Literal `stores` call addresses preserve the destination slot, with an opaque
+  value graph at that slot because contracts do not describe callee field
+  mappings. Named/computed receivers with unproven mappings use opaque holder
+  anchors. Precise absent source roots stay absent through unknown mappings;
+  unknown/null receiver sources become explicit opaque nodes before wrapping.
+  Shared entry and terminal permissions are retained.
+
+  Private production-source LLVM checks 18 post-store root/selection/known
+  records across direct and nested fields, conservative array elements, owned
+  payloads, live named receivers and opaque function stores. Existing historical
+  siblings remain present and new roots occur only at proven direct-store paths.
+  Helper probes cover nested cursor direction, sibling exclusion, all shared/
+  exclusive entry and terminal combinations, precise absence, unknown fallback,
+  repeated wrapper interning and unknown/absent receiver wrapping. All five
+  engines/O2, compiler/private LLVM ASan, host/runtime ASan/UBSan and the full
+  stores contract suite pass. Repeated partial stores at 64/1,024 submissions
+  retain identical final bytes/counts (32,154,831/48) and peak bytes (32,168,528);
+  repeated opaque named-receiver stores retain identical final bytes/counts
+  (32,160,920/110) and peak bytes (32,174,539). Full regression, production and
+  seed convergence, and external editor/distribution installation pass.
+  Reports: `build/loan-provenance{,-asan}-audit.json`,
+  `build/provenance-selection{,-asan}-audit.json`, `build/repl-lifecycle-audit.json`.
+  Evidence: `build/release-audit/provenance-stores-{build,focused,regression,sanitize,contract-sanitize,lifecycle,distribution}.log`.
+  Emitted compiler IR SHA-256:
+  `86c4ded8446266adc07443232c5425fac8fe36cbb11873d3c8c5a6a9dd14e3ae`.
+
+  Metadata installation is now connected to actual storage operations, but
+  existing coarse roots/ancestry remain the authoritative permission checker
+  on both frontends. Precise physical destination summaries, computed reborrow
+  adaptation, graph-aware authorization, parameter/call substitution and
+  descriptor lifetimes remain required before arbitrary nested borrowed
+  storage is accepted. All release gates remain Open.
+
 ## Next implementation checkpoints
 
 - Complete nested stored references and borrowed slice elements; preserve

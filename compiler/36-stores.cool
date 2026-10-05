@@ -139,14 +139,18 @@ fn ReferenceStoreRetain(check: * ReferenceCheck, target: * Local, source: * Refe
         while (existing != null && !(existing.holder == target && existing.root == source.root && existing.parent == ancestry && existing.exclusive == source.exclusive && existing.indirect == layer)) {
             existing = existing.next;
         }
+        if (existing != null) { ReferenceProvenanceJoin(check, existing, source); }
         if (existing == null) {
             let retained = ReferenceNew(check, source.root, ancestry, source.exclusive, layer, value, marker.next);
+            retained.provenance = source.provenance;
+            retained.provenance_type = source.provenance_type;
+            retained.provenance_known = source.provenance_known;
             retained.holder = target;
             marker.next = retained;
         }
     }
 }
-fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, stop: * ReferenceLoan) {
+fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, stop: * ReferenceLoan, destination: *Node, opaque: bool) {
     unsafe {
         var source = check.loans;
         while (source != stop) {
@@ -155,13 +159,14 @@ fn ReferenceInstall(check: * ReferenceCheck, target: * Local, value: * Node, sto
                 if (NestedReference(target.type)) {
                     layer = 1;
                 }
-                ReferenceStoreRetain(check, target, source, value, stop, layer, null);
+                var installed = ReferenceInstalledGraph(check, source, target.type, destination, opaque);
+                ReferenceStoreRetain(check, target, &raw installed, value, stop, layer, null);
                 // Every live receiver of this physical destination gains the installed
                 // payload roots. Its parent follows the physical reborrow ancestry.
                 var physical = stop;
                 while (physical != null) {
                     if (physical.root == target && physical.indirect == 0 && physical.holder != null && physical.holder != target && NestedReference(physical.holder.type)) {
-                        var copy = * source;
+                        var copy = ReferenceReceiverGraph(check, &raw installed, physical.holder.type);
                         copy.exclusive = copy.exclusive & Shape(physical.holder.type).count;
                         var parent = physical.parent;
                         if (parent == null) {
@@ -182,13 +187,13 @@ fn ReferenceStoreDestination(check: * ReferenceCheck, destination: * Node, origi
         var resolved = false;
         // A direct non-reference place has its own original holder.
         if (origin == null && via != null && !IsReference(via.type)) {
-            ReferenceInstall(check, via, value, stop);
+            ReferenceInstall(check, via, value, stop, destination, false);
             return;
         }
         var loan = check.loans;
         while (loan != null) {
             if (loan.root != null && loan.indirect == 0 && ((origin != null && origin.kind != 3 && loan.holder == null && loan.expression == origin) || (via != null && loan.holder == via))) {
-                ReferenceInstall(check, loan.root, value, stop);
+                ReferenceInstall(check, loan.root, value, stop, destination, false);
                 resolved = true;
             }
             loan = loan.next;
@@ -227,7 +232,7 @@ fn ReferenceCallStores(check: * ReferenceCheck, node: * Node, stop: * ReferenceL
                     var resolved = false;
                     while (physical != stop) {
                         if (physical.expression == destination && physical.holder == null && physical.indirect == 0 && physical.root != null) {
-                            ReferenceInstall(check, physical.root, value, stop);
+                            ReferenceInstall(check, physical.root, value, stop, destination, true);
                             resolved = true;
                             var source = check.loans;
                             while (source != stop) {

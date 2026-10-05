@@ -1,0 +1,79 @@
+// Install value metadata at a proven destination cursor. The scoped checker
+// retains all historical roots; this graph records where those roots can occur.
+fn ReferenceInstalledGraph(check: *ReferenceCheck, source: *ReferenceLoan, type: i64, destination: *Node, opaque: bool) -> ReferenceLoan {
+    unsafe {
+        var result = *source;
+        result.provenance_type = type;
+        // A proven absent source root stays absent even at an unknown mapping.
+        if (source.provenance == null && source.provenance_known != 0) { return result; }
+        var place = destination;
+        // A stores call knows its literal address argument, but its checked
+        // signature does not specify which subfield of that argument is set.
+        if (opaque) {
+            if (destination.kind == 23 && destination.op == 0) { place = destination.a; }
+            else { place = null; }
+        }
+        let via = BorrowRoot(place);
+        var cursor = ReferencePlaceCursor(place, via, null);
+        var path = cursor.path;
+        // A named reference's physical loan points at the referent's original
+        // holder. Remove that first addressing edge from the value cursor.
+        if (path != null && path.kind == 3 && IsReference(path.type) && Shape(path.type).element == type) { path = path.next; }
+        var complete = cursor.complete != 0;
+        if (path != null && path.type != type) { complete = false; }
+        if (path == null && (via == null || (via.type != type && (!IsReference(via.type) || Shape(via.type).element != type)))) { complete = false; }
+        var leaf = source.provenance;
+        var leaf_type = source.provenance_type;
+        if (opaque) {
+            // Literal calls identify the destination slot, never a mapping
+            // from argument fields to the callee's internal storage fields.
+            leaf_type = Shape(destination.type).element;
+            leaf = ReferenceGraphValueNode(check.graph, leaf_type, source.root, ReferenceRootMode(source), 1);
+        } else if (leaf == null && source.provenance_known == 0) {
+            leaf = ReferenceGraphValueNode(check.graph, leaf_type, source.root, ReferenceRootMode(source), 1);
+        }
+        if (complete && leaf != null) {
+            var reverse: *ProvenanceCursor = null;
+            var step = path;
+            while (step != null) {
+                let copy = cast[*ProvenanceCursor](CAlloc(i64(sizeof(ProvenanceCursor))));
+                *copy = *step; copy.next = reverse; reverse = copy; step = step.next;
+            }
+            step = reverse;
+            while (step != null) {
+                leaf = ReferenceGraphParent(check.graph, step.type, step.kind, step.key, leaf);
+                step = step.next;
+            }
+            ReferenceCursorFree(reverse);
+            if (leaf.type != type) { complete = false; }
+        }
+        if (!complete) {
+            leaf = ReferenceGraphValueNode(check.graph, type, source.root, ReferenceRootMode(source), 1);
+        }
+        result.provenance = leaf;
+        result.provenance_known = 1;
+        if (leaf != null) { result.provenance_known = BoolInt(leaf.opaque == 0); }
+        ReferenceCursorFree(cursor.path);
+        return result;
+    }
+}
+// Physical receiver anchors keep their original layer-zero loans. Only the
+// installed payload is adapted to the receiver's declared reference value.
+fn ReferenceReceiverGraph(check: *ReferenceCheck, source: *ReferenceLoan, type: i64) -> ReferenceLoan {
+    unsafe {
+        var result = *source;
+        result.provenance_type = type;
+        if (result.provenance == null && source.provenance_known != 0) { return result; }
+        if (result.provenance == null && source.provenance_known == 0) {
+            result.provenance = ReferenceGraphValueNode(check.graph, source.provenance_type, source.root, ReferenceRootMode(source), 1);
+        }
+        if (IsReference(type) && Shape(type).element == source.provenance_type) {
+            if (result.provenance != null) { result.provenance = ReferenceGraphParent(check.graph, type, 3, 0, result.provenance); }
+            result.provenance_known = 1;
+        } else {
+            result.provenance = ReferenceGraphValueNode(check.graph, type, source.root, ReferenceRootMode(source), 1);
+            result.provenance_known = 0;
+        }
+        return result;
+    }
+}

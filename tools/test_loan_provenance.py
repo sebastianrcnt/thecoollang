@@ -8,10 +8,28 @@ def run(cmd,**kw):return subprocess.run(list(map(str,cmd)),cwd=ROOT,capture_outp
 AUDIT='''extern "C" fn LoanRecord(stage:i64,holder:*u8,root:*u8,field:*u8,reading:i64,writing:i64,valid:i64);
 fn LoanAudit(check:*ReferenceCheck,node:*Node){unsafe{
  let local=node.local_ref;if(local==null || local.name==null){return;}
+ if(Eq(local.name,cast[*u8]("receiver"))!=0 && IsReference(local.type)){
+  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
+   var unknown=ReferenceLoan{};unknown.root=loan.root;unknown.provenance_type=Shape(local.type).element;
+   var wrapped=ReferenceReceiverGraph(check,&raw unknown,local.type);
+   var cursor=ProvenanceCursor{type:local.type,kind:3,key:0,next:null};
+   if(wrapped.provenance==null || !ReferenceLoanQuery(&raw wrapped,&raw cursor,loan.root,false) || ReferenceLoanQuery(&raw wrapped,&raw cursor,loan.root,true)){NativeExit(66);}
+   unknown.provenance_known=1;wrapped=ReferenceReceiverGraph(check,&raw unknown,local.type);
+   if(wrapped.provenance!=null || wrapped.provenance_known!=1){NativeExit(67);}
+   unknown.provenance_type=local.type;wrapped=ReferenceReceiverGraph(check,&raw unknown,local.type);
+   if(wrapped.provenance!=null || wrapped.provenance_known!=1){NativeExit(68);}
+  }loan=loan.next;}return;
+ }
  if(Eq(local.name,cast[*u8]("picked"))!=0 || Eq(local.name,cast[*u8]("picked_copy"))!=0 || Eq(local.name,cast[*u8]("uncertain"))!=0 || Eq(local.name,cast[*u8]("indexed"))!=0){
   var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
    let valid=loan.provenance_type==local.type && (loan.provenance==null || (loan.provenance.graph==check.graph && loan.provenance.type==local.type));
    LoanRecord(node.kind,local.name,loan.root.name,cast[*u8]("value"),BoolInt(ReferenceLoanQuery(loan,null,loan.root,false)),loan.provenance_known,BoolInt(valid));
+  }loan=loan.next;}return;
+ }
+ if(Eq(local.name,cast[*u8]("after_left"))!=0 || Eq(local.name,cast[*u8]("after_right"))!=0 || Eq(local.name,cast[*u8]("after_call"))!=0 || Eq(local.name,cast[*u8]("after_nested"))!=0 || Eq(local.name,cast[*u8]("after_element"))!=0 || Eq(local.name,cast[*u8]("after_owned"))!=0){
+  var loan=check.loans;while(loan!=null){if(loan.holder==local && loan.root!=null){
+   let valid=loan.provenance_type==local.type && (loan.provenance==null || (loan.provenance.graph==check.graph && loan.provenance.type==local.type));
+   LoanRecord(node.kind,local.name,loan.root.name,cast[*u8]("store"),BoolInt(ReferenceLoanQuery(loan,null,loan.root,false)),loan.provenance_known,BoolInt(valid));
   }loan=loan.next;}return;
  }
  if(AggregateKind(local.type)!=1){return;}
@@ -58,7 +76,16 @@ fn AuditSelection(){
  {let picked=(*new[Pair](tracked)).left;assert(*picked==7);}
  let opaque=swap(&x,&y);let uncertain=opaque.left;assert(*uncertain==8);
 }
-fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();io.println(42);}
+fn setright(dst:&mut Pair,src:&i64) stores(dst,src){(*dst).right=src;}
+fn AuditStores(){var x=7;var y=8;var z=9;
+ var stored=Pair{left:&x,right:&y};stored.left=&z;let receiver=&mut stored;(*receiver).right=&z;
+ let after_left=(*receiver).left;let after_right=(*receiver).right;assert(*after_left==9);assert(*after_right==9);
+ var callstored=Pair{left:&x,right:&y};setright(&mut callstored,&z);let after_call=callstored.left;assert(*after_call==7);
+ var nested=Outer{inner:Pair{left:&x,right:&y}};nested.inner.left=&z;let after_nested=nested.inner.left;assert(*after_nested==9);
+ var elements=[2]&i64{&x,&y};elements[0]=&z;let after_element=elements[1];assert(*after_element==8);
+ var owned=new[Pair](Pair{left:&x,right:&y});(*owned).left=&z;let after_owned=(*owned).left;assert(*after_owned==9);
+}
+fn main(){AuditPair();AuditSame();AuditMixed();AuditSelection();AuditStores();io.println(42);}
 '''
 with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  tmp=Path(directory);source=(ROOT/'compiler/16-references.cool').read_text();
@@ -92,7 +119,14 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
   else:assert (reading,known)==(1,0),(stage,holder,root,reading,known)
  assert sum(r[1]=='picked' and r[2]=='x' for r in selection)==4,selection
  assert any(r[1]=='picked_copy' and r[2]=='x' for r in selection),selection
- records=[r for r in records if r not in selection]
+ stores=[r for r in records if r[3]=='store'];assert len(stores)==18,stores
+ for stage,holder,root,field,reading,known in stores:
+  assert stage==7 and root in ('x','y','z'),(stage,holder,root)
+  expected=int(root in ('x','z'))
+  if holder=='after_right':expected=int(root in ('y','z'))
+  if holder=='after_element':expected=1
+  assert (reading,known)==(expected,int(not(holder=='after_call' and root=='z'))),(holder,root,reading,known)
+ records=[r for r in records if r not in selection and r not in stores]
  # Original roots are independent of queried field. In Pair, only x reaches
  # left and y reaches right; AuditSame additionally puts x in both fields.
  by_holder={}
@@ -114,6 +148,6 @@ with tempfile.TemporaryDirectory(prefix='cool live loan graph ') as directory:
  r=run([binary,'repl-quiet'],input=repl,env=env);assert r.returncode==0 and r.stdout=='7\n8\n3\n' and r.stderr.count('error:')==2,r
  assert 'AddressSanitizer' not in r.stderr and 'runtime error:' not in r.stderr,r
  assert sum(line.startswith('LOAN ') for line in r.stderr.splitlines())>=8,r
- report={'records':records,'selection_records':selection,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode oracle mixed shared/exclusive fields, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
+ report={'records':records,'selection_records':selection,'store_records':stores,'sanitize':args.sanitize,'artifact_sha256':digests,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'compiler_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'platform_source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in [ROOT/'compiler/host.c',*(ROOT/'language'/name for name in ('runtime.c','memory.h','numeric.h','ffi.h','repl_io.h','args.h'))]},'audit_source_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Private production compiler hook at actual binding/copy/whole-assignment checks; typed field root/mode and value-selection oracles, partial/nested/element/owned stores, live receiver propagation and opaque call unions, unknown/absent receiver probes, five engines/O2 and partial-runtime/failed-function-check REPL recovery. Scoped permissions still use the existing coarse checker; graph substitution and nested acceptance are not certified.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
- print(f'live loan provenance: {len(records)} field/root/mode and {len(selection)} selection records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))
+ print(f'live loan provenance: {len(records)} field/root/mode and {len(selection)} selection and {len(stores)} store records, initializers/copies/whole assignments/same-root fields mixed permissions, five engines/O2 and REPL recovery PASS'+(' with ASan/UBSan' if args.sanitize else ''))

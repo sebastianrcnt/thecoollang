@@ -48,6 +48,31 @@ def oracle(nodes,edges,path,start,mode,complete,typ,known,extra,write):
  reading=int(any(query(nodes,edges,extra,n,m,write) for n,m in states) or (not extra and any(not write or m for m in fallback)))
  return reading,int(precise)
 AUDIT='''
+export "C" fn StoreGraphProbe(){unsafe{
+ var graph=ProvenanceGraph{};var external=Local{};var holder=Local{};holder.type=10;
+ var check=ReferenceCheck{};check.graph=&raw graph;
+ var address=Node{};address.kind=22;address.type=100010;address.local_ref=&raw holder;
+ var field=Node{};field.kind=24;field.type=100020;field.a=&raw address;field.field_key=100;
+ var nested=Node{};nested.kind=24;nested.type=100030;nested.a=&raw field;nested.field_key=200;
+ var tail=ProvenanceCursor{type:20,kind:1,key:200,next:null};
+ var path=ProvenanceCursor{type:10,kind:1,key:100,next:&raw tail};
+ for(var mode:i64=0;mode<2;mode=mode+1){for(var cap:i64=0;cap<2;cap=cap+1){
+  var source=ReferenceLoan{};source.root=&raw external;source.exclusive=mode;source.provenance_type=30;source.provenance_known=1;
+  source.provenance=ProvenanceNodeNew(&raw graph,30,&raw external,cap);
+  var installed=ReferenceInstalledGraph(&raw check,&raw source,10,&raw nested,false);
+  if(installed.provenance_type!=10 || installed.provenance_known!=1 || !ReferenceLoanQuery(&raw installed,&raw path,&raw external,false) || BoolInt(ReferenceLoanQuery(&raw installed,&raw path,&raw external,true))!=(mode&cap)){NativeExit(61);}
+  path.key=101;if(ReferenceLoanQuery(&raw installed,&raw path,&raw external,false)){NativeExit(62);}path.key=100;
+  let head=graph.nodes;
+  for(var i:i64=0;i<128;i=i+1){installed=ReferenceInstalledGraph(&raw check,&raw source,10,&raw nested,false);if(graph.nodes!=head){NativeExit(63);}}
+ }}
+ var absent=ReferenceLoan{};absent.root=&raw external;absent.provenance_type=30;absent.provenance_known=1;
+ var missing=ReferenceInstalledGraph(&raw check,&raw absent,10,&raw nested,false);
+ if(missing.provenance!=null || missing.provenance_known!=1 || missing.provenance_type!=10){NativeExit(64);}
+ var unknown=absent;unknown.provenance_known=0;
+ var fallback=ReferenceInstalledGraph(&raw check,&raw unknown,10,null,false);
+ if(fallback.provenance==null || fallback.provenance_known!=0 || ReferenceLoanQuery(&raw fallback,null,&raw external,true)){NativeExit(65);}
+ ProvenanceGraphFree(&raw graph);
+}}
 export "C" fn SelectJoinProbe(){unsafe{
  var graph=ProvenanceGraph{};var root=Local{};var check=ReferenceCheck{};check.graph=&raw graph;
  var shared=ReferenceLoan{};shared.root=&raw root;shared.provenance_type=20;
@@ -89,10 +114,10 @@ DRIVER=r'''
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-extern void SelectJoinProbe(void);
+extern void SelectJoinProbe(void);extern void StoreGraphProbe(void);
 extern int64_t SelectProbe(int64_t,int64_t,int64_t*,int64_t*,int64_t,int64_t*,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t,int64_t*,int64_t);
 static int64_t get(void){int64_t v;if(scanf("%"SCNd64,&v)!=1)abort();return v;}
-int main(void){SelectJoinProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
+int main(void){SelectJoinProbe();StoreGraphProbe();int64_t n;while(scanf("%"SCNd64,&n)==1){int64_t e=get(),c=get(),q=get(),start=get(),mode=get(),complete=get(),type=get(),known=get(),writing=get();
  int64_t *ns=calloc(n*4+1,8),*es=calloc(e*5+1,8),*ps=calloc(c*4+1,8),*qs=calloc(q*4+1,8);
  for(int64_t i=0;i<n*4;i++)ns[i]=get();for(int64_t i=0;i<e*5;i++)es[i]=get();for(int64_t i=0;i<c*4;i++)ps[i]=get();for(int64_t i=0;i<q*4;i++)qs[i]=get();
  printf("%"PRId64"\n",SelectProbe(n,e,ns,es,c,ps,start,mode,complete,type,known,q,qs,writing));free(ns);free(es);free(ps);free(qs);
@@ -138,6 +163,6 @@ with tempfile.TemporaryDirectory(prefix='cool provenance selection ') as directo
  r=run([binary],input='\n'.join(lines)+'\n',env=env);assert r.returncode==0,r
  actual=list(map(int,r.stdout.split()));assert len(actual)==len(expected),(len(actual),len(expected),r)
  for i,(a,b) in enumerate(zip(actual,expected)):assert a==b,(i,a,b,cases[i])
- report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query oracle; same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Metadata only, not permission authorization.'}
+ report={'cases':len(cases),'seed':20261005,'sanitize':args.sanitize,'source_sha256':{str(f.relative_to(ROOT)):hashlib.sha256(f.read_bytes()).hexdigest() for f in files},'artifact_sha256':artifacts,'private_ir_sha256':hashlib.sha256(ir.read_bytes()).hexdigest(),'audit_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),'method':'Independent Python product-state selection/alternative-query oracle; same external root per loan, opaque and precise/null alternatives, wrong types, shared barriers, field/element/referent/owner edges, cyclic paths and graphs. Nested store cursor wrapping, wrong sibling exclusion, source entry/terminal capabilities, precise absence/unknown fallback and repeated wrapper interning probes. Metadata only, not permission authorization.'}
  if args.output:args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,indent=2)+'\n')
  print(f'provenance selection: {len(cases)} independent oracle cases PASS'+(' with ASan/UBSan' if args.sanitize else ''))
