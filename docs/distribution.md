@@ -109,10 +109,14 @@ instrumented libraries, external installation and development packaging on the
 `macos-15` ARM64 hosted runner, with checkout/upload actions pinned to commits.
 The runner label follows the [official hosted-runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 Its setup explicitly checks native arm64 and availability of Rosetta for legacy
-x86 probes. A remote workflow run has **not** been executed or certified by local
-validation; G10 remains open until real CI/release evidence is recorded.
+x86 probes. Workflow run `37412986851` for the release commit
+`a97ef2c7913b` completed successfully with all nine steps green and produced the
+published archive; the release contract records that evidence and G10 is closed.
 
-No stable release has been published, signed or uploaded by this work.
+Cool `1.0.0` is published as a GitHub release with the archive the remote
+workflow built and its SHA-256 companion. The archive is not code-signed or
+notarized; installation verifies the manifest identity, the tested host and the
+per-file checksums instead.
 
 ## Editor client configuration
 

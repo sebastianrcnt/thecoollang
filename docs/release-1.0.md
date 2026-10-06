@@ -3505,10 +3505,22 @@ through ordinary evaluation or library use.
   running `make -j4 editor-client-fetch editor-client-test` started the editor
   test before the pinned Neovim client had been fetched, so the test reported
   `Neovim test client missing` and the remaining steps were skipped. The fetch
-  is now serialized ahead of the parallel test in the same workflow, and the
-  end-to-end green run for the tagged release commit is published with the
-  release itself (see the release page for `v1.0.0`), together with the archive
-  and its SHA-256.
+  is now serialized ahead of the parallel test in the same workflow.
+
+- Release CI result: workflow run `37412986851` (`Verify Cool release build`,
+  `macos-15` arm64) for commit `a97ef2c7913bec7474df088b2cba49a0e71d7be4`
+  completed **success** in 15m42s with all nine steps green - compiler, runtime
+  and bootstrap regressions; the real editor client integration; the 55
+  instrumented and sanitizer library checks; the external distribution
+  validation; the release packaging and the artifact upload. The packaging step
+  produced `1.0.0-a97ef2c7913b-1a03da23043d-darwin-arm64.tar.gz` (428,391 bytes,
+  SHA-256 `c36fa0c66bfa4f90bbd4a5d7318a3a8c1c2cfc8b8682f7b6f61e8e18499d2ba8`);
+  its manifest records version `1.0.0`, a clean tree, tested host macOS `15.7.9`,
+  minimum macOS `15.0`, the toolchain and per-file checksums. The archive and its
+  `.sha256` companion were downloaded, verified against that checksum and
+  published with the `v1.0.0` tag as
+  <https://github.com/sebastianrcnt/thecoollang/releases/tag/v1.0.0>. The only
+  change committed after that run is this record.
 
 ## Next implementation checkpoints
 
