@@ -57,6 +57,12 @@ developer-tools-test: build/language.BIN
 	python3 tools/test_developer_tools.py
 test: developer-tools-test
 
+# Specification/release-contract `make` references must resolve to real targets.
+.PHONY: spec-map-test
+spec-map-test:
+	python3 tools/test_spec_map.py
+test: spec-map-test
+
 .PHONY: benchmark
 benchmark: all
 	python3 tools/bench_language.py --output build/language-benchmark.json

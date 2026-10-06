@@ -3358,6 +3358,13 @@ through ordinary evaluation or library use.
   obligation statement, the whole-language conformance mapping and the remaining
   freeze tasks stay Open.
 
+- Specification conformance map: added `tools/test_spec_map.py` and
+  `make spec-map-test` (part of `make test`). It extracts every backtick-quoted
+  make-target reference from `docs/specification.md` and this contract and fails
+  if any is not a real Makefile target. All 50 references currently resolve.
+  This guards G1's conformance mapping against stale evidence links; the
+  whole-language conformance and semantic audit itself stays Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
