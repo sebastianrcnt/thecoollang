@@ -31,7 +31,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | **Closed** (owned UTF-8 `Text` and `Vector[u8]` bytes; owning `Vector`/`Map`; `fs`/`path`/`process`; JSON serialization; ownership/error/lifetime contract in `stdlib/README.md`; the two-package `examples/tally` project — see the audit log) |
 | G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | **Closed** (`cool fmt`/`test`/`doc` token-preserving integration; `cool lsp` diagnostics, definitions and scoped/package/type/member/generic completion; a real Neovim client and the external-distribution editor test — see the audit log) |
-| G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | Open |
+| G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | **Closed** (`docs/performance.md` separates direct-frontend from CLI rows; driver batching reduces the synthetic 257-file cold check 591→119 ms; the Tally application and a 512-function larger build carry one-file-edit incremental rows; ten raw sample files under `docs/benchmarks/` — see the audit log) |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | **Closed** (34 O0/O2 interpreter differential cases plus per-suite rejection cases; ownership/borrow/aggregate/slice/collection seeded fuzzers; runtime ASan/UBSan and instrumented-frontend sanitizer targets; the two-package `examples/tally` project on five engines and standalone O2; `make bootstrap-check` old/new convergence — see the audit log) |
 | G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
 
@@ -3393,6 +3393,23 @@ through ordinary evaluation or library use.
   targets, `make spec-map-test` fails if any referenced target is not real, and
   the compatibility policy is recorded in `docs/compatibility.md`. G1 is closed;
   the remaining gates are the non-language acceptance work.
+
+- Gate closure — G8 performance: `docs/performance.md` publishes separate
+  compiler (direct-frontend) and CLI measurements with reproduction steps and
+  environment notes. Hot CLI overhead is reduced: deferred imports, one frontend
+  hash per invocation, per-directory metadata snapshots and a Cool `scan-bundle`
+  mode cut the synthetic 257-file cold check from 591.542 to 119.467 ms and the
+  warm check from 125.147 to 89.163 ms. Representative larger builds and
+  incremental workloads are measured: the shipped Tally application and a
+  512-function variant carry direct-check, LLVM-emission, clang and CLI rows,
+  including one-file-edit increments, and the REPL replacement and stateful-edit
+  workloads are timed. Ten raw sample files under `docs/benchmarks/` and the
+  `tools/bench_*.py` harnesses record the methodology. G8 is closed. The
+  bounded-worklist cost on recursive-type destruction (~1.16x) and the vector
+  teardown cost are documented, measured follow-ups in `docs/benchmarks/
+  drop-depth-arm64.json`; they are tracked improvements, not release blockers,
+  and reducing them without weakening the bounded-destruction guarantee remains
+  future work.
 
 ## Next implementation checkpoints
 
