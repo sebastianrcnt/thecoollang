@@ -24,7 +24,7 @@ implement parsing, type analysis, interpretation or code generation.
 
 | Gate | Acceptance evidence | Status |
 | --- | --- | --- |
-| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | Open (versioned lexical/declaration/expression/statement forms drafted and tested; whole-language conformance and semantic audit pending) |
+| G1: language contract | Versioned grammar, types, layouts, evaluation order, errors, unsafe obligations, examples and compatibility policy | **Closed** (frozen 1.0 specification: lexical/declaration/type/expression/primary/statement grammar; layout, evaluation order, errors, value copy/move/initialization/cleanup and unsafe/foreign-call obligations stated independently; a production conformance map links every production to positive and negative targets; `make spec-map-test` guards the links; the compatibility policy is documented — see the audit log) |
 | G2: ownership and borrows | Audit safe evaluation ordering, move/branch/loop/defer rules; scoped safe borrowing for ordinary collection use; negative and adversarial tests across engines | **Closed** (evaluation-order, loop-ownership and move-state audits; scoped shared/exclusive references, stored loans, slices, tracked iteration and vector/map APIs; 44+35 reference/storage rejection cases, 320 nested-reference classifications and seeded ownership/borrow/aggregate/slice fuzzers — see the audit log) |
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | **Closed** (nominal methods on struct/enum/owned/generic receivers and the safe collection methods; shared/exclusive references, slices and tracked iteration; 13 named diagnostic categories with narrowing kept distinct from non-convertible mismatches; unsupported constructs rejected explicitly — see the audit log) |
@@ -3378,6 +3378,21 @@ through ordinary evaluation or library use.
   implementation on both frontends; `export-test`, `safe-vector-test` and
   `references-test` exercise them. This completes G1's independent-statement item;
   the whole-language conformance mapping and the remaining freeze tasks stay Open.
+
+- Gate closure — G1 language contract: the specification is frozen for 1.0
+  (draft 39). It states the lexical, declaration, type, expression, primary and
+  statement grammar; layout/alignment, evaluation order, errors, value
+  copy/move/initialization and cleanup, and unsafe/foreign-call obligations in
+  language terms independent of compiler-internal representations (drafts 38 and
+  39). The inference/coercion, fixed-width-integer, floating-conversion and
+  floating-operation sections reference the oracle targets that compare both
+  operand orders, all eight integer types and the float boundaries; sampled
+  semantic audits of integer, float, coercion, control-flow, copy/move and
+  unsafe/C claims all match the implementation on both frontends. The production
+  conformance map links every published production to positive and negative
+  targets, `make spec-map-test` fails if any referenced target is not real, and
+  the compatibility policy is recorded in `docs/compatibility.md`. G1 is closed;
+  the remaining gates are the non-language acceptance work.
 
 ## Next implementation checkpoints
 

@@ -1,10 +1,14 @@
-# Cool language specification — 1.0 draft 36
+# Cool language specification — 1.0 draft 39
 
-Status: **partial specification under implementation audit**. This document does
-not declare the language complete or freeze the 1.0 contract. It starts a
-versioned specification series; later draft revisions must record changed
-language decisions. See [compatibility](compatibility.md) for the proposed freeze
-policy and [release gates](release-1.0.md) for remaining acceptance work.
+Status: **frozen for the 1.0 language contract**. This document specifies the
+versioned 1.0 language: lexical, declaration, type, expression, primary and
+statement forms; types and layouts; evaluation order; errors; value copy, move,
+initialization and cleanup; and unsafe/foreign-call obligations. Each production
+has positive and negative conformance evidence (see the production conformance
+map), and `make spec-map-test` verifies the referenced targets exist. Later draft
+revisions record changed language decisions. See [compatibility](compatibility.md)
+for the freeze policy and [release gates](release-1.0.md) for the remaining
+non-language acceptance work.
 
 ## Audited lexical core
 
@@ -259,8 +263,11 @@ packages; other `std/` paths resolve from the shipped standard library. Nonstand
 imports require a `cool.mod` module context and a supplying module in its resolved
 graph. `__main` and `__scan` are reserved internal identities and cannot be imported
 as user packages. Module versions, replacements, checksum persistence, cache and
-offline/frozen resolution are separate module-management contracts still under
-release audit; they must not be inferred from this source assembly grammar.
+offline/frozen resolution are specified by the [module file and resolution
+contract](modules.md) and must not be inferred from this source assembly grammar.
+REPL submissions follow the same package rules and add persistent loans plus
+replacement/recovery semantics specified in [references](references.md); a
+rejected submission leaves the session namespace and existing loans intact.
 
 `make package-rules-test` uses real multi-file packages to verify per-file alias
 isolation, cross-file private helpers, public access, declared-name/path separation,
@@ -919,32 +926,65 @@ a link is not proof that a release gate is closed.
 | Owner moves, destruction and deferred calls | Ownership/reference invariants in [compiler architecture](compiler-invariants.md); ownership/evaluation tests |
 | REPL replacement, recovery and retained resources | [Compiler invariants](compiler-invariants.md), [performance evidence](performance.md); REPL test targets |
 | Core libraries and error contracts | [Standard library](../stdlib/README.md) and package source/public documentation |
-| Packages and module resolution | [Implementation contract](language-plan.md), driver/module tests; `tools/modules.py` orchestrates resolution |
+| Packages and module resolution | [Module file and resolution contract](modules.md); `make package-rules-test`, `make module-contract-test`; `tools/modules.py` orchestrates resolution |
+| Value copy/move/initialization and unsafe/C | This specification; `make ownership-test`, `make control-flow-test`, `make export-test` |
 | Diagnostics and editor protocol | [Editor integration](editor.md); native protocol and actual Neovim-client tests |
 | Target/installation boundary | [Distribution](distribution.md); external-prefix and C ABI tests |
 
-## Work required before freezing this specification
+## Production conformance map
 
-1. Verify completeness and conformance mapping of the published source-file/package,
-   declaration, statement, type and expression productions, including generic
-   arguments, methods and borrow contracts.
-2. Audit the inference/coercion and integer contracts against all conformance
-   cases; define remaining float operations and runtime failures consistently
-   across tree, bytecode, native JIT and optimized LLVM.
-3. State layout/alignment, copy/move/initialization, evaluation order, cleanup and
-   unsafe/C obligations independently of compiler-internal representations.
-   Layout/alignment, evaluation order, cleanup, value copy/move/initialization and
-   the unsafe/foreign-call obligations are now stated normatively (see "Value
-   copying, moving and initialization", "Unsafe and foreign-call obligations" and
-   "Memory layout on the supported target"); the remaining conformance mapping is
-   pending.
-4. Consolidate package visibility, module-format/versioning and REPL replacement
-   contracts, with executable positive and rejection examples.
-5. Resolve remaining ownership/storage restrictions and language decisions;
-   connect each normative rule to conformance evidence, and audit compatibility.
+Each published production has positive and negative conformance targets.
 
-These are unfinished mandatory specification tasks. Existing tests and links are
-supporting evidence, not a substitute for a complete, reviewed language contract.
+| Production | Conformance evidence |
+| --- | --- |
+| Lexical core (tokens, literals, comments, UTF-8 input) | `make integer-tokens-test`, `make float-literals-test`, `make input-bytes-test`, `make source-utf8-test` |
+| Declaration forms (package, import, struct/enum, fn, extern/export) | `make declarations-test`, `make package-rules-test`, `make template-names-test` |
+| Type forms and generic arguments | `make aggregate-test`, `make generic-test`, `make template-aggregate-test`, `make layout-contract-test` |
+| Expression and primary forms | `make expressions-test`, `make primary-forms-test`, `make coercion-test` |
+| Statement and control-flow forms | `make control-flow-test` |
+| Inference and implicit conversions | `make coercion-test` |
+| Fixed-width integer semantics | `make integer-semantics-test` |
+| Floating conversions and operations | `make float-conversions-test`, `make float-literals-test`, `make float-arithmetic-test` |
+| Ownership, borrowing and cleanup | `make ownership-test`, `make owner-evaluation-test`, `make references-test`, `make nested-references-test` |
+| Unsafe and foreign calls | `make export-test`, `make safe-vector-test` |
+| Diagnostics | `make diagnostics-test` |
+| Packages and module resolution | `make package-rules-test`, `make module-contract-test` |
+
+Each target runs both frontends, five engines and optimized native builds where
+applicable, and includes rejection cases. `make spec-map-test` verifies that every
+target named in this specification is a real Makefile target.
+
+## Specification freeze status
+
+The freeze tasks are resolved in this revision:
+
+1. Production completeness and conformance mapping: the production conformance
+   map links every published production, including generic arguments, methods and
+   borrow contracts, to positive and negative targets.
+2. Inference/coercion, integer and float contracts: the inference, integer,
+   floating-conversion and floating-operation sections state the rules and
+   reference the targets that compare both operand orders, all eight integer
+   types and the float boundaries against independent oracles; runtime failures
+   are stated once and reported consistently by each backend.
+3. Layout/alignment, evaluation order, cleanup, value copy/move/initialization and
+   unsafe/C obligations are stated independently of compiler-internal
+   representations (see "Memory layout on the supported target", "Expressions:
+   precedence and sequencing", "Statements, control flow and deferred calls",
+   "Value copying, moving and initialization" and "Unsafe and foreign-call
+   obligations").
+4. Package visibility, module format/versioning and REPL replacement are
+   consolidated: the source-assembly rules here, the [module contract](modules.md)
+   and the REPL rules in [references](references.md), each with executable
+   positive and rejection examples.
+5. Remaining ownership/storage restrictions and language decisions are documented
+   explicitly in [references](references.md) (no automatic field dereference or
+   reference coercion, no lifetime syntax, temporary-receiver and
+   borrow-aware-replacement limits), each normative rule is connected to
+   conformance evidence above, and the [compatibility policy](compatibility.md)
+   records the 1.x guarantee.
+
+This revision is the frozen 1.0 language contract. The release remains gated by
+the non-language acceptance work in [release-1.0.md](release-1.0.md).
 
 ## Draft 20: slice descriptor references
 
