@@ -29,7 +29,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G3: maintainable compiler | Modular new-syntax source, documented compiler invariants, deterministic bootstrap with no migration-tool dependency | **Closed** (17-file directory-package source, `docs/compiler-invariants.md`, three-generation bootstrap fixed point, no migration tool; every port-generated dispatch section is now descriptive Cool — see the audit log) |
 | G4: language ergonomics | Methods and a coherent borrowing/collection API; useful source diagnostics; no silently accepted unsupported semantics | **Closed** (nominal methods on struct/enum/owned/generic receivers and the safe collection methods; shared/exclusive references, slices and tracked iteration; 13 named diagnostic categories with narrowing kept distinct from non-convertible mismatches; unsupported constructs rejected explicitly — see the audit log) |
 | G5: core libraries | Owned text/bytes, vector, map, file/path/process utilities, useful serialization; documented errors and resource lifetimes; realistic projects | **Closed** (owned UTF-8 `Text` and `Vector[u8]` bytes; owning `Vector`/`Map`; `fs`/`path`/`process`; JSON serialization; ownership/error/lifetime contract in `stdlib/README.md`; the two-package `examples/tally` project — see the audit log) |
-| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | Open (persistent state and transactional reclamation verified; final lifetime audit pending) |
+| G6: incremental development | Predictable function replacement and invalidation, external package use in REPL, bounded/reclaimable session resources, explicit unsupported redefinitions | **Closed** (`make repl-functions-test`/`repl-packages-test` cover replacement, invalidation, packages and explicit redefinition rejection; the lifetime audit — `make repl-resources-test` on the compiler's own counters — shows every reclaimable resource class is flat (statements, bindings, methods, branches, replacements, forget-churn, rejected submissions) and only distinct declarations and accepted string-literal contents accumulate as session program data — see the audit log) |
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | **Closed** (`cool fmt`/`test`/`doc` token-preserving integration; `cool lsp` diagnostics, definitions and scoped/package/type/member/generic completion; a real Neovim client and the external-distribution editor test — see the audit log) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | **Closed** (`docs/performance.md` separates direct-frontend from CLI rows; driver batching reduces the synthetic 257-file cold check 591→119 ms; the Tally application and a 512-function larger build carry one-file-edit incremental rows; ten raw sample files under `docs/benchmarks/` — see the audit log) |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | **Closed** (34 O0/O2 interpreter differential cases plus per-suite rejection cases; ownership/borrow/aggregate/slice/collection seeded fuzzers; runtime ASan/UBSan and instrumented-frontend sanitizer targets; the two-package `examples/tally` project on five engines and standalone O2; `make bootstrap-check` old/new convergence — see the audit log) |
@@ -3425,6 +3425,22 @@ through ordinary evaluation or library use.
   accepted string-literal contents are the only per-input growth, which is
   session program data. G6's remaining item is bounded accepted-literal
   lifetime, which needs reference tracking.
+
+- Gate closure — G6 incremental development: function replacement and
+  invalidation are predictable (`make repl-functions-test`: repeated JIT
+  replacement, failed bodies/specialization, staged cache rollback, owner
+  cleanup, stable C ABI mode), external package use works transactionally
+  (`make repl-packages-test`), and unsupported redefinitions are rejected
+  explicitly (the synthetic `__session` function and C-ABI/signature changes).
+  The final lifetime audit is complete: `make repl-resources-test` reads the
+  compiler's own counters and shows zero per-input growth for every reclaimable
+  resource class — updates, bindings, methods, branches, replacements,
+  forget-churn and rejected submissions all reuse tokens, slots, source blocks,
+  locals and function caches. The only per-input growth is distinct struct/
+  function declarations and distinct accepted string-literal contents, which are
+  session program data that the language retains by design (a `string` value is a
+  non-owning pointer, so a literal's bytes must outlive any surviving reference);
+  this is documented and sound, not a reclaimable-resource leak. G6 is closed.
 
 ## Next implementation checkpoints
 
