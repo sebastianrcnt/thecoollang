@@ -28,9 +28,10 @@ currently refer to immutable literals; no ownership claim is made.
 on normal block exit, return, break and continue. Panic/runtime failure terminates
 the process and does not promise cleanup.
 
-This remains a development toolchain. The current standard library covers
-collections, owned text, checked arithmetic, JSON, files, paths, process arguments
-and subprocesses; additional domains and release audits remain open.
+Cool 1.0 is declared. The current standard library covers collections, owned
+text, checked arithmetic, JSON, files, paths, process arguments and subprocesses;
+additional domains are future work recorded in the release contract's
+checkpoints.
 This directory retains the bootstrap frontend. The production frontend in
 `compiler/` directory package uses new syntax and compiles itself; `make selfhost-check`
 verifies both IR and native binary convergence.
@@ -72,7 +73,8 @@ artifacts, parser scratch and unreferenced source/token history are reclaimed;
 package, type and alias roots may retain their source. Aggregate layout changes,
 concurrent redefinition and interactive REPL completion remain unsupported.
 `:forget name` releases persistent bindings subject to active loans. The session
-has explicit token/function/depth limits; the final resource audit remains open.
+has explicit token/function/depth limits; the resource audit that closed gate G6
+is recorded in the release contract.
 
 ## Numeric and developer tools coverage
 

@@ -1131,8 +1131,9 @@ This supports local and cross-call replacement of reference fields, borrowed
 aggregates, slices and borrowed owning handles. Repeated identical retained
 edges are merged. Compilation rejection rolls back staged loans; REPL runtime
 failure retains candidate roots because a store may already have executed.
-Multi-layer stored borrowed pointees and borrowed slice elements remain required
-work. All 1.0 release gates remain open.
+Multi-layer stored borrowed pointees and borrowed slice elements remained
+required work at that draft; the 1.0 release gates recorded in
+[the release contract](release-1.0.md) are now closed.
 
 
 ## Draft 27: slice return roots and stable simple projections

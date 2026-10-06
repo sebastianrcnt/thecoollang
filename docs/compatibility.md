@@ -1,10 +1,9 @@
 # Cool compatibility policy — 1.0 draft 1
 
-This is the proposed 1.0 contract, not a statement that 1.0 has shipped.
-`VERSION` remains the authoritative toolchain version; the release gates in
-[release-1.0.md](release-1.0.md) must pass before this policy is frozen.
-Development versions may change source behavior. Record a tested compiler
-revision alongside reproducible builds during this period.
+Status: **frozen for the 1.0 contract**. Cool 1.0 is declared: the mandatory
+gates in [release-1.0.md](release-1.0.md) are closed and `VERSION` is `1.0.0`.
+`VERSION` remains the authoritative toolchain version; record a tested compiler
+revision alongside reproducible builds.
 
 ## Source and behavior after the 1.0 freeze
 

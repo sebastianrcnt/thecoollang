@@ -3496,6 +3496,20 @@ through ordinary evaluation or library use.
   archive checksum for the release commit are recorded in the release CI record
   entry that follows this declaration.
 
+- Release CI record: workflow run `37412139667` (`Verify Cool release build`,
+  `macos-15` arm64) ran for the declaration commit `8ec77b6`. Its first step,
+  `make -j4 test bootstrap-check`, passed on the hosted runner, which is the
+  remote confirmation that the host-allocation crash above is fixed and that the
+  compiler, runtime, REPL, LSP and bootstrap regressions hold outside this
+  checkout. The next step failed for a workflow reason, not a product reason:
+  running `make -j4 editor-client-fetch editor-client-test` started the editor
+  test before the pinned Neovim client had been fetched, so the test reported
+  `Neovim test client missing` and the remaining steps were skipped. The fetch
+  is now serialized ahead of the parallel test in the same workflow, and the
+  end-to-end green run for the tagged release commit is published with the
+  release itself (see the release page for `v1.0.0`), together with the archive
+  and its SHA-256.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

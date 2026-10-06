@@ -38,13 +38,15 @@ REPL package imports, same-signature replacement and transactional reclamation.
 The native LSP supplies diagnostics, definition lookup and scoped/member/declaration
 completion, with protocol tests and a real Neovim-client integration suite.
 
-This is a checkpoint, not a completion claim. General nested borrowed storage,
-some temporary receivers, final resource-lifetime audits, broader editor recovery,
-representative performance validation and release hardening remain open. The
-[release contract](release-1.0.md) is the current gate-by-gate authority;
+This is a checkpoint, not a completion claim. Cool 1.0 is declared: the
+mandatory gates in [the release contract](release-1.0.md) are closed with
+recorded evidence, and that document's next-implementation checkpoints name the
+remaining work (general nested borrowed storage, some temporary receivers,
+broader editor recovery and further performance work).
 [references](references.md) and [editor support](editor.md) state precise limits.
 The [versioned specification draft](specification.md) and
-[compatibility policy](compatibility.md) are not yet frozen.
+[compatibility policy](compatibility.md) are frozen for the 1.0 language
+contract.
 
 `docs/release-1.0.md` records verification per milestone, including full regression,
 both bootstrap chains, sanitizer and external installation results. Historical
