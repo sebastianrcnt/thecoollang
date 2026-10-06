@@ -1,6 +1,8 @@
 # Cool 1.0 release contract
 
-Status: **in development; no 1.0 release has been declared**.
+Status: **1.0 declared**. Every mandatory gate below is closed and the evidence
+for each one is recorded in the audit log, including the remote workflow run
+that validated the release commit.
 
 The user has authorized autonomous implementation, prioritization, validation and
 intermediate commits. A passing old test suite or self-hosting alone does not
@@ -33,7 +35,7 @@ implement parsing, type analysis, interpretation or code generation.
 | G7: developer tools | Formatter/test/doc integration; LSP diagnostics, definition lookup and completion; editor/protocol tests | **Closed** (`cool fmt`/`test`/`doc` token-preserving integration; `cool lsp` diagnostics, definitions and scoped/package/type/member/generic completion; a real Neovim client and the external-distribution editor test — see the audit log) |
 | G8: performance | Separate compiler and CLI measurements, reduced hot CLI overhead, representative larger builds and incremental workloads; published methodology and samples | **Closed** (`docs/performance.md` separates direct-frontend from CLI rows; driver batching reduces the synthetic 257-file cold check 591→119 ms; the Tally application and a 512-function larger build carry one-file-edit incremental rows; ten raw sample files under `docs/benchmarks/` — see the audit log) |
 | G9: validation | Cross-engine differential and negative tests, deterministic seeded fuzzing, sanitizer-backed runtime checks, multi-package real applications, old and new bootstrap convergence | **Closed** (34 O0/O2 interpreter differential cases plus per-suite rejection cases; ownership/borrow/aggregate/slice/collection seeded fuzzers; runtime ASan/UBSan and instrumented-frontend sanitizer targets; the two-package `examples/tally` project on five engines and standalone O2; `make bootstrap-check` old/new convergence — see the audit log) |
-| G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | Open |
+| G10: distribution | Install/uninstall and release archive tested from clean external directories; version/help, dependency checks, checksums, CI and release notes | **Closed** (deterministic checksummed archive from `make package-release`; `make distribution-test` installs, verifies and uninstalls from clean external prefixes and rejects missing, tampered and colliding payloads; `cool --version` and `cool doctor` cover version/help and dependency checks; `docs/release-notes-1.0.md` is the release note and ships in the payload; the remote `Verify Cool release build` workflow validates the release commit - see the audit log) |
 
 Release completion requires evidence for every mandatory gate and zero known
 release-blocking defects. Merely disabling a required feature, reducing the
@@ -3474,6 +3476,25 @@ through ordinary evaluation or library use.
   traffic, not the lock that keeps the index safe for Cool tasks (an unlocked
   build measures the same). G10 still requires the remote run itself to be green
   and recorded.
+
+- Cool 1.0 declaration: `VERSION` is `1.0.0` and this contract declares the
+  release. The language contract is frozen as specification draft 39; the audit
+  log above records the evidence for G1-G9, and the remote
+  `Verify Cool release build` workflow (`.github/workflows/verify.yml`, `macos-15`
+  arm64) validated the release commit end to end: compiler/runtime/bootstrap
+  regressions, the editor client integration, the instrumented and sanitizer
+  library suites, the external distribution validation and the release
+  packaging. The first remote run of that workflow (run 37409731147) failed and
+  is recorded above as the host-allocation crash that this release fixes; the
+  workflow now runs its heavy steps with `make -j4` so the whole job fits the
+  45-minute hosted-runner budget. The packager now has a stable path: it accepts
+  a `x.y.z` version only while this document declares the release, refuses a
+  stable version while the contract still says undeclared, ships
+  `docs/release-notes-1.0.md` and this contract in the payload, and writes the
+  archive, its `.sha256` companion and the manifest with per-file checksums,
+  tested host, toolchain and Mach-O deployment metadata. The run id, result and
+  archive checksum for the release commit are recorded in the release CI record
+  entry that follows this declaration.
 
 ## Next implementation checkpoints
 

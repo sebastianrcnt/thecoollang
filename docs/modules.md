@@ -8,8 +8,8 @@ or compatibility with Go's module proxy/checksum protocols.
 
 `cool.mod` requires one `module PATH`. An optional, single `cool 1.0` directive
 selects the currently supported language/manifest interpretation; absence means
-1.0. This language selector is distinct from the installed toolchain's
-`0.1.0-dev` distribution version. Other language selectors and unknown directives
+1.0. This language selector is distinct from the installed toolchain's own
+distribution version (`VERSION`). Other language selectors and unknown directives
 are errors, including proposed future `format` directives.
 
 Requirements have the form `require PATH VERSION`, and local replacements have

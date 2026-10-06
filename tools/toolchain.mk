@@ -194,11 +194,12 @@ methods-test: build/cool-compiler build/language.BIN build/language-runtime.o bu
 	python3 tools/test_methods.py
 test: methods-test
 
-.PHONY: distribution-test package-dev
+.PHONY: distribution-test package-dev package-release
 distribution-test: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/test_distribution.py
 package-dev: build/cool-compiler build/language-runtime.o build/language-runtime.dylib
 	python3 tools/package_release.py
+package-release: package-dev
 
 .PHONY: reference-sets-test
 reference-sets-test: build/cool-compiler build/language.BIN build/language-runtime.o build/language-runtime.dylib

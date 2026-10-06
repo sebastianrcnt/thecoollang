@@ -1,15 +1,17 @@
-# Development distribution and installation
+# Distribution and installation
 
-Cool remains **0.1.0-dev**, not 1.0. The mandatory release gates are tracked in
-[the release contract](release-1.0.md). Packaging a working development artifact
-does not close language, safety, editor or incremental-session requirements.
+Cool 1.0 is declared; the mandatory gates G1-G10 are tracked in
+[the release contract](release-1.0.md) and their evidence is recorded in its
+audit log. Packaging a working artifact does not by itself close language,
+safety, editor or incremental-session requirements; each gate records its own
+evidence.
 
 ## Build and identify an artifact
 
 On the supported native Apple Silicon macOS build host:
 
 ```sh
-make package-dev
+make package-release
 # For an explicitly uncommitted development snapshot:
 python3 tools/package_release.py --allow-dirty
 ```
@@ -19,9 +21,11 @@ The packager builds the new-syntax compiler and native runtimes, then writes
 clean working tree unless `--allow-dirty` is given. The manifest records dirty
 state, version, source revision, payload identity, per-file SHA-256 checksums,
 build dependencies, tested host and actual Mach-O deployment metadata for the
-compiler/runtime artifacts. The current packager deliberately accepts only
-`0.x.y-dev` versions. A stable 1.0 publishing path must be added only after its
-release gates pass.
+compiler/runtime artifacts. The packager accepts a stable `x.y.z` version only while
+[the release contract](release-1.0.md) declares the release, and packages a
+`0.x.y-dev` development artifact otherwise; a stable version is refused while
+the contract still declares 1.0 undeclared. The payload also ships the release
+notes and the release contract.
 
 Archive IDs include version, commit and payload digest. Tar entry order, owner,
 permissions and timestamps are normalized; gzip's timestamp is fixed. The source

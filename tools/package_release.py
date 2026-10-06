@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Build a deterministic development binary archive; does not declare Cool 1.0."""
+"""Build a deterministic Cool binary archive: the declared 1.0 release once the
+release contract declares it, a 0.x.y-dev development artifact before that."""
 import argparse
 import gzip
 import hashlib
@@ -30,7 +31,11 @@ def main():
     dirty=bool(command('git','status','--porcelain'))
     if dirty and not args.allow_dirty:raise ValueError('source tree is dirty; commit it or use --allow-dirty for a development artifact')
     version=(ROOT/'VERSION').read_text().strip()
-    if not re.fullmatch(r'0\.[0-9]+\.[0-9]+-dev',version):raise ValueError('this development packager requires a 0.x.y-dev version; 1.0 release gates remain open')
+    stable=bool(re.fullmatch(r'[1-9][0-9]*\.[0-9]+\.[0-9]+',version))
+    if not stable and not re.fullmatch(r'0\.[0-9]+\.[0-9]+-dev',version):
+        raise ValueError('version must be a stable x.y.z release or a 0.x.y-dev development version: '+version)
+    if stable and 'no 1.0 release has been declared' in (ROOT/'docs/release-1.0.md').read_text():
+        raise ValueError('docs/release-1.0.md still declares 1.0 undeclared; refusing to package a stable release')
     subprocess.run(['make','-s','build/cool-compiler','build/language-runtime.o','build/language-runtime.dylib'],cwd=ROOT,check=True)
     revision=command('git','rev-parse','HEAD');epoch=int(os.environ.get('SOURCE_DATE_EPOCH',command('git','show','-s','--format=%ct','HEAD')))
     with tempfile.TemporaryDirectory(prefix='cool-package-') as temporary:
@@ -45,10 +50,14 @@ def main():
             if source.is_symlink():raise ValueError('release input must not be a symlink: '+name)
             target=stage/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,target)
         shutil.copyfile(ROOT/'tools/install_release.py',stage/'install.py')
-        (stage/'README.md').write_text('''# Cool development binary distribution
+        introduction=('''# Cool %s binary distribution
+
+This is the declared Cool %s release. The payload records what it contains and
+the evidence behind every mandatory gate in `docs/release-1.0.md`.''' % (version,version)) if stable else '''# Cool development binary distribution
 
 This is a development build, not Cool 1.0. The release gates in
-`docs/release-1.0.md` remain open. It contains the new-syntax self-hosted compiler,
+`docs/release-1.0.md` remain open.'''
+        (stage/'README.md').write_text(introduction+''' It contains the new-syntax self-hosted compiler,
 standard library and native runtimes; no legacy loader or compiler seed is used.
 
 Python 3.10+ and native Apple Silicon macOS are required. Native linking also
