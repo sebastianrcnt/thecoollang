@@ -156,6 +156,95 @@ static const uint64_t allocation_magic = UINT64_C(0xc001c0de5eed1234);
 static void *native_task;
 static void *native_tls[2];
 
+// Live host allocations, so that Free and MSize can recognize their own
+// pointers without reading memory before them. AOT data heaps and executable
+// JIT mappings carry no Allocation header, and such a heap can start a mapping
+// (macOS places a MAP_JIT region next to a PROT_NONE neighbour), so the bytes
+// before a foreign pointer may be unmapped. Stale bytes left behind by a
+// released zone can even still hold the header magic, so the index, not the
+// header, decides ownership.
+static void **host_live;
+static size_t host_live_slots, host_live_used, host_live_tombstones;
+
+#define HOST_LIVE_TOMBSTONE ((void *)1)
+
+static size_t host_live_hash(const void *p) {
+    uint64_t x = (uint64_t)(uintptr_t)p >> 4;
+    x *= UINT64_C(0x9e3779b97f4a7c15);
+    return (size_t)(x >> 32);
+}
+
+static void host_live_rehash(size_t slots) {
+    void **fresh = calloc(slots, sizeof(*fresh));
+    if (!fresh)
+        fail("out of memory in the host allocation index");
+    for (size_t i = 0; i < host_live_slots; i++) {
+        void *live = host_live[i];
+        if (live == NULL || live == HOST_LIVE_TOMBSTONE)
+            continue;
+        size_t j = host_live_hash(live) & (slots - 1);
+        while (fresh[j] != NULL)
+            j = (j + 1) & (slots - 1);
+        fresh[j] = live;
+    }
+    free(host_live);
+    host_live = fresh;
+    host_live_slots = slots;
+    host_live_tombstones = 0;
+}
+
+static void host_live_add(void *p) {
+    if (host_live_slots == 0 ||
+        (host_live_used + host_live_tombstones + 1) * 4 >= host_live_slots * 3)
+        host_live_rehash(host_live_slots ? host_live_slots * 2 : 1024);
+    size_t mask = host_live_slots - 1;
+    size_t i = host_live_hash(p) & mask;
+    size_t reusable = SIZE_MAX;
+    while (host_live[i] != NULL) {
+        if (host_live[i] == p)
+            return;
+        if (host_live[i] == HOST_LIVE_TOMBSTONE && reusable == SIZE_MAX)
+            reusable = i;
+        i = (i + 1) & mask;
+    }
+    if (reusable == SIZE_MAX)
+        reusable = i;
+    else
+        host_live_tombstones--;
+    host_live[reusable] = p;
+    host_live_used++;
+}
+
+static int host_live_take(void *p) {
+    if (host_live_slots == 0)
+        return 0;
+    size_t mask = host_live_slots - 1;
+    size_t i = host_live_hash(p) & mask;
+    while (host_live[i] != NULL) {
+        if (host_live[i] == p) {
+            host_live[i] = HOST_LIVE_TOMBSTONE;
+            host_live_used--;
+            host_live_tombstones++;
+            return 1;
+        }
+        i = (i + 1) & mask;
+    }
+    return 0;
+}
+
+static int host_live_has(const void *p) {
+    if (host_live_slots == 0)
+        return 0;
+    size_t mask = host_live_slots - 1;
+    size_t i = host_live_hash(p) & mask;
+    while (host_live[i] != NULL) {
+        if (host_live[i] == p)
+            return 1;
+        i = (i + 1) & mask;
+    }
+    return 0;
+}
+
 static void *host_alloc(int64_t size, void *task) {
     (void)task;
     if (size < 0 || (uint64_t)size > SIZE_MAX - sizeof(Allocation))
@@ -165,6 +254,7 @@ static void *host_alloc(int64_t size, void *task) {
         fail("out of memory in HolyC allocation");
     p->size = (uint64_t)size;
     p->magic = allocation_magic;
+    host_live_add(p + 1);
     return p + 1;
 }
 
@@ -175,22 +265,17 @@ static void *host_calloc(int64_t size, void *task) {
 }
 
 static void host_free(void *p) {
-    if (!p)
-        return;
+    if (!host_live_take(p))
+        return; // a foreign heap: its lifetime is the compiler process
     Allocation *a = (Allocation *)p - 1;
-    // AOT data heaps and executable JIT mappings do not carry our malloc
-    // header. Their lifetime is the compiler process; Free leaves them mapped.
-    if (a->magic != allocation_magic)
-        return;
     a->magic = 0;
     free(a);
 }
 
 static int64_t host_msize(const void *p) {
-    if (!p)
+    if (!host_live_has(p))
         return 0;
-    const Allocation *a = (const Allocation *)p - 1;
-    return a->magic == allocation_magic ? (int64_t)a->size : 0;
+    return (int64_t)((const Allocation *)p - 1)->size;
 }
 
 static char *host_strnew(const char *s, void *task) {
@@ -846,6 +931,27 @@ int main(int argc, char **argv) {
     run_initializers(&program);
     return 0;
 #endif
+    if (argc == 2 && !strcmp(argv[1], "--check-free-guard")) {
+        // Free and MSize must ignore a foreign heap pointer whose preceding
+        // bytes are unmapped, which is how macOS can lay out a MAP_JIT region.
+        size_t page = (size_t)sysconf(_SC_PAGESIZE);
+        uint8_t *guard = mmap(NULL, page * 2, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANON, -1, 0);
+        if (guard == MAP_FAILED) {
+            perror("mmap guard pages");
+            exit(1);
+        }
+        if (mprotect(guard, page, PROT_NONE)) {
+            perror("mprotect guard page");
+            exit(1);
+        }
+        uint8_t *foreign = guard + page;
+        host_free(foreign);
+        if (host_msize(foreign) != 0)
+            fail("MSize reported a foreign heap pointer");
+        puts("free guard: unmapped neighbour ignored");
+        return 0;
+    }
     if (argc >= 3 && !strcmp(argv[1], "--run")) {
         native_argc = argc - 2;
         native_argv = argv + 2;

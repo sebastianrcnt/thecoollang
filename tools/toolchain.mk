@@ -1,7 +1,7 @@
 # Standalone Cool host toolchain (Apple silicon macOS).
 .DEFAULT_GOAL := all
 COOLC_SEED := $(abspath coolc/seed/Compiler.BIN)
-.PHONY: all native-host test coolc-test codegen-test checks-test behavior-test fmt-test cli-test bootstrap-check clean
+.PHONY: all native-host test coolc-test codegen-test free-guard-test checks-test behavior-test fmt-test cli-test bootstrap-check clean
 all: build/cool build/coolc build/hcfmt.BIN
 native-host: build/coolc
 build:
@@ -17,6 +17,8 @@ build/hcfmt.BIN: coolc/Fmt/Native.cool coolc/Fmt/HCFmt.cool coolc/Fmt/HCTok.cool
 	tail -1 build/hcfmt-compile.log
 codegen-test: build/coolc build/coolc-x86_64
 	python3 tools/native/codegen.py
+free-guard-test: build/coolc
+	build/coolc --check-free-guard
 checks-test: build/coolc
 	tools/native/checks.sh
 behavior-test: build/coolc
@@ -27,7 +29,7 @@ cli-test: all
 	python3 tools/test_cli.py
 coolc-test: codegen-test checks-test behavior-test
 	coolc/Host/test.sh
-test: coolc-test fmt-test cli-test
+test: coolc-test fmt-test cli-test free-guard-test
 bootstrap-check: build/coolc
 	tools/native/bootstrap.sh
 clean:

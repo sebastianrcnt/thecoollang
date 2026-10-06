@@ -3442,6 +3442,35 @@ through ordinary evaluation or library use.
   non-owning pointer, so a literal's bytes must outlive any surviving reference);
   this is documented and sound, not a reclaimable-resource leak. G6 is closed.
 
+- Remote CI host-allocation crash: the first remote run of
+  `.github/workflows/verify.yml` (run 37409731147) failed in `make codegen-test`
+  because the seed-compiler host `build/coolc` died with `SIGBUS` (exit -10) on
+  its very first BIN compile. The crash report shows `EXC_BAD_ACCESS` /
+  `KERN_PROTECTION_FAILURE` at `0x10490fff8`, with the faulting instruction in
+  `host_free` called from JIT code: that address is the last bytes of a
+  `mapped file` region whose protection is `---/---`, and the module's `MAP_JIT`
+  region begins on the next page. `host_free`/`host_msize` decided ownership by
+  reading the 16-byte `Allocation` header before the pointer, but the Cool-side
+  heap legitimately hands Free pointers that start a mapping, so that read
+  touched an unmapped neighbour page. Ownership is now decided by a live
+  allocation index that Free and MSize consult before touching the pointer at
+  all; this also removes the latent hazard that stale bytes left by a released
+  zone could still carry the header magic and be freed. `build/coolc
+  --check-free-guard` maps a page next to a `PROT_NONE` page and requires Free
+  and MSize to ignore the foreign pointer; the new `make free-guard-test` (part
+  of `make test`) runs it, and the unguarded build dies with the same
+  `Bus error: 10` the remote runner reported. Local evidence: the full
+  `make -k -j4 test lsp-test bootstrap-check editor-distribution-test
+  borrowed-vector-sanitize-test nested-reference-slice-sanitize-test
+  stores-sanitize-test drop-depth-sanitize-test ownership-fuzz-sanitize-test
+  aggregate-fuzz-sanitize-test slice-fuzz-sanitize-test` run exits 0 in
+  `build/drop-depth/reg26.log`, both bootstrap paths converge with IR SHA256
+  `ea91aeff95689dab4baa17ab53e5602e15caca4ab227d6a4c9a829a3ad8a3c0f` (unchanged),
+  the self-hosted `language.BIN` is byte-identical to the pre-change host's
+  (`f6c1de9972d2f3f6e6f0aa9292734ea9c8b8cdf90d3c50a0848b2dd086086e0f`) and its
+  compile time is unchanged. G10 still requires the remote run itself to be
+  green and recorded.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit
