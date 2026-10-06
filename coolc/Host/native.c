@@ -165,6 +165,9 @@ static void *native_tls[2];
 // header, decides ownership.
 static void **host_live;
 static size_t host_live_slots, host_live_used, host_live_tombstones;
+// Cool tasks run on real threads and allocate through MAlloc, so the index is
+// shared mutable state. Only the index is locked; malloc keeps its own locks.
+static pthread_mutex_t host_live_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define HOST_LIVE_TOMBSTONE ((void *)1)
 
@@ -174,6 +177,7 @@ static size_t host_live_hash(const void *p) {
     return (size_t)(x >> 32);
 }
 
+// Callers hold host_live_lock.
 static void host_live_rehash(size_t slots) {
     void **fresh = calloc(slots, sizeof(*fresh));
     if (!fresh)
@@ -194,6 +198,7 @@ static void host_live_rehash(size_t slots) {
 }
 
 static void host_live_add(void *p) {
+    pthread_mutex_lock(&host_live_lock);
     if (host_live_slots == 0 ||
         (host_live_used + host_live_tombstones + 1) * 4 >= host_live_slots * 3)
         host_live_rehash(host_live_slots ? host_live_slots * 2 : 1024);
@@ -201,8 +206,10 @@ static void host_live_add(void *p) {
     size_t i = host_live_hash(p) & mask;
     size_t reusable = SIZE_MAX;
     while (host_live[i] != NULL) {
-        if (host_live[i] == p)
+        if (host_live[i] == p) {
+            pthread_mutex_unlock(&host_live_lock);
             return;
+        }
         if (host_live[i] == HOST_LIVE_TOMBSTONE && reusable == SIZE_MAX)
             reusable = i;
         i = (i + 1) & mask;
@@ -213,36 +220,46 @@ static void host_live_add(void *p) {
         host_live_tombstones--;
     host_live[reusable] = p;
     host_live_used++;
+    pthread_mutex_unlock(&host_live_lock);
 }
 
 static int host_live_take(void *p) {
-    if (host_live_slots == 0)
-        return 0;
-    size_t mask = host_live_slots - 1;
-    size_t i = host_live_hash(p) & mask;
-    while (host_live[i] != NULL) {
-        if (host_live[i] == p) {
-            host_live[i] = HOST_LIVE_TOMBSTONE;
-            host_live_used--;
-            host_live_tombstones++;
-            return 1;
+    pthread_mutex_lock(&host_live_lock);
+    int found = 0;
+    if (host_live_slots != 0) {
+        size_t mask = host_live_slots - 1;
+        size_t i = host_live_hash(p) & mask;
+        while (host_live[i] != NULL) {
+            if (host_live[i] == p) {
+                host_live[i] = HOST_LIVE_TOMBSTONE;
+                host_live_used--;
+                host_live_tombstones++;
+                found = 1;
+                break;
+            }
+            i = (i + 1) & mask;
         }
-        i = (i + 1) & mask;
     }
-    return 0;
+    pthread_mutex_unlock(&host_live_lock);
+    return found;
 }
 
 static int host_live_has(const void *p) {
-    if (host_live_slots == 0)
-        return 0;
-    size_t mask = host_live_slots - 1;
-    size_t i = host_live_hash(p) & mask;
-    while (host_live[i] != NULL) {
-        if (host_live[i] == p)
-            return 1;
-        i = (i + 1) & mask;
+    pthread_mutex_lock(&host_live_lock);
+    int found = 0;
+    if (host_live_slots != 0) {
+        size_t mask = host_live_slots - 1;
+        size_t i = host_live_hash(p) & mask;
+        while (host_live[i] != NULL) {
+            if (host_live[i] == p) {
+                found = 1;
+                break;
+            }
+            i = (i + 1) & mask;
+        }
     }
-    return 0;
+    pthread_mutex_unlock(&host_live_lock);
+    return found;
 }
 
 static void *host_alloc(int64_t size, void *task) {
