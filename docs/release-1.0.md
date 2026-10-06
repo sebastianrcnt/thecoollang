@@ -3467,9 +3467,13 @@ through ordinary evaluation or library use.
   `build/drop-depth/reg26.log`, both bootstrap paths converge with IR SHA256
   `ea91aeff95689dab4baa17ab53e5602e15caca4ab227d6a4c9a829a3ad8a3c0f` (unchanged),
   the self-hosted `language.BIN` is byte-identical to the pre-change host's
-  (`f6c1de9972d2f3f6e6f0aa9292734ea9c8b8cdf90d3c50a0848b2dd086086e0f`) and its
-  compile time is unchanged. G10 still requires the remote run itself to be
-  green and recorded.
+  (`f6c1de9972d2f3f6e6f0aa9292734ea9c8b8cdf90d3c50a0848b2dd086086e0f`). The index is
+  consulted by every Free and MSize, so it costs something: twelve interleaved
+  runs of `build/coolc language/Native.cool` measure a 0.115 s median before the
+  change and 0.132 s after (~15%, about 17 ms per compile). That is the hash
+  traffic, not the lock that keeps the index safe for Cool tasks (an unlocked
+  build measures the same). G10 still requires the remote run itself to be green
+  and recorded.
 
 ## Next implementation checkpoints
 
