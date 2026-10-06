@@ -3365,6 +3365,20 @@ through ordinary evaluation or library use.
   This guards G1's conformance mapping against stale evidence links; the
   whole-language conformance and semantic audit itself stays Open.
 
+- Specification: added a normative "Unsafe and foreign-call obligations" section
+  (draft 39) stating, in language terms, that `unsafe` gates `&raw`, `cast[*T]`
+  (exact pointee element match, no tracked raw lifetime), raw-pointer
+  dereference/index/arithmetic and `borrow_raw[R](pointer, anchor)` (reference
+  result type, matching element type, exclusive anchor for an exclusive result,
+  and the programmer's validity/alignment/initialization/loan obligations); that
+  a shared-derived pointer must not mutate shared storage; and the `extern "C"`/
+  `export` signature and symbol rules (scalars and raw pointers, explicit string
+  pointer, `C`-only convention, no collisions or reserved names, floating
+  environment outside the contract). Each rule was checked against the
+  implementation on both frontends; `export-test`, `safe-vector-test` and
+  `references-test` exercise them. This completes G1's independent-statement item;
+  the whole-language conformance mapping and the remaining freeze tasks stay Open.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

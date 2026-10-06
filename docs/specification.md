@@ -807,10 +807,54 @@ use-after-move rejection, copy-versus-move by field type, once-only drop and
 reverse cleanup ordering, across both frontends, five engines and optimized
 native builds.
 
+## Unsafe and foreign-call obligations
+
+`unsafe` introduces a lexical block in which the raw-pointer and foreign-call
+operations below are permitted. It does not disable type, ownership, borrowing or
+initialization checks, and it does not permit violating an existing safe
+reference's rules. The following operations require an enclosing `unsafe` block:
+
+- `&raw place` creates a raw address, and `cast[*T](reference)` exposes a
+  reference's pointee address. The cast element type must match the pointee type
+  exactly. The resulting raw pointer carries no tracked lifetime; the programmer
+  must use it only while the storage is valid.
+- Dereferencing, indexing and integer arithmetic on typed raw pointers.
+- `borrow_raw[R](pointer, anchor)` constructs a reference `R` from a raw pointer,
+  rooted in the named reference `anchor`. `R` must be a reference type, the
+  pointer element type must match, and an exclusive result requires an exclusive
+  anchor. The programmer must additionally prove the pointer is valid, properly
+  aligned, initialized and inside storage protected by the anchor's loan; an
+  exclusive result also requires the pointed-to storage itself to be exclusively
+  protected. Naming an unrelated anchor does not make a pointer valid. The
+  compiler retains the anchor's provenance and checks caller-side conflicts, but
+  cannot verify arbitrary raw-pointer data structures.
+
+A raw pointer derived from a shared reference must not be used to mutate that
+shared storage. This obligation is on the programmer, not the compiler.
+
+`extern "C"` and `export` declare externally supplied or exported functions.
+Their signatures accept scalar values and raw pointers, not by-value Cool
+aggregates, and a string must be passed as an explicit pointer. Foreign
+conventions other than `C` are rejected. Exported symbols must not collide, must
+agree on argument and result types, and must not use reserved C runtime names.
+Foreign code that changes the floating-point environment is outside this audited
+contract.
+
+`make safe-vector-test` executes an owning-vector and binary-file program with no
+`unsafe` block; `make export-test` checks the C ABI at O0/O2; `make
+references-test` and the rejection suites check the raw-pointer and `borrow_raw`
+element and anchor rules across both frontends, five engines and optimized
+native builds.
+
 ## Draft revisions
 
 - Draft 37: state the checked runtime-failure contract (triggers, abort with
   status 2, no unwinding) and the source-position reporting of each backend.
+- Draft 39: state the unsafe and foreign-call obligations in language terms
+  (`&raw`/`cast[*T]` element matching, no tracked raw lifetime, `borrow_raw`
+  anchor and validity obligations, raw-pointer dereference/index/arithmetic, and
+  the `extern "C"`/`export` signature and symbol rules) independent of
+  compiler-internal representations.
 - Draft 38: state the value copy/move/initialization/cleanup rules in language
   terms (copyable scalars, pointers and references; move-only owners; aggregate
   copyability by field; slice views; default zero initialization; once-only drop
@@ -889,10 +933,11 @@ a link is not proof that a release gate is closed.
    across tree, bytecode, native JIT and optimized LLVM.
 3. State layout/alignment, copy/move/initialization, evaluation order, cleanup and
    unsafe/C obligations independently of compiler-internal representations.
-   Layout/alignment, evaluation order, cleanup and value copy/move/initialization
-   are now stated normatively (see "Value copying, moving and initialization" and
-   "Memory layout on the supported target"); the consolidated unsafe/C obligation
-   statement and the remaining conformance mapping are pending.
+   Layout/alignment, evaluation order, cleanup, value copy/move/initialization and
+   the unsafe/foreign-call obligations are now stated normatively (see "Value
+   copying, moving and initialization", "Unsafe and foreign-call obligations" and
+   "Memory layout on the supported target"); the remaining conformance mapping is
+   pending.
 4. Consolidate package visibility, module-format/versioning and REPL replacement
    contracts, with executable positive and rejection examples.
 5. Resolve remaining ownership/storage restrictions and language decisions;
