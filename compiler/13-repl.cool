@@ -547,6 +547,35 @@ fn Repl(prompt: i8) {
                 Number(stats, ctx.v_bytecode_compilations);
                 Append(stats, cast[*u8](" jit_compilations="));
                 Number(stats, ctx.v_jit_compilations);
+                Append(stats, cast[*u8](" tokens="));
+                Number(stats, ctx.v_ntok);
+                Append(stats, cast[*u8](" aggregates="));
+                Number(stats, ctx.v_naggregates);
+                var locals: i64 = 0;
+                var local = ctx.v_repl_locals;
+                while (local != null) { locals = locals + 1; local = local.next; }
+                Append(stats, cast[*u8](" locals="));
+                Number(stats, locals);
+                var literals: i64 = 0;
+                var bucket: i64 = 0;
+                while (bucket < 1024) {
+                    var entry = ctx.v_repl_literals[bucket];
+                    while (entry != null) { literals = literals + 1; entry = entry.next; }
+                    bucket = bucket + 1;
+                }
+                Append(stats, cast[*u8](" literals="));
+                Number(stats, literals);
+                var blocks: i64 = 0;
+                var source_bytes: i64 = 0;
+                var source = ctx.v_repl_sources;
+                while (source != null) {
+                    if (source.live != 0) { blocks = blocks + 1; source_bytes = source_bytes + (source.end - source.begin); }
+                    source = source.next;
+                }
+                Append(stats, cast[*u8](" source_blocks="));
+                Number(stats, blocks);
+                Append(stats, cast[*u8](" source_bytes="));
+                Number(stats, source_bytes);
                 Char(stats, 10);
                 Out(stats.data);
                 Free(stats.data);

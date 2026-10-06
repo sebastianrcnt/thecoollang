@@ -135,7 +135,7 @@ U0 ReplStep(Text *text) {
     ReplDiscardNewDrops(TRUE,FALSE); ReplLoansFinish(TRUE,locals); repl_locals = locals; ReplTrimStorage(); FreeBytecode(f);
 }
 U0 Repl(Bool prompt) {
-    Text *text, *stats; I64 i, compiled; DropSlot *d;
+    Text *text, *stats; I64 i, compiled, bucket, locals_count, literals_count, blocks, source_bytes; DropSlot *d; Local *local; ReplLiteral *entry; ReplSource *source;
     functions = CAlloc(MAX_FUNCTIONS * sizeof(Function)); nfun = 1;
     functions[0].name = "__session"; functions[0].package = "__main";
     repl_snapshot = CAlloc(MAX_FUNCTIONS * sizeof(Function));
@@ -151,7 +151,17 @@ U0 Repl(Bool prompt) {
             for (i = 1; i < nfun; i++) if (functions[i].bytecode) compiled++;
             Append(stats, "functions="); Number(stats, nfun - 1); Append(stats, " compiled="); Number(stats, compiled);
             Append(stats, " bytecode_compilations="); Number(stats, bytecode_compilations);
-            Append(stats, " jit_compilations="); Number(stats, jit_compilations); Char(stats, '\n'); Out(stats->data); Free(stats->data); Free(stats); goto repl_next;
+            Append(stats, " jit_compilations="); Number(stats, jit_compilations);
+            locals_count=0; for(local=repl_locals;local;local=local->next)locals_count++;
+            literals_count=0; for(bucket=0;bucket<1024;bucket++)for(entry=repl_literals[bucket];entry;entry=entry->next)literals_count++;
+            blocks=0; source_bytes=0; for(source=repl_sources;source;source=source->next)if(source->live){blocks++;source_bytes+=source->end-source->begin;}
+            Append(stats, " tokens="); Number(stats, ntok);
+            Append(stats, " aggregates="); Number(stats, naggregates);
+            Append(stats, " locals="); Number(stats, locals_count);
+            Append(stats, " literals="); Number(stats, literals_count);
+            Append(stats, " source_blocks="); Number(stats, blocks);
+            Append(stats, " source_bytes="); Number(stats, source_bytes);
+            Char(stats, '\n'); Out(stats->data); Free(stats->data); Free(stats); goto repl_next;
         }
         locals = repl_locals; repl_moves = MoveSnapshot(); repl_executing = FALSE;
         MemCpy(repl_snapshot, functions, nfun * sizeof(Function));

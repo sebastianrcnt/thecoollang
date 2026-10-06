@@ -63,6 +63,12 @@ spec-map-test:
 	python3 tools/test_spec_map.py
 test: spec-map-test
 
+# Fast REPL session-resource audit on the compiler's internal counters.
+.PHONY: repl-resources-test
+repl-resources-test: build/cool-compiler
+	python3 tools/bench_repl_resources.py --counts 200,800
+test: repl-resources-test
+
 .PHONY: benchmark
 benchmark: all
 	python3 tools/bench_language.py --output build/language-benchmark.json

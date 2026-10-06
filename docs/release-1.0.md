@@ -3411,6 +3411,21 @@ through ordinary evaluation or library use.
   and reducing them without weakening the bounded-destruction guarantee remains
   future work.
 
+- Fast REPL resource audit: both frontends' `cool repl` `:stats` now report the
+  compiler's own session counters in addition to function counts — token-table
+  occupancy, aggregate count, live session locals, interned literals and live
+  source blocks/bytes (identical on the production and bootstrap frontends). `tools/bench_repl_resources.py` (`make repl-resources-test`)
+  reads those counters from one process per size and asserts zero per-input
+  growth for the statement workloads (updates, bindings, methods, branches,
+  replacements, forget-churn, rejected literals and rejected types). This is
+  deterministic and, unlike an OS-RSS sweep, runs a small geometric size sweep
+  in well under a second, so the session-resource audit no longer needs
+  thousands of submissions. It confirms that structural resources are
+  reclaimable and flat; distinct struct/function declarations and distinct
+  accepted string-literal contents are the only per-input growth, which is
+  session program data. G6's remaining item is bounded accepted-literal
+  lifetime, which needs reference tracking.
+
 ## Next implementation checkpoints
 
 - Reduce the remaining bounded-worklist cost for recursive-type scope-exit

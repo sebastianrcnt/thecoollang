@@ -122,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix='cool tally 한글 ') as tmp:
         assert result.returncode == 0, (front,result)
         output = result.stdout.splitlines()
         assert output[:-1] == values, (front,output[:20],values[:20],result.stderr[:2000])
-        stats = re.fullmatch(r'functions=(\d+) compiled=(\d+) bytecode_compilations=(\d+) jit_compilations=(\d+)',output[-1])
+        stats = re.match(r'functions=(\d+) compiled=(\d+) bytecode_compilations=(\d+) jit_compilations=(\d+)',output[-1])
         assert stats and int(stats[4]) >= args.rounds, (front,output[-1])
         assert result.stderr.count('error:') == sum(errors.values()), (front,result.stderr)
         for diagnostic,count in errors.items():

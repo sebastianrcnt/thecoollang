@@ -23,7 +23,7 @@ def check(front, label, source, output, errors=()):
 
 for front in fronts:
     check(front, 'repeated session statistics keep no formatting buffers', ':stats\n'*512,
-          'functions=0 compiled=0 bytecode_compilations=0 jit_compilations=0\n'*512)
+          'functions=0 compiled=0 bytecode_compilations=0 jit_compilations=0 tokens=3 aggregates=0 locals=0 literals=0 source_blocks=0 source_bytes=0\n'*512)
     check(front, 'branch snapshots have submission lifetime',
           'var total=0;\n' + 'if(total>=0){total=total+1;}else{total=0;}\n'*100000 + 'total',
           '100000\n')
@@ -73,7 +73,7 @@ for front in fronts:
     source += 'broken[Input](Input{value:1})\n' * 160
     source += 'survivor\nfn fresh()->i64{return 42;}\nfresh()\n:stats'
     check(front, 'rejected specialization disposes its artifacts', source,
-          '9\n42\nfunctions=2 compiled=1 bytecode_compilations=1 jit_compilations=0\n', ['unknown field'] * 160)
+          '9\n42\nfunctions=2 compiled=1 bytecode_compilations=1 jit_compilations=0 tokens=52 aggregates=1 locals=1 literals=2 source_blocks=4 source_bytes=52\n', ['unknown field'] * 160)
 
     prefix = 'import "std/mem";\nvar total=0;\nfn bomb(n:i64)->i64{var owner=new[i64](n);assert(n<4);return *owner;}\n'
     failing = '{total=bomb(1);total=bomb(2);total=bomb(3);total=bomb(4);}\n'

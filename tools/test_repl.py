@@ -29,8 +29,8 @@ p = subprocess.run([ROOT/'tools/cool', 'repl'], input=source, text=True, capture
 assert p.returncode == 0, p
 assert p.stdout.splitlines() == [
     '42', '1', '1', '1', '1',
-    'functions=2 compiled=2 bytecode_compilations=2 jit_compilations=2',
-    '9', 'functions=2 compiled=2 bytecode_compilations=3 jit_compilations=2',
+    'functions=2 compiled=2 bytecode_compilations=2 jit_compilations=2 tokens=27 aggregates=0 locals=1 literals=2 source_blocks=3 source_bytes=27',
+    '9', 'functions=2 compiled=2 bytecode_compilations=3 jit_compilations=2 tokens=27 aggregates=0 locals=1 literals=2 source_blocks=3 source_bytes=27',
     '9', '41', '7', '9'], (p.stdout, p.stderr)
 assert 'signature change requires a new session' in p.stderr
 assert 'incompatible types' in p.stderr

@@ -62,7 +62,7 @@ fn main() { io.println(sum(10000)); }
     session = ('fn value() -> i64 { return 1; }\nfn caller() -> i64 { return value(); }\n'
                + 'caller()\n' * 4 + 'fn value() -> i64 { return 2; }\ncaller()\n:stats\n:quit\n')
     measure('repl_compile_hot_replace_and_call_with_startup', front + ['repl-quiet'],
-            '1\n1\n1\n1\n2\nfunctions=2 compiled=2 bytecode_compilations=3 jit_compilations=2\n', input=session)
+            '1\n1\n1\n1\n2\nfunctions=2 compiled=2 bytecode_compilations=3 jit_compilations=2 tokens=27 aggregates=0 locals=0 literals=2 source_blocks=3 source_bytes=27\n', input=session)
 report = {'platform': platform.platform(), 'machine': platform.machine(),
           'repeats': args.repeats, 'workload': 'sum integers [0, 10000)',
           'note': 'All measurements include process startup; setup excluded. No in-process latency claim.',
